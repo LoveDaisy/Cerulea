@@ -16,8 +16,8 @@ Run::
     uv run python experiments/twilight_nocturnal.py
     uv run python experiments/twilight_nocturnal.py --quick      # ~2 min
 
-Output: ``figures/08_twilight_deep.png`` and
-``experiments/out/08_twilight_deep.json``.
+Output: ``figures/11_twilight_deep.png`` and
+``experiments/out/11_twilight_deep.json``.
 """
 from __future__ import annotations
 
@@ -67,7 +67,16 @@ def fisheye(atmo, sun_elevation_deg, size, quality, seed=0):
                                  zen.ravel(), az.ravel(), quality=quality,
                                  seed=seed)
     shape = zen.shape + (rad.shape[-1],)
-    rad = np.where(mask[..., None], rad.reshape(shape), 0.0)
+    rad = rad.reshape(shape)
+    # The engine's coarse angular grid can produce isolated outliers in the
+    # last degree above the horizon, where the Monte Carlo sees the longest
+    # optical paths.  Clip them to a robust high percentile of the whole field
+    # before tone mapping, otherwise a handful of pixels set the exposure.
+    vals = rad[np.isfinite(rad) & (rad > 0)]
+    if vals.size:
+        cap = np.percentile(vals, 99.7) * 4.0
+        rad = np.clip(np.nan_to_num(rad, nan=0.0, posinf=cap), 0.0, cap)
+    rad = np.where(mask[..., None], rad, 0.0)
     err = np.where(mask[..., None], err.reshape(shape), 0.0)
     lum = luminance(rad)
     rgb = color.render_rgb(rad, atmo.wl, tonemap="aces",
@@ -84,7 +93,16 @@ def deterministic_fisheye(atmo, sun_elevation_deg, size):
     rad = sky_radiance_total(atmo, 90.0 - sun_elevation_deg,
                              zen.ravel(), az.ravel())
     shape = zen.shape + (rad.shape[-1],)
-    rad = np.where(mask[..., None], rad.reshape(shape), 0.0)
+    rad = rad.reshape(shape)
+    # The engine's coarse angular grid can produce isolated outliers in the
+    # last degree above the horizon, where the Monte Carlo sees the longest
+    # optical paths.  Clip them to a robust high percentile of the whole field
+    # before tone mapping, otherwise a handful of pixels set the exposure.
+    vals = rad[np.isfinite(rad) & (rad > 0)]
+    if vals.size:
+        cap = np.percentile(vals, 99.7) * 4.0
+        rad = np.clip(np.nan_to_num(rad, nan=0.0, posinf=cap), 0.0, cap)
+    rad = np.where(mask[..., None], rad, 0.0)
     rgb = color.render_rgb(rad, atmo.wl, tonemap="aces",
                            reference_percentile=99.0,
                            preserve_chromaticity=True)
@@ -226,7 +244,7 @@ def main(argv=None):
 
     fig.suptitle("The deep twilight: a spherical Monte Carlo for the light "
                  "that travels sideways", fontsize=12)
-    save(fig, "08_twilight_deep.png")
+    save(fig, "11_twilight_deep.png")
     plt.close(fig)
 
     out = dict(
@@ -237,8 +255,8 @@ def main(argv=None):
         quality=quality, panel_size=size,
         runtime_s=time.time() - t0,
     )
-    (OUT / "08_twilight_deep.json").write_text(json.dumps(out, indent=2))
-    print(f"  data -> {OUT / '08_twilight_deep.json'}")
+    (OUT / "11_twilight_deep.json").write_text(json.dumps(out, indent=2))
+    print(f"  data -> {OUT / '11_twilight_deep.json'}")
     return out
 
 

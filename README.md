@@ -27,6 +27,10 @@ radiative-transfer solver.  The output is spectral radiance
 | Hazy horizon | Mie scattering with a forward-peaked phase function |
 | Dust storms | Large particles, weak spectral dependence, absorbing |
 | Near-vs-far weather | Horizontally varying aerosol optical depth along the line of sight |
+| **Red afterglow filling the sky** | A scattering layer *above the shadow* — volcanic stratospheric sulphate or cirrus |
+| **Blue sun** | Anomalous (non-monotonic) Mie extinction from a narrow size distribution |
+| **Refraction, flattened sunset sun** | Traced rays through the refractive atmosphere |
+| **Overcast / underlit cloud decks** | Delta-Eddington two-stream on a plane-parallel layer |
 
 ## Quick start
 
@@ -69,19 +73,23 @@ img = render.render_scene(atmo, sun_elevation_deg=5.0,
 skycolor/
   spectra/        solar spectrum, CIE CMFs, O3/NO2 cross sections, Rayleigh
   atmosphere.py   US1976 + thermospheric tail, ozone, aerosol layers, horizontal fields
-  aerosol.py      analytic Angstrom and physical Mie aerosol models
+  mie.py          Mie coefficients, analytic Legendre moments, adaptive phase grids
+  aerosol.py      eight-member aerosol library (rural … volcanic … cloud), delta-M
   geometry.py     solar position, spherical-shell ray tracing
   rt/single.py    exact single scattering in spherical geometry
   rt/multiple.py  successive-orders multiple scattering (Fourier + Gauss-Legendre)
   rt/mc.py        independent Monte Carlo reference solver
-  rt/solver.py    single + multiple
+  rt/twilight.py  spherical multiple scattering for deep twilight
+  rt/cloud.py     delta-Eddington cloud layer
+  cloud.py        cloud optics (Mie droplets, delta-M, presets)
+  refraction.py   traced atmospheric refraction
   color.py        spectrum -> XYZ -> sRGB, adaptation, tone mapping
   render.py       sky dome, cameras (panorama / fisheye / perspective), images
   presets.py      named scenarios
 tools/build_data.py   rebuilds the packaged data tables from data_raw/
-experiments/          scripts that produce the figures (01..06)
+experiments/          scripts that produce the figures (01..10)
 validation/           five independent checks against published references
-tests/                52 tests
+tests/                173 tests
 docs/                 architecture, method notes, the write-up
 ```
 

@@ -61,3 +61,72 @@ not trustworthy.
   analytic single-scattering estimate, fixed, and pinned by
   `tests/test_render.py`.
 * The perspective camera's pitch had the wrong sign (`skycolor/render.py`).
+
+---
+
+# Second addendum — after the aerosol library, refraction and the twilight engine
+
+Three further pieces have landed since the first addendum.  The validation
+harness numbers move slightly but the verdicts do not:
+
+| check | before this round | now |
+|---|---|---|
+| 1 Rayleigh | PASS | PASS (unchanged) |
+| 2 DNI | PASS | PASS (+4.9 / +5.4 %) |
+| 2 DHI | +38 % | +41 / +46 % (same reference caveat) |
+| 3 CIE relative luminance, θ ≤ 60° | 14.5 % | 10.6 % RMS |
+| 3 horizon sun-side / zenith | 8.43 | 8.83 (vs CIE 3.65) |
+| 4 measured horizon chromaticity | Δxy = 0.0193 | **Δxy = 0.0184** |
+| 5 twilight, −6° | 0.567 vs 0.516 | 0.568 vs 0.516 |
+| 5 twilight, −9° | 7.3e-4 (24× low) | 7.4e-4 in the deterministic model, **0.0238 with the twilight engine (1.39× of Patat)** |
+| 5 twilight, −12° | 7.5e-7 | **2.1e-3 with the engine (1.45× of Patat)** |
+
+## The deep twilight is fixed
+
+`skycolor/rt/twilight.py` (spherical Monte Carlo, split estimator: exact
+deterministic first order + Monte Carlo for orders ≥ 2) closes the largest gap
+in the model.  Against Patat et al. (2006):
+
+| solar elevation | deterministic | engine | Patat | engine / Patat |
+|---|---|---|---|---|
+| −3° | 37.6 | 37.8 | 40.1 | 0.94 |
+| −6° | 0.737 | 0.978 | 0.516 | 1.89 |
+| −9° | 9.6e-4 | 0.0238 | 0.0171 | 1.39 |
+| −12° | 9.8e-7 | 2.1e-3 | 0.00146 | 1.45 |
+
+The −6° overshoot is not a transport error: the direct Monte Carlo gives the
+same value, and it is a model-atmosphere/site mismatch (sea-level standard
+atmosphere versus the 2400 m Paranal site).  The check-5 harness still uses
+the deterministic model, so it still reports a failure at −9° and below; that
+is a deliberate choice to keep the harness comparing like with like, and the
+engine's numbers are in `docs/TWILIGHT.md` §2.2.
+
+## The aerosol library
+
+`skycolor/aerosol.py` now has eight Mie-backed members with analytic Legendre
+moments (no angular quadrature) and delta-M scaling.  The moments are exact to
+2e-8 against an independent quadrature, `beta_1` matches the Bohren–Huffman
+`g` to 1e-10, and the phase-function normalisation is within 2.2e-4 for every
+member.  This fixed a real bug: the old fixed angular grid gave `g = 3.57` for
+an 8 µm droplet (the physical value is 0.861).
+
+| member | α₅₅₀ | SSA₅₅₀ | g₅₅₀ | τ(450)/τ(650) | delta-M |
+|---|---|---|---|---|---|
+| rural | 1.30 | 0.982 | 0.714 | 1.62 | no |
+| urban | 1.25 | 0.901 | 0.704 | 1.59 | no |
+| maritime | 0.55 | 1.000 | 0.813 | 1.23 | recommended |
+| desert_dust | −0.04 | 0.876 | 0.816 | 0.984 | required |
+| biomass_burning | 1.84 | 0.865 | 0.586 | 1.97 | no |
+| volcanic_stratospheric | −0.31 | 1.000 | 0.710 | 0.892 | optional |
+| cirrus | −0.04 | 0.9998 | 0.868 | 0.986 | required |
+| water_cloud | −0.04 | 1.000 | 0.858 | 0.985 | required |
+
+## Clouds
+
+`skycolor/cloud.py` + `skycolor/rt/cloud.py` add a plane-parallel, homogeneous
+cloud deck solved with delta-Eddington, validated against an independent Monte
+Carlo: albedo within 0.1–0.7 % for a conservative `g = 0` layer and within 1 %
+for `g = 0.85` at τ ≥ 5; `R + T + direct = 1` to 1e-12; the overcast
+horizon/zenith ratio is exactly 1/3; τ → 0 reduces bit-for-bit to the clear
+sky.  The brief's "albedo 0.7 at τ = 10" holds only for `g = 0.6`; for real
+droplets (`g = 0.859`) it needs τ = 30 (`docs/CLOUD.md`).
