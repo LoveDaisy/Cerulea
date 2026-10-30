@@ -244,10 +244,22 @@ def _local_linear_weights(coarse_vec, query_vec, bandwidth=None, weights=None):
         delta = coarse_vec[idx] - nq
         X = np.column_stack([np.ones(idx.size), delta @ t1, delta @ t2])
         M = X.T @ (w[:, None] * X)
+        # A tiny ridge keeps the local-linear system well conditioned when the
+        # neighbourhood is nearly collinear (which happens at the horizon and
+        # on the anti-solar meridian).  Without it a single noisy coarse value
+        # can be extrapolated by many orders of magnitude.
+        ridge = 1e-6 * max(float(np.trace(M)), 1e-300)
+        M = M + ridge * np.eye(3)
         try:
             # smoother row = e0^T (X^T W X)^-1 X^T W
             Y = np.linalg.solve(M, (X * w[:, None]).T)         # (3, n_idx)
             row = Y[0]
+            # Reject an extrapolating solution: a single weight much larger
+            # than the sum of the (positive) kernel weights means the fit is
+            # amplifying noise rather than interpolating.
+            if not np.all(np.isfinite(row)) or np.max(np.abs(row)) > 10.0 * max(
+                    float(np.max(w)), 1e-300):
+                row = w / w.sum()
         except np.linalg.LinAlgError:  # pragma: no cover
             row = w / w.sum()
         W[q, idx] = row

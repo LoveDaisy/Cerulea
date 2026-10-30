@@ -32,6 +32,11 @@ radiance, stderr = twilight_radiance(
 Both arrays are `(n_view, n_wl)` in W m⁻² sr⁻¹ nm⁻¹ and the view angles
 broadcast against each other, exactly like `rt.solver.sky_radiance_total`.
 
+The figure is produced by `experiments/twilight_nocturnal.py`
+(`figures/08_twilight_deep.png`): the zenith brightness from 0 to −18° for the
+deterministic model, the engine and the Patat fit, plus fisheye renders at −9°
+and −12°.
+
 ---
 
 ## 1. Estimator design
@@ -178,7 +183,8 @@ should be used instead of the deterministic model.
 
 ### 2.2 Patat, Ugolnikov & Postylyakov (2006)
 
-Zenith V-band luminance, `quality="medium"`.  Reference: the Table 1
+Zenith V-band luminance, 5 anchor wavelengths and 3 × 10⁷ photons (between the
+`low` and `medium` presets).  Reference: the Table 1
 second-order fit of Patat et al. (2006, A&A 455, 385) converted with
 `L = 1.08 × 10⁵ × 10^(−0.4 m_V)` cd m⁻² (the same reference and conversion as
 `validation/check5_twilight.py`).  The −3° and −18° points are extrapolations
@@ -197,7 +203,7 @@ range (−6° to −12°).  This is the tolerance used by `validation/check5`
 (0.5 dex) tightened by the extra physics the engine supplies.
 
 **Verdict: all four elevations are within a factor of 2, and the deep
-twilight — where the deterministic model is 24× too dark at −9° and 1500× too
+twilight — where the deterministic model is 23× too dark at −9° and 1900× too
 dark at −12° — is now within 1.4–1.5×.**
 
 The engine passes the stated tolerance at every elevation.  The single-scattering
@@ -282,16 +288,24 @@ approximately valid.
 
 | quality | photons (`n_anchor × n_photons`) | measured | full 30 × 60 × 40 sky |
 |---|---:|---:|---:|
-| `low` | 2.0 × 10⁷ | ~2.1 µs/photon | **~45 s** |
-| `medium` | 8.4 × 10⁷ | ~2.1 µs/photon | **~3 min** |
-| `high` | 4.0 × 10⁸ | ~2.1 µs/photon | ~15 min |
-| `ultra` | 1.6 × 10⁹ | ~2.1 µs/photon | ~1 h |
+| `low` | 2.0 × 10⁷ | ~3 µs/photon | **~1 min** |
+| `medium` | 8.4 × 10⁷ | ~3 µs/photon | **~4 min** |
+| `high` | 4.0 × 10⁸ | ~3 µs/photon | ~20 min |
+| `ultra` | 1.6 × 10⁹ | ~3 µs/photon | ~80 min |
 
-Measured on the zenith at 550 nm (the per-photon cost is dominated by the
-grazing coarse directions, which is conservative): 3 × 10⁷ photons in 64 s at
-−9° and 69 s at −6°, i.e. **2.1–2.3 µs per photon** on one core.  The cost is
-linear in `n_anchor × n_photons` and independent of the number of view
-directions and output wavelengths.
+The per-photon cost was measured directly: 3 × 10⁷ photons took 64 s at −9°
+and 69 s at −6° (≈ 2 µs/photon), and 5 × 10⁶ photons on a 48-direction grid
+took 14–16 s (≈ 3 µs/photon, the grazing coarse directions are the expensive
+ones).  The cost is linear in `n_anchor × n_photons` and independent of the
+number of view directions and output wavelengths, so a **30 × 60 direction,
+40 wavelength sky takes about four minutes at `medium`** — the stated target.
+
+Below about −13° the scattered light itself collapses (the shadow boundary
+reaches the top of the model atmosphere at −14°), and a finite photon budget
+detects nothing: the engine then returns zero and raises a `RuntimeWarning`
+rather than silently pretending to have measured it.  That is physically
+correct for a model without airglow, and it is why the −18° reference (the
+natural night sky) is not a test of the engine.
 
 The cost is `n_anchor × n_photons`; the number of output directions and the
 number of output wavelengths are essentially free.  These are single-core
