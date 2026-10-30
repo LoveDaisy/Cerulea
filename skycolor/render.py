@@ -62,11 +62,18 @@ def sample_dome(dome: dict, view_zenith, view_azimuth_rel) -> np.ndarray:
 
 
 def hemispherical_irradiance(radiance: np.ndarray, zenith_deg, azimuth_rel_deg):
-    """Integrate a dome to get the diffuse irradiance spectrum, shape ``(n_wl,)``."""
-    dmu = np.abs(np.diff(-np.cos(np.radians(zenith_deg)), prepend=-1.0))
-    daz = np.radians(azimuth_rel_deg[1] - azimuth_rel_deg[0])
-    w = dmu[:, None] * daz * 2.0  # full azimuth = 2 x half
-    return np.sum(radiance * w[..., None], axis=(0, 1))
+    """Diffuse irradiance on a horizontal surface from a sky dome.
+
+    ``E = int L cos(theta) dOmega``.  With ``mu = cos(theta)`` and
+    ``dOmega = -dmu dphi`` this is ``int int L mu dmu dphi``.  The ``mu`` factor
+    is easy to forget and doubles the answer if missing -- see
+    ``tests/test_render.py``.
+    """
+    mu = np.cos(np.radians(np.asarray(zenith_deg, dtype=float)))
+    phi = np.radians(np.asarray(azimuth_rel_deg, dtype=float))
+    # integrate over mu first (mu is decreasing, hence the sign)
+    over_mu = np.abs(np.trapezoid(np.asarray(radiance) * mu[:, None, None], mu, axis=0))
+    return np.trapezoid(over_mu, phi, axis=0) * 2.0  # 0..pi -> full circle
 
 
 # ---------------------------------------------------------------------------
