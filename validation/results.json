@@ -1,0 +1,85 @@
+{
+  "checks": [
+    {
+      "error": null,
+      "key": "check1",
+      "metrics": [
+        {
+          "dev": -0.31202152299325336,
+          "dev_kind": "rel_pct",
+          "model": 0.09676237351018305,
+          "name": "tau_R(550 nm), vertical",
+          "passed": true,
+          "reference": 0.09706523794391267,
+          "tolerance": 2.0,
+          "unit": ""
+        },
+        {
+          "dev": 1.0328729095551057,
+          "dev_kind": "abs",
+          "model": 1.0328729095551057,
+          "name": "max |dev|, 300-400 nm",
+          "passed": true,
+          "reference": 0.0,
+          "tolerance": 2.0,
+          "unit": "%"
+        },
+        {
+          "dev": 0.5450336293074654,
+          "dev_kind": "abs",
+          "model": 0.5450336293074654,
+          "name": "max |dev|, 400-700 nm",
+          "passed": true,
+          "reference": 0.0,
+          "tolerance": 1.0,
+          "unit": "%"
+        },
+        {
+          "dev": 0.4838196271679748,
+          "dev_kind": "abs",
+          "model": 0.4838196271679748,
+          "name": "RMS dev, 300-700 nm",
+          "passed": true,
+          "reference": 0.0,
+          "tolerance": 1.0,
+          "unit": "%"
+        }
+      ],
+      "summary": "tau_R(550) = 0.09676 vs 0.09707 (-0.31 %); worst deviation over 300-700 nm is 1.03 % at 300 nm.",
+      "title": "Rayleigh optical depth vs Bodhaine et al. (1999)",
+      "verdict": "PASS"
+    },
+    {
+      "error": null,
+      "key": "check2",
+      "metrics": [],
+      "summary": "not implemented (skipped)",
+      "title": "Direct/diffuse clear-sky illuminance",
+      "verdict": "SKIP"
+    },
+    {
+      "error": null,
+      "key": "check3",
+      "metrics": [],
+      "summary": "not implemented (skipped)",
+      "title": "CIE 110 clear-sky luminance distribution",
+      "verdict": "SKIP"
+    },
+    {
+      "error": null,
+      "key": "check4",
+      "metrics": [],
+      "summary": "not implemented (skipped)",
+      "title": "Sky chromaticity vs measured spectra",
+      "verdict": "SKIP"
+    },
+    {
+      "error": null,
+      "key": "check5",
+      "metrics": [],
+      "summary": "not implemented (skipped)",
+      "title": "Twilight zenith luminance",
+      "verdict": "SKIP"
+    }
+  ]
+}
