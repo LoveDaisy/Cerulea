@@ -1,0 +1,329 @@
+{
+  "checks": [
+    {
+      "error": null,
+      "key": "check1",
+      "metrics": [
+        {
+          "dev": -0.31202152299325336,
+          "dev_kind": "rel_pct",
+          "model": 0.09676237351018305,
+          "name": "tau_R(550 nm), vertical",
+          "passed": true,
+          "reference": 0.09706523794391267,
+          "tolerance": 2.0,
+          "unit": ""
+        },
+        {
+          "dev": 1.0328729095551057,
+          "dev_kind": "abs",
+          "model": 1.0328729095551057,
+          "name": "max |dev|, 300-400 nm",
+          "passed": true,
+          "reference": 0.0,
+          "tolerance": 2.0,
+          "unit": "%"
+        },
+        {
+          "dev": 0.5450336293074654,
+          "dev_kind": "abs",
+          "model": 0.5450336293074654,
+          "name": "max |dev|, 400-700 nm",
+          "passed": true,
+          "reference": 0.0,
+          "tolerance": 1.0,
+          "unit": "%"
+        },
+        {
+          "dev": 0.4838196271679748,
+          "dev_kind": "abs",
+          "model": 0.4838196271679748,
+          "name": "RMS dev, 300-700 nm",
+          "passed": true,
+          "reference": 0.0,
+          "tolerance": 1.0,
+          "unit": "%"
+        }
+      ],
+      "summary": "tau_R(550) = 0.09676 vs 0.09707 (-0.31 %); worst deviation over 300-700 nm is 1.03 % at 300 nm.",
+      "title": "Rayleigh optical depth vs Bodhaine et al. (1999)",
+      "verdict": "PASS"
+    },
+    {
+      "error": null,
+      "key": "check2",
+      "metrics": [
+        {
+          "dev": 4.854339474630225,
+          "dev_kind": "rel_pct",
+          "model": 101.85760872640249,
+          "name": "DNI illuminance, AM1.5 (48.19deg)",
+          "passed": true,
+          "reference": 97.1420059834979,
+          "tolerance": 10.0,
+          "unit": "klx"
+        },
+        {
+          "dev": 5.1598816930700515,
+          "dev_kind": "rel_pct",
+          "model": 394.15497376192195,
+          "name": "DNI, 400-700 nm, AM1.5",
+          "passed": true,
+          "reference": 374.81496500000003,
+          "tolerance": 10.0,
+          "unit": "W/m2"
+        },
+        {
+          "dev": 6.296559849282126,
+          "dev_kind": "abs",
+          "model": 6.296559849282126,
+          "name": "DNI spectral RMS, 400-700 nm",
+          "passed": true,
+          "reference": 0.0,
+          "tolerance": 10.0,
+          "unit": "%"
+        },
+        {
+          "dev": 5.556151374542846,
+          "dev_kind": "rel_pct",
+          "model": 7.307954154734275,
+          "name": "DHI illuminance, h=30deg (CIE 110, T=2.2)",
+          "passed": true,
+          "reference": 6.92328590950953,
+          "tolerance": 25.0,
+          "unit": "klx"
+        },
+        {
+          "dev": 10.209829024071778,
+          "dev_kind": "rel_pct",
+          "model": 8.749059831031758,
+          "name": "DHI illuminance, h=60deg (CIE 110, T=2.2)",
+          "passed": true,
+          "reference": 7.9385476853619,
+          "tolerance": 25.0,
+          "unit": "klx"
+        },
+        {
+          "dev": 3.9523153867339307,
+          "dev_kind": "rel_pct",
+          "model": 94.78554637842686,
+          "name": "DNI illuminance, h=30deg (Bird)",
+          "passed": true,
+          "reference": 91.18175581351514,
+          "tolerance": 15.0,
+          "unit": "klx"
+        },
+        {
+          "dev": 5.66385035761641,
+          "dev_kind": "rel_pct",
+          "model": 109.45432452881967,
+          "name": "DNI illuminance, h=60deg (Bird)",
+          "passed": true,
+          "reference": 103.58729514244891,
+          "tolerance": 15.0,
+          "unit": "klx"
+        }
+      ],
+      "summary": "DNI: 94.8/101.9/109.5 klx at h=30/48.19/60 vs 91.2/97.1/103.6; DHI: 7.3/8.7 klx vs CIE 6.9/7.9.",
+      "title": "Clear-sky direct and diffuse illuminance",
+      "verdict": "PASS"
+    },
+    {
+      "error": null,
+      "key": "check3",
+      "metrics": [
+        {
+          "dev": 101.43543091562863,
+          "dev_kind": "rel_pct",
+          "model": 7.355659033042477,
+          "name": "horizon sun-side / zenith, h=45deg",
+          "passed": false,
+          "reference": 3.6516212662326524,
+          "tolerance": 40.0,
+          "unit": ""
+        },
+        {
+          "dev": 4.096761048962461,
+          "dev_kind": "rel_pct",
+          "model": 2.0869715955305628,
+          "name": "horizon anti-solar / zenith, h=45deg",
+          "passed": true,
+          "reference": 2.0048381664333865,
+          "tolerance": 25.0,
+          "unit": ""
+        },
+        {
+          "dev": 3.7793695115913875,
+          "dev_kind": "abs",
+          "model": 3.7793695115913875,
+          "name": "RMS dev, theta<=60deg, h=45deg",
+          "passed": true,
+          "reference": 0.0,
+          "tolerance": 20.0,
+          "unit": "%"
+        },
+        {
+          "dev": 14.375708718445555,
+          "dev_kind": "abs",
+          "model": 14.375708718445555,
+          "name": "RMS dev, 60-75deg, h=45deg",
+          "passed": true,
+          "reference": 0.0,
+          "tolerance": 25.0,
+          "unit": "%"
+        },
+        {
+          "dev": 40.314113956090644,
+          "dev_kind": "abs",
+          "model": 40.314113956090644,
+          "name": "RMS dev, 75-90deg horizon, h=45deg",
+          "passed": false,
+          "reference": 0.0,
+          "tolerance": 30.0,
+          "unit": "%"
+        },
+        {
+          "dev": 18.44040671983706,
+          "dev_kind": "abs",
+          "model": 18.44040671983706,
+          "name": "RMS dev, whole sky, h=45deg",
+          "passed": false,
+          "reference": 0.0,
+          "tolerance": 15.0,
+          "unit": "%"
+        },
+        {
+          "dev": 137.88213604135814,
+          "dev_kind": "rel_pct",
+          "model": 19.863379412136375,
+          "name": "horizon sun-side / zenith, h=30deg",
+          "passed": false,
+          "reference": 8.350092925297648,
+          "tolerance": 50.0,
+          "unit": ""
+        },
+        {
+          "dev": 73.08852540660322,
+          "dev_kind": "rel_pct",
+          "model": 2.764066101044109,
+          "name": "horizon sun-side / zenith, h=60deg",
+          "passed": false,
+          "reference": 1.5969089196126816,
+          "tolerance": 50.0,
+          "unit": ""
+        }
+      ],
+      "summary": "h=45deg: sun-side horizon/zenith 7.36 vs CIE 3.65 (+101%); anti-solar 2.09 vs 2.00; RMS 3.8% (theta<=60deg), 40.3% (horizon band).",
+      "title": "CIE 110-1994 clear-sky luminance distribution",
+      "verdict": "FAIL"
+    },
+    {
+      "error": null,
+      "key": "check4",
+      "metrics": [
+        {
+          "dev": 0.007621381954476594,
+          "dev_kind": "abs",
+          "model": 0.2988841026454386,
+          "name": "mean delta x, horizon",
+          "passed": true,
+          "reference": 0.29126272069096204,
+          "tolerance": 0.02,
+          "unit": "xy"
+        },
+        {
+          "dev": 0.01148909874264551,
+          "dev_kind": "abs",
+          "model": 0.3242426343430843,
+          "name": "mean delta y, horizon",
+          "passed": true,
+          "reference": 0.3127535356004388,
+          "tolerance": 0.02,
+          "unit": "xy"
+        },
+        {
+          "dev": 0.01929979403382298,
+          "dev_kind": "abs",
+          "model": 0.01929979403382298,
+          "name": "RMS delta xy, horizon",
+          "passed": true,
+          "reference": 0.0,
+          "tolerance": 0.02,
+          "unit": "xy"
+        },
+        {
+          "dev": 0.01104032941417036,
+          "dev_kind": "abs",
+          "model": 0.01104032941417036,
+          "name": "RMS delta u'v', horizon",
+          "passed": true,
+          "reference": 0.0,
+          "tolerance": 0.02,
+          "unit": "u'v'"
+        }
+      ],
+      "summary": "horizon xy: model (0.299,0.324) vs measured (0.291,0.313); RMS dxy=0.0193, du'v'=0.0110.",
+      "title": "Sky chromaticity vs measured spectra",
+      "verdict": "PASS"
+    },
+    {
+      "error": null,
+      "key": "check5",
+      "metrics": [
+        {
+          "dev": -0.14907707701117187,
+          "dev_kind": "abs",
+          "model": 28.441144102952016,
+          "name": "zenith luminance, h=-3deg (extrapolated ref)",
+          "passed": true,
+          "reference": 40.0889,
+          "tolerance": 0.5,
+          "unit": "cd/m2"
+        },
+        {
+          "dev": 0.04079415597892254,
+          "dev_kind": "abs",
+          "model": 0.5673071185433664,
+          "name": "zenith luminance, h=-6deg",
+          "passed": true,
+          "reference": 0.516445,
+          "tolerance": 0.5,
+          "unit": "cd/m2"
+        },
+        {
+          "dev": -1.3736983544279384,
+          "dev_kind": "abs",
+          "model": 0.000723976087236007,
+          "name": "zenith luminance, h=-9deg",
+          "passed": false,
+          "reference": 0.0171168,
+          "tolerance": 0.5,
+          "unit": "cd/m2"
+        },
+        {
+          "dev": -9.164224928296095,
+          "dev_kind": "abs",
+          "model": 0.0,
+          "name": "zenith luminance, h=-12deg",
+          "passed": false,
+          "reference": 0.00145957,
+          "tolerance": 0.5,
+          "unit": "cd/m2"
+        },
+        {
+          "dev": -8.257023039528608,
+          "dev_kind": "abs",
+          "model": 0.0,
+          "name": "zenith luminance, h=-18deg",
+          "passed": false,
+          "reference": 0.000180727,
+          "tolerance": 0.5,
+          "unit": "cd/m2"
+        }
+      ],
+      "summary": "zenith L: -6deg 0.567 vs 0.516; -9deg 0.00072 vs 0.017; -12deg 0 vs 0.0015 cd/m2.",
+      "title": "Twilight zenith luminance (Patat et al. 2006)",
+      "verdict": "FAIL"
+    }
+  ]
+}
