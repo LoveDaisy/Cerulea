@@ -105,3 +105,42 @@ directly, which is unambiguous).
 * All model atmospheres are built from `skycolor/presets.py`
   (`clear`: 300 DU O₃, AOD₅₅₀ = 0.05, exponential aerosol with H = 1.5 km,
   Hinterland aerosol; `pristine`: Rayleigh + O₃ only).
+
+## check6 — a second, independent twilight dataset
+
+* **M. J. Koomen, C. Lock, D. M. Packer, R. Scolnik, R. Tousey and E. O.
+  Hulburt (1952)**, *Measurements of the Brightness of the Twilight Sky*,
+  Journal of the Optical Society of America **42**, 353–359.  DOI:
+  [10.1364/JOSA.42.000353](https://doi.org/10.1364/JOSA.42.000353).
+  * A recording photometer of **photopic** sensitivity (no filter), at two
+    stations: **Maryland, altitude 30 m**, and **Sacramento Peak, New Mexico,
+    altitude 2800 m**; solar altitude +5° to −15°, clear air, no clouds.
+  * The Maryland **zenith** surface brightness in cd ft⁻², and the conversion
+    `m = −2.5 log₁₀ I[cd ft⁻²] + 9.9846` mag arcsec⁻², are taken from Table 5
+    of **S. Nawar, A. B. Morcos, R. M. El Agmy, G. M. A. Gad and S.
+    Elgohary (2020)**, *Sky twilight brightness at zenith expressed in
+    magnitudes*, NRIAG J. Astron. Geophys. **9**, 63–70, DOI
+    [10.1080/20909977.2020.1714176](https://doi.org/10.1080/20909977.2020.1714176)
+    (CC-BY).  The 1952 article itself is paywalled; its abstract was read from
+    the Optica archive and confirms the instrument, both sites, their
+    altitudes and the Maryland/Sacramento Peak ratio.
+  * Conversion applied here: `L = 10.7639 I[cd ft⁻²]` cd m⁻².  The source's
+    magnitude column is kept separately; it agrees with the conversion to
+    0.0006 mag.  The values are quoted to 1–2 significant figures.
+  * Derived values: `data/twilight_koomen1952.csv`.
+
+* **S. Nawar et al. (2020)**, same paper, Tables 1–3: zenith twilight
+  brightness at **Helwan** (115 m), **Daraw** (250 m) and **Abu Simbel**
+  (210 m), 0–15° solar depression, in mag arcsec⁻², for broad glass filters at
+  4410 Å (B), 5500 Å (yellow) and 7900 Å (R).  Converted by the authors from
+  S₁₀(λ) units with `m = −2.5 log₁₀ S₁₀ + 27.78`.  These are **not** Johnson
+  bands; the yellow (5500 Å) column is used as a V proxy only.  Luminance via
+  `L = 1.08×10⁵ × 10^(−0.4 m)` cd m⁻², the same relation used by check5.
+  * Derived values: `data/twilight_nawar2020.csv` (112 rows, all three bands).
+  * Every row was checked against the S₁₀→magnitude relation; maximum residual
+    0.055 mag (a single Abu Simbel blue row that the source rounds to 9.8).
+
+* **Patat et al. (2006)**, CrAO vs Paranal pressure comparison used in
+  `SECOND_DATASET.md` §4.2: §4 of the paper (arXiv:astro-ph/0604128) gives
+  ΔV = 0.27 ± 0.03 mag between the CrAO site (600 m, 961 hPa) and Paranal
+  (2400 m, 743 hPa), against a pressure prediction of 0.28 mag.
