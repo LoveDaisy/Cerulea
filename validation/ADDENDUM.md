@@ -177,3 +177,63 @@ aerosols are unaffected, which is the expected sanity check.
 A performance caveat: a dusty atmosphere now takes ~100 s for one
 multiple-scattering solve.  That is documented in the roadmap as the
 performance item.
+
+---
+
+# Fourth addendum — the twilight excess was a site effect
+
+## A second dataset
+
+`validation/check6_second_dataset.py` and `validation/SECOND_DATASET.md` add
+**Koomen et al. (1952)**, JOSA 42, 353: a *photopic* recording photometer at
+Maryland, altitude 30 m, zenith, solar altitude +5° to −15°.  Photopic is the
+same weighting the model computes, so this comparison avoids the V-band
+conversion entirely.
+
+| h | Koomen (30 m) | Patat (2400 m) | model | model/Koomen | model/Patat |
+|---|---|---|---|---|---|
+| −3° | 21.53 | 40.09 † | 37.53 | 1.74 | 0.94 |
+| −6° | 0.6458 | 0.5164 | 0.7362 | **1.14** | 1.43 |
+| −9° | 0.01615 | 0.01712 | 0.0210 ± 0.0056 | 1.30 [0.95–1.64] | 1.22 |
+| −12° | 0.001292 | 0.001460 | 0.00430 ± 0.00255 | 3.33 [1.35–5.31] | 2.95 |
+
+† outside the fitted range of the Patat fit.  Model: `clear` preset (300 DU,
+AOD 0.05, sea level); `pristine` gives 1.52 vs Patat at −6°.
+
+## What it settles
+
+At −6° the model is **1.14×** a sea-level measurement, not 1.5×.  Koomen is
+1.25× (0.24 mag) brighter than Patat, and that is the altitude of Paranal:
+Patat et al. measure ΔV = 0.27 ± 0.03 mag between 961 and 743 hPa themselves,
+and Koomen's second station at 2800 m shows the same effect.  So
+
+```
+1.14 (model vs sea level)  ×  1.25 (sea level vs Paranal)  =  1.43
+```
+
+which is exactly the old model/Patat ratio.  The "1.5× twilight excess" was a
+comparison of a sea-level model with a 2400 m reference.
+
+The −3° row is the one genuine tension: the two references disagree by
+0.66 mag there, and Patat's −3° is an extrapolation.  It is excluded from the
+verdict.
+
+## The defect the exercise found
+
+Run at 2.4 km the model changes by **0.3 %**, while the data demand
+1.25–1.39× for the same pressure ratio.  The model is right at sea level and
+wrong at altitude: its twilight does not scale with the low-atmosphere column.
+That implies a non-negligible part of the twilight light is scattered *in the
+shadowed troposphere*, lit from above by the diffuse field, and the model
+produces too little of it.  This is now a milestone-level item in
+`docs/ROADMAP.md`.
+
+## Vertical structure is excluded
+
+`docs/PROFILES.md` sweeps the ozone profile, the temperature above 20 km, the
+ground albedo and the phase-function truncation.  None of them can supply the
+factor 0.66 that the old comparison asked for; the only lever that reaches it
+is a −26 K stratopause, which no observed climatology supports.  A useful
+side result: the −6° zenith is lit by 35–60 km and attenuated by the shadowed
+0–20 km, so *column* changes cancel to ~0.2 % per 1 % while *profile* changes
+do not — which is why the earlier column-level tests were so unresponsive.

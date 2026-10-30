@@ -81,6 +81,15 @@ which part of the deck is still lit.
 (`g = 0`) and 1 % (`g = 0.85`, τ ≥ 5); `R + T + direct = 1` to 10⁻¹².
 *Code:* `cloud.py`, `rt/cloud.py`, `docs/CLOUD.md`.
 
+### M8b — the twilight question closed by a second dataset
+
+A single reference cannot separate a model error from a reference bias.  A
+second, independent, *photopic* twilight measurement (Koomen et al. 1952,
+sea level) showed that the model is 1.14× the measurement like-for-like, and
+that the remaining factor is the 2400 m altitude of the original reference.
+The search also turned up the one thing that is wrong: the model has almost no
+altitude response.  See `validation/SECOND_DATASET.md`.
+
 ### M8 — the physics of red skies and blue suns
 
 Two questions that turned out to have clean answers:
@@ -116,17 +125,25 @@ understand.  Each is worth resolving before adding new physics.
    refraction off for speed, turn it on when the *apparent* solar position
    matters (drawing the disk, matching a timestamped photograph).
    **The open question it was masking is the next one.**
-2. **The twilight is 1.5× too bright between −5° and −12°, and it is not a
-   coordinate artefact.**  At −3° the model is within 3 % of Patat et al.; at
-   −6° it is 1.5–1.6× high under *both* readings above, and the spherical
-   engine shows the same mild excess at −9° and −12° (1.39×, 1.45×).  The
-   shape of the discrepancy — correct near sunset, ~1.5× low once the
-   multiple scattering takes over — points at a shared physical input rather
-   than at the coordinate convention.  Ruled out so far: site altitude
-   (1.82 → 1.70), aerosol optical depth (no change), ozone column (2.15 at
-   250 DU, 1.78 at 400 DU).  Candidates still open: the ozone *vertical
-   profile* (only the column is constrained), the temperature profile above
-   20 km, and the reference fit itself.
+2. **Resolved, and it was the wrong question: the twilight excess is a site
+   effect.**  A second, independent, *photopic* measurement — Koomen et al.
+   (1952), JOSA 42, 353, Maryland, 30 m — settles it.  Like for like, at sea
+   level, the model is **1.14×** the measurement at −6°, not 1.5×.  Koomen's
+   sea-level sky is itself 1.25× (0.24 mag) brighter than the Patat fit, and
+   that difference *is* the altitude of Paranal (2400 m): Patat et al. measure
+   ΔV = 0.27 ± 0.03 mag between 961 and 743 hPa themselves, and Koomen's own
+   second station at 2800 m shows the same.  So 1.14 × 1.25 = 1.43 is the
+   whole of the old "1.5× excess" — the comparison was mixing a sea-level model
+   with a 2400 m reference.  See `validation/SECOND_DATASET.md`.
+
+   **The live defect it exposed is different and worth a milestone of its
+   own:** the model has almost no altitude response.  Run at 2.4 km it changes
+   by 0.3 %, while the data demand 1.25–1.39× for that pressure ratio.  The
+   model is right at sea level and wrong at altitude, which means some of the
+   twilight light must come from the *low* atmosphere — the shadowed
+   troposphere, lit from above by the diffuse field — and our multiple
+   scattering does not produce enough of it.  That is a physical gap, not a
+   calibration one.
 
 3. **The limb.**  The model's horizon is ≈ 2× brighter than the CIE 110 fit.
    The CIE formula is a daylighting standard, not a physical model, so this may
@@ -211,7 +228,7 @@ For the original question — *what colour is the sky, and why?* — the project
 close.  What remains is not more phenomena but **tighter error bars**:
 
 * a measured clear-sky spectral radiance set to replace the CIE fit at the limb;
-* a decided convention for the twilight reference;
+* an altitude-dependent twilight, which the second dataset showed is missing;
 * polarisation, which is the one large piece of physics still missing.
 
 Everything else on this page is either a different project (3D clouds) or a
