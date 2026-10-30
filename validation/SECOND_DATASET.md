@@ -226,12 +226,13 @@ the systematic uncertainty of the older absolute twilight photometry is
 
 Running the same model at Paranal's altitude
 (`atmosphere("clear").at_altitude(2.4)`, surface pressure 756 hPa) gives
-**0.734 cd m⁻² at −6°, i.e. 1.003 × the sea-level value**.  The measurements
-require 1.25–1.39 × for the same pressure ratio.
+**0.734 cd m⁻² at −6°, i.e. a 0.3 % change** (the sea-level value is 1.003 ×
+the 2.4 km value).  The measurements require 1.25–1.39 × for the same
+pressure ratio.
 
 So the model reproduces the sea-level sky but not the *altitude dependence* of
 the twilight.  Physically this is expected: at −6° the zenith line of sight is
-already in shadow up to ~20 km, so the first-order term comes from the
+already in shadow below ~35 km, so the first-order term comes from the
 stratosphere and is almost independent of what happens below 2.4 km; the
 observed pressure dependence is carried by multiple scattering in the low
 atmosphere, which the plane-parallel solver under-represents.  This is the same
@@ -253,7 +254,7 @@ model calibration error.**
   the model and Patat, and its position is quantitatively explained by the
   altitude difference between the two sites.
 * What the second dataset *does* expose is a genuine model deficiency: the
-  model has essentially **no altitude response** (1.003 ×) where the data give
+  model has essentially **no altitude response** (0.3 %) where the data give
   1.25–1.39 ×.  The model is right at sea level and wrong at 2400 m, for a
   reason unrelated to the absolute calibration.
 * Below −9° the second dataset is consistent with the previously reported
