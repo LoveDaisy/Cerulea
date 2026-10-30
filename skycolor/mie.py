@@ -222,14 +222,19 @@ def _B_coefficient(n: int, a: int) -> float:
     """
     if a < 0 or a > n or (n - a) % 2 != 0:
         return 0.0
+
+    def in_S(m: int, k: int) -> bool:
+        """True if ``k`` is in {m-1, m-3, ...} (the support of pi_m)."""
+        return 0 <= k <= m - 1 and (m - 1 - k) % 2 == 0
+
     val = 0.0
-    # from n * mu * pi_n
-    if a - 1 >= 0 and (n - 1 - (a - 1)) % 2 == 0:
+    # from n * mu * pi_n:  mu P_k -> (k+1) P_{k+1} + k P_{k-1}
+    if in_S(n, a - 1):
         val += n * a
-    if (n - 1 - (a + 1)) % 2 == 0:
+    if in_S(n, a + 1):
         val += n * (a + 1)
     # from -(n+1) * pi_{n-1}
-    if a <= n - 2 and (n - 2 - a) % 2 == 0:
+    if in_S(n - 1, a):
         val -= (n + 1) * (2 * a + 1)
     return float(val)
 

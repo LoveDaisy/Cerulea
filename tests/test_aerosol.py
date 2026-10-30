@@ -375,3 +375,21 @@ def test_documented_values_are_consistent_with_docstrings():
         doc = cls.__doc__ or ""
         assert "SSA" in doc
         assert "delta-M" in doc
+
+
+def test_angular_function_legendre_expansion():
+    """``pi_n`` and ``tau_n`` have the sparse Legendre expansions documented in
+    ``skycolor.mie``; verify the closed-form coefficients against quadrature."""
+    from skycolor.mie import _A_coefficient, _B_coefficient, _angular_functions
+
+    nmax = 12
+    mu, w = np.polynomial.legendre.leggauss(200)
+    pi, tau = _angular_functions(mu, nmax)
+    for n in range(1, nmax + 1):
+        for a in range(0, n + 1):
+            pl = np.polynomial.legendre.legval(mu, [0] * a + [1])
+            # Legendre coefficient: (2a+1)/2 * integral(pi P_a)
+            ref_pi = (2 * a + 1) * 0.5 * np.sum(w * pi[n] * pl)
+            ref_tau = (2 * a + 1) * 0.5 * np.sum(w * tau[n] * pl)
+            assert ref_pi == pytest.approx(_A_coefficient(n, a), abs=1e-10)
+            assert ref_tau == pytest.approx(_B_coefficient(n, a), abs=1e-10)

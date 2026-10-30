@@ -41,7 +41,6 @@ Mie coefficients with the Gaunt/Wigner 3-j expansion implemented in
 """
 from __future__ import annotations
 
-import functools
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Callable, Sequence
@@ -49,12 +48,8 @@ from typing import Callable, Sequence
 import numpy as np
 
 from .mie import (
-    MieCoefficients,
-    gaunt_squared,
     log_normal_nodes,
-    mie_asymmetry,
     mie_coefficients,
-    mie_legendre_moments,
     mie_moment_numerators,
     mie_phase,
     phase_table_angles,
