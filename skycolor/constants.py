@@ -19,7 +19,7 @@ P0 = 101325.0  # standard sea-level pressure [Pa]
 T0 = 288.15  # standard sea-level temperature [K]
 
 #: atmospheric top used by the model [m]
-Z_TOA = 120.0e3
+Z_TOA = 200.0e3
 
 # ---------------------------------------------------------------------------
 # Molecules

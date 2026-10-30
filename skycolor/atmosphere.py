@@ -98,8 +98,16 @@ DEFAULT_Z_BOUNDS = np.array([
     8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0,
     20.0, 21.5, 23.0, 25.0, 27.0, 29.0, 31.0, 33.0, 35.0, 38.0, 41.0, 44.0,
     47.0, 50.0, 53.0, 56.0, 60.0, 65.0, 70.0, 75.0, 80.0, 85.0, 90.0, 95.0,
-    100.0, 105.0, 110.0, 115.0, 120.0,
+    100.0, 105.0, 110.0, 115.0, 120.0, 125.0, 130.0, 135.0, 140.0, 150.0, 160.0,
+    175.0, 200.0,
 ])
+
+#: Above the US76 range the thermosphere is hot and tenuous; a simple
+#: exponential tail with this scale height reproduces the observed density
+#: (10^17 m^-3 at 120 km, ~10^14 at 200 km) well enough for twilight, whose
+#: light below about -10 deg solar elevation comes from these altitudes.
+THERMOSPHERE_SCALE_HEIGHT_KM = 15.0
+THERMOSPHERE_START_KM = 120.0
 
 
 # ---------------------------------------------------------------------------
@@ -113,13 +121,14 @@ _O3_PROFILE = np.array([
     [35.0, 2.4e12], [38.0, 1.6e12], [40.0, 1.1e12], [42.0, 7.5e11],
     [45.0, 5.0e11], [48.0, 3.2e11], [50.0, 2.2e11], [55.0, 1.0e11],
     [60.0, 5.0e10], [70.0, 1.5e10], [80.0, 5.0e9], [120.0, 1.0e9],
+    [200.0, 1.0e7],
 ])
 
 #: stratospheric NO2 number density [molecules cm^-3] vs height [km]
 _NO2_PROFILE = np.array([
     [0.0, 1.0e9], [10.0, 2.0e9], [15.0, 5.0e9], [20.0, 1.2e10],
     [25.0, 1.5e10], [30.0, 1.2e10], [35.0, 7.0e9], [40.0, 3.0e9],
-    [50.0, 8.0e8], [60.0, 2.0e8], [120.0, 1.0e7],
+    [50.0, 8.0e8], [60.0, 2.0e8], [120.0, 1.0e7], [200.0, 1.0e5],
 ])
 
 
@@ -350,8 +359,13 @@ class Atmosphere:
         return us76_temperature(np.asarray(z_km, dtype=float))
 
     def n_air(self, z_km):
-        """Dry-air number density [m^-3]."""
-        return self.pressure(z_km) / (1.380649e-23 * self.temperature(z_km))
+        """Dry-air number density [m^-3], with a thermospheric tail."""
+        z = np.asarray(z_km, dtype=float)
+        n = self.pressure(z) / (1.380649e-23 * self.temperature(z))
+        n0 = self.pressure(np.array(THERMOSPHERE_START_KM)) / (
+            1.380649e-23 * self.temperature(np.array(THERMOSPHERE_START_KM)))
+        tail = n0 * np.exp(-(z - THERMOSPHERE_START_KM) / THERMOSPHERE_SCALE_HEIGHT_KM)
+        return np.where(z > THERMOSPHERE_START_KM, tail, n)
 
     def n_o3(self, z_km):
         return _log_interp(_O3_PROFILE, z_km) * 1e6 * self._o3_scale

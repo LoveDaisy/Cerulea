@@ -19,8 +19,10 @@ def test_temperature_layers():
 
 
 def test_ozone_column_matches_du():
+    from skycolor.constants import Z_TOA
+
     at = Atmosphere(WL_COARSE, ozone_du=300.0, aerosols=[])
-    z = np.linspace(0, 120, 20000)
+    z = np.linspace(0, Z_TOA / 1e3, 20000)
     col = np.trapezoid(at.n_o3(z), z * 1e3)
     assert col / DU == pytest.approx(300.0, rel=1e-6)
 
