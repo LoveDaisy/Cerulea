@@ -109,3 +109,21 @@ def test_delta_m_scales_coarse_aerosol():
     assert f.max() > 0.2                     # dust loses a lot of forward peak
     assert np.all(props["beta_ext"] <= at.layer_properties()["beta_ext"] + 1e-12)
     assert np.allclose(props["moments"][:, 0, :], 1.0)
+
+
+def test_restrict_preserves_subclass_overrides():
+    """`_restrict` must keep subclass profiles: rebuilding silently drops them."""
+    from skycolor.atmosphere import Atmosphere
+    from skycolor.constants import WL_COARSE
+
+    class Cold(Atmosphere):
+        def n_air(self, z):
+            zz = np.asarray(z, dtype=float)
+            return super().n_air(z) * np.exp(-np.maximum(zz - 20.0, 0.0) * (1 / 6.0 - 1 / 6.5))
+
+    at = Cold(WL_COARSE, ozone_du=300.0, aerosols=[])
+    sub = at._restrict([0, 1, 2])
+    assert isinstance(sub, Cold)
+    assert sub.wl.size == 3
+    assert sub.n_air(np.array([40.0]))[0] != at.n_air(np.array([40.0]))[0] * 0 + \
+        Atmosphere(WL_COARSE[:3], ozone_du=300.0, aerosols=[]).n_air(np.array([40.0]))[0]

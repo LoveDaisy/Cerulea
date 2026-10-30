@@ -143,6 +143,9 @@ def _sub_atmosphere(atmo, index):
     idx = np.asarray(index, dtype=int)
     if np.array_equal(idx, np.arange(wl.size)):
         return atmo
+    if hasattr(atmo, "_restrict"):
+        # preserves subclass overrides of n_o3 / n_air; rebuilding drops them
+        return atmo._restrict(idx)
     ground = np.asarray(atmo.ground_albedo, dtype=float)
     return Atmosphere(
         wl[idx],

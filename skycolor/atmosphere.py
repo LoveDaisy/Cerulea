@@ -503,6 +503,24 @@ class Atmosphere:
         out["moments"] = beta
         return out
 
+    def _restrict(self, index):
+        """A copy of this atmosphere restricted to the wavelengths ``index``.
+
+        Used by the single-wavelength Monte Carlo loops.  Copying (rather than
+        rebuilding) preserves subclass overrides such as a custom ozone or
+        density profile, which a rebuild used to drop silently.
+        """
+        import copy
+
+        new = copy.copy(self)
+        idx = np.asarray(index, dtype=int)
+        new.wl = self.wl[idx]
+        new.ground_albedo = np.asarray(self.ground_albedo)[idx]
+        new._sigma_ray = self._sigma_ray[idx]
+        new._sigma_o3 = self._sigma_o3[idx]
+        new._sigma_no2 = self._sigma_no2[idx]
+        return new
+
     # -- column helpers ------------------------------------------------------
     @property
     def r_bounds(self) -> np.ndarray:
