@@ -80,8 +80,10 @@ uv run python experiments/01_day_cycle.py
   与一次散射的域一致性是已知边界（高度响应审计时要看）。
 - `rt/twilight.py` + `rt/mc.py`：深暮光球面 Monte Carlo，split estimator（一次散射
   确定性、二次以上 MC）。引擎耗时按光子数线性。
-- `aerosol.py` / `mie.py`：Mie 光学是 cold-start 的主要开销；`max_cached_wavelengths`
-  默认 8，而工作波长网格通常 81 个，这是缓存失效/重复计算的已知来源。
+- `aerosol.py` / `mie.py`：Mie 光学是 cold-start 的主要开销。`max_cached_wavelengths`
+  默认 256，覆盖 81 波长工作网格；预设气溶胶通过 `shared()` 跨 `Atmosphere` 复用，
+  因此 warm / 重复调用的 Mie 预处理接近零。冷启动仍需向量化/LUT（后续任务）。
+  共享实例是**只读契约**，不要 mutate 气溶胶属性。
 - `validation/`：对照公开文献的独立检查。`results.json` 是回归护栏，物理数字变化要
   有独立证据并重跑对应 check。
 
