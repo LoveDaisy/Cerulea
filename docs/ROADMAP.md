@@ -100,19 +100,42 @@ Two questions that turned out to have clean answers:
 These are not roadmap items, they are the things we do not currently
 understand.  Each is worth resolving before adding new physics.
 
-1. **What does "solar elevation" mean in the twilight reference data?**  With
-   geometric shadows the model matches Patat et al. at −6° to 1.5×; with full
-   refraction it is 3.3× high.  Either the reference uses apparent altitudes, or
-   something else in the twilight model is ~40 % too bright.  This single
-   convention decides whether refraction should be on by default.
-2. **The limb.**  The model's horizon is ≈ 2× brighter than the CIE 110 fit.
+1. **Resolved: the solar-altitude convention does not matter.**  Computing the
+   sky both ways settles it — the two self-consistent readings are nearly
+   degenerate, because shifting the reference axis by the refraction (0.5°) and
+   raising the terminator by the same 0.5° are the same operation:
+
+   | reading | −3° | −6° |
+   |---|---|---|
+   | H1: reference axis is *true* altitude, refraction on | 1.44× | 3.28× |
+   | H2: reference axis is *apparent* altitude, refraction on | 0.91× | 1.58× |
+   | geometric model (refraction off, true axis) | 1.03× | 1.52× |
+
+   H2 is the better reading, and it lands within a few per cent of the plain
+   geometric model.  So the convention is not worth resolving further: keep
+   refraction off for speed, turn it on when the *apparent* solar position
+   matters (drawing the disk, matching a timestamped photograph).
+   **The open question it was masking is the next one.**
+2. **The twilight is 1.5× too bright between −5° and −12°, and it is not a
+   coordinate artefact.**  At −3° the model is within 3 % of Patat et al.; at
+   −6° it is 1.5–1.6× high under *both* readings above, and the spherical
+   engine shows the same mild excess at −9° and −12° (1.39×, 1.45×).  The
+   shape of the discrepancy — correct near sunset, ~1.5× low once the
+   multiple scattering takes over — points at a shared physical input rather
+   than at the coordinate convention.  Ruled out so far: site altitude
+   (1.82 → 1.70), aerosol optical depth (no change), ozone column (2.15 at
+   250 DU, 1.78 at 400 DU).  Candidates still open: the ozone *vertical
+   profile* (only the column is constrained), the temperature profile above
+   20 km, and the reference fit itself.
+
+3. **The limb.**  The model's horizon is ≈ 2× brighter than the CIE 110 fit.
    The CIE formula is a daylighting standard, not a physical model, so this may
    be a reference problem — but a measured clear-sky luminance scan would settle
    it, and we do not have one.
-3. **The V band vs the photopic integral.**  Twilight spectra are strongly
+4. **The V band vs the photopic integral.**  Twilight spectra are strongly
    coloured; comparing a photopic integral with a Johnson-V magnitude is a
    10–20 % systematic that nobody has quantified here.
-4. **Performance.**  A dusty atmosphere takes ~100 s for one multiple-scattering
+5. **Performance.**  A dusty atmosphere takes ~100 s for one multiple-scattering
    solve.  That is a documentation-grade solver, not an interactive one.
 
 ---

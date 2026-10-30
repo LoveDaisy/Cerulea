@@ -91,14 +91,26 @@ twilight **brighter by a factor of 2-5**:
 | -6 deg | 0.79 | 1.69 | 0.516 |
 | -9 deg | 1.1e-3 | 5.3e-3 | 0.0171 |
 
-The geometric model agrees with the reference at -3 deg (1.03x); the refracted
-model is 1.4x high there and 3.3x high at -6 deg.  Refraction is physically
-real, so one of two things must be true:
+Does that mean refraction should be off?  Not exactly: it is nearly degenerate
+with the convention used for the reference's x-axis.  If the tabulated "solar
+elevation" is the **apparent** altitude, then a data point at -3 deg apparent
+corresponds to -3.55 deg true, and the model must be evaluated there:
 
-1. the literature's "solar elevation" is the **apparent** altitude, in which
-   case adding refraction double-counts it; or
-2. something else in the twilight model is ~40 % too bright.
+| reading | -3 deg | -6 deg |
+|---|---|---|
+| H1: reference axis is *true*, refraction on | 1.44x | 3.28x |
+| H2: reference axis is *apparent*, refraction on | 0.91x | 1.58x |
+| geometric model (refraction off, true axis) | 1.03x | 1.52x |
 
-Until that is settled the geometric shadow is the default (it matches the
-reference), and `Atmosphere(refraction=True)` is the physically complete mode.
-This is recorded as open question #1 in `docs/ROADMAP.md`.
+H2 fits the reference better, and it is within a few per cent of the plain
+geometric model -- shifting the reference axis by 0.5 deg and raising the
+terminator by 0.5 deg are the same operation.  So the convention cannot be
+determined from this data, and it does not change the prediction.
+
+Practical consequence: the geometric shadow stays the default because it is
+free, and `Atmosphere(refraction=True)` is the mode to use whenever the
+*apparent* solar position matters -- rendering the flattened sunset sun, or
+matching a timestamped photograph.
+
+The residual 1.5x at -6 deg survives both readings and is therefore a genuine
+discrepancy; it is tracked as open question #2 in `docs/ROADMAP.md`.
