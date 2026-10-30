@@ -90,7 +90,27 @@ the sharp geometry lives), while **higher orders are plane-parallel** (they are
 smooth and diffuse, so the plane-parallel approximation is much less costly
 there).
 
-### 2.4 From spectrum to pixels
+### 2.4 Refraction
+
+`skycolor/refraction.py` traces real rays through the refractive atmosphere
+instead of using an empirical fit, because the fits are only defined above the
+horizon and we need the geometry of rays that graze it.  The ray equation
+`d/ds (n u) = grad n` is integrated with RK4; the density gradient comes from a
+cubic spline (a piecewise-linear gradient destroys the convergence), and the
+grazing angle is obtained in closed form from Bouguer's invariant
+`n r sin(theta) = const`.
+
+The integrated refraction is 33 arcminutes at the horizon and matches
+Saemundsson's fit to a few per cent above 5 degrees.  It is used for the solar
+position and for the dip of the horizon.
+
+It is **not** used for the shadow mask in the radiative transfer, and that is a
+deliberate, documented choice: raising the terminator while keeping straight
+rays admits surface-grazing rays whose optical depth should be computed along
+their *bent* path, and the result over-brightens twilight by 3–6×
+(see `docs/REFRACTION.md`).  Bending the paths is the next step.
+
+### 2.5 From spectrum to pixels
 
 1. **Colorimetry**: integrate against the CIE 1931 2° colour matching
    functions.
@@ -194,7 +214,62 @@ clean air mass over the observer and a hazy one 100 km away (or the reverse).
 The difference in the horizon chromaticity is comparable to changing the AOD
 by a factor of ten, while the zenith stays clean.
 
-### 4.6 Altitude
+### 4.6 Where a red afterglow comes from
+
+"Red sky filling the whole sky" is not produced by haze near the ground.  A
+tropospheric layer is in shadow as soon as the sun sets, so it can only
+*subtract* light: at solar elevation −3°, a boundary-layer aerosol of AOD 0.2
+drops the luminance at 3° elevation from 605 to 56 cd m⁻² and moves the
+chromaticity from (0.427) to (0.319), i.e. dimmer and whiter.
+
+What produces the effect is a scattering layer **above the earth's shadow**.
+Sweeping the altitude of a 0.15 AOD layer at fixed solar elevation:
+
+| layer altitude | chromaticity x at 8° elevation | luminance [cd m⁻²] |
+|---|---|---|
+| none | 0.34 | 44 |
+| 3 km | 0.35 | 47 |
+| 9 km (cirrus) | 0.36 | 55 |
+| 15 km | 0.40 | 80 |
+| 22 km | 0.52 | 250 |
+| 30 km | 0.55 | 320 |
+
+A 22 km layer with AOD 0.35 keeps the whole western sky glowing deep red down
+to −7°, when the same sky without it is already dark (`08_volcanic_twilight.png`).
+That is exactly the mechanism behind the vivid twilights that followed
+Krakatoa (1883) and Pinatubo (1991): a stratospheric sulphate layer, still
+sunlit long after the ground is in shadow.
+
+The same layer produces Bishop's ring, because the ring is the diffraction
+aureole of the same particles.
+
+### 4.7 The blue sun
+
+A blue sun is real physics, not a white-balance artefact.  It needs an
+**extinction spectrum that is not monotonic**: more extinction in the red than
+in the blue.  That happens when the particle radius is close to half the
+wavelength and the size distribution is narrow enough for the Mie ripple to
+survive.
+
+Sweeping radius and width at AOD 1.0 (`09_blue_sun.png`):
+
+| r_g [µm] | σ_g | τ(450)/τ(650) | beam chromaticity |
+|---|---|---|---|
+| 0.45 | 1.05 | **0.71** | (0.280, 0.300) — blue |
+| 0.45 | 2.00 | 1.03 | (0.335, 0.347) — neutral |
+| 0.25 | 1.10 | 1.53 | (0.369, 0.365) — red |
+| Ångström α = 1.3 | — | 1.9 (by construction) | (0.378, 0.380) — red |
+| no aerosol | — | 1.0 | (0.335, 0.347) |
+
+An Ångström power law is monotonic by construction and can **never** make the
+beam bluer; only Mie theory can.  For desert dust the effect is much weaker
+because the particles are large and broadly distributed, so the extinction is
+nearly grey: the blue sun of a dust storm is mostly a contrast effect (the
+surrounding sky is butterscotch, so a merely less-orange sun reads as blue —
+this is what happens on Mars), while the blue sun of a smoke or volcanic
+aerosol is the real anomalous-extinction effect.
+
+### 4.8 Altitude
 
 From 3 km the zenith gets darker and deeper blue (less air above), the horizon
 is depressed, and the whole sky gains contrast.
@@ -215,8 +290,11 @@ is depressed, and the whole sky gains contrast.
   arch, which a plane-parallel multiple-scattering solver cannot represent.
   The atmosphere is extended to 200 km with a thermospheric tail, but that is
   not the limiting factor.
-* **No refraction.**  The sun's apparent position is not raised by ~0.5° at the
-  horizon, so the twilight timing is off by a couple of minutes.
+* **Refraction is only half-implemented.**  The solar position and the horizon
+  dip use traced rays, but the radiative-transfer shadow mask does not: bending
+  the terminator while keeping straight rays over-brightens twilight by 3–6×.
+  Doing it properly means integrating the sun-ray optical depth along the
+  refracted chord.
 * **Henyey-Greenstein aureole.**  The solar aureole is too smooth.
 * **Temperature-independent Chappuis band** (the JPL table has no temperature
   dependence in the visible).
