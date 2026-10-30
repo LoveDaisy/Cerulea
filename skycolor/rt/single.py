@@ -182,7 +182,15 @@ def sky_radiance(
         mu_sun = np.clip(x_vec @ shat / np.maximum(r_pts, 1e-9),
                          -1.0, 1.0)
         p_sun = r_pts * np.sqrt(np.maximum(1.0 - mu_sun**2, 0.0))
-        lit = is_sunlit(p_sun, mu_sun)
+        if getattr(atmo, "refraction", False):
+            # the terminator is raised by refraction: a point at altitude z is
+            # still sunlit down to a slightly larger solar zenith angle
+            from ..refraction import get_tables
+
+            crit = get_tables(atmo).shadow_zenith_true(z_pts)
+            lit = mu_sun > np.cos(np.radians(crit))
+        else:
+            lit = is_sunlit(p_sun, mu_sun)
 
         # ---- local optical properties, shape (n_pts, n_ray, n_wl) ----------
         beta_ray = atmo.n_air(z_pts)[..., None] * s_ray

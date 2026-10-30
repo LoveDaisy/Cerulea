@@ -64,6 +64,7 @@ import numpy as np
 from scipy.special import assoc_legendre_p_all
 
 from .. import spectra
+from ..constants import R_EARTH
 from ..geometry import is_sunlit, path_lengths_sun
 from .single import _tau_from_columns, species_columns
 
@@ -162,7 +163,14 @@ def _sun_transmittance_boundaries(atmo, sun_zenith_deg: float) -> np.ndarray:
     lengths = path_lengths_sun(p, c, rb, rb)  # (n_shell, n_boundary)
     cols = species_columns(atmo, lengths, rb)
     tau = _tau_from_columns(atmo, cols)
-    lit = is_sunlit(p, c)
+    if getattr(atmo, "refraction", False):
+        from ..refraction import get_tables
+
+        z_b = (rb - R_EARTH) / 1e3
+        crit = get_tables(atmo).shadow_zenith_true(z_b)
+        lit = c > np.cos(np.radians(crit))
+    else:
+        lit = is_sunlit(p, c)
     return np.where(lit[:, None], np.exp(-tau), 0.0)
 
 

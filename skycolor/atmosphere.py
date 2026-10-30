@@ -279,6 +279,7 @@ class Atmosphere:
         surface_pressure: float = P0,
         z_bounds_km: np.ndarray | None = None,
         elevation_km: float = 0.0,
+        refraction: bool = False,
     ):
         self.wl = np.asarray(wl_nm, dtype=float)
         self.ozone_du = float(ozone_du)
@@ -286,6 +287,16 @@ class Atmosphere:
         self.aerosols = list(aerosols or [])
         self.surface_pressure = float(surface_pressure)
         self.elevation_km = float(elevation_km)
+        #: Whether the direct-beam shadow boundary includes atmospheric
+        #: refraction (see :mod:`skycolor.refraction`).  **Off by default.**
+        #: Refraction genuinely raises the terminator, but the extra light
+        #: comes from rays that graze the surface, and those must be traced
+        #: along their *bent* path: shifting the mask while keeping straight
+        #: rays lets the model admit surface-grazing rays whose optical depth
+        #: is ill-defined, and it over-brightens twilight by 3-6x.  Use it for
+        #: the solar position and the horizon dip; use ``False`` here until
+        #: the paths are refracted too.
+        self.refraction = bool(refraction)
         self.z_bounds = np.array(z_bounds_km if z_bounds_km is not None else DEFAULT_Z_BOUNDS,
                                  dtype=float)
         self.z_mid = 0.5 * (self.z_bounds[1:] + self.z_bounds[:-1])
@@ -325,8 +336,8 @@ class Atmosphere:
         new = Atmosphere(
             self.wl, ozone_du=self.ozone_du, no2_column=self.no2_column,
             aerosols=[], ground_albedo=self.ground_albedo,
-            surface_pressure=p0, z_bounds_km=self.z_bounds - z0,
-            elevation_km=z0,
+            surface_pressure=p0, z_bounds_km=self.z_bounds,
+            elevation_km=z0, refraction=self.refraction,
         )
         # rescale aerosol layers to the column remaining above the observer
         for lay in self.aerosols:
