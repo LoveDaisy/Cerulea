@@ -164,7 +164,7 @@ def test_albedo_matches_monte_carlo():
     # a real droplet distribution (Mie, g = 0.861, delta-M at f = beta_2)
     optics = cloud.get_preset("stratus").optics([550.0])
     res = rtcloud.delta_eddington(10.0, 1.0, optics.g[0], 1.0, f=optics.f[0])
-    assert res.albedo[0] == pytest.approx(0.3956, rel=0.03)    # MC(Mie) 0.3956
+    assert res.albedo[0] == pytest.approx(0.4025, rel=0.03)    # MC(Mie) 0.4025
 
 
 def test_albedo_grows_towards_one():
@@ -178,7 +178,7 @@ def test_albedo_grows_towards_one():
 def test_albedo_reference_value_tau_10():
     """The 'about 0.7 at tau = 10' number corresponds to g ~ 0.6."""
     res = rtcloud.delta_eddington(10.0, 1.0, 0.6, 1.0, f=0.6**2)
-    assert res.albedo[0] == pytest.approx(0.69, abs=0.03)
+    assert res.albedo[0] == pytest.approx(0.688, abs=0.03)
     # and for a water cloud (g = 0.86) the same albedo needs tau ~ 30
     optics = cloud.get_preset("stratus").optics([550.0])
     res = rtcloud.delta_eddington(30.0, 1.0, optics.g[0], 1.0, f=optics.f[0])

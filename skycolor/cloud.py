@@ -159,12 +159,15 @@ def mie_coefficients(x, m: complex):
     x_safe = np.maximum(x, 1e-12)
     rho = m * x
 
-    # logarithmic derivative D_n(rho) by downward recurrence
-    D = np.zeros((n_max + 1, n_x), dtype=complex)
-    for n in range(n_max, 0, -1):
-        act = n_max_i >= n
-        d_next = D[n, act]
-        D[n - 1, act] = n / rho[act] - 1.0 / (d_next + n / rho[act])
+    # Logarithmic derivative D_n(rho) by downward recurrence.  It has to be
+    # started well above both n_max and |m|x, otherwise D_n has not converged
+    # where the series needs it (the usual criterion is |m|x + 15).  Omitting
+    # this makes Q_ext wrong by several per cent at x > 50.
+    n_start = max(n_max, int(np.ceil(np.abs(m) * x_safe.max()))) + 15
+    D = np.zeros((n_start + 1, n_x), dtype=complex)
+    D[n_start] = 0.0
+    for n in range(n_start, 0, -1):
+        D[n - 1] = n / rho - 1.0 / (D[n] + n / rho)
 
     # Riccati-Bessel psi_n, chi_n by upward recurrence, masked per size
     psi = np.zeros((n_max + 2, n_x))
