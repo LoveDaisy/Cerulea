@@ -83,6 +83,10 @@ harness numbers move slightly but the verdicts do not:
 
 ## The deep twilight is fixed
 
+> **Pre-M10 values.**  The engine numbers in this section predate the
+> two-branch chord fix; the corrected ones are in the sixth addendum
+> (0.563 cd m⁻² at −6°, 9.3 × 10⁻³ at −9°, 5.5 × 10⁻⁴ at −12°).
+
 `skycolor/rt/twilight.py` (spherical Monte Carlo, split estimator: exact
 deterministic first order + Monte Carlo for orders ≥ 2) closes the largest gap
 in the model.  Against Patat et al. (2006):
