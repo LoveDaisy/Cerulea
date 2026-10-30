@@ -2,23 +2,23 @@
 
 *The second dataset asked for by open question #2 of `docs/ROADMAP.md`.*
 
-**Short answer.** A second, independent, absolute twilight measurement exists
-and it does **not** show the model 1.5 × high at −6°.  Koomen et al. (1952)
-measured the zenith twilight sky at Maryland (30 m above sea level) with a
-photopic photometer — the same photopic weighting the model computes.  Against
-it the sea-level model is **1.14 ×** high at −6°, not 1.5 ×.  Koomen's
-sea-level sky is itself **1.25 ×** brighter than the Patat et al. (2006) fit,
-and that 0.24 mag is the altitude difference between Maryland (30 m) and
-Paranal (2400 m), which Patat et al. measure independently (ΔV = 0.27 mag
-between 743 and 961 hPa) and which Koomen's own second station confirms
-(Sacramento Peak, 2800 m, is 2/3 to 1/2 as bright as Maryland).
+**Short answer.** The −6° level is no longer a factor-of-two problem.  After
+the M10 chord fix the sea-level model is **0.69×** Koomen et al. (1952)
+(0.44 vs 0.646 cd m⁻²) and **0.86×** Patat et al. (2006); the spherical
+engine gives **0.85×** Koomen and **1.07×** Patat.  The old 1.14× (geometric)
+and 2.20× (refracted) numbers were artifacts of a solar path that returned
+only one perigee → space traversal, dropping the near-side perigee → point
+segment of every grazing twilight ray.  The remaining 15–30 % is inside the
+1950s absolute calibration and the plane-parallel multiple-scattering
+approximation.
 
-So the 1.5 × at −6° is mostly a **site mismatch**, not a wrong reference and
-not a wrong sea-level calibration: 1.14 (model vs sea level) × 1.25 (sea level
-vs Paranal) = 1.43, which is the model/Patat ratio.  What *is* a model problem
-is that the model has **no altitude response at all** (1.00 × over the same
-pressure ratio where the data give 1.25–1.39 ×).  The model is right at sea
-level and cannot represent a 2400 m site.
+What *is* still a model problem is the altitude response, and the chord fix
+changed its sign: the model is a few per cent **brighter** at 2.4 km, while
+Koomen's Maryland (30 m) and Patat's Paranal (2400 m) skies, and Patat's own
+961 vs 743 hPa pair, are **0.80× darker**.  The `at_altitude` helper also
+scales the US1976 density profile by `p(z0)/P0`, so the density at the 2.4 km
+site is 0.746× too low; the altitude comparison needs its own audit before it
+can be used as a constraint.  See `validation/ADDENDUM.md` (sixth addendum).
 
 ---
 
@@ -131,11 +131,11 @@ AOD₅₅₀ 0.05, *pristine* = Rayleigh + O₃ only.  Deterministic
 
 | h | Koomen 1952<br>(Maryland, 30 m) | Patat 2006<br>(Paranal, 2400 m) | model<br>clear | model<br>pristine | **model / Koomen** | model / Patat |
 |---:|---:|---:|---:|---:|---:|---:|
-| 0° | 161.5 | — | 149 | 154 | **0.92** | — |
-| −3° | 21.53 | 40.09 † | 37.53 | 41.15 | **1.74** | 0.94 |
-| −6° | 0.6458 | 0.5164 | 0.7362 | 0.7849 | **1.14** | 1.43 |
-| −9° | 0.01615 | 0.01712 | 0.0210 ± 0.0056 | — | **1.30** [0.95–1.64] | 1.22 |
-| −12° | 0.001292 | 0.001460 | 0.00430 ± 0.00255 | — | **3.33** [1.35–5.31] | 2.95 |
+| 0° | 161.5 | — | 157 | — | **0.97** | — |
+| −3° | 21.53 | 40.09 † | 20.1 | 22.3 | **0.93** | 0.50 |
+| −6° | 0.6458 | 0.5164 | 0.444 | 0.498 | **0.69** | 0.86 |
+| −9° | 0.01615 | 0.01712 | 0.0124 ± 0.0043 | — | **0.77** [0.5–1.0] | 0.73 |
+| −12° | 0.001292 | 0.001460 | 0.00303 ± 0.00255 | — | **2.35** [0.9–3.8] | 2.08 |
 | −15° | 0.000431 | 0.000320 | 1.5 × 10⁻⁵ ‡ | — | 0.04 | 0.05 |
 
 † extrapolation of the Patat fit outside its stated 95° ≤ ζ ≤ 105° range.
@@ -143,10 +143,11 @@ AOD₅₅₀ 0.05, *pristine* = Rayleigh + O₃ only.  Deterministic
 the −15° row is used for the verdict.
 Brackets are the 1σ range propagated from the engine's own statistical error.
 
-**At −6° the model is 1.14 × the second dataset and 1.43 × Patat.**  The
-1.5–1.6 × excess reported in `docs/ROADMAP.md` is reproduced only against
-Patat, and only in its pristine-atmosphere form (1.43 with `clear`, 1.52 with
-`pristine`).
+**At −6° the model is 0.69× Koomen (deterministic) or 0.85× (spherical
+engine), and 0.86× Patat (deterministic) or 1.07× (engine).**  The old 1.14×
+and 2.20× were the one-branch chord (M10); the residual 15–30 % is inside the
+1950s absolute calibration and the plane-parallel multiple-scattering
+approximation.
 
 ### 4.2 The two references differ by 0.24 mag — and that is the altitude
 
@@ -172,33 +173,35 @@ The Maryland–Paranal difference (0.24 mag) is therefore within 0.1 mag of the
 al. measured between their own two sites.  **The reference is not wrong; it is a 2400 m reference.**
 
 Applying that measured site factor to the model's sea-level value gives
-0.7362 / 1.251 = 0.588 cd m⁻², i.e. 1.14 × Patat — exactly the same residual as
-the direct sea-level comparison.  The 1.43 decomposes as
-**1.14 (model vs sea level) × 1.25 (sea level vs Paranal)**.
+0.444 / 1.251 = 0.355 cd m⁻², i.e. 0.69 × Patat — the same residual as the
+direct sea-level comparison.  The raw model/Patat ratio 0.86 decomposes as
+**0.69 (model vs sea level) × 1.25 (sea level vs Paranal)**.  This is a
+diagnostic, not a prediction: the model's own altitude response has the wrong
+sign (see §5), so the scaled value is not what the model would compute at
+2400 m.
 
 ### 4.3 The deep twilight
 
-At −9° the engine gives 0.0210 ± 0.0056 against Koomen's 0.01615 (1.30 ×,
-1σ 0.95–1.64) and Patat's 0.01712 (1.22 ×).  The model is high by 0.1–0.3 mag,
-but the engine's `low` budget is 27 % per point.  At −12° the `low` run gives
-0.0043 ± 0.0026, i.e. 3.3 × Koomen with a 1σ lower bound of 1.35 ×; the
-higher-budget production values quoted in `docs/TWILIGHT.md` §2.2
-(0.0238 ± 0.0043 at −9°, 0.00212 ± 0.00128 at −12°) give 1.47 × and 1.64 ×
-against Koomen.  **The second dataset is consistent with a 1.4–1.6 × excess
-below −9°, but at `quality="low"` it cannot confirm it at more than ~1σ.**
+At −9° the medium-quality benchmark gives 9.31 × 10⁻³ ± 1.91 × 10⁻³ against
+Koomen's 0.01615 (0.58 ×, 1σ 0.46–0.70) and Patat's 0.01712 (0.54 ×, 1σ
+0.43–0.66).  The low-quality `check6` run gives 0.0124 ± 0.0043 (0.77 ×),
+consistent within 1σ.  At −12° the medium run gives 5.46 × 10⁻⁴ ± 3.16 × 10⁻⁴,
+0.42 × Koomen (1σ 0.18–0.67) and 0.37 × Patat; the 58 % error makes this
+non-conclusive.  **The chord fix removed the old 1.4–1.6 × excess and revealed
+a deficit that grows with depth; at −9° it is ~2σ.**
 
 ### 4.4 The two points that do not fit
 
 **−3°.**  Koomen gives 21.53 cd m⁻², Patat's fit 40.09 (extrapolated) and the
-model 37.53.  The model is 1.74 × Koomen and 0.94 × Patat: the two references
-disagree by 0.66 mag here, and the model sits with Patat.  Koomen's own
-`0° → −3°` slope (0.97 mag deg⁻¹) is much shallower than its
+model 20.1.  The model is 0.93 × Koomen and 0.50 × Patat: the two references
+disagree by 0.66 mag here, and the patched model now sits with Koomen.
+Koomen's own `0° → −3°` slope (0.97 mag deg⁻¹) is much shallower than its
 `−3° → −6°` slope (1.27 mag deg⁻¹), and the 3° value is quoted to one
 significant figure, so it may simply be a weak point.  It does not affect the
 −6° question, but it is the one place where the second dataset and the model
 disagree by more than 0.5 mag, and it is not resolved here.
 
-**0°.**  The model gives 149 cd m⁻² against Koomen's 161.5 (0.92 ×).  The
+**0°.**  The model gives 157 cd m⁻² against Koomen's 161.5 (0.97 ×).  The
 Patat fit is not defined there (its extrapolation, 8 × 10³ cd m⁻², is
 meaningless), so only Koomen can be used.
 
@@ -208,11 +211,11 @@ Yellow filter (5500 Å), luminance [cd m⁻²]:
 
 | h | Helwan (115 m) | Daraw (250 m) | Abu Simbel (210 m) | model | model/Daraw |
 |---:|---:|---:|---:|---:|---:|
-| 0° | 105.1 | 114.8 | — | 149 | 1.29 |
-| −3° | 16.65 | 13.23 | 5.94 | 37.53 | 2.84 |
-| −6° | 0.761 | 0.551 | 0.179 | 0.736 | 1.34 |
-| −9° | 0.0167 | 0.0145 | 0.00727 | 0.0210 | 1.44 |
-| −12° | 0.00115 | 0.00096 | 0.000985 | 0.00430 | 4.49 |
+| 0° | 105.1 | 114.8 | — | 157 | 1.37 |
+| −3° | 16.65 | 13.23 | 5.94 | 20.1 | 1.52 |
+| −6° | 0.761 | 0.551 | 0.179 | 0.444 | 0.81 |
+| −9° | 0.0167 | 0.0145 | 0.00727 | 0.0124 | 0.86 |
+| −12° | 0.00115 | 0.00096 | 0.000985 | 0.00303 | 3.16 |
 
 The three Egyptian sites span 1.5 mag at −6° (Helwan 0.76, Daraw 0.55,
 Abu Simbel 0.18 cd m⁻²).  Helwan (a suburb of Cairo) and Daraw bracket the
@@ -222,59 +225,54 @@ settle a 0.15 mag question; it is shown here as an honest measure of how large
 the systematic uncertainty of the older absolute twilight photometry is
 (≈0.5 mag), not as evidence for or against the model.
 
-## 5. The model's altitude response — the real remaining problem
+## 5. The altitude response — still the real remaining problem
 
-Running the same model at Paranal's altitude
-(`atmosphere("clear").at_altitude(2.4)`, surface pressure 756 hPa) gives
-**0.734 cd m⁻² at −6°, i.e. a 0.3 % change** (the sea-level value is 1.003 ×
-the 2.4 km value).  The measurements require 1.25–1.39 × for the same
-pressure ratio.
+After the chord fix the sea-level value at −6° is 0.444 cd m⁻² and
+`at_altitude(2.4)` gives 0.515, i.e. the model is **1.16× brighter** at
+altitude.  The data are the other way round: Koomen's Maryland (30 m) sky is
+1.25× brighter than Patat's Paranal (2400 m), and Patat's own 961 → 743 hPa
+pair gives 1.28×.  The model's altitude response therefore has the **wrong
+sign**.
 
-So the model reproduces the sea-level sky but not the *altitude dependence* of
-the twilight.  Physically this is expected: at −6° the zenith line of sight is
-already in shadow below ~35 km, so the first-order term comes from the
-stratosphere and is almost independent of what happens below 2.4 km; the
-observed pressure dependence is carried by multiple scattering in the low
-atmosphere, which the plane-parallel solver under-represents.  This is the same
-physics as open question #2's "shape of the discrepancy", and it is the part of
-the problem the second dataset does *not* solve.
+Two things need separating.  First, the model's own `at_altitude` helper scales
+the US1976 density profile by `p(z0)/P0`, so the density at the 2.4 km site is
+0.746× too low; with a plain US1976 profile (observer moved to 2.4 km, no
+pressure rescaling) the deterministic model gives 0.470 (1.06×) and the
+spherical engine 0.541 (0.98×), i.e. the sign is closer but still not the
+data's 0.80×.  Second, the remaining difference is the same low-atmosphere
+multiple scattering: at sea level the engine adds 0.11 cd m⁻² of diffuse light
+that the plane-parallel solver misses, and at 2.4 km that low layer is gone.
+This is the physical gap the second dataset exposes; the chord fix does not
+close it, and the altitude comparison should not be used as a calibration
+constraint until `at_altitude` is audited.
 
 ## 6. Verdict
 
-**The 1.5 × excess at −6° is largely a Patat-specific (site) effect, not a
-model calibration error.**
+**The −6° level is no longer a factor-of-two problem; the altitude response
+is.**
 
-* Like-for-like, at sea level: model / Koomen = **1.14** (0.06 mag).  The
-  model's absolute twilight level at −6° is good to ~15 %.
-* Patat's Paranal sky is **0.24 mag darker** than Koomen's Maryland sky, as
-  expected from the 1013 → 743 hPa pressure ratio; the model/Patat ratio is
-  therefore 1.14 × 1.25 = **1.43** (`clear`) or 1.52 (`pristine`), reproducing
-  the number in the roadmap.
-* The second dataset does **not** show the model 1.5 × high; it sits between
-  the model and Patat, and its position is quantitatively explained by the
-  altitude difference between the two sites.
-* What the second dataset *does* expose is a genuine model deficiency: the
-  model has essentially **no altitude response** (0.3 %) where the data give
-  1.25–1.39 ×.  The model is right at sea level and wrong at 2400 m, for a
-  reason unrelated to the absolute calibration.
-* Below −9° the second dataset is consistent with the previously reported
-  1.4–1.6 × excess, but at `quality="low"` it cannot confirm it beyond ~1σ.
-
-The practical consequence for the project: `check5` should compare the model
-with Patat at **Paranal's pressure**, or state explicitly that the comparison
-is sea-level-model vs 2400 m-site; the ~0.3 mag offset is not a model error at
-−6°.  The open question that remains is why the model's multiple scattering
-does not scale with the low-atmosphere column.
+* At sea level: model / Koomen = **0.69** (deterministic) or **0.85**
+  (spherical engine).  The model is 15–30 % low, inside the 1950s calibration.
+* Against Patat: 0.86 (deterministic) or 1.07 (engine).  The old 1.14/2.20
+  were the one-branch chord.
+* At −9° the engine is 0.58 × Koomen (0.54 × Patat, medium; 1σ ~0.46–0.70);
+  the old 1.4–1.6 × excess is gone, replaced by a ~1.7 × deficit at ~2σ.
+* The model's altitude response has the wrong sign: it is slightly brighter at
+  2.4 km where the data are 0.80× darker.  `at_altitude` has a pressure-scaling
+  bug (density 0.746× too low at 2.4 km); the low-atmosphere multiple
+  scattering is the physical candidate.
+* The practical consequence: `check5` is single-scattering only and now reads
+  0.70× Patat at −6°; compare the full model/engine, not the single-scattering
+  harness, when discussing the absolute level.
 
 ## 7. What would settle the rest
 
+* an **audit of `at_altitude`**: fix the `p(z0)/P0` scaling and re-run the
+  two-site comparison; then compare the engine (spherical MS) at 0 and 2.4 km
+  against Koomen/Patat;
 * a **measured** twilight profile at a high-altitude site with a stated
   pressure (Paranal, Mauna Kea, Dome C) so that the model can be run at the
   same pressure rather than corrected by a scaling law;
-* a re-analysis of the model's plane-parallel multiple scattering against a
-  spherical Monte Carlo at −6° with the *same* atmosphere at two pressures —
-  the engine exists and would say directly whether the 1.003 × is physical or
-  a defect of the plane-parallel solver;
 * the original Koomen et al. tables (all degrees, both stations), which would
   give a two-pressure dataset from a single instrument — the cleanest possible
   test of the altitude response.

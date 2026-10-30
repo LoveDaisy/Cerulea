@@ -75,6 +75,29 @@ def test_refracted_path_length_horizontal(atmo):
     assert 1.55e6 < total < 1.75e6, total
 
 
+def test_refracted_path_below_horizon_includes_both_branches():
+    """The n != 1 helper must include the near-side perigee -> point segment."""
+    from skycolor.constants import R_EARTH
+    from skycolor.refraction import sun_path_lengths
+
+    rb = np.array([R_EARTH, R_EARTH + 2000, R_EARTH + 5000,
+                   R_EARTH + 20000, R_EARTH + 60000, R_EARTH + 120000.0])
+    n_layer = np.array([1.0003, 1.0003, 1.0002, 1.0001, 1.0])
+    r = R_EARTH + 40000.0
+    elev = np.radians(-6.0)
+    c = np.sin(elev)                       # mu_app = cos(apparent zenith)
+    a = n_layer[3] * r * np.cos(elev)      # point is in shell 3
+    L = sun_path_lengths(np.array([a]), np.array([c]), np.array([r]),
+                         rb, n_layer)[:, 0]
+
+    b = a / n_layer
+    s_lo = np.sqrt(np.maximum(rb[:-1]**2 - b**2, 0.0))
+    s_hi = np.sqrt(np.maximum(rb[1:]**2 - b**2, 0.0))
+    u = r * abs(c)
+    expected = (s_hi - s_lo) + (np.minimum(s_hi, u) - np.minimum(s_lo, u))
+    assert np.allclose(L, expected, rtol=1e-12)
+
+
 def test_refraction_geometry_lookup():
     from skycolor.refraction import geometry
 

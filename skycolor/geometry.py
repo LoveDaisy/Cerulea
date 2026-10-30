@@ -170,10 +170,20 @@ def shell_lengths_upward(p: float, r_bounds: np.ndarray, u_from, u_to) -> np.nda
 def path_lengths_sun(p_sun, cos_zenith_point, r_point, r_bounds) -> np.ndarray:
     """Per-shell path lengths of the sun ray from a point out to space.
 
-    When the sun is below the local tangent plane (``cos_zenith_point < 0``)
-    the ray first dips towards the Earth and then climbs out again, so the
-    shells between the perigee and the point are traversed *twice*.  Getting
-    this right is what makes the twilight arch appear in the right place.
+    When the sun is below the local horizontal (``cos_zenith_point < 0``) the
+    ray that reaches the point first descends to its perigee and then climbs
+    out on the far side.  The light traverses two branches:
+
+    * the far branch, perigee -> space, and
+    * the near branch, perigee -> the point.
+
+    Both are part of the optical depth.  In this decomposition ``up`` is the
+    part of the near branch above the point and ``down`` the part below it, so
+    ``up + down`` is one complete perigee -> space traversal (the near branch,
+    numerically equal to the far one).  The full sun ray is that traversal
+    plus the near-side ``perigee -> point`` segment, i.e. ``up + 2 * down``.
+    Counting only ``up + down`` stops at the perigee and halves the optical
+    depth of every grazing twilight ray.
 
     Returns ``(n_shell, n_points)``.
     """
@@ -186,7 +196,7 @@ def path_lengths_sun(p_sun, cos_zenith_point, r_point, r_bounds) -> np.ndarray:
     s0, s1 = s[:-1], s[1:]
     up = np.maximum(s1 - np.maximum(s0, u_point), 0.0)
     down = np.maximum(np.minimum(s1, u_point) - np.minimum(s0, u_point), 0.0)
-    return up + np.where(c[None, :] < 0.0, down, 0.0)
+    return up + np.where(c[None, :] < 0.0, 2.0 * down, 0.0)
 
 
 def is_sunlit(p_sun, cos_zenith_point, r_earth: float = R_EARTH) -> np.ndarray:
@@ -214,6 +224,11 @@ def sky_angles(n_zenith: int = 48, n_azimuth: int = 96, vmin_deg: float = 0.0):
 def path_lengths_sun_array(p, cos_zenith_point, r_point, r_bounds) -> np.ndarray:
     """Vectorised :func:`path_lengths_sun` for arrays of arbitrary shape.
 
+    The two-branch geometry of :func:`path_lengths_sun` applies unchanged:
+    when the sun is below the local horizontal the near-side
+    ``perigee -> point`` segment is included, hence the factor two on
+    ``down``.
+
     Returns an array of shape ``(n_shell,) + np.shape(p)``.
     """
     rb = np.asarray(r_bounds, dtype=float)
@@ -226,4 +241,4 @@ def path_lengths_sun_array(p, cos_zenith_point, r_point, r_bounds) -> np.ndarray
     s0, s1 = s[:-1], s[1:]
     up = np.maximum(s1 - np.maximum(s0, u_point[None]), 0.0)
     down = np.maximum(np.minimum(s1, u_point[None]) - np.minimum(s0, u_point[None]), 0.0)
-    return up + np.where(c[None] < 0.0, down, 0.0)
+    return up + np.where(c[None] < 0.0, 2.0 * down, 0.0)

@@ -168,66 +168,67 @@ O(10 %) of the multiple-scattering part.)
 
 | solar elev. | view zenith | deterministic [cd m⁻²] | engine [cd m⁻²] | ratio | σ |
 |---:|---:|---:|---:|---:|---:|
-| −3° | 0° | 37.58 | 37.73 | **1.004** | 0.7 % |
-| −3° | 30° | 52.55 | 54.00 | 1.028 | 0.6 % |
-| −3° | 60° | 120.9 | 127.1 | 1.051 | 0.6 % |
-| −3° | 80° | 293.1 | 315.7 | 1.077 | 0.7 % |
-| −4.5° | 0° | 6.736 | 7.227 | 1.073 | 0.9 % |
-| −4.5° | 60° | 26.56 | 29.93 | 1.127 | 0.6 % |
-| −6° | 0° | 0.7368 | 0.9856 | **1.338** | 2.2 % |
-| −6° | 60° | 4.012 | 5.200 | 1.296 | 0.8 % |
-| −6° | 80° | 19.24 | 23.29 | 1.211 | 0.7 % |
+| −3° | 0° | 20.11 | 20.47 | **1.018** | 0.6 % |
+| −3° | 30° | 28.63 | 30.07 | 1.050 | 0.5 % |
+| −3° | 60° | 68.43 | 73.43 | 1.073 | 0.5 % |
+| −3° | 80° | 175.4 | 193.3 | 1.102 | 0.6 % |
+| −4.5° | 0° | 3.557 | 3.798 | 1.068 | 0.8 % |
+| −4.5° | 60° | 14.54 | 16.51 | 1.136 | 0.5 % |
+| −6° | 0° | 0.4443 | 0.5625 | **1.266** | 1.8 % |
+| −6° | 60° | 2.415 | 3.073 | 1.273 | 0.7 % |
+| −6° | 80° | 11.11 | 13.32 | 1.198 | 0.7 % |
 
-**Where the models agree.**  Down to −3° the two agree to 0.4–8 %; the
+**Where the models agree.**  Down to −3° the two agree to 2–10 %; the
 difference is entirely the multiple-scattering field, and it grows as the
-diffuse transport becomes non-local (8 % at 80° at −3°, 14 % at −4.5°).  Above
+diffuse transport becomes non-local (10 % at 80° at −3°, 14 % at −4.5°).  Above
 the horizon (−3° to +90°) this is the expected size of the plane-parallel
 error.
 
 **Where they do not.**  Below about −4.5° the plane-parallel multiple
 scattering loses the horizontal transport and the two models diverge by
-30–35 % at −6°, and by an order of magnitude at −9° (the deterministic model
-is 20× too dark at −9° and essentially zero at −12°).  *This is the point of
+20–27 % at −6°, and by an order of magnitude at −9° (the deterministic model
+is ~60× too dark at −9° and essentially zero at −12°).  *This is the point of
 the engine*: the spherical answer is the correct one there, and the engine
 should be used instead of the deterministic model.
 
 ### 2.2 Patat, Ugolnikov & Postylyakov (2006)
 
-Zenith V-band luminance, 5 anchor wavelengths and 3 × 10⁷ photons (between the
-`low` and `medium` presets).  Reference: the Table 1
-second-order fit of Patat et al. (2006, A&A 455, 385) converted with
-`L = 1.08 × 10⁵ × 10^(−0.4 m_V)` cd m⁻² (the same reference and conversion as
-`validation/check5_twilight.py`).  The −3° and −18° points are extrapolations
-of that fit outside its stated 95° ≤ ζ ≤ 105° validity range.
+Zenith V-band luminance, `quality="medium"` (8 anchors, 1.2 × 10⁷ photons
+per anchor).  Reference: the Table 1 second-order fit of Patat et al. (2006,
+A&A 455, 385) converted with `L = 1.08 × 10⁵ × 10^(−0.4 m_V)` cd m⁻² (the same
+reference and conversion as `validation/check5_twilight.py`).  The −3° and
+−18° points are extrapolations of that fit outside its stated
+95° ≤ ζ ≤ 105° validity range.
 
 | solar elev. | Patat 2006 [cd m⁻²] | single only | deterministic (single + plane-parallel MS) | **engine** (stat. error) | engine / Patat |
 |---:|---:|---:|---:|---:|---:|
-| −3° (extrap.) | 40.09 | 28.57 | 37.58 | **37.80** ± 0.24 | **0.94** |
-| −6° | 0.516 | 0.570 | 0.737 | **0.978** ± 0.018 | **1.89** |
-| −9° | 0.0171 | 7.38 × 10⁻⁴ | 9.58 × 10⁻⁴ | **0.0238** ± 0.0043 | **1.39** |
-| −12° | 0.00146 | 7.56 × 10⁻⁷ | 9.80 × 10⁻⁷ | **2.12 × 10⁻³** ± 1.28 × 10⁻³ | **1.45** |
+| −3° (extrap.) | 40.09 | 16.19 | 20.11 | **20.47** ± 0.12 | **0.51** |
+| −6° | 0.516 | 0.366 | 0.444 | **0.563** ± 0.010 | **1.09** |
+| −9° | 0.0171 | 2.95 × 10⁻⁴ | 5.85 × 10⁻⁴ | **9.31 × 10⁻³** ± 1.91 × 10⁻³ | **0.54** |
+| −12° | 0.00146 | 1.15 × 10⁻⁵ | 1.17 × 10⁻⁵ | **5.46 × 10⁻⁴** ± 3.16 × 10⁻⁴ | **0.37** |
 
 **Tolerance considered acceptable.**  A factor of 2 (0.3 dex) in absolute
 luminance at every elevation, with a factor of 1.5 preferred inside the fitted
 range (−6° to −12°).  This is the tolerance used by `validation/check5`
 (0.5 dex) tightened by the extra physics the engine supplies.
 
-**Verdict: all four elevations are within a factor of 2, and the deep
-twilight — where single scattering is 23× too dark at −9° and 1900× too dark
-at −12° — is now within 1.4–1.5×.**
+**Verdict: the chord fix removed the old excess and revealed a deficit at
+depth.**  At −6° the engine is 1.09× Patat (0.87× Koomen); at −9° it is
+0.54× Patat (0.58× Koomen), and at −12° 0.37× Patat (0.42× Koomen).  The
+−9° and −12° points carry 20 % and 58 % statistical error, so the −9° deficit
+is ~2σ and the −12° one ~1.5σ; they are consistent with a converged value of
+0.6–1.0 at −9° and 0.4–1.0 at −12°.  The factor-2 tolerance is met at −6° and
+−9°, not at −12°.
 
-The engine meets the **factor-2** tolerance at every elevation.  It does *not*
-meet the preferred **factor-1.5** tolerance at −6° (1.89); it does at −9°
-(1.39) and −12° (1.45).  The single-scattering column shows why the engine is
-needed at all: 0.043× the reference at −9° and 0.0005× at −12°, against 1.39×
-and 1.45× for the engine.
+The single-scattering column shows why the engine is needed at all: 0.017× the
+reference at −9° and 0.008× at −12°, against 0.54 and 0.37 for the engine.
 
-The remaining error is a **factor 1.4–1.9 overestimate**, not an
-underestimate, and at −9°/−12° it is inside the (18 % / 60 %) statistical
-error.
-At −6° it is dominated by the model-atmosphere/site mismatch described below;
-at −9° and −12° the statistical error is 18 % and 60 %, so the 1.4× ratios are
-consistent with a converged value of order 1.0–1.5 within 1–2σ.
+The residual now changes sign with depth (1.09 → 0.54 → 0.37) and is
+consistent with the same low-atmosphere multiple scattering that the
+plane-parallel solver misses and that the engine only partially recovers.  The
+old 1.39/1.45 "excess" was the one-branch chord (M10); the low-quality
+`check6` run gives 0.0124 ± 0.0043 at −9°, consistent with the medium value
+within 1σ.
 
 Two caveats must be read with the table:
 
@@ -235,17 +236,9 @@ Two caveats must be read with the table:
   measured sky is the natural night sky (airglow, no scattering); the model has
   no airglow, so the −18° row measures the absence of an emission component,
   not a scattering error;
-* the **−6°** comparison is the one where the engine *overshoots*.  The
-  first-order model already matches Patat to +10 % there, and the spherical
-  multiple scattering adds another +34 % (the deterministic plane-parallel
-  solver adds +30 %, so this is not a Monte Carlo artefact — the direct
-  reference Monte Carlo gives the same value).  The model atmosphere is a
-  sea-level mid-latitude standard atmosphere with AOD 0.05, while Paranal is a
-  2400 m desert site with an extremely clean, dry atmosphere; a site-specific
-  atmosphere would lower both the Rayleigh column and the multiple scattering.
-  We regard this as a **model-atmosphere/reference-site mismatch rather than a
-  transport error**, but it is not resolved here and it is the largest
-  remaining absolute-photometry uncertainty at −6°.
+* the **−6°** comparison is now the best-constrained point: 1.09× Patat and
+  0.87× Koomen, inside the site/calibration spread.  The old "the engine
+  overshoots at −6°" caveat was the chord bug.
 
 ### 2.3 Bias against a high-photon direct Monte Carlo
 
@@ -356,10 +349,12 @@ same `rt/single.sky_radiance` call the production model makes.
    run.**
 2. **The anti-solar horizon** (§2.3): ~10 % low at −9°, a smoother-resolution
    effect.
-3. **The −6° absolute level**: the engine is ~1.4–1.9× the Patat fit, and the
-   direct Monte Carlo agrees with the engine, so the excess is in the model
-   atmosphere (sea level, AOD 0.05) rather than in the transport.  Not resolved
-   here.
+3. **The twilight level**: after the M10 chord fix the engine is 1.09× Patat
+   (0.87× Koomen) at −6°, 0.54× at −9° and 0.37× at −12°.  The residual is now
+   a deficit that grows with depth, consistent with the low-atmosphere multiple
+   scattering that the plane-parallel solver misses; the −6° point is inside
+   the site/calibration spread.  The old "engine is 1.4–1.9× the Patat fit"
+   was the one-branch chord.
 4. **No airglow.**  Below about −15° the real sky is dominated by the natural
    night sky, which the model does not contain; the −18° comparison is
    therefore not a test of the engine.

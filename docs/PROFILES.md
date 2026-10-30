@@ -1,5 +1,13 @@
 # Vertical structure and the twilight excess at −6°
 
+> **Superseded by the M10 chord fix.**  The "factor 0.66" this document tries
+> to explain was the one-branch solar chord, not a real excess.  After the fix
+> the model is 0.69× Koomen (deterministic) / 0.85× (spherical engine) at −6°,
+> so there is no 0.66 to fill.  The sensitivity results below are retained as a
+> record: they correctly show that vertical structure is not a lever, and the
+> statement "the −6° zenith is lit by 35–60 km and dimmed by the shadowed
+> troposphere" is still the right physical picture.
+
 **Verdict: no.**  No plausible change to the vertical structure of the
 atmosphere reduces the −6° zenith luminance by the factor **0.66** that would
 be needed to reach Patat et al. (2006).  The ozone profile *shape* moves it by

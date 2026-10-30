@@ -56,7 +56,8 @@ kilometres.  A split-estimator Monte Carlo (exact deterministic first order +
 Monte Carlo for orders ≥ 2) on a coarse angular grid closes the gap.
 
 *Validated:* −9° goes from 24× too dark to 1.39× of Patat et al. (2006); −12°
-from 1500× to 1.45×.
+from 1500× to 1.45×.  (M10 later moved these to 0.54× and 0.37×: the 1.39/1.45
+were the one-branch chord.)
 *Code:* `rt/twilight.py`, `docs/TWILIGHT.md`.
 
 ### M6 — refraction, taken seriously (**now the default**)
@@ -71,8 +72,8 @@ a ray trace per photon.
 (1661 km vs 1663 km for a horizontal ray); the apparent-elevation table against
 the ray tracer.
 *Code:* `refraction.py`, `data/refraction.csv`, `docs/REFRACTION.md`.
-*Consequence:* twilight is 2–5× brighter, and the absolute twilight level is
-now the open question (see below).
+*Consequence:* twilight is 2–5× brighter.  The absolute level that this exposed
+was later traced to a two-branch chord bug (M10), not to refraction itself.
 
 ### M7 — a cloud deck
 
@@ -98,6 +99,7 @@ A single reference cannot separate a model error from a reference bias.  A
 second, independent, *photopic* twilight measurement (Koomen et al. 1952,
 sea level) showed that the model is 1.14× the measurement like-for-like, and
 that the remaining factor is the 2400 m altitude of the original reference.
+(M10 later showed the 1.14 was a partial cancellation; see below.)
 The search also turned up the one thing that is wrong: the model has almost no
 altitude response.  See `validation/SECOND_DATASET.md`.
 
@@ -113,6 +115,30 @@ Two questions that turned out to have clean answers:
 
 *Figures:* `08_volcanic_twilight.png`, `09_blue_sun.png`.
 
+### M10 — the solar chord: one branch short
+
+The twilight level was not a physical excess.  For a scattering point whose
+sun is below the local horizontal, the ray to the sun crosses its perigee: the
+light traverses the far branch (perigee → space) and the near branch
+(perigee → point).  `path_lengths_sun` returned only one perigee → space
+traversal, i.e. it stopped at the perigee and dropped the near-side
+perigee → point segment.  Every grazing twilight ray was therefore
+under-attenuated by half of its dense lower-atmosphere column.
+
+*Verified:* the geometric column at 40 km, χ = 96°, against a numerical line
+integral: 8.67 × 10³⁰ vs 4.35 × 10³⁰ m⁻², ratio 1.99.  The refracted column
+at 38/47/60 km against an RK4 ray trace: 0.50 before, 0.995/1.010/0.984 after.
+*Consequence:* the −6° zenith moves from 1.42 to 0.44 cd m⁻² (deterministic)
+and from 0.99 to 0.55 (spherical engine); model/Koomen goes from 2.20 to 0.69
+(deterministic) or 0.85 (engine); model/Patat from 2.75 to 0.86 or 1.07.  The
+old geometric 1.14× was a partial cancellation between this bug (too bright)
+and the absence of refraction (too dark).
+*Code:* `geometry.py`, `refraction.py`, `tests/test_geometry.py`,
+`tests/test_refraction.py`.
+*Lesson:* the Monte Carlo and the engine share `path_lengths_sun`, so their
+1 % agreement could not catch this; the independent check has to be a line
+integral or a ray trace.
+
 ---
 
 ## Open questions that matter now
@@ -120,50 +146,46 @@ Two questions that turned out to have clean answers:
 These are not roadmap items, they are the things we do not currently
 understand.  Each is worth resolving before adding new physics.
 
-1. **Resolved: the solar-altitude convention does not matter.**  Computing the
-   sky both ways settles it — the two self-consistent readings are nearly
-   degenerate, because shifting the reference axis by the refraction (0.5°) and
-   raising the terminator by the same 0.5° are the same operation:
+1. **Resolved, but the old answer was a bug artifact: the solar-altitude
+   convention.**  The previous version of this page found H1 and H2 nearly
+   degenerate.  That was computed with the one-branch chord (M10), which
+   over-brightened twilight by ~2× and happened to compensate the 0.5° axis
+   shift.  After the fix the two readings are far apart (ratios to Koomen):
 
    | reading | −3° | −6° |
    |---|---|---|
-   | H1: reference axis is *true* altitude, refraction on | 1.44× | 3.28× |
-   | H2: reference axis is *apparent* altitude, refraction on | 0.91× | 1.58× |
-   | geometric model (refraction off, true axis) | 1.03× | 1.52× |
+   | H1: reference axis is *true* altitude, refraction on | 0.93× | **0.69×** |
+   | H2: reference axis is *apparent* altitude, refraction on | — | 0.29× |
+   | geometric model (refraction off, true axis) | 0.75× | 0.46× |
 
-   H2 is the better reading, and it lands within a few per cent of the plain
-   geometric model.  So the convention is not worth resolving further: keep
-   refraction off for speed, turn it on when the *apparent* solar position
-   matters (drawing the disk, matching a timestamped photograph).
-   **The open question it was masking is the next one.**
-2. **Resolved, and it was the wrong question: the twilight excess is a site
-   effect.**  A second, independent, *photopic* measurement — Koomen et al.
-   (1952), JOSA 42, 353, Maryland, 30 m — settles it.  Like for like, at sea
-   level, the model is **1.14×** the measurement at −6°, not 1.5×.  Koomen's
-   sea-level sky is itself 1.25× (0.24 mag) brighter than the Patat fit, and
-   that difference *is* the altitude of Paranal (2400 m): Patat et al. measure
-   ΔV = 0.27 ± 0.03 mag between 961 and 743 hPa themselves, and Koomen's own
-   second station at 2800 m shows the same.  So 1.14 × 1.25 = 1.43 is the
-   whole of the old "1.5× excess" — the comparison was mixing a sea-level model
-   with a 2400 m reference.  See `validation/SECOND_DATASET.md`.
+   H2 is now much too dark.  The references almost certainly tabulate the
+   **true** (ephemeris) solar altitude, so use H1; refraction stays on by
+   default, and the geometric mode is kept only to reproduce old numbers.  The
+   convention is now a ~10 % systematic, not a factor of two.
+2. **The twilight level was a chord bug, not a site effect and not a physical
+   excess.**  A second, independent, *photopic* measurement — Koomen et al.
+   (1952), JOSA 42, 353, Maryland, 30 m — lets the model be compared like for
+   like at sea level.  With the two-branch chord (M10) the −6° zenith is
+   **0.69×** Koomen (deterministic) or **0.85×** (spherical engine), and
+   0.86× / 1.07× Patat.  The old 2.20× (and the 1.14× geometric before it)
+   were artifacts: the missing near-side perigee→point segment made every
+   grazing ray too bright, and the geometric mode's missing refraction partly
+   cancelled it.  The residual 15–30 % is inside the 1950s absolute
+   calibration (±0.2–0.4 mag) and the plane-parallel multiple-scattering
+   approximation; it is no longer a factor-of-two problem.  See
+   `validation/SECOND_DATASET.md` and the sixth addendum of
+   `validation/ADDENDUM.md`.
 
-   **Caveat, and it is the live question.**  Refraction is now on by default.
-   That raises twilight by 2–5×, and the sea-level agreement moves from 1.14×
-   to **2.2×** at −6° (Koomen) and 1.43× → 2.75× (Patat).  Since a real sky
-   includes refraction, this is honest evidence that the model's twilight
-   *level* is 1.5–2.5× too bright, and that the earlier 1.14× was partly a
-   cancellation between a terminator that was too low and a twilight that was
-   too bright.  Settling it needs the altitude sweep below plus a decision on
-   whether the optical depth of the grazing solar ray is right at 30–35 km.
-
-   **The other defect the second dataset exposed is different and worth a
-   milestone of its own:** the model has almost no altitude response.  Run at 2.4 km it changes
-   by 0.3 %, while the data demand 1.25–1.39× for that pressure ratio.  The
-   model is right at sea level and wrong at altitude, which means some of the
-   twilight light must come from the *low* atmosphere — the shadowed
-   troposphere, lit from above by the diffuse field — and our multiple
-   scattering does not produce enough of it.  That is a physical gap, not a
-   calibration one.
+   **The defect the second dataset exposed is still open, and the chord fix
+   changed its sign.**  Run at 2.4 km, the deterministic model is 1.06×
+   *brighter* and the spherical engine 0.98×, while the data (Koomen Maryland
+   30 m vs Patat Paranal 2400 m; Patat's own 961 vs 743 hPa pair) are 0.80×
+   *darker*.  The model's altitude response therefore has the wrong sign.  Part
+   of the problem is the `at_altitude` helper: it scales the US1976 density
+   profile by `p(z0)/P0`, so the density at the 2.4 km site comes out 0.746×
+   too low.  The altitude comparison needs its own audit before it can be used
+   as a constraint; the missing low-atmosphere multiple scattering remains the
+   physical candidate.
 
 3. **The limb.**  The model's horizon is ≈ 2× brighter than the CIE 110 fit.
    The CIE formula is a daylighting standard, not a physical model, so this may
@@ -248,7 +270,9 @@ For the original question — *what colour is the sky, and why?* — the project
 close.  What remains is not more phenomena but **tighter error bars**:
 
 * a measured clear-sky spectral radiance set to replace the CIE fit at the limb;
-* an altitude-dependent twilight, which the second dataset showed is missing;
+* an altitude-dependent twilight with the right *sign* (the chord fix resolved
+  the absolute level, but the model is still brighter at 2.4 km where the data
+  are darker; `at_altitude` needs auditing first);
 * polarisation, which is the one large piece of physics still missing.
 
 Everything else on this page is either a different project (3D clouds) or a

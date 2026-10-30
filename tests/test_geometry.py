@@ -27,6 +27,41 @@ def test_vertical_sun_path_decreases_with_height():
     assert total[0] > total[1] > total[2] > 0
 
 
+def test_sun_path_below_horizon_includes_both_branches():
+    """A downward sun ray crosses the perigee: far branch + near branch."""
+    rb = np.array([R_EARTH, R_EARTH + 2000, R_EARTH + 5000,
+                   R_EARTH + 20000, R_EARTH + 60000, R_EARTH + 120000.0])
+    r = R_EARTH + 40000.0
+    chi = np.radians(96.0)
+    p = r * np.sin(chi)
+    c = np.cos(chi)
+    L = path_lengths_sun(np.array([p]), np.array([c]), np.array([r]), rb)[:, 0]
+
+    s = np.sqrt(np.maximum(rb**2 - p**2, 0.0))
+    u = r * abs(c)
+    # far branch: a full chord in every shell; near branch: perigee -> point
+    expected = (s[1:] - s[:-1]) + (np.minimum(s[1:], u) - np.minimum(s[:-1], u))
+    assert np.allclose(L, expected, rtol=1e-12)
+    # one branch alone (the old behaviour) is measurably shorter
+    assert expected.sum() > 1.4 * (s[-1] - s[0])
+
+
+def test_sun_path_above_horizon_is_single_branch():
+    """A ray that starts upwards never reaches the perigee; no extra branch."""
+    rb = np.array([R_EARTH, R_EARTH + 2000, R_EARTH + 5000,
+                   R_EARTH + 20000, R_EARTH + 60000, R_EARTH + 120000.0])
+    r = R_EARTH + 40000.0
+    chi = np.radians(80.0)
+    p = r * np.sin(chi)
+    c = np.cos(chi)
+    L = path_lengths_sun(np.array([p]), np.array([c]), np.array([r]), rb)[:, 0]
+
+    s = np.sqrt(np.maximum(rb**2 - p**2, 0.0))
+    u = r * abs(c)
+    expected = np.maximum(s[1:] - np.maximum(s[:-1], u), 0.0)
+    assert np.allclose(L, expected, rtol=1e-12)
+
+
 def test_sunlit_criterion():
     # looking up -> always lit, even with a tiny impact parameter
     assert is_sunlit(np.array([1e5]), np.array([0.5]))

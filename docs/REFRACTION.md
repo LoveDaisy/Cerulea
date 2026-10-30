@@ -80,38 +80,41 @@ altitude `z` is still sunlit, comes out as
   earlier worry that it should only be applied near the horizon was right
   physically, but the closed form removes the need to encode it.)
 
-## The measured effect, and why it is still off by default
+## The measured effect, and the two-branch chord
 
-Bending the paths raises the terminator by 0.5-1.0 degrees and therefore makes
-twilight **brighter by a factor of 2-5**:
+Bending the paths raises the terminator by 0.5–1.0 degrees and makes twilight
+brighter.  With the corrected two-branch chord (see below) the model gives,
+for the `clear` preset at sea level:
 
-| solar elevation | geometric shadow | full refraction | Patat et al. (2006) |
-|---|---|---|---|
-| -3 deg | 41.2 | 57.6 | 40.1 |
-| -6 deg | 0.79 | 1.69 | 0.516 |
-| -9 deg | 1.1e-3 | 5.3e-3 | 0.0171 |
+| solar elevation | geometric | full refraction | Koomen 1952 | Patat 2006 |
+|---|---|---|---|---|
+| −3° | 16.0 (0.75 K) | 20.1 (0.93 K) | 21.5 | 40.1 † |
+| −6° | 0.295 (0.46 K) | 0.444 (0.69 K) | 0.646 | 0.516 |
 
-Does that mean refraction should be off?  Not exactly: it is nearly degenerate
-with the convention used for the reference's x-axis.  If the tabulated "solar
-elevation" is the **apparent** altitude, then a data point at -3 deg apparent
-corresponds to -3.55 deg true, and the model must be evaluated there:
+† Patat's −3° is an extrapolation.
 
-| reading | -3 deg | -6 deg |
+`sun_path_lengths` follows the *whole* solar ray: for a point whose sun is
+below the local horizontal the light goes through the perigee, so the optical
+depth is the far branch (perigee → space) plus the near branch (perigee →
+point).  An earlier implementation returned only one perigee → space traversal
+(the "one-branch chord"); it under-attenuated every grazing twilight ray and
+was the real source of the old 2.20× excess.  See the sixth addendum of
+`validation/ADDENDUM.md`.
+
+### The solar-altitude convention
+
+If the reference's "solar elevation" is the **apparent** altitude, a data point
+at −6° apparent corresponds to −6.55° true, and the model must be evaluated
+there:
+
+| reading | −3° | −6° |
 |---|---|---|
-| H1: reference axis is *true*, refraction on | 1.44x | 3.28x |
-| H2: reference axis is *apparent*, refraction on | 0.91x | 1.58x |
-| geometric model (refraction off, true axis) | 1.03x | 1.52x |
+| H1: reference axis is *true*, refraction on | 0.50× | 0.86× |
+| H2: reference axis is *apparent*, refraction on | — | 0.36× |
+| geometric model (refraction off, true axis) | 0.40× | 0.57× |
 
-H2 fits the reference better, and it is within a few per cent of the plain
-geometric model -- shifting the reference axis by 0.5 deg and raising the
-terminator by 0.5 deg are the same operation.  So the convention cannot be
-determined from this data, and it does not change the prediction.
-
-Practical consequence: **refraction is on by default** (`Atmosphere(refraction=True)`,
-since the physics is right and the extra cost is a division per shell).  The
-`refraction=False` switch reproduces the geometric-shadow numbers quoted in the
-older reports, which is useful because it is the mode that agrees better with
-the sea-level twilight measurement -- see the caveat below.
-
-The residual 1.5x at -6 deg survives both readings and is therefore a genuine
-discrepancy; it is tracked as open question #2 in `docs/ROADMAP.md`.
+(ratios to Patat).  H1 is the better reading; H2 is much too dark.  The old
+"the two readings are degenerate" result was computed with the one-branch
+chord.  The references almost certainly tabulate the true (ephemeris) solar
+altitude.  Refraction stays on by default; `refraction=False` reproduces the
+geometric numbers above.

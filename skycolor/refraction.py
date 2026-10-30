@@ -347,6 +347,15 @@ def sun_path_lengths(a, mu_app, r_point, r_bounds, n_layer):
     form as a straight ray with ``p`` replaced by ``b_k`` -- which is why the
     whole correction costs one division rather than a ray trace.
 
+    The two-branch geometry is the same as in
+    :func:`skycolor.geometry.path_lengths_sun`: when the source is below the
+    local horizontal (``mu_app < 0``) the ray reaches the point through the
+    perigee, so the full path is the far branch (perigee -> space) plus the
+    near branch (perigee -> point).  ``up + down`` is one perigee -> space
+    traversal; the near-side ``perigee -> point`` segment adds another
+    ``down``, hence the factor two.  Without it every grazing twilight ray
+    is under-attenuated by half of its dense lower-atmosphere column.
+
     Returns an array of shape ``(n_shell, ...)`` matching ``a``.
     """
     a = np.asarray(a, dtype=float)
@@ -364,4 +373,4 @@ def sun_path_lengths(a, mu_app, r_point, r_bounds, n_layer):
     u_point = r * np.abs(c)
     up = np.maximum(s_hi - np.maximum(s_lo, u_point[None]), 0.0)
     down = np.maximum(np.minimum(s_hi, u_point[None]) - np.minimum(s_lo, u_point[None]), 0.0)
-    return up + np.where(c[None] < 0.0, down, 0.0)
+    return up + np.where(c[None] < 0.0, 2.0 * down, 0.0)
