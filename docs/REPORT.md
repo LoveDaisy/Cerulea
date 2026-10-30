@@ -110,14 +110,19 @@ See `validation/REPORT.md` for the full table.  Headlines:
 |---|---|
 | Rayleigh optical depth vs Bodhaine (1999), 300–700 nm | RMS 0.48 %, worst 1.0 % → **pass** |
 | Direct normal illuminance vs Bird & Hulstrom / ASTM G173 | +4 to +6 % → **pass** |
-| Diffuse horizontal illuminance vs CIE 110 | +6 to +10 % → **pass** |
-| CIE 110 clear-sky relative luminance, θ ≤ 60° | RMS 3–4 % → **pass** |
+| Diffuse horizontal illuminance vs CIE 110 (T = 2.2) | +38 %, but 9.5 klx = 86 W m⁻² is a normal measured clear-sky DHI → **reference is the weak link** |
+| CIE 110 clear-sky relative luminance, θ ≤ 60° | 3.8 % RMS single-scattering only; 14.5 % with multiple scattering (dominated by one point, the solar aureole) |
 | CIE 110 relative luminance, last 5° above the horizon | model ≈ 2× too bright → **known deviation** |
-| CIE 110 relative luminance at the sun's position | model too weak (aureole under-resolved) → **known deviation** |
+| CIE 110 relative luminance at the sun's position | model too weak (the HG aureole has no forward peak) → **known deviation** |
 | Single scattering vs the analytic plane-parallel Rayleigh solution | 1.5–4 % → **pass** |
+| Single scattering vs Monte Carlo (thin atmosphere, 9 points) | within 1.7σ → **pass** |
 | Diffuse / direct ratio, pure Rayleigh atmosphere | 0.056 vs 0.061 analytic → **pass** |
 | SOS energy conservation (conservative atmosphere) | 2.3 × 10⁻⁴ → **pass** |
-| Monte Carlo reference vs the deterministic model | see `docs/MC_REFERENCE.md` |
+| MC global energy conservation | 0.9985 → **pass** |
+| MS/SS at the zenith, sun at 60°, clear sky | 0.31 (SOS) vs 0.31 (MC) → **pass** |
+| Twilight zenith luminance at −6°, h = −6° | 0.567 vs 0.516 cd m⁻² (Patat et al. 2006) → +10 % → **pass** |
+| Twilight zenith luminance at −9° and below | 20×–2000× too dark → **known failure**, see below |
+| Horizon chromaticity vs measured Berlin spectra | Δxy = 0.019 (tolerance 0.02) → **marginal pass** |
 
 The two deviations are understood and documented rather than papered over:
 the last few degrees above the horizon are where the plane-parallel diffuse
@@ -158,6 +163,16 @@ Three separate mechanisms produce the twilight sky:
    black: light scattered in the still-sunlit upper atmosphere diffuses down
    into the shadow.
 
+The last of these is where the model stops working.  At −6° the zenith
+luminance is within 10 % of the empirical fit of Patat et al. (2006), but at
+−9° it is 20× too dark and at −12° it is essentially zero.  The reason is
+geometric rather than radiative: the zenith line of sight at −9° is entirely
+inside the Earth's shadow, and the light that actually reaches it has travelled
+several hundred kilometres *horizontally* from the sunlit twilight arch.  A
+horizontally homogeneous, plane-parallel multiple-scattering solver has no
+mechanism for that transport.  Reproducing deep twilight needs a spherical
+three-dimensional multiple-scattering model.
+
 ### 4.4 Air
 
 The aerosol optical depth, the Ångström exponent and the single-scattering
@@ -191,9 +206,15 @@ is depressed, and the whole sky gains contrast.
   the polarised sky (and the neutral points, Babinet and Brewster) would need a
   Stokes-vector treatment.
 * **Plane-parallel multiple scattering.**  Higher orders ignore the Earth's
-  curvature; this is a few per cent except near the horizon.
-* **120 km top.**  Astronomical twilight (sun below −10°) is dominated by
-  scattering above 120 km; the model therefore goes dark too fast there.
+  curvature.  At a viewing zenith angle of 88° the plane-parallel airmass is
+  28.6 against a true spherical value of about 19, so the limb's diffuse
+  radiance is over-estimated by roughly 50 %.  Away from the horizon the error
+  is small.
+* **Deep twilight.**  Below about −8° the failure is geometric: the light
+  reaching the zenith has to travel horizontally from the sunlit twilight
+  arch, which a plane-parallel multiple-scattering solver cannot represent.
+  The atmosphere is extended to 200 km with a thermospheric tail, but that is
+  not the limiting factor.
 * **No refraction.**  The sun's apparent position is not raised by ~0.5° at the
   horizon, so the twilight timing is off by a couple of minutes.
 * **Henyey-Greenstein aureole.**  The solar aureole is too smooth.

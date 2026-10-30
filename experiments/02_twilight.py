@@ -16,10 +16,11 @@ import numpy as np
 from common import FIG, OUT, WL, chromaticity_of, save, strip
 from skycolor import color, presets, render
 
-#: approximate ranges of clear-sky zenith luminance quoted in the literature
-#: (Rozenberg 1966; Krisciunas & Schaefer 1991; modern all-sky cameras).
-LIT = [(-0.5, 200, 600), (-3.0, 30, 120), (-6.0, 2, 12), (-9.0, 0.3, 2.0),
-       (-12.0, 0.02, 0.3), (-18.0, 0.0005, 0.005)]
+#: Clear-sky zenith luminance in the V band, from the empirical fit of
+#: Patat, Ugolnikov & Postylyakov (2006), A&A 455, 385 (the reference used in
+#: ``validation/check5_twilight.py``).  A factor-of-two band is drawn around it.
+PATAT_2006 = {-3.0: 0.0, -6.0: 0.516, -9.0: 0.0171, -12.0: 0.00146, -18.0: 0.000181}
+LIT = [(k, v / 2, v * 2) for k, v in PATAT_2006.items() if v > 0]
 
 
 def main():
@@ -43,7 +44,7 @@ def main():
     axes[0].semilogy(depressions, zen_lum, "k-", lw=2, label="model, zenith")
     for e, lo, hi in LIT:
         axes[0].plot([-e, -e], [lo, hi], "o-", color="tab:red", ms=6, lw=2,
-                     label="literature range" if e == -0.5 else None)
+                     label="Patat et al. 2006 (x2 band)" if e == -6 else None)
     for name, e in [("civil", -6), ("nautical", -12), ("astronomical", -18)]:
         axes[0].axvline(-e, color="0.7", ls="--", lw=0.8)
         axes[0].text(-e + 0.15, 1e3, name, rotation=90, va="top", fontsize=7, color="0.4")

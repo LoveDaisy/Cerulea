@@ -23,8 +23,9 @@ def draw_cie(ax):
     from skycolor import spectra
 
     x, y = np.meshgrid(np.linspace(0, 0.8, 400), np.linspace(0, 0.9, 450))
-    XYZ = np.stack([x / y, np.ones_like(x), (1 - x - y) / y], axis=-1)
-    rgb = color.xyz_to_linear_srgb(XYZ)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        XYZ = np.stack([x / y, np.ones_like(x), (1 - x - y) / y], axis=-1)
+        rgb = color.xyz_to_linear_srgb(XYZ)
     inside = (rgb.min(axis=-1) > -0.02) & (x + y < 1)
     loc = spectra.cie_xyz(np.arange(380, 781, 1.0))
     wl = np.arange(380, 781, 1.0)
@@ -37,8 +38,9 @@ def draw_cie(ax):
     patch = PathPatch(path, facecolor="none", edgecolor="0.4", lw=0.8)
     ax.add_patch(patch)
     clip = patch
-    im = ax.imshow(np.clip(rgb ** (1 / 2.2), 0, 1), extent=[0, 0.8, 0, 0.9],
-                   origin="lower", alpha=0.35)
+    with np.errstate(invalid="ignore"):
+        tint = np.clip(np.nan_to_num(rgb) ** (1 / 2.2), 0, 1)
+    im = ax.imshow(tint, extent=[0, 0.8, 0, 0.9], origin="lower", alpha=0.35)
     im.set_clip_path(clip)
     ax.set_xlim(0.0, 0.75)
     ax.set_ylim(0.0, 0.85)

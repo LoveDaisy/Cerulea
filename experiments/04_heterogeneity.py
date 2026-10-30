@@ -10,6 +10,12 @@ The model attaches a radial weight to the aerosol amount
 (:class:`skycolor.atmosphere.HorizontalField`), which is applied at every
 scattering point, so this is treated with the full spherical single-scattering
 integral.
+
+**Caveat.**  Only the first-order term knows about the horizontal field: the
+multiple-scattering solver is horizontally homogeneous and uses the layer's
+nominal optical depth.  The multiple-scattering contribution therefore dilutes
+the contrast shown here.  The true contrast is somewhere between the
+single-scattering-only images (very strong) and what is plotted.
 """
 from __future__ import annotations
 

@@ -21,6 +21,8 @@ import sys
 import traceback
 from dataclasses import dataclass, field
 
+import os
+
 import numpy as np
 
 # Make the worktree importable no matter which directory the script is run
@@ -36,7 +38,16 @@ if str(ROOT) not in sys.path:
 
 from skycolor import presets, spectra  # noqa: E402
 from skycolor.constants import DU, P0, R_EARTH  # noqa: E402
-from skycolor.rt.single import direct_sun_transmittance, sky_radiance  # noqa: E402
+from skycolor.rt.single import direct_sun_transmittance  # noqa: E402
+
+#: ``SKYCOLOR_MULTIPLE=1`` switches every check to the full solver
+#: (single + multiple scattering) instead of single scattering alone.
+if os.environ.get("SKYCOLOR_MULTIPLE", "1") == "1":
+    from skycolor.rt.solver import sky_radiance_total as sky_radiance  # noqa: E402
+    MULTIPLE = True
+else:
+    from skycolor.rt.single import sky_radiance  # noqa: E402
+    MULTIPLE = False
 
 # ---------------------------------------------------------------------------
 # spectral grids

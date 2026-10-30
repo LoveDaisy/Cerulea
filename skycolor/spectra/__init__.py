@@ -103,7 +103,7 @@ def rayleigh_cross_section(wl_nm: np.ndarray, depolarization: float = DEPOLARIZA
 
     Bodhaine, Wood, Dutton & Slusser (1999), *On Rayleigh optical depth
     calculations*, J. Atmos. Ocean. Tech. 16, 1854.  At 550 nm this returns
-    1.135e-31 m^2, giving a sea-level vertical optical depth of 0.097.
+    4.507e-31 m^2, giving a sea-level vertical optical depth of 0.097.
     """
     wl = np.asarray(wl_nm, dtype=float)
     lam = wl * 1e-9
