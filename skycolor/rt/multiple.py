@@ -191,6 +191,7 @@ def solve(
     tol: float = _TOL,
     chunk: int = _CHUNK,
     single_view: bool = False,
+    delta_m: bool = True,
 ) -> SOSResult:
     """Run the SOS solver and return radiance plus flux diagnostics.
 
@@ -216,7 +217,11 @@ def solve(
         n_view = vza.size
 
     # -- layer optics --------------------------------------------------------
-    props = atmo.layer_properties()
+    # delta-M: the truncated Legendre expansion loses the forward peak, which
+    # for dust and cloud droplets is ~37 % of the scattered energy.  Scaling
+    # the optical depth and the moments is the standard cure (Wiscombe 1977);
+    # without it the multiple-scattering field of a dusty sky is wrong.
+    props = atmo.delta_m_properties(n_moments) if delta_m else atmo.layer_properties()
     beta_ext = np.maximum(props["beta_ext"], 0.0)
     beta_sca = np.maximum(props["beta_sca"], 0.0)
     dz = np.diff(z_bounds) * 1000.0
@@ -276,7 +281,10 @@ def solve(
     w_up = w[n_down:]
 
     # Legendre moments of the layer-averaged phase function
-    beta = np.asarray(atmo.phase_moments(n_moments), dtype=float)  # (nz,L,n_wl)
+    if delta_m:
+        beta = np.asarray(props["moments"], dtype=float)
+    else:
+        beta = np.asarray(atmo.phase_moments(n_moments), dtype=float)
     beta = beta[:, :n_moments, :]
 
     # associated Legendre functions at the Gauss nodes and at mu_s

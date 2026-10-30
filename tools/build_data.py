@@ -109,9 +109,58 @@ def build_no2() -> None:
     _write("no2_cross_section.csv", "wavelength_nm,sigma_220K_cm2,sigma_294K_cm2", [WL, a, b])
 
 
+
+
+# ---------------------------------------------------------------------------
+# refraction table
+# ---------------------------------------------------------------------------
+#: altitudes [km] and apparent elevations [deg] of the refraction table
+_REFRACT_ALT = np.array([0.0, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 13.0, 16.0,
+                         20.0, 25.0, 30.0, 38.0, 47.0, 56.0, 70.0, 90.0, 120.0])
+_REFRACT_ELEV = np.array([-8.0, -7.0, -6.0, -5.0, -4.0, -3.0, -2.0, -1.0,
+                          0.0, 1.0, 2.0, 3.0, 5.0, 7.5, 10.0, 15.0, 20.0])
+
+
+def build_refraction() -> None:
+    """Tabulate the astronomical refraction vs altitude and apparent elevation.
+
+    Columns: ``altitude_km, apparent_elevation_deg, true_elevation_deg``.
+    ``true = apparent + refraction``, so the table is monotonic in the
+    apparent elevation and can be inverted to go from the geometric solar
+    elevation (what an ephemeris gives) to the apparent one (what the light
+    actually does).  Entries below the dip of the horizon are omitted: there
+    the ray hits the ground and the point is in shadow.
+    """
+    from skycolor.atmosphere import Atmosphere, us76_pressure, us76_temperature
+    from skycolor.constants import N_STD_AIR, R_EARTH
+    from skycolor.refraction import REFRACTIVITY_STD, _Profile, _trace
+
+    atmo = Atmosphere(np.array([550.0]), aerosols=[])
+    prof = _Profile(atmo)
+    rows = []
+    for h in _REFRACT_ALT:
+        r0 = R_EARTH + h * 1e3
+        dip = np.degrees(np.arccos(R_EARTH / r0))
+        for e in _REFRACT_ELEV:
+            if e < -dip - 1e-9:
+                continue          # the ray hits the ground
+            hit, _, _, bend = _trace(prof, r0, np.pi / 2 - np.radians(e),
+                                     R_EARTH, R_EARTH + 1.2e6, 2000.0, 400000)
+            if hit:
+                continue
+            rows.append((h, e, e - np.degrees(bend)))
+    path = OUT / "refraction.csv"
+    with path.open("w", newline="") as fh:
+        fh.write("altitude_km,apparent_elevation_deg,true_elevation_deg\n")
+        for h, e, t in rows:
+            fh.write(f"{h:.6g},{e:.6g},{t:.9g}\n")
+    print(f"wrote {path.relative_to(ROOT)}  ({len(rows)} rows)")
+
+
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
     build_cie()
     build_solar()
     build_ozone()
     build_no2()
+    build_refraction()

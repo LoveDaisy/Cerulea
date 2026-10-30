@@ -440,6 +440,11 @@ class Atmosphere:
         """Legendre moments of the layer-averaged phase function.
 
         Shape ``(n_layer, n_moments, n_wl)``; ``p(cos t) = sum_l (2l+1) b_l P_l``.
+
+        These are the *raw* moments.  A discrete-ordinates code that truncates
+        at ``n_moments`` must use :meth:`delta_m_moments` instead, otherwise the
+        forward peak that lives beyond the truncation is silently discarded --
+        which for dust and cloud droplets is 37 % of the scattered energy.
         """
         props = self.layer_properties()
         nz, nwl = props["beta_ray"].shape
@@ -456,6 +461,46 @@ class Atmosphere:
             bs = np.multiply.outer(w, rel_sca)  # absolute aerosol scattering coeff
             for l in range(n_moments):
                 out[:, l, :] += mom[l][None, :] * bs / beta_sca
+        return out
+
+    def delta_m_moments(self, n_moments: int = 32):
+        """delta-M-scaled moments and the forward fraction.
+
+        Returns ``(moments, f)`` with ``moments`` of shape
+        ``(n_layer, n_moments, n_wl)`` and ``f`` of shape
+        ``(n_layer, n_wl)``.  ``f = beta_{n_moments}`` is the fraction of the
+        scattered energy that the truncated expansion would lose.  The
+        transformation (Wiscombe 1977) is
+
+            f        = beta_N
+            beta*_l  = (beta_l - f) / (1 - f)          l = 0 .. N-1
+            tau*     = tau (1 - omega f)
+            omega*   = omega (1 - f) / (1 - omega f)
+
+        Use :meth:`delta_m_properties` to get the rescaled optical properties
+        consistently with these moments.
+        """
+        raw = self.phase_moments(n_moments + 1)          # (nz, N+1, nwl)
+        f = np.clip(raw[:, n_moments, :], 0.0, 0.999)
+        beta = (raw[:, :n_moments, :] - f[:, None, :]) / (1.0 - f[:, None, :])
+        beta[:, 0, :] = 1.0
+        return beta, f
+
+    def delta_m_properties(self, n_moments: int = 32) -> dict:
+        """Layer optical properties rescaled by delta-M, plus the moments."""
+        props = self.layer_properties()
+        beta, f = self.delta_m_moments(n_moments)
+        beta_ext = np.maximum(props["beta_ext"], 0.0)
+        beta_sca = np.maximum(props["beta_sca"], 0.0)
+        omega = np.where(beta_ext > 1e-300, beta_sca / np.maximum(beta_ext, 1e-300), 0.0)
+        new_ext = beta_ext * (1.0 - omega * f)
+        new_sca = beta_sca * (1.0 - f)
+        out = dict(props)
+        out["beta_ext"] = new_ext
+        out["beta_sca"] = new_sca
+        out["beta_ray"] = props["beta_ray"] * (1.0 - f)   # only used via the moments
+        out["delta_m_f"] = f
+        out["moments"] = beta
         return out
 
     # -- column helpers ------------------------------------------------------

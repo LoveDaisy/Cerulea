@@ -260,3 +260,108 @@ def apparent_solar_zenith(atmo, true_zenith_deg, refraction=True):
     if not refraction:
         return true_zenith_deg
     return get_tables(atmo).apparent_zenith(true_zenith_deg)
+
+
+# ---------------------------------------------------------------------------
+# the refractive geometry used by the radiative transfer
+# ---------------------------------------------------------------------------
+#: grid of the packaged refraction table
+def _load_table():
+    import pathlib
+
+    path = pathlib.Path(__file__).resolve().parent / "data" / "refraction.csv"
+    return np.loadtxt(path, delimiter=",", skiprows=1)
+
+
+class RefractionGeometry:
+    """Turn the packaged refraction table into fast vectorised lookups.
+
+    The table gives, for a grid of altitudes and *apparent* elevations, the
+    *true* (asymptotic) elevation of the source.  Radiative transfer needs the
+    inverse: given the geometric solar elevation at a point, what is the
+    apparent one, and what is the resulting Bouguer invariant?
+    """
+
+    def __init__(self):
+        raw = _load_table()
+        self.alts = np.unique(raw[:, 0])
+        self.true_grid = np.linspace(-10.0, 90.0, 1200)
+        self.app = np.full((len(self.alts), len(self.true_grid)), np.nan)
+        for i, z in enumerate(self.alts):
+            m = raw[:, 0] == z
+            et, ea = raw[m, 2], raw[m, 1]
+            o = np.argsort(et)
+            et, ea = et[o], ea[o]
+            inside = (self.true_grid >= et[0]) & (self.true_grid <= et[-1])
+            self.app[i, inside] = np.interp(self.true_grid[inside], et, ea)
+            # outside the tabulated range the refraction is either negligible
+            # (high elevations) or the point is in shadow (low ones); extend
+            # with slope 1 / the endpoint slope so the interpolation is smooth
+            self.app[i, self.true_grid < et[0]] = ea[0] + (self.true_grid[self.true_grid < et[0]] - et[0])
+            above = self.true_grid > et[-1]
+            self.app[i, above] = self.true_grid[above] - (et[-1] - ea[-1])
+
+    def apparent_elevation(self, true_elev_deg, alt_km):
+        """Apparent elevation [deg] for a given true elevation and altitude."""
+        te = np.asarray(true_elev_deg, dtype=float)
+        z = np.atleast_1d(np.asarray(alt_km, dtype=float))
+        z = np.broadcast_to(z, te.shape)
+        te_flat = te.reshape(-1)
+        z_flat = z.reshape(-1)
+        # interpolate along the true-elevation axis for every altitude row,
+        # then blend across altitude
+        rows = np.stack([np.interp(te_flat, self.true_grid, self.app[i])
+                         for i in range(len(self.alts))])          # (n_alt, N)
+        zi = np.interp(z_flat, self.alts, np.arange(len(self.alts)))
+        i0 = np.clip(np.floor(zi).astype(int), 0, len(self.alts) - 1)
+        i1 = np.clip(i0 + 1, 0, len(self.alts) - 1)
+        w = zi - i0
+        idx = np.arange(te_flat.size)
+        vals = rows[i0, idx] * (1 - w) + rows[i1, idx] * w
+        return vals.reshape(te.shape)
+
+
+_GEOM: RefractionGeometry | None = None
+
+
+def geometry() -> RefractionGeometry:
+    """Cached :class:`RefractionGeometry` built from the packaged table."""
+    global _GEOM
+    if _GEOM is None:
+        _GEOM = RefractionGeometry()
+    return _GEOM
+
+
+def refractivity_of(atmo, z_km):
+    """Refractivity ``n - 1`` at height ``z``."""
+    return REFRACTIVITY_STD * atmo.n_air(z_km) / N_STD_AIR
+
+
+def sun_path_lengths(a, mu_app, r_point, r_bounds, n_layer):
+    """Per-shell path lengths of a *refracted* solar ray.
+
+    ``a`` is the Bouguer invariant ``n r sin(theta)``, ``mu_app`` the cosine of
+    the apparent zenith angle at the point and ``n_layer`` the refractive index
+    of each shell.  Inside a homogeneous shell the ray is a straight chord with
+    impact parameter ``b_k = a / n_k``, so the path length has the same closed
+    form as a straight ray with ``p`` replaced by ``b_k`` -- which is why the
+    whole correction costs one division rather than a ray trace.
+
+    Returns an array of shape ``(n_shell, ...)`` matching ``a``.
+    """
+    a = np.asarray(a, dtype=float)
+    c = np.asarray(mu_app, dtype=float)
+    r = np.asarray(r_point, dtype=float)
+    rb = np.asarray(r_bounds, dtype=float)
+    n = np.asarray(n_layer, dtype=float)
+    shp = a.shape
+    b = a[None] / n.reshape((len(rb) - 1,) + (1,) * a.ndim)          # (ns, ...)
+    r_lo = rb[:-1].reshape((-1,) + (1,) * a.ndim)
+    r_hi = rb[1:].reshape((-1,) + (1,) * a.ndim)
+    big = np.broadcast_to(b, (len(rb) - 1,) + shp)
+    s_lo = np.sqrt(np.maximum(r_lo**2 - big**2, 0.0))
+    s_hi = np.sqrt(np.maximum(r_hi**2 - big**2, 0.0))
+    u_point = r * np.abs(c)
+    up = np.maximum(s_hi - np.maximum(s_lo, u_point[None]), 0.0)
+    down = np.maximum(np.minimum(s_hi, u_point[None]) - np.minimum(s_lo, u_point[None]), 0.0)
+    return up + np.where(c[None] < 0.0, down, 0.0)

@@ -154,6 +154,15 @@ def sky_radiance(
 
     s_ray, s_o3, s_no2 = atmo._sigma_ray, atmo._sigma_o3, atmo._sigma_no2
 
+    use_refraction = bool(getattr(atmo, "refraction", False))
+    if use_refraction:
+        from ..refraction import refractivity_of
+
+        n_layer = 1.0 + refractivity_of(atmo, z_mid)
+        n_surface = 1.0 + refractivity_of(atmo, atmo.elevation_km)
+    else:
+        n_layer = None
+        n_surface = 1.0
     zs = np.radians(sun_zenith_deg)
     azs = np.radians(sun_azimuth_deg)
     shat = np.array([np.sin(zs) * np.sin(azs), np.sin(zs) * np.cos(azs), np.cos(zs)])
@@ -179,18 +188,22 @@ def sky_radiance(
         x_vec[..., 2] += r0
         h_pts = np.hypot(x_vec[..., 0], x_vec[..., 1]) / 1e3
 
-        mu_sun = np.clip(x_vec @ shat / np.maximum(r_pts, 1e-9),
-                         -1.0, 1.0)
+        mu_sun = np.clip(x_vec @ shat / np.maximum(r_pts, 1e-9), -1.0, 1.0)
         p_sun = r_pts * np.sqrt(np.maximum(1.0 - mu_sun**2, 0.0))
-        if getattr(atmo, "refraction", False):
-            # the terminator is raised by refraction: a point at altitude z is
-            # still sunlit down to a slightly larger solar zenith angle
-            from ..refraction import get_tables
+        if use_refraction:
+            from ..refraction import geometry as _refr_geometry, refractivity_of
 
-            crit = get_tables(atmo).shadow_zenith_true(z_pts)
-            lit = mu_sun > np.cos(np.radians(crit))
+            # the light bends on its way in, so the direction at the point is
+            # the *apparent* one and the Bouguer invariant uses it
+            e_true = np.degrees(np.arcsin(mu_sun))
+            e_app = _refr_geometry().apparent_elevation(e_true, z_pts)
+            mu_app = np.sin(np.radians(e_app))
+            p_sun = (1.0 + refractivity_of(atmo, z_pts)) * r_pts * np.cos(np.radians(e_app))
+            lit = (mu_app >= 0.0) | (p_sun > n_surface * R_EARTH)
+            c_sun = mu_app
         else:
             lit = is_sunlit(p_sun, mu_sun)
+            c_sun = mu_sun
 
         # ---- local optical properties, shape (n_pts, n_ray, n_wl) ----------
         beta_ray = atmo.n_air(z_pts)[..., None] * s_ray
@@ -217,7 +230,12 @@ def sky_radiance(
             tau = first[None]
 
         # ---- solar optical depth ------------------------------------------
-        lengths = path_lengths_sun_array(p_sun, mu_sun, r_pts, r_bounds)  # (ns, np, nr)
+        if use_refraction:
+            from ..refraction import sun_path_lengths
+
+            lengths = sun_path_lengths(p_sun, c_sun, r_pts, r_bounds, n_layer)
+        else:
+            lengths = path_lengths_sun_array(p_sun, mu_sun, r_pts, r_bounds)  # (ns, np, nr)
         tau_sun = (np.einsum("kpr,k->pr", lengths, n_air_mid)[..., None] * s_ray
                    + np.einsum("kpr,k->pr", lengths, n_o3_mid)[..., None] * s_o3
                    + np.einsum("kpr,k->pr", lengths, n_no2_mid)[..., None] * s_no2)

@@ -23,6 +23,7 @@ skycolor = "skycolor.cli:main"
 dev = [
     "pytest>=8,<9",
     "matplotlib>=3.8,<4",
+    "netCDF4>=1.6,<2",   # only needed by tools/build_data.py
 ]
 
 [tool.setuptools.packages.find]

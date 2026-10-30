@@ -55,27 +55,50 @@ altitude `z` is still sunlit, comes out as
 ## What is used where
 
 * **Solar position** (`geometry.sun_position(..., refraction=True)`) and the
-  horizon dip are unambiguous and are used as described.
-* **The radiative-transfer shadow mask** (`Atmosphere(refraction=True)`) is
-  available but **off by default**, for a reason worth recording.
+  horizon dip.
+* **The radiative transfer can use the full refractive geometry**
+  (`Atmosphere(refraction=True)`): the apparent solar elevation at every
+  scattering point is looked up in `data/refraction.csv`, the Bouguer invariant
+  `a = n r sin(theta_app)` is formed from it, and the per-shell path length is
+  evaluated with the impact parameter `b_k = a / n_k`.
 
-## Why the shadow mask is off by default
+  That last step is the whole trick.  Inside a homogeneous shell a refracted
+  ray is a straight chord, so
 
-Turning it on raises the terminator, which is physically right, but it lets the
-single-scattering integrator admit rays that geometrically graze the surface.
-Those rays must be traced along their *bent* path, and their optical depth is
-then enormous (two passes through the whole boundary layer, τ ≈ 7).  Keeping
-straight rays while shifting only the mask computes the optical depth of a path
-that passes *below* the surface, which is meaningless, and the result is that
-twilight comes out 3–6× too bright:
+  ```
+  straight:  L_k = sqrt(r_{k+1}^2 - p^2) - sqrt(r_k^2 - p^2),   p = r sin(theta)
+  refracted: L_k = sqrt(r_{k+1}^2 - b_k^2) - sqrt(r_k^2 - b_k^2), b_k = a / n_k
+  ```
 
-| solar elevation | geometric | refraction mask on | Patat et al. (2006) |
+  so bending the *whole optical path* costs one division per shell rather than
+  a ray trace per photon.  The formula was checked against numerical path
+  integration: a horizontal ray at the surface gives 1659 km analytically and
+  1663 km numerically (0.1 %).
+
+  Because `b_k -> p` wherever the ray does not graze, the correction is
+  self-disabling: no region switching, no threshold, no wasted work.  (The
+  earlier worry that it should only be applied near the horizon was right
+  physically, but the closed form removes the need to encode it.)
+
+## The measured effect, and why it is still off by default
+
+Bending the paths raises the terminator by 0.5-1.0 degrees and therefore makes
+twilight **brighter by a factor of 2-5**:
+
+| solar elevation | geometric shadow | full refraction | Patat et al. (2006) |
 |---|---|---|---|
-| −3° | 41.2 cd m⁻² | 58.4 | 40.1 |
-| −6° | 0.79 | 3.02 | 0.516 |
+| -3 deg | 41.2 | 57.6 | 40.1 |
+| -6 deg | 0.79 | 1.69 | 0.516 |
+| -9 deg | 1.1e-3 | 5.3e-3 | 0.0171 |
 
-So: refraction needs the **paths** bent, not just the mask moved.  That is the
-honest next step (it means integrating the sun-ray optical depth along the
-refracted chord), and `Atmosphere(refraction=True)` is left in place as the
-hook for it.  Until then the geometric shadow, which reproduces the Patat fit
-to +52 % at −6°, is the better approximation.
+The geometric model agrees with the reference at -3 deg (1.03x); the refracted
+model is 1.4x high there and 3.3x high at -6 deg.  Refraction is physically
+real, so one of two things must be true:
+
+1. the literature's "solar elevation" is the **apparent** altitude, in which
+   case adding refraction double-counts it; or
+2. something else in the twilight model is ~40 % too bright.
+
+Until that is settled the geometric shadow is the default (it matches the
+reference), and `Atmosphere(refraction=True)` is the physically complete mode.
+This is recorded as open question #1 in `docs/ROADMAP.md`.

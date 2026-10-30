@@ -130,3 +130,50 @@ for `g = 0.85` at τ ≥ 5; `R + T + direct = 1` to 1e-12; the overcast
 horizon/zenith ratio is exactly 1/3; τ → 0 reduces bit-for-bit to the clear
 sky.  The brief's "albedo 0.7 at τ = 10" holds only for `g = 0.6`; for real
 droplets (`g = 0.859`) it needs τ = 30 (`docs/CLOUD.md`).
+
+---
+
+# Third addendum — full refraction and delta-M
+
+## Refraction now bends the optical path
+
+`refraction.py` traces rays through the refractive atmosphere, and the
+radiative transfer now uses the full geometry: the apparent solar elevation at
+every scattering point is looked up from `data/refraction.csv`, the Bouguer
+invariant `a = n r sin(theta_app)` is formed, and the per-shell path length is
+`sqrt(r^2 - (a/n_k)^2)` differences.  Checking that closed form against
+numerical path integration: **1659 km vs 1663 km** for a horizontal ray at the
+surface (0.1 %).
+
+Measured effect: twilight becomes **2–5× brighter**, because the terminator
+rises by 0.5–1.0°.
+
+| solar elev. | geometric shadow | full refraction | Patat 2006 |
+|---|---|---|---|
+| −3° | 41.2 | 57.6 | 40.1 |
+| −6° | 0.79 | 1.69 | 0.516 |
+| −9° | 1.1e-3 | 5.3e-3 | 0.0171 |
+
+The geometric model matches the reference at −3° (1.03×); the refracted one is
+1.4× high there.  `Atmosphere(refraction=True)` is therefore available but not
+the default, and the **solar-altitude convention of the reference** (true or
+apparent) is now the dominant open question — see `docs/ROADMAP.md` #1.
+
+## delta-M is applied to the multiple-scattering solver
+
+`atmosphere.delta_m_properties()` returns optical depth and moments rescaled by
+the Wiscombe transformation, and `rt/multiple.py` now uses it by default.
+Effect at 550 nm, zenith view, sun at 60°:
+
+| atmosphere | MS without delta-M | MS with delta-M |
+|---|---|---|
+| clear, AOD 0.1 (fine) | 0.00654 | 0.00654 (f = 0, unchanged) |
+| dusty, AOD 1.0 | 0.06003 | **0.02218** |
+
+The dusty case moves by a factor 2.7 because 35 % of the scattered energy sits
+in the forward peak that the 32-moment truncation was discarding.  Fine
+aerosols are unaffected, which is the expected sanity check.
+
+A performance caveat: a dusty atmosphere now takes ~100 s for one
+multiple-scattering solve.  That is documented in the roadmap as the
+performance item.

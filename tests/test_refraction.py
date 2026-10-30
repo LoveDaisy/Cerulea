@@ -59,3 +59,53 @@ def test_horizon_dip():
     # 1 km -> 1.02 deg, 10 km -> 3.2 deg
     assert t.horizon_dip(np.array([1.0]))[0] == pytest.approx(1.02, abs=0.02)
     assert t.horizon_dip(np.array([10.0]))[0] == pytest.approx(3.21, abs=0.05)
+
+
+def test_refracted_path_length_horizontal(atmo):
+    """A horizontal ray at the surface traverses ~1660 km of atmosphere."""
+    from skycolor.constants import R_EARTH
+    from skycolor.refraction import refractivity_of, sun_path_lengths
+
+    rb = atmo.r_bounds
+    n_layer = 1.0 + refractivity_of(atmo, atmo.z_mid)
+    a = (1.0 + refractivity_of(atmo, 0.0)) * R_EARTH
+    L = sun_path_lengths(np.array([a]), np.array([0.0]), np.array([R_EARTH]),
+                         rb, n_layer)
+    total = float(L.sum())
+    assert 1.55e6 < total < 1.75e6, total
+
+
+def test_refraction_geometry_lookup():
+    from skycolor.refraction import geometry
+
+    g = geometry()
+    app = g.apparent_elevation(np.array([0.0, 1.0, 5.0, 45.0]),
+                               np.zeros(4))
+    assert 0.3 < app[0] < 0.75          # horizon: ~0.5 deg
+    assert np.all(np.diff(app) > 0)
+    assert app[3] == pytest.approx(45.0, abs=0.1)
+
+
+def test_delta_m_identity_for_small_particles():
+    from skycolor.atmosphere import Atmosphere
+    from skycolor.constants import WL_COARSE
+
+    at = Atmosphere(WL_COARSE, aerosols=[])       # Rayleigh only
+    beta, f = at.delta_m_moments(16)
+    assert np.all(f < 1e-6)
+    raw = at.phase_moments(16)
+    assert np.allclose(beta, raw, atol=1e-6)
+
+
+def test_delta_m_scales_coarse_aerosol():
+    from skycolor.atmosphere import AerosolLayer, Atmosphere, ExponentialProfile
+    from skycolor.aerosol import DesertDustAerosol
+    from skycolor.constants import WL_COARSE
+
+    at = Atmosphere(WL_COARSE, aerosols=[AerosolLayer(DesertDustAerosol(), 1.0,
+                                                      ExponentialProfile(2.0))])
+    props = at.delta_m_properties(32)
+    f = props["delta_m_f"]
+    assert f.max() > 0.2                     # dust loses a lot of forward peak
+    assert np.all(props["beta_ext"] <= at.layer_properties()["beta_ext"] + 1e-12)
+    assert np.allclose(props["moments"][:, 0, :], 1.0)
