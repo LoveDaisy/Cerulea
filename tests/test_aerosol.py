@@ -6,13 +6,16 @@ Covers the four things that can go wrong independently:
 2. the analytic Legendre moments (exactness, g = beta_1, physical range);
 3. the adaptive phase table (normalisation and the forward peak);
 4. the delta-M transformation (energy conservation, limits) and the documented
-   library table (Angstrom exponent, SSA, asymmetry, tau(450)/tau(650)).
+   library table (Angstrom exponent, SSA, asymmetry, tau(450)/tau(650));
+5. the per-wavelength Mie state cache and the shared preset instances
+   (capacity/eviction, bitwise reuse, no cross-contamination).
 """
 from __future__ import annotations
 
 import numpy as np
 import pytest
 
+from skycolor import presets
 from skycolor.aerosol import (
     LIBRARY,
     AngstromAerosol,
@@ -393,3 +396,68 @@ def test_angular_function_legendre_expansion():
             ref_tau = (2 * a + 1) * 0.5 * np.sum(w * tau[n] * pl)
             assert ref_pi == pytest.approx(_A_coefficient(n, a), abs=1e-10)
             assert ref_tau == pytest.approx(_B_coefficient(n, a), abs=1e-10)
+
+
+# ===========================================================================
+# 5. per-wavelength state cache and shared preset instances
+# ===========================================================================
+def test_state_cache_capacity_and_eviction():
+    """The state LRU honours ``max_cached_wavelengths``, and a wavelength
+    refilled after eviction comes back bit-identical: states are pure
+    functions of (wavelength, construction parameters), so capacity trades
+    only memory for time, never values."""
+    wl = np.array([400.0, 450.0, 500.0, 550.0, 600.0, 650.0])
+    capped = MieAerosol(
+        modes=[LogNormalMode(0.2, 2.0)], n_radii=32, max_cached_wavelengths=4
+    )
+    fresh = MieAerosol(
+        modes=[LogNormalMode(0.2, 2.0)], n_radii=32, max_cached_wavelengths=64
+    )
+    first = capped.relative_coefficients(wl)
+    assert len(capped._states) <= 4  # the 6-wavelength working set overflows
+    second = capped.relative_coefficients(wl)  # re-queries evicted states
+    reference = fresh.relative_coefficients(wl)
+    assert np.array_equal(first, second)
+    assert np.array_equal(second, reference)
+
+
+def test_repeated_calls_and_preset_reuse_are_bitwise_identical():
+    """Repeated delta-M calls hit the cached states and moments and return
+    bit-identical results, and two ``presets.clear(...)`` builds share one
+    aerosol instance so the Mie caches survive the rebuild."""
+    wl = np.array([400.0, 450.0, 500.0, 550.0, 600.0])
+    a1 = presets.clear(wl).aerosols[0].aerosol
+    a2 = presets.clear(wl).aerosols[0].aerosol
+    assert a1 is a2  # the shared instance, not an equal-by-value copy
+
+    rc1 = a1.relative_coefficients(wl)
+    rc2 = a2.relative_coefficients(wl)
+    assert np.array_equal(rc1[0], rc2[0])
+    assert np.array_equal(rc1[1], rc2[1])
+
+    dm1 = a1.delta_m(wl, 16)
+    dm2 = a1.delta_m(wl, 16)  # second call: cached states + cached moments
+    assert np.array_equal(dm1.beta, dm2.beta)
+    assert np.array_equal(dm1.f, dm2.f)
+    assert np.array_equal(dm1.g_star, dm2.g_star)
+
+
+def test_no_cross_contamination_across_rh_and_wavelength():
+    """Different construction arguments give different shared instances with
+    different values, and interleaved wavelength queries never interfere:
+    the shared key is the full construction signature, the per-wavelength
+    cache key is the wavelength, and neither leaks across."""
+    wl = np.array([400.0, 500.0, 600.0])
+    a5 = presets.hazy(wl, rh=0.5).aerosols[0].aerosol
+    a8 = presets.hazy(wl, rh=0.8).aerosols[0].aerosol
+    assert a5 is not a8  # the RH argument is part of the shared key
+
+    c5 = a5.relative_coefficients(wl)[0]
+    c8 = a8.relative_coefficients(wl)[0]
+    assert not np.array_equal(c5, c8)  # RH must matter
+
+    # interleaved off-grid queries perturb neither instance
+    _ = a5.relative_coefficients(np.array([412.5]))
+    _ = a8.relative_coefficients(np.array([700.0]))
+    assert np.array_equal(a5.relative_coefficients(wl)[0], c5)
+    assert np.array_equal(a8.relative_coefficients(wl)[0], c8)

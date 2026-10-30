@@ -89,7 +89,7 @@ skycolor/
 tools/build_data.py   rebuilds the packaged data tables from data_raw/
 experiments/          scripts that produce the figures (01..10)
 validation/           six independent checks against published references
-tests/                207 tests
+tests/                210 tests
 docs/                 architecture, method notes, the write-up, the roadmap
 ```
 
