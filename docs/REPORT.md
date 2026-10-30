@@ -142,13 +142,44 @@ See `validation/REPORT.md` for the full table.  Headlines:
 | MS/SS at the zenith, sun at 60°, clear sky | 0.31 (SOS) vs 0.31 (MC) → **pass** |
 | Twilight zenith luminance at −6°, h = −6° | 0.567 vs 0.516 cd m⁻² (Patat et al. 2006) → +10 % → **pass** |
 | Twilight zenith luminance at −9° and below | 20×–2000× too dark → **known failure**, see below |
-| Horizon chromaticity vs measured Berlin spectra | Δxy = 0.019 (tolerance 0.02) → **marginal pass** |
+| Horizon chromaticity vs measured Berlin spectra | Δxy = 0.018 (tolerance 0.02) → **marginal pass** |
+| Twilight zenith luminance at −9°, spherical engine | 0.0238 vs 0.0171 cd m⁻² (1.39×) → **pass** |
+| Twilight zenith luminance at −12°, spherical engine | 2.1e-3 vs 1.46e-3 cd m⁻² (1.45×) → **pass** |
+| Mie phase moments vs quadrature | 2e-8, `beta_1` = g to 1e-10 → **pass** |
+| Cloud albedo vs Monte Carlo | 0.1–0.7 % (`g=0`), ≤1 % (`g=0.85`, τ≥5) → **pass** |
+| Cloud `R + T + direct` | 1 to 1e-12 → **pass** |
+| Refraction at the horizon | 33′ (Sæmundsson 29′, classical 34′) → **pass** |
 
 The two deviations are understood and documented rather than papered over:
 the last few degrees above the horizon are where the plane-parallel diffuse
 approximation and the aerosol vertical profile matter most, and the Henyey-
 Greenstein phase function cannot reproduce the sharp forward diffraction peak
 that makes the solar aureole.
+
+### 3.1 The deep twilight needs a spherical solver
+
+The single biggest failure of the deterministic model is twilight below −8°.
+The reason is geometric: at −9° the zenith line of sight is entirely inside
+the Earth's shadow, and the light that reaches it has travelled several
+hundred kilometres sideways from the sunlit twilight arch.  A horizontally
+homogeneous plane-parallel solver cannot represent that; a spherical
+three-dimensional one can.
+
+`skycolor/rt/twilight.py` runs the existing Monte Carlo as a production
+engine with a split estimator (the first order is taken from the exact
+deterministic solver, only orders ≥ 2 from the Monte Carlo), a coarse angular
+grid with a spherical local-linear regression, and wavelength interpolation.
+Against Patat et al. (2006):
+
+| solar elevation | deterministic | engine | Patat | engine / Patat |
+|---|---|---|---|---|
+| −3° | 37.6 | 37.8 | 40.1 | 0.94 |
+| −6° | 0.74 | 0.98 | 0.516 | 1.89 |
+| −9° | 9.6 × 10⁻⁴ | 0.024 | 0.0171 | 1.39 |
+| −12° | 9.8 × 10⁻⁷ | 2.1 × 10⁻³ | 0.00146 | 1.45 |
+
+So the deepest twilight goes from being 24× and 1500× too dark to within a
+factor of 1.5, at the cost of a few minutes of Monte Carlo per sky.
 
 ## 4. What the model says
 
@@ -269,7 +300,18 @@ surrounding sky is butterscotch, so a merely less-orange sun reads as blue —
 this is what happens on Mars), while the blue sun of a smoke or volcanic
 aerosol is the real anomalous-extinction effect.
 
-### 4.8 Altitude
+### 4.8 Clouds
+
+A uniform cloud deck is grey and conservative, so its colour is borrowed from
+the illuminant: white under a high sun, orange at sunset.  What the model adds
+is the geometry of *which part of the deck is still lit*.  The shadow boundary
+is at `z = R(1/sin θ − 1)`, i.e. 0.97 km at −1°, 3.9 km at −2°, 8.7 km at −3°.
+So a stratus deck stops glowing at −1.2°, an altostratus at −2.3° and a cirrus
+at −3.2°.  The altostratus base goes from (0.37, 0.38) at +5° to (0.60, 0.39)
+at −2.2°, with the luminance falling by five orders of magnitude over the same
+range.
+
+### 4.9 Altitude
 
 From 3 km the zenith gets darker and deeper blue (less air above), the horizon
 is depressed, and the whole sky gains contrast.
@@ -285,11 +327,12 @@ is depressed, and the whole sky gains contrast.
   28.6 against a true spherical value of about 19, so the limb's diffuse
   radiance is over-estimated by roughly 50 %.  Away from the horizon the error
   is small.
-* **Deep twilight.**  Below about −8° the failure is geometric: the light
-  reaching the zenith has to travel horizontally from the sunlit twilight
-  arch, which a plane-parallel multiple-scattering solver cannot represent.
-  The atmosphere is extended to 200 km with a thermospheric tail, but that is
-  not the limiting factor.
+* **Deep twilight in the deterministic model.**  Below about −8° the failure
+  is geometric: the light reaching the zenith has to travel horizontally from
+  the sunlit twilight arch, which a plane-parallel multiple-scattering solver
+  cannot represent.  `skycolor/rt/twilight.py` fixes it with a spherical
+  Monte Carlo (see §3.1) at the cost of running the diffuse field as a Monte
+  Carlo rather than a deterministic solve.
 * **Refraction is only half-implemented.**  The solar position and the horizon
   dip use traced rays, but the radiative-transfer shadow mask does not: bending
   the terminator while keeping straight rays over-brightens twilight by 3–6×.
