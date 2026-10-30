@@ -368,6 +368,12 @@ class MieAerosol(Aerosol):
     def __post_init__(self):
         self._nodes = self._build_nodes()
         self._states: "OrderedDict[float, _State]" = OrderedDict()
+        # Phase tables are cheap to keep but expensive to rebuild.  They are
+        # cached separately from the per-wavelength coefficient states, so a
+        # repeated sky_radiance() call over the same 80 wavelengths does not
+        # rebuild every table after the 8-state coefficient cache evicts.
+        self._tables: "OrderedDict[float, PhaseTable]" = OrderedDict()
+        self._max_tables = 512
 
     # -- construction --------------------------------------------------------
     def _build_nodes(self):
@@ -488,6 +494,18 @@ class MieAerosol(Aerosol):
         return beta
 
     # -- phase function ------------------------------------------------------
+    def _get_table(self, wl_nm: float) -> PhaseTable:
+        key = round(float(wl_nm), 6)
+        table = self._tables.get(key)
+        if table is not None:
+            self._tables.move_to_end(key)
+            return table
+        table = self._build_table(self._state(key))
+        self._tables[key] = table
+        while len(self._tables) > self._max_tables:
+            self._tables.popitem(last=False)
+        return table
+
     def _build_table(self, state: "_State") -> PhaseTable:
         theta = phase_table_angles(
             state.x_max,
@@ -521,23 +539,17 @@ class MieAerosol(Aerosol):
         wl = np.atleast_1d(np.asarray(wl_nm, dtype=float))
         out = np.empty((mu_arr.size, wl.size))
         for i, w in enumerate(wl):
-            state = self._state(w)
             if self.use_phase_table:
-                if state.table is None:
-                    state.table = self._build_table(state)
-                out[:, i] = state.table(mu_arr)
+                out[:, i] = self._get_table(w)(mu_arr)
             else:
-                out[:, i] = self._phase_direct(state, mu_arr)
+                out[:, i] = self._phase_direct(self._state(w), mu_arr)
         if np.ndim(mu) == 0 and np.ndim(wl_nm) == 0:
             return float(out[0, 0])
         return out
 
     def phase_table(self, wl_nm) -> PhaseTable:
         """Return (and cache) the adaptive phase table at ``wl_nm``."""
-        state = self._state(float(wl_nm))
-        if state.table is None:
-            state.table = self._build_table(state)
-        return state.table
+        return self._get_table(float(wl_nm))
 
     def phase_normalisation(self, wl_nm) -> float:
         """``int p dOmega`` from the tabulated phase function [should be 4 pi]."""
@@ -577,7 +589,6 @@ class _State:
     g: float
     x_max: float
     beta: np.ndarray | None = None
-    table: PhaseTable | None = None
 
 
 # ===========================================================================
