@@ -5,20 +5,34 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "skycolor"
 version = "0.1.0"
-description = "Physically based spectral simulation of sky colour: Rayleigh/Mie scattering, ozone absorption, twilight and inhomogeneous atmospheres."
+description = "Physically based spectral simulation of sky colour: Rayleigh/Mie scattering, ozone absorption, twilight, refraction and inhomogeneous atmospheres."
 readme = "README.md"
-requires-python = ">=3.10"
-dependencies = ["numpy>=1.24", "scipy>=1.10"]
-
-[project.optional-dependencies]
-plot = ["matplotlib>=3.7", "Pillow>=10"]
-dev = ["pytest>=7"]
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "numpy>=2.0,<3",
+    "scipy>=1.11,<2",
+    "pillow>=10,<13",
+]
 
 [project.scripts]
 skycolor = "skycolor.cli:main"
+
+# Installed by default with `uv sync`.  The figures need matplotlib; the tests
+# need pytest.  Neither is needed to *run* the model.
+[dependency-groups]
+dev = [
+    "pytest>=8,<9",
+    "matplotlib>=3.8,<4",
+]
 
 [tool.setuptools.packages.find]
 include = ["skycolor*"]
 
 [tool.setuptools.package-data]
 skycolor = ["data/*.csv", "data/*.md"]
+
+[tool.uv]
+# The lock file is committed, so the exact versions (including transitive
+# dependencies) are reproducible.  Refresh deliberately with `uv lock --upgrade`
+# and re-run the validation suite afterwards.
+default-groups = ["dev"]

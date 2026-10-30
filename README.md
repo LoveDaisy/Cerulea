@@ -30,16 +30,27 @@ radiative-transfer solver.  The output is spectral radiance
 
 ## Quick start
 
+The environment is managed by [uv](https://docs.astral.sh/uv/) and the exact
+dependency versions are pinned in `uv.lock` (Python 3.12).  Everything below
+assumes `uv run`, which uses that locked environment.
+
 ```bash
-python -m venv .venv && .venv/bin/pip install -e .[plot]
+uv sync          # creates .venv from uv.lock, exactly reproducible
+uv run pytest -q
+```
+
+To refresh the lock file on purpose: `uv lock --upgrade`, then re-run the
+validation suite (`uv run python -m validation.run_all`) before committing it.
+
+```bash
 
 # a 3-degree sun, looking at it, 100-degree field of view
-.venv/bin/python -m skycolor.cli render --sun-elevation 3 --camera perspective \
+uv run python -m skycolor.cli render --sun-elevation 3 --camera perspective \
     --size 1200x520 --pitch 14 --hfov 100 --preset clear --aod 0.05 \
     --yaw 180 --out sunset.png
 
 # colour coordinates of the zenith / horizon
-.venv/bin/python -m skycolor.cli chart --sun-elevation 20 --preset hazy --aod 0.3
+uv run python -m skycolor.cli chart --sun-elevation 20 --preset hazy --aod 0.3
 ```
 
 ```python
