@@ -326,7 +326,6 @@ def _trace_wavelength(atmo, iw, dirs, counts, sun_hat, max_scatter, rng,
 
     # --- phase-function tables for sampling --------------------------------
     phase_tables = [_phase_table(atmo, iw, j) for j in range(len(atmo.aerosols))]
-    mu_grid = np.linspace(-1.0, 1.0, _N_PHASE)
 
     # --- bookkeeping -------------------------------------------------------
     vid = np.repeat(np.arange(n_view), counts)
@@ -419,6 +418,8 @@ def _trace_wavelength(atmo, iw, dirs, counts, sun_hat, max_scatter, rng,
             gd_new[gi] += 1
             # lift just above the surface
             xn[gi] = normal * (rg + 1e-6)[:, None]
+            if rho <= 0.0:  # black surface: nothing can be reflected
+                kill[gi] = True
 
         # --- trial steps (real collision or null collision) ------------------
         ti = np.nonzero(trial & ~escaped)[0]
@@ -557,6 +558,7 @@ def _prepare(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
 
 def _run(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
          sun_azimuth_deg, n_photons, seed, max_scatter, split):
+    max_scatter = max(1, int(max_scatter))
     dirs, counts, sun_hat = _prepare(atmo, sun_zenith_deg, view_zenith_deg,
                                      view_azimuth_deg, sun_azimuth_deg, n_photons)
     n_view = dirs.shape[0]
