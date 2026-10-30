@@ -1,0 +1,6 @@
+sun_elevation_deg,sun_zenith_deg,V_mag_arcsec2,zenith_luminance_cd_m2,source
+-3,93,8.5760,40.0889,Patat2006_V_band_fit
+-6,96,13.3010,0.516445,Patat2006_V_band_fit
+-9,99,17.0000,0.0171168,Patat2006_V_band_fit
+-12,102,19.6730,0.00145957,Patat2006_V_band_fit
+-18,108,21.9410,0.000180727,Patat2006_V_band_fit

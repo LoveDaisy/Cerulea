@@ -57,7 +57,42 @@ directly, which is unambiguous).
 
 ## check4 — sky chromaticity
 
-*(to be completed; see REPORT.md for what was actually used)*
+* **P. Balakrishnan, A. Diakite-Kortlever, D. Dumortier, J. Hernández-Andrés,
+  P. Kenny, M. Maskarenj, C. Pierson, A. Thorseth, P. Xue and M. Knoop
+  (2023)**, *SKYSPECTRA: an opensource data package for worldwide spectral
+  daylight*, Proceedings of the 30th CIE Session, Ljubljana, CIE x050:2023
+  OP026.  DOI: [10.25039/x50.2023.OP026](https://doi.org/10.25039/x50.2023.OP026).
+  Open data: Zenodo record
+  [10.5281/zenodo.8147546](https://doi.org/10.5281/zenodo.8147546).
+  * `spectral_patch_radiance.csv`: measured 10°-aperture spectral radiance of
+    sky patches, 360–800 nm at 1 nm.
+  * `meta_sun_positions.csv`, `meta_weather.csv`: sun geometry and
+    `sky_condition` / `sky_type_cie` flags.
+  * `meta_location.csv`: Berlin (DE-BLN), 52.51°N, 13.33°E, 35 m.
+  * We used the DE-BLN block (first 53 MB of the 1.42 GB
+    `spectral_patch_radiance.csv`; the full file was not downloaded).  All
+    distributed Berlin patches are at the 6° almucantar and azimuths
+    180–240°.
+  * Extracted subset: `data/skyspectra_berlin_horizon_xy.csv` (76 patch
+    spectra from 13 clear-sky timestamps with solar elevation 30–50°) and
+    `data/skyspectra_berlin_horizon_mean_spectrum.csv` (mean spectrum per
+    patch).  The selection and extraction are documented in
+    `validation/check4_chromaticity.py`.
+
+## check5 — twilight
+
+* **F. Patat, O. S. Ugolnikov and O. V. Postylyakov (2006)**, *UBVRI twilight
+  sky brightness at ESO-Paranal*, Astronomy & Astrophysics **454**, 229–235.
+  DOI: [10.1051/0004-6361:20064986](https://doi.org/10.1051/0004-6361:20064986);
+  arXiv: [astro-ph/0604128](https://arxiv.org/abs/astro-ph/0604128).
+  Table 1, V band: `m_V(ζ) = 11.84 + 1.518(ζ−95) − 0.057(ζ−95)²`
+  mag arcsec⁻², fitted over 95° ≤ ζ ≤ 105°.
+* **V surface brightness → luminance.**  Standard Johnson V relation
+  `L = 1.08×10⁵ × 10^(−0.4 m_V)` cd m⁻², i.e. 1 cd m⁻² ≈ 12.6 V
+  mag arcsec⁻².  A 0.1 mag error is a 10 % luminance error.
+* Derived values: `data/twilight_patat2006.csv`.  The −3° and −18° entries are
+  extrapolations beyond the fit range; the −18° value is the natural night-sky
+  level (Patat et al. find it is reached at ζ ≈ 105–106°).
 
 ## check5 — twilight
 

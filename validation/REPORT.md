@@ -20,10 +20,10 @@ Reference sources are documented in `validation/data/SOURCES.md`.
 | # | Check | Reference | Verdict |
 |---|---|---|---|
 | 1 | Rayleigh optical depth, 300–700 nm | Bodhaine et al. (1999), Table 3 / eq. (30) | **PASS** |
-| 2 | Direct + diffuse clear-sky illuminance | CIE 110-1994, ASTM G173-03 | *pending* |
+| 2 | Direct + diffuse clear-sky illuminance | CIE 110-1994, ASTM G173-03, Bird & Hulstrom | **PASS** |
 | 3 | Clear-sky relative luminance distribution | CIE 110-1994 | **FAIL** (horizon only) |
-| 4 | Sky chromaticity | measured spectra | *pending* |
-| 5 | Twilight zenith luminance | measured twilight tables | *pending* |
+| 4 | Sky chromaticity (horizon) | SKYSPECTRA measured spectra | **PASS** (marginal) |
+| 5 | Twilight zenith luminance | Patat et al. (2006), V band | **FAIL** (−9° and below) |
 
 ---
 
@@ -79,6 +79,58 @@ is wrong by a factor of four.  No code was changed.
 
 ---
 
+## Check 2 — clear-sky direct and diffuse illuminance
+
+**References.**  No single published table covers direct and diffuse
+illuminance at both requested elevations, so three independent references are
+used:
+
+1. **ASTM G173-03** direct-normal spectrum at air mass 1.5 (solar elevation
+   48.19°) — the standard reference spectrum.  Its photopic integral is
+   **97.14 klx** and its 400–700 nm integral is **374.8 W m⁻²** (computed from
+   the committed `data_raw/ASTMG173.csv`).
+2. **CIE 110-1994** clear-sky diffuse illuminance at 30° and 60°, obtained by
+   integrating the absolute luminance distribution with the standard's
+   zenith-luminance relation, at turbidity **T = 2.2** (a typical clean
+   continental value for AOD₅₅₀ ≈ 0.05).  At T = 2.2 the CIE zenith
+   luminance agrees with the model to within 3 %, which is itself a useful
+   consistency check.
+3. **Bird & Hulstrom (1981)** clear-sky broadband model (as implemented in
+   pvlib), with AOD₅₀₀ = 0.057, precipitable water 1.5 cm and ozone
+   0.3 atm-cm, converted to illuminance with the G173 direct-beam luminous
+   efficacy **107.9 lm/W**.  This supplies an independent direct-normal
+   estimate at 30° and 60°.
+
+**Numbers** (model / reference):
+
+| quantity | model | reference | deviation | tolerance | verdict |
+|---|---:|---:|---:|---:|---|
+| DNI illuminance, h = 30° (Bird) | 94.8 klx | 91.2 klx | +4.0 % | 15 % | PASS |
+| DNI illuminance, h = 60° (Bird) | 109.5 klx | 103.6 klx | +5.7 % | 15 % | PASS |
+| DNI illuminance, AM1.5 (G173) | 101.9 klx | 97.1 klx | +4.9 % | 10 % | PASS |
+| DNI 400–700 nm, AM1.5 | 394.2 W m⁻² | 374.8 W m⁻² | +5.2 % | 10 % | PASS |
+| DNI spectral RMS, 400–700 nm | 6.3 % | 0 | 6.3 % | 10 % | PASS |
+| DHI illuminance, h = 30° (CIE 110, T=2.2) | 7.31 klx | 6.92 klx | +5.6 % | 25 % | PASS |
+| DHI illuminance, h = 60° (CIE 110, T=2.2) | 8.75 klx | 7.94 klx | +10.2 % | 25 % | PASS |
+
+Figure: `figures/check2_illuminance.png`.
+
+**Verdict: PASS** on all metrics, with two honest caveats.
+
+* The direct beam is systematically **4–6 % high**.  The model has no water
+  vapour, O₂ or CO₂ absorption.  In the visible this produces the 45 %
+  spike at the O₂ A-band (688 nm) visible in the spectral panel; integrated
+  over 400–700 nm it is only +5.2 %, and the illuminance error is +4.9 %.
+* The diffuse check is sensitive to the assumed CIE turbidity.  At **T = 3**
+  (a hazier sky) the same model values are **33 % and 38 % low** at h = 30°
+  and 60° respectively.  This is the expected signature of the missing
+  multiple scattering.  At T = 2.2, which matches the model's clean
+  continental aerosol load, the integrated diffuse illuminance agrees within
+  10 % — the horizon-distribution error seen in check 3 largely averages out
+  in the horizontal integral.
+
+---
+
 ## Check 3 — CIE 110-1994 clear-sky relative luminance
 
 **Reference.** CIE 110-1994, *Spatial distribution of daylight — Luminance
@@ -115,8 +167,8 @@ Figures: `figures/check3_cie_luminance.png` (maps and model/CIE ratio) and
 
 **Verdict: FAIL**, but the failure is localised and interpretable:
 
-* Above 60° zenith angle the model is excellent: RMS 3–4 %, maximum
-  deviation below 20 %.
+* For view zenith angles below 60° (the upper sky) the model is excellent:
+  RMS 3–4 %, maximum deviation below 20 %.
 * The anti-solar horizon agrees with CIE to within 4–9 %.
 * The sun-side horizon is **about 2× too bright** at h = 45° (2.4× at
   h = 30°, 1.7× at h = 60°), and the whole-sky RMS (18.4 %) is dominated by
@@ -157,10 +209,160 @@ the horizon**, not too strong.
   when the limb's single-scattered radiance is not redistributed by higher
   orders.
 
+### Pristine / uniform-H evidence
+
+The table above already records the key attribution experiment: the limb
+excess appears with and without aerosol (pristine 9.78, exponential 7.36,
+well-mixed 6.30, CIE 3.65).  The aerosol profile changes *which* side of the
+horizon is wrong, but not the existence of a ~2x limb error.  That is the
+signature of the missing scattering orders, not of a bad aerosol model.
+
 We did **not** change the model.
 
-## Checks 2, 4, 5
+## Check 4 — horizon chromaticity vs measured spectra
 
-Check 2 (illuminance) is in progress.  Checks 4 and 5 are not yet
-implemented; a check that cannot run is reported as `SKIP` and does not make
-`run_all.py` fail.
+**Reference.** SKYSPECTRA (Balakrishnan et al. 2023, CIE x050:2023 OP026;
+open data, Zenodo DOI [10.5281/zenodo.8147546](https://doi.org/10.5281/zenodo.8147546)).
+The `spectral_patch_radiance` table contains measured 10°-aperture spectral
+radiance of sky patches.  For Berlin the distributed patches are on the
+horizon ring (6° almucantar, azimuths 180/192/204/216/228/240°).
+
+**Selection.** All DE-BLN setup-1 timestamps with `sky_condition = clear` and
+solar elevation 30–50° (13 timestamps, 76 patch spectra, mostly 2015-03-08
+plus a few June/September days).  The model is evaluated at the same sun
+position and the same viewing geometry, with `presets.clear` (AOD₅₅₀ = 0.05).
+The extracted reference data are in
+`data/skyspectra_berlin_horizon_xy.csv` and
+`data/skyspectra_berlin_horizon_mean_spectrum.csv`.
+
+**Numbers** (CIE 1931 xy):
+
+| quantity | model | measured | deviation | tolerance | verdict |
+|---|---:|---:|---:|---:|---|
+| mean x, horizon | 0.2989 | 0.2913 | +0.0076 | 0.02 | PASS |
+| mean y, horizon | 0.3242 | 0.3128 | +0.0115 | 0.02 | PASS |
+| RMS Δxy | 0.0193 | 0 | 0.0193 | 0.02 | PASS (marginal) |
+| RMS Δu′v′ | 0.0110 | 0 | 0.0110 | 0.02 | PASS |
+
+Figure: `figures/check4_chromaticity.png`.
+
+**Verdict: PASS, but marginal.**  The model reproduces the measured horizon
+chromaticity to about 0.019 in xy (0.011 in u′v′), which is a few JNDs.  The
+residual is systematic: the model horizon is slightly **too yellow** (both x
+and y are high).  The result depends on the assumed aerosol load:
+
+| AOD₅₅₀ | RMS Δxy |
+|---:|---:|
+| 0.02 | 0.0154 |
+| 0.05 | 0.0193 |
+| 0.10 | 0.0360 |
+
+A cleaner atmosphere (AOD 0.02) fits Berlin better; a hazy one (AOD 0.10) is
+clearly too yellow.  This is consistent with the check-3 finding that the
+model's aerosol/horizon treatment is not calibrated.
+
+**What this does *not* test.**  All distributed Berlin patches are at 6°
+elevation, so this is a horizon check only.  No open measured **zenith**
+spectrum was found in the timebox.  For information, the model gives
+zenith (x, y) = (0.2602, 0.2734), (0.2644, 0.2771) and (0.2731, 0.2864) at
+h = 30°, 45°, 60°.  At h = 30° the model's y is just below the 0.28–0.32
+range quoted in `docs/ARCHITECTURE.md`; adding multiple scattering would
+whiten the zenith and raise y, so the missing MS is a plausible explanation,
+but this is *not* established by a measurement here.
+
+## Check 5 — twilight zenith luminance vs Patat et al. (2006)
+
+**Reference.** F. Patat, O. S. Ugolnikov & O. V. Postylyakov (2006), *UBVRI
+twilight sky brightness at ESO-Paranal*, A&A 454, 229,
+[arXiv:astro-ph/0604128](https://arxiv.org/abs/astro-ph/0604128).  Table 1
+gives a second-order fit to the measured V-band zenith surface brightness for
+sun zenith distance 95–105°:
+
+```
+m_V(ζ) = 11.84 + 1.518 (ζ − 95) − 0.057 (ζ − 95)²   [mag arcsec⁻²]
+```
+
+converted to luminance with `L = 1.08e5 × 10^(−0.4 m_V)` cd m⁻² (1 cd m⁻²
+≈ 12.6 V mag arcsec⁻²).  The values used are in
+`data/twilight_patat2006.csv`.
+
+**Numbers** (model / reference, zenith):
+
+| solar elev. | model L [cd m⁻²] | Patat L [cd m⁻²] | model/ref | deviation | verdict |
+|---:|---:|---:|---:|---:|---|
+| −3° | 28.4 | 40.1 | 0.71 | −0.15 dex | PASS (ref. extrapolated) |
+| −6° | 0.567 | 0.516 | 1.10 | +0.04 dex | PASS |
+| −9° | 7.24×10⁻⁴ | 1.71×10⁻² | 0.042 | −1.37 dex | **FAIL** |
+| −12° | 0 (exactly) | 1.46×10⁻³ | 0 | < −9 dex | **FAIL** |
+| −18° | 0 (exactly) | 1.81×10⁻⁴ | 0 | < −8 dex | **FAIL** |
+
+Figure: `figures/check5_twilight.png`.
+
+**Verdict: FAIL**, exactly where the architecture predicts it should fail.
+The single-scattering model is remarkably good at −6° (10 % high), but it
+collapses at −9° (24× too dark) and returns **exactly zero** at −12° and
+below.  The reason is geometric, not numerical: at −12° the zenith line of
+sight lies entirely inside the Earth's shadow, so there is no first-order
+scattering along it.  All the light seen at the zenith in real deep twilight
+arrives by multiple scattering from the still-sunlit layers near the horizon.
+At −18° the reference is the natural night sky (Patat et al. state that the
+night-sky level is reached at ζ ≈ 105–106°); the model contains no airglow
+and no multiple scattering, so zero is the expected answer.
+
+Caveats: the −3° and −18° reference values are extrapolations of the fit
+beyond its stated 95–105° validity range.  The −3° comparison should be read
+as indicative only; the −12° and −9° comparisons are within the fitted range
+and are the meaningful ones.
+
+---
+
+## Overall judgement
+
+**What is trustworthy.**
+
+* The molecular optical depth is correct to ~1 % (check 1).
+* Absolute clear-sky *photometry* is good: direct normal illuminance within
+  5–6 % of ASTM G173 and Bird, diffuse horizontal illuminance within 10 % of
+  CIE 110 at a matching turbidity (check 2).
+* For the upper sky (view zenith ≤ 60°) the relative luminance distribution
+  matches CIE 110 to 3–4 % RMS (check 3).
+* The daytime horizon *hue* matches measured Berlin spectra to Δxy ≈ 0.019
+  (check 4), with a small yellow bias.
+
+**What is not trustworthy yet.**
+
+1. **Deep twilight.**  Below −9° the model is a factor 24 too dark; below
+   −12° it is identically zero (check 5).  Any twilight or "blue hour"
+   colour is therefore a single-scattering approximation, not a prediction.
+2. **The bright limb.**  The sun-side horizon is ~2× too bright relative to
+   the zenith at h = 45°, and the model puts the luminance maximum at the
+   horizon instead of at the sun (check 3).  Absolute horizon luminance and
+   the shape of the aureole should not be trusted.
+3. **The forward aureole / circumsolar region.**  It is too weak at the sun
+   and too strong at the limb (check 3); this is the same missing-MS problem.
+4. **Gas absorption.**  The model has no H₂O, O₂ or CO₂; direct beam is 4–6 %
+   high in the visible and up to 45 % high at the O₂ A-band (check 2).
+5. **Zenith saturation.**  The model zenith is at the blue edge of the
+   expected chromaticity range (y ≈ 0.273 at h = 30°); multiple scattering
+   would whiten it.  Not measured here, so this is a hypothesis, not a
+   verdict.
+
+**Bottom line.**  The model's *colour* predictions are trustworthy for the
+daytime upper sky and qualitatively right for the horizon and sunset, at the
+level of "is this sky blue/white/orange and roughly how saturated".  They are
+**not** trustworthy for absolute luminance near the horizon or for any
+twilight scene deeper than about −6°, until multiple scattering is
+implemented.  The failures are consistent, understood, and all point at the
+same missing physics rather than at independent bugs.
+
+## Reproducing
+
+```bash
+cd "/Users/zhangjiajie/Codes/skycolor-wt/validation"
+PY="/Users/zhangjiajie/Codes/Sky Color Simulation/.venv/bin/python"
+"$PY" validation/run_all.py          # all checks, table, results.json
+"$PY" validation/check3_cie_luminance.py   # one check at a time
+```
+
+`run_all.py` exits 0 if every check that ran passed (skipped checks do not
+fail the run), 1 if any check failed.

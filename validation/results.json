@@ -52,10 +52,81 @@
     {
       "error": null,
       "key": "check2",
-      "metrics": [],
-      "summary": "not implemented (skipped)",
-      "title": "Direct/diffuse clear-sky illuminance",
-      "verdict": "SKIP"
+      "metrics": [
+        {
+          "dev": 4.854339474630225,
+          "dev_kind": "rel_pct",
+          "model": 101.85760872640249,
+          "name": "DNI illuminance, AM1.5 (48.19deg)",
+          "passed": true,
+          "reference": 97.1420059834979,
+          "tolerance": 10.0,
+          "unit": "klx"
+        },
+        {
+          "dev": 5.1598816930700515,
+          "dev_kind": "rel_pct",
+          "model": 394.15497376192195,
+          "name": "DNI, 400-700 nm, AM1.5",
+          "passed": true,
+          "reference": 374.81496500000003,
+          "tolerance": 10.0,
+          "unit": "W/m2"
+        },
+        {
+          "dev": 6.296559849282126,
+          "dev_kind": "abs",
+          "model": 6.296559849282126,
+          "name": "DNI spectral RMS, 400-700 nm",
+          "passed": true,
+          "reference": 0.0,
+          "tolerance": 10.0,
+          "unit": "%"
+        },
+        {
+          "dev": 5.556151374542846,
+          "dev_kind": "rel_pct",
+          "model": 7.307954154734275,
+          "name": "DHI illuminance, h=30deg (CIE 110, T=2.2)",
+          "passed": true,
+          "reference": 6.92328590950953,
+          "tolerance": 25.0,
+          "unit": "klx"
+        },
+        {
+          "dev": 10.209829024071778,
+          "dev_kind": "rel_pct",
+          "model": 8.749059831031758,
+          "name": "DHI illuminance, h=60deg (CIE 110, T=2.2)",
+          "passed": true,
+          "reference": 7.9385476853619,
+          "tolerance": 25.0,
+          "unit": "klx"
+        },
+        {
+          "dev": 3.9523153867339307,
+          "dev_kind": "rel_pct",
+          "model": 94.78554637842686,
+          "name": "DNI illuminance, h=30deg (Bird)",
+          "passed": true,
+          "reference": 91.18175581351514,
+          "tolerance": 15.0,
+          "unit": "klx"
+        },
+        {
+          "dev": 5.66385035761641,
+          "dev_kind": "rel_pct",
+          "model": 109.45432452881967,
+          "name": "DNI illuminance, h=60deg (Bird)",
+          "passed": true,
+          "reference": 103.58729514244891,
+          "tolerance": 15.0,
+          "unit": "klx"
+        }
+      ],
+      "summary": "DNI: 94.8/101.9/109.5 klx at h=30/48.19/60 vs 91.2/97.1/103.6; DHI: 7.3/8.7 klx vs CIE 6.9/7.9.",
+      "title": "Clear-sky direct and diffuse illuminance",
+      "verdict": "PASS"
     },
     {
       "error": null,
@@ -149,18 +220,110 @@
     {
       "error": null,
       "key": "check4",
-      "metrics": [],
-      "summary": "not implemented (skipped)",
+      "metrics": [
+        {
+          "dev": 0.007621381954476594,
+          "dev_kind": "abs",
+          "model": 0.2988841026454386,
+          "name": "mean delta x, horizon",
+          "passed": true,
+          "reference": 0.29126272069096204,
+          "tolerance": 0.02,
+          "unit": "xy"
+        },
+        {
+          "dev": 0.01148909874264551,
+          "dev_kind": "abs",
+          "model": 0.3242426343430843,
+          "name": "mean delta y, horizon",
+          "passed": true,
+          "reference": 0.3127535356004388,
+          "tolerance": 0.02,
+          "unit": "xy"
+        },
+        {
+          "dev": 0.01929979403382298,
+          "dev_kind": "abs",
+          "model": 0.01929979403382298,
+          "name": "RMS delta xy, horizon",
+          "passed": true,
+          "reference": 0.0,
+          "tolerance": 0.02,
+          "unit": "xy"
+        },
+        {
+          "dev": 0.01104032941417036,
+          "dev_kind": "abs",
+          "model": 0.01104032941417036,
+          "name": "RMS delta u'v', horizon",
+          "passed": true,
+          "reference": 0.0,
+          "tolerance": 0.02,
+          "unit": "u'v'"
+        }
+      ],
+      "summary": "horizon xy: model (0.299,0.324) vs measured (0.291,0.313); RMS dxy=0.0193, du'v'=0.0110.",
       "title": "Sky chromaticity vs measured spectra",
-      "verdict": "SKIP"
+      "verdict": "PASS"
     },
     {
       "error": null,
       "key": "check5",
-      "metrics": [],
-      "summary": "not implemented (skipped)",
-      "title": "Twilight zenith luminance",
-      "verdict": "SKIP"
+      "metrics": [
+        {
+          "dev": -0.14907707701117187,
+          "dev_kind": "abs",
+          "model": 28.441144102952016,
+          "name": "zenith luminance, h=-3deg (extrapolated ref)",
+          "passed": true,
+          "reference": 40.0889,
+          "tolerance": 0.5,
+          "unit": "cd/m2"
+        },
+        {
+          "dev": 0.04079415597892254,
+          "dev_kind": "abs",
+          "model": 0.5673071185433664,
+          "name": "zenith luminance, h=-6deg",
+          "passed": true,
+          "reference": 0.516445,
+          "tolerance": 0.5,
+          "unit": "cd/m2"
+        },
+        {
+          "dev": -1.3736983544279384,
+          "dev_kind": "abs",
+          "model": 0.000723976087236007,
+          "name": "zenith luminance, h=-9deg",
+          "passed": false,
+          "reference": 0.0171168,
+          "tolerance": 0.5,
+          "unit": "cd/m2"
+        },
+        {
+          "dev": -9.164224928296095,
+          "dev_kind": "abs",
+          "model": 0.0,
+          "name": "zenith luminance, h=-12deg",
+          "passed": false,
+          "reference": 0.00145957,
+          "tolerance": 0.5,
+          "unit": "cd/m2"
+        },
+        {
+          "dev": -8.257023039528608,
+          "dev_kind": "abs",
+          "model": 0.0,
+          "name": "zenith luminance, h=-18deg",
+          "passed": false,
+          "reference": 0.000180727,
+          "tolerance": 0.5,
+          "unit": "cd/m2"
+        }
+      ],
+      "summary": "zenith L: -6deg 0.567 vs 0.516; -9deg 0.00072 vs 0.017; -12deg 0 vs 0.0015 cd/m2.",
+      "title": "Twilight zenith luminance (Patat et al. 2006)",
+      "verdict": "FAIL"
     }
   ]
 }
