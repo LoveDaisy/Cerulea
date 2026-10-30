@@ -82,15 +82,15 @@ skycolor/
   rt/twilight.py  spherical multiple scattering for deep twilight
   rt/cloud.py     delta-Eddington cloud layer
   cloud.py        cloud optics (Mie droplets, delta-M, presets)
-  refraction.py   traced atmospheric refraction
+  refraction.py   traced refraction, apparent solar position, refracted optical paths
   color.py        spectrum -> XYZ -> sRGB, adaptation, tone mapping
   render.py       sky dome, cameras (panorama / fisheye / perspective), images
   presets.py      named scenarios
 tools/build_data.py   rebuilds the packaged data tables from data_raw/
 experiments/          scripts that produce the figures (01..10)
 validation/           five independent checks against published references
-tests/                173 tests
-docs/                 architecture, method notes, the write-up
+tests/                192 tests
+docs/                 architecture, method notes, the write-up, the roadmap
 ```
 
 ## How good is it?
