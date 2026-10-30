@@ -150,7 +150,9 @@ def mie_coefficients(x, m: complex):
     ``n_max(x) = x + 4 x^(1/3) + 2`` and freezing the inactive columns keeps
     the recurrences stable from ``x = 1`` to ``x = 10^4``; without the mask a
     single shared ``n_max`` overflows for the small droplets in a broad
-    distribution.
+    distribution.  The downward recurrence for the logarithmic derivative must
+    instead be started above ``|m|x + 15`` for *every* size, or ``Q_ext`` is
+    wrong by several per cent once ``x > 50``.
     """
     x = np.atleast_1d(np.asarray(x, dtype=float))
     n_x = x.size

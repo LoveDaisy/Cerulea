@@ -96,7 +96,11 @@ class TwoStream:
     transmittance : ndarray
         Diffuse flux emerging from the far side / incident flux.
     direct_transmittance : ndarray
-        Unscattered beam / incident flux.
+        Transmittance of the *delta-scaled* beam, ``exp(-tau'/mu0)``.  Under
+        delta-M the forward-scattered light (a fraction ``f`` of the
+        scattering) is moved into this beam, so it is larger than the
+        physically unscattered ``exp(-tau/mu0)``; it is what closes the energy
+        budget ``R + T + direct = 1``.
     total_transmittance : ndarray
         ``transmittance + direct_transmittance``.
     """
@@ -248,6 +252,15 @@ def delta_eddington(tau, omega, g, mu0, f=0.0, ground_albedo=0.0, incident=1.0):
         with np.errstate(divide="ignore", invalid="ignore"):
             gc_big = 0.5 * ((e1 - ea) / (lam_safe + a) + (e2 - ea) / (a - lam_safe))
             gs_big = 0.5 * ((e1 - ea) / (lam_safe + a) - (e2 - ea) / (a - lam_safe))
+            # lam == a is a removable 0/0: the limit of (e2 - ea)/(a - lam) is
+            # t e^{-lam t}.  Evaluate it explicitly; without this a layer whose
+            # lambda happens to equal 1/mu0 returns nan.
+            near = np.abs(a - lam_safe) < 1e-6
+            residue = t * e2
+            gc_near = 0.5 * ((e1 - ea) / (lam_safe + a) + residue)
+            gs_near = 0.5 * ((e1 - ea) / (lam_safe + a) - residue)
+        gc_big = np.where(near, gc_near, gc_big)
+        gs_big = np.where(near, gs_near, gs_big)
         gc_small = (1.0 - ea) / a
         gs_small = t / a - (1.0 - ea) / a**2
         gc = np.where(big, gc_big, gc_small)

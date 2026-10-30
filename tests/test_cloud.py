@@ -192,6 +192,15 @@ def test_zero_optical_depth_is_transparent():
     assert res.direct_transmittance[0] == pytest.approx(1.0)
 
 
+def test_removable_resonance_lambda_equals_inverse_mu0():
+    """omega = 2/3, g = 0 gives lambda = 1 exactly: the particular solution
+    has a 0/0 at mu0 = 1 and must still be finite."""
+    res = rtcloud.delta_eddington(5.0, 2.0 / 3.0, 0.0, 1.0, f=0.0)
+    assert np.all(np.isfinite(res.albedo))
+    assert np.all(np.isfinite(res.transmittance))
+    assert 0.0 < res.albedo[0] < 1.0
+
+
 def test_grazing_beam_albedo_stays_bounded():
     """R must stay finite (and below 1) as the beam approaches the horizon."""
     for mu0 in [0.5, 0.1, 0.01, 1e-3]:
