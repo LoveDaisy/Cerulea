@@ -414,7 +414,9 @@ class MieAerosol(Aerosol):
         x_max = 0.0
         for r, w, mi in self._nodes:
             x = 2.0 * np.pi * r / (float(wl_nm) * 1e-3)
-            if x <= 0.0:
+            if x < 1e-4:
+                # far below the Rayleigh regime the cross section is
+                # negligible; skipping avoids ill-conditioned Bessel recurrences
                 continue
             m = self._index(mi, wl_nm)
             c = mie_coefficients(x, m)
@@ -598,8 +600,8 @@ class DeltaMResult:
         Forward-scattered fraction, ``beta_{n_moments}`` (clipped to
         ``[0, 1-1e-12]`` for numerical safety).
     tau_star, omega_star : ndarray (n_wl,) or None
-        Renormalised optical depth and single-scattering albedo, if ``tau`` /
-        ``omega`` were supplied.
+        Renormalised optical depth and single-scattering albedo.  ``tau*``
+        requires both ``tau`` and ``omega``; ``omega*`` requires ``omega``.
     g_star : ndarray (n_wl,)
         Renormalised asymmetry parameter ``beta*_1 = (g-f)/(1-f)``.
     n_moments : int
@@ -686,14 +688,16 @@ def delta_m(moments, n_moments: int | None = None, tau=None, omega=None) -> Delt
 
     tau_arr = _rescale(tau)
     omega_arr = _rescale(omega)
+    # tau* needs both tau and omega (the (1 - omega f) factor is the whole
+    # point); omega* needs only omega.
     tau_star = None
     omega_star = None
-    if tau_arr is not None:
-        tau_star = (1.0 - omega_arr * f) * tau_arr if omega_arr is not None else tau_arr
     if omega_arr is not None:
         denom = 1.0 - omega_arr * f
         denom = np.where(np.abs(denom) < 1e-12, 1e-12, denom)
         omega_star = omega_arr * one_minus_f / denom
+        if tau_arr is not None:
+            tau_star = (1.0 - omega_arr * f) * tau_arr
 
     if squeezed:
         beta = beta[:, 0]
@@ -746,8 +750,8 @@ def _dust_index(wl_nm):
     wl = np.asarray(wl_nm, dtype=float)
     k_wl = np.array([300.0, 400.0, 450.0, 500.0, 550.0, 600.0, 650.0, 700.0,
                      800.0, 900.0, 1000.0, 1200.0])
-    k_val = np.array([0.020, 0.014, 0.010, 0.007, 0.005, 0.004, 0.0043, 0.005,
-                      0.007, 0.010, 0.013, 0.016])
+    k_val = np.array([0.0040, 0.0028, 0.0020, 0.0014, 0.0010, 0.0008, 0.00086,
+                      0.0010, 0.0014, 0.0020, 0.0026, 0.0032])
     k = np.interp(wl, k_wl, k_val)
     n = 1.55 + 0.005 * (550.0 / wl - 1.0)
     return n + 1j * k
@@ -764,7 +768,7 @@ def _soot_index(wl_nm):
 def _brown_carbon_index(wl_nm):
     """Biomass-burning aerosol: moderately absorbing, strongly blue-weighted."""
     wl = np.asarray(wl_nm, dtype=float)
-    k = 0.15 * (550.0 / wl) ** 1.2
+    k = 0.03 * (550.0 / wl) ** 1.2
     n = 1.60 + 0.02 * (550.0 / wl - 1.0)
     return n + 1j * k
 
@@ -828,8 +832,8 @@ def _maritime_config(rh: float = 0.5):
     return dict(
         name=f"maritime(RH={rh:.0%})",
         modes=[
-            LogNormalMode(0.20 * f, 2.0, 0.5, refractive_index=m),
-            LogNormalMode(3.5 * f, 1.9, 0.5, refractive_index=m),
+            LogNormalMode(0.10 * f, 1.8, 0.997, refractive_index=m),
+            LogNormalMode(1.5 * f, 1.9, 0.003, refractive_index=m),
         ],
         refractive_index=m,
     )
@@ -852,7 +856,7 @@ def _biomass_burning_config(rh: float = 0.3):
     f = humidity_growth_factor(rh, 0.15)
     return dict(
         name=f"biomass_burning(RH={rh:.0%})",
-        modes=[LogNormalMode(0.06 * f, 1.8, 1.0, refractive_index=_brown_carbon_index)],
+        modes=[LogNormalMode(0.05 * f, 1.8, 1.0, refractive_index=_brown_carbon_index)],
         refractive_index=_brown_carbon_index,
     )
 
@@ -900,10 +904,10 @@ class RuralAerosol(MieAerosol):
     as well, and the humidity growth follows Shettle & Fenn's ``(1-RH)^-0.35``
     law.
 
-    At 550 nm and RH = 50 %% this model gives an Angstrom exponent
-    ``alpha ~ 1.6``, ``SSA ~ 0.97`` and ``g ~ 0.58``.  The forward peak is
-    broad; delta-M is *not* required for this aerosol (``f`` at 32 moments is
-    below 1e-3).
+    At 550 nm and RH = 50 % this model gives ``alpha(440/660) = 1.30``,
+    ``SSA = 0.982`` and ``g = 0.714``.  ``tau(450)/tau(650) = 1.62``: blue is
+    removed faster than red, so this aerosol cannot produce a blue sun.  The
+    forward peak is broad; delta-M is *not* required (``f_32 < 1e-4``).
     """
 
     def __init__(self, rh: float = 0.5, **kw):
@@ -918,8 +922,10 @@ class UrbanAerosol(MieAerosol):
     reproduce the measured urban single-scattering albedo of about 0.88-0.92
     at 550 nm (e.g. Dubovik et al. 2002, AERONET inversions).
 
-    At 550 nm and RH = 50 %% this model gives ``alpha ~ 1.7``, ``SSA ~ 0.90``
-    and ``g ~ 0.60``.  delta-M is not required.
+    At 550 nm and RH = 50 % this model gives ``alpha(440/660) = 1.25``,
+    ``SSA = 0.901`` and ``g = 0.704``.  ``tau(450)/tau(650) = 1.59``.  delta-M
+    is not required (``f_32 < 1e-4``), but the absorbing soot mode makes the
+    single-scattering albedo strongly wavelength dependent.
     """
 
     def __init__(self, rh: float = 0.5, **kw):
@@ -930,13 +936,16 @@ class MaritimeAerosol(MieAerosol):
     """Maritime aerosol: sea salt, accumulation + coarse mode.
 
     Provenance: OPAC sea-salt modes (Hess et al. 1998) and Shettle & Fenn
-    (1979) maritime model.  The two modes are the accumulation mode
-    (``r_g ~ 0.2 um``) and the coarse mode (``r_g ~ 3.5 um``); sea salt is
-    hygroscopic, with ``f(RH) = (1-RH)^-0.30``.
+    (1979) maritime model.  The two modes are an accumulation mode
+    (``r_g = 0.10 um``, ``sigma_g = 1.8``, 99.7 % of the number) and a coarse
+    mode (``r_g = 1.5 um``, ``sigma_g = 1.9``, 0.3 % of the number, most of the
+    mass); sea salt is hygroscopic, with ``f(RH) = (1-RH)^-0.30``.
 
-    At 550 nm and RH = 50 %% this model gives ``alpha ~ 0.6``, ``SSA ~ 0.99``
-    and ``g ~ 0.75``.  The coarse mode produces a narrow forward peak;
-    delta-M is recommended (``f`` at 32 moments is a few percent).
+    At 550 nm and RH = 50 % this model gives ``alpha(440/660) = 0.55``,
+    ``SSA = 1.000`` and ``g = 0.813``.  ``tau(450)/tau(650) = 1.23``.  The
+    coarse mode produces a narrow forward peak; delta-M is recommended
+    (``f_32 = 0.127``, i.e. 13 % of the energy is in the omitted forward
+    delta).
     """
 
     def __init__(self, rh: float = 0.5, **kw):
@@ -953,9 +962,15 @@ class DesertDustAerosol(MieAerosol):
     visible (see ``docs/AEROSOL.md``).  Dust is only weakly hygroscopic here
     (``gamma = 0.05``).
 
-    At 550 nm this model gives ``alpha ~ 0.1-0.3``, ``SSA ~ 0.93`` and
-    ``g ~ 0.75``.  The coarse mode has a strong forward peak; delta-M is
-    required (``f`` at 32 moments is several percent).
+    At 550 nm this model gives ``alpha(440/660) = -0.04``, ``SSA = 0.876``
+    and ``g = 0.816``.  The negative Angstrom exponent is the anomalous dust
+    behaviour: the broad coarse mode plus the iron-oxide absorption makes the
+    extinction *increase* slightly towards the red, with
+    ``tau(450)/tau(650) = 0.984`` (a weak blue-sun tendency; a narrow coarse
+    mode, e.g. ``r = 0.45 um`` and ``sigma_g = 1.05``, pushes the ratio down
+    to about 0.71, but that is not a realistic desert-dust width).  The
+    coarse mode has a strong forward peak; delta-M is required
+    (``f_32 = 0.368``).
     """
 
     def __init__(self, rh: float = 0.0, **kw):
@@ -971,8 +986,10 @@ class BiomassBurningAerosol(MieAerosol):
     Eck et al. 2005).  The imaginary index is a brown-carbon model, so
     absorption increases towards the blue.
 
-    At 550 nm this model gives ``alpha ~ 2.1``, ``SSA ~ 0.85`` and
-    ``g ~ 0.55``.  delta-M is not required.
+    At 550 nm and RH = 30 % this model gives ``alpha(440/660) = 1.84``,
+    ``SSA = 0.865`` and ``g = 0.586``.  ``tau(450)/tau(650) = 1.97``: strongly
+    blue-absorbing, the opposite of a blue sun.  delta-M is not required
+    (``f_32 < 1e-4``).
     """
 
     def __init__(self, rh: float = 0.3, **kw):
@@ -988,8 +1005,12 @@ class VolcanicStratosphericAerosol(MieAerosol):
     "sulfate" mode).  This is the aerosol that produces the red/purple
     afterglows after a major eruption.
 
-    At 550 nm this model gives ``alpha ~ 0.5-0.7``, ``SSA > 0.999`` and
-    ``g ~ 0.75``.  The forward peak is moderate; delta-M is recommended.
+    At 550 nm this model gives ``alpha(440/660) = -0.31``, ``SSA > 0.999``
+    and ``g = 0.710``.  ``tau(450)/tau(650) = 0.892``: the layer is slightly
+    grey/red-biased, not a strong blue absorber, so its role in the red
+    afterglow is through near-conservative forward scattering rather than
+    through spectral extinction.  The forward peak is moderate; delta-M is
+    optional (``f_32 = 0.004``).
     """
 
     def __init__(self, **kw):
@@ -1010,8 +1031,9 @@ class CirrusAerosol(MieAerosol):
     ``sigma_g = 1.35``), within the range measured by in-situ campaigns
     (e.g. Heymsfield & McFarquhar 1996); refractive index of ice Ih.
 
-    At 550 nm this model gives ``alpha ~ 0``, ``SSA > 0.999`` and
-    ``g ~ 0.85``.  The forward peak is strong; delta-M is required.
+    At 550 nm this model gives ``alpha(440/660) = -0.04``, ``SSA = 0.9998``
+    and ``g = 0.868``.  ``tau(450)/tau(650) = 0.986``.  The forward peak is
+    strong; delta-M is required (``f_32 = 0.381``).
     """
 
     def __init__(self, **kw):
@@ -1026,10 +1048,11 @@ class WaterCloudAerosol(MieAerosol):
     (e.g. Miles et al. 2000); the refractive index is that of liquid water.
     The default is ``r_eff = 8 um``.
 
-    At 550 nm this model gives ``alpha ~ 0``, ``SSA > 0.9999`` and
-    ``g ~ 0.86``.  The forward peak is extremely strong -- at ``r = 8 um`` its
-    width is about ``0.3 deg`` -- so delta-M is **required** (``f`` at 32
-    moments is tens of percent), and a plain 32-moment expansion without
+    At 550 nm this model gives ``alpha(440/660) = -0.04``, ``SSA = 1.000``
+    and ``g = 0.858``.  ``tau(450)/tau(650) = 0.985``.  The forward peak is
+    extremely strong -- at ``r = 8 um`` its width is about ``0.3 deg`` -- so
+    delta-M is **required** (``f_32 = 0.383``, i.e. 38 % of the energy is in
+    the omitted forward delta), and a plain 32-moment expansion without
     delta-M is meaningless.
     """
 

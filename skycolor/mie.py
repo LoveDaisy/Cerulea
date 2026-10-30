@@ -437,9 +437,9 @@ def phase_table_angles(
     """
     x_max = max(float(x_max), 1e-3)
     if n_forward is None:
-        n_forward = int(np.clip(2.5 * x_max, 80, 400))
+        n_forward = int(np.clip(3.0 * x_max, 80, 800))
     if n_mid is None:
-        n_mid = int(np.clip(4.0 * x_max, 240, 1400))
+        n_mid = int(np.clip(8.0 * x_max, 240, 2400))
     n_forward = max(int(n_forward), 16)
     n_mid = max(int(n_mid), 16)
     n_back = max(int(n_back), 8)
