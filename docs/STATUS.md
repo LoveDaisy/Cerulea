@@ -19,7 +19,7 @@ argument; this is the state.*
 | Colour | CIE 1931 → Bradford → ACES, tone-mapping options |
 | Cameras | panorama, fisheye, perspective; ground; sun disk |
 
-207 tests.  Environment pinned by `uv.lock` (Python 3.12, numpy 2.5, scipy 1.18).
+210 tests.  Environment pinned by `uv.lock` (Python 3.12, numpy 2.5, scipy 1.18).
 
 ## How well it is validated
 
@@ -62,8 +62,14 @@ argument; this is the state.*
    model cannot show it.
 6. **Clouds are one homogeneous deck** — no cumulus, no silver linings, no
    halos (ice = equivalent spheres).
-7. **Performance**: a dusty atmosphere takes ~100 s for one
-   multiple-scattering solve.
+7. **Performance**: the bottleneck is Mie pre-processing, not the
+   multiple-scattering solve.  The per-wavelength cache now holds the whole
+   81-point working grid (capacity 8 → 256) and the preset aerosols are
+   shared across atmospheres, so warm and repeat calls are ≈ 0 (warm single
+   clear 1 dir 0.35 → 0.003 s; second `delta_m_properties(32)` 6.8 →
+   0.002 s; a second `presets.dusty` build ~41 s → < 1 ms; values
+   bit-identical).  Cold dusty Mie pre-processing (~40 s) still needs
+   vectorised kernels or a lookup table.  Numbers: `tools/perf_bench.py`.
 
 ## Where to look
 

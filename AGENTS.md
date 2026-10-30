@@ -17,7 +17,7 @@ uv sync        # 从 uv.lock 重建 .venv；不要 pip install 进环境
 ### 测试
 
 ```bash
-uv run pytest -q                      # 全量 207 tests，约 3.5 min
+uv run pytest -q                      # 全量 210 tests，约 3.5 min
 uv run python -m validation.run_all   # 六项物理校验，10+ min
 ```
 
@@ -60,7 +60,7 @@ uv run python experiments/01_day_cycle.py
 │   └── data/            # 提交在仓库里的数据表（离线可运行）
 ├── validation/          # check1..6 + common.py + 各轮 addendum
 ├── experiments/         # 生成 figures/ 的脚本（01..12）
-├── tests/               # 207 tests
+├── tests/               # 210 tests
 ├── docs/                # STATUS / ROADMAP / REPORT / 专题文档 / 中文摘要
 ├── tools/               # build_data.py、twilight_benchmark.py
 ├── figures/             # 提交在仓库里的结果图

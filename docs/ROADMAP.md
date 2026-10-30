@@ -194,8 +194,17 @@ understand.  Each is worth resolving before adding new physics.
 4. **The V band vs the photopic integral.**  Twilight spectra are strongly
    coloured; comparing a photopic integral with a Johnson-V magnitude is a
    10–20 % systematic that nobody has quantified here.
-5. **Performance.**  A dusty atmosphere takes ~100 s for one multiple-scattering
-   solve.  That is a documentation-grade solver, not an interactive one.
+5. **Performance.**  The bottleneck is Mie pre-processing, not the
+   multiple-scattering solve: a cold dusty ``delta_m(32)`` costs ~40 s on
+   the reference machine (phase tables + analytic Legendre moments), while
+   the transfer itself takes seconds.  The per-wavelength state cache now
+   holds the whole 81-wavelength working grid (capacity 8 → 256) and the
+   preset aerosols are shared across atmospheres, so warm and repeat calls
+   are nearly free: warm single clear 1 dir 0.353 → 0.003 s, a second
+   ``delta_m_properties(32)`` 6.8 → 0.002 s, a second ``presets.dusty``
+   build ~41 s → < 1 ms (``tools/perf_bench.py``; all values bit-identical
+   to the pre-change code).  Cold starts still pay the full Mie build and
+   need vectorised kernels or a lookup table.
 
 ---
 
