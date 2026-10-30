@@ -7,31 +7,38 @@ from . import color
 from .constants import WL_COARSE
 
 
+# ---------------------------------------------------------------------------
+# sky dome
+# ---------------------------------------------------------------------------
 def sky_dome(atmo, sun_zenith_deg: float, n_zenith: int = 46, n_azimuth: int = 91,
-             n_gauss: int = 3, chunk: int = 512, min_zenith_deg: float = 0.0):
-    """Compute the radiance of the whole sky on a (zenith, relative azimuth) grid.
+             n_gauss: int = 3, chunk: int = 512, min_zenith_deg: float = 0.0,
+             multiple: bool = True):
+    """Radiance of the whole sky on a (zenith, relative azimuth) grid.
 
     The atmosphere is horizontally homogeneous, so the radiance only depends on
-    the angle between the viewing direction and the sun.  The grid covers
-    relative azimuths 0..180 degrees.
-
-    Returns a dict with ``zenith`` (deg), ``azimuth_rel`` (deg), ``radiance``
-    ``(n_zenith, n_azimuth, n_wl)`` and ``wl``.
+    the angle between the viewing direction and the sun; the grid covers
+    relative azimuths 0..180 degrees.  Returns a dict with ``zenith``,
+    ``azimuth_rel``, ``radiance`` (n_zenith, n_azimuth, n_wl), ``wl`` and
+    ``sun_zenith_deg``.
     """
     zen = np.linspace(min_zenith_deg, 90.0, n_zenith)
     az = np.linspace(0.0, 180.0, n_azimuth)
     Z, A = np.meshgrid(zen, az, indexing="ij")
-    rad = sky_radiance_grid(atmo, sun_zenith_deg, Z, A, n_gauss=n_gauss, chunk=chunk)
+    rad = sky_radiance_grid(atmo, sun_zenith_deg, Z, A, n_gauss=n_gauss, chunk=chunk,
+                            multiple=multiple)
     return dict(zenith=zen, azimuth_rel=az, radiance=rad, wl=atmo.wl,
                 sun_zenith_deg=sun_zenith_deg)
 
 
-def sky_radiance_grid(atmo, sun_zenith_deg, Z, A, n_gauss=3, chunk=512, sun_azimuth_deg=0.0):
-    from .rt.single import sky_radiance
+def sky_radiance_grid(atmo, sun_zenith_deg, Z, A, n_gauss=3, chunk=512,
+                      sun_azimuth_deg=0.0, multiple=True):
+    from .rt.solver import sky_radiance_total
 
     shape = np.shape(Z)
-    rad = sky_radiance(atmo, sun_zenith_deg, np.ravel(Z), np.ravel(A) + sun_azimuth_deg,
-                       sun_azimuth_deg=sun_azimuth_deg, n_gauss=n_gauss, chunk=chunk)
+    rad = sky_radiance_total(atmo, sun_zenith_deg, np.ravel(Z),
+                             np.ravel(A) + sun_azimuth_deg,
+                             sun_azimuth_deg=sun_azimuth_deg, multiple=multiple,
+                             n_gauss=n_gauss, chunk=chunk)
     return rad.reshape(shape + (rad.shape[-1],))
 
 
@@ -54,27 +61,32 @@ def sample_dome(dome: dict, view_zenith, view_azimuth_rel) -> np.ndarray:
             + r10 * fz * (1 - fa) + r11 * fz * fa)
 
 
+def hemispherical_irradiance(radiance: np.ndarray, zenith_deg, azimuth_rel_deg):
+    """Integrate a dome to get the diffuse irradiance spectrum, shape ``(n_wl,)``."""
+    dmu = np.abs(np.diff(-np.cos(np.radians(zenith_deg)), prepend=-1.0))
+    daz = np.radians(azimuth_rel_deg[1] - azimuth_rel_deg[0])
+    w = dmu[:, None] * daz * 2.0  # full azimuth = 2 x half
+    return np.sum(radiance * w[..., None], axis=(0, 1))
+
+
 # ---------------------------------------------------------------------------
 # cameras
 # ---------------------------------------------------------------------------
-def panorama_grid(width: int, height: int, min_elevation: float = -10.0):
-    """Equirectangular panorama: x -> azimuth, y -> elevation."""
+def panorama_grid(width: int, height: int, min_elevation: float = -8.0,
+                  max_elevation: float = 90.0):
     azimuth = np.linspace(0.0, 360.0, width, endpoint=False)
-    elevation = np.linspace(90.0, min_elevation, height)
+    elevation = np.linspace(max_elevation, min_elevation, height)
     A, E = np.meshgrid(azimuth, elevation, indexing="xy")
     return A, E
 
 
-def fisheye_grid(size: int, max_zenith: float = 90.0, projection: str = "equal_area"):
-    """Circular fisheye image.
-
-    ``equal_area`` maps solid angle linearly onto the disk (a "hemispherical
-    fisheye"), ``equidistant`` maps zenith angle linearly onto the radius.
-    Returns ``(azimuth, elevation, mask)``.
-    """
+def fisheye_grid(size: int, max_zenith: float = 90.0, projection: str = "equal_area",
+                 center=None):
     y, x = np.mgrid[0:size, 0:size].astype(float)
-    cx = cy = (size - 1) / 2.0
-    r = np.hypot(x - cx, y - cy) / cx
+    cx, cy = (size - 1) / 2.0, (size - 1) / 2.0
+    if center is not None:
+        cx, cy = center
+    r = np.hypot(x - cx, y - cy) / ((size - 1) / 2.0)
     mask = r <= 1.0
     if projection == "equal_area":
         zen = np.degrees(np.arcsin(np.clip(r, 0, 1)))
@@ -84,35 +96,97 @@ def fisheye_grid(size: int, max_zenith: float = 90.0, projection: str = "equal_a
     return azimuth, 90.0 - zen, mask
 
 
-def render_from_dome(dome, sun_azimuth_deg, azimuth, elevation, mask=None,
-                     exposure=None, tonemap="aces", adaptation="bradford",
-                     white_xy=None, reference_percentile=99.0, sun_disk=False):
-    """Render an image from a pre-computed dome."""
-    rel = (azimuth - sun_azimuth_deg + 180.0) % 360.0 - 180.0
-    rad = sample_dome(dome, 90.0 - elevation, rel)
+def perspective_grid(width: int, height: int, hfov_deg: float = 90.0,
+                     pitch_deg: float = 0.0, yaw_deg: float = 0.0):
+    """Pinhole camera looking towards ``yaw`` at ``pitch`` (degrees)."""
+    f = (width / 2.0) / np.tan(np.radians(hfov_deg) / 2.0)
+    x, y = np.meshgrid(np.arange(width) + 0.5 - width / 2.0,
+                       height / 2.0 - (np.arange(height) + 0.5), indexing="xy")
+    dx, dy, dz = x / f, y / f, np.ones_like(x)
+    n = np.sqrt(dx**2 + dy**2 + dz**2)
+    dx, dy, dz = dx / n, dy / n, dz / n
+    p = np.radians(pitch_deg)
+    v = np.radians(yaw_deg)
+    dy2 = dy * np.cos(p) - dz * np.sin(p)
+    dz2 = dy * np.sin(p) + dz * np.cos(p)
+    dx3 = dx * np.cos(v) + dz2 * np.sin(v)
+    dz3 = -dx * np.sin(v) + dz2 * np.cos(v)
+    elevation = np.degrees(np.arcsin(np.clip(dy2, -1, 1)))
+    azimuth = (np.degrees(np.arctan2(dx3, dz3))) % 360.0
+    return azimuth, elevation
+
+
+# ---------------------------------------------------------------------------
+# high level renderer
+# ---------------------------------------------------------------------------
+def ground_radiance(atmo, dome, sun_zenith_deg, ground_albedo=None):
+    """Spectral radiance of a Lambertian ground illuminated by sun + sky."""
+    from .rt.single import direct_sun_transmittance
+    from .spectra import solar_irradiance
+
+    albedo = (atmo.ground_albedo if ground_albedo is None
+              else np.full(len(atmo.wl), ground_albedo))
+    E_diff = hemispherical_irradiance(dome["radiance"], dome["zenith"], dome["azimuth_rel"])
+    T = direct_sun_transmittance(atmo, sun_zenith_deg)
+    cosz = max(np.cos(np.radians(sun_zenith_deg)), 0.0)
+    E_dir = solar_irradiance(atmo.wl) * T * cosz
+    return np.asarray(albedo) / np.pi * (E_dir + E_diff), E_dir + E_diff
+
+
+def render_scene(atmo, sun_elevation_deg: float, sun_azimuth_deg: float = 0.0,
+                 camera: str = "panorama", size=(1000, 500), exposure=None,
+                 tonemap: str = "aces", adaptation=None,
+                 reference_percentile: float = 92.0, sun_disk: bool = True,
+                 ground: bool = True, n_zenith: int = 50, n_azimuth: int = 91,
+                 hfov_deg: float = 90.0, pitch_deg: float = 0.0, yaw_deg: float = 0.0,
+                 white_xy=None, preserve_chromaticity: bool = True):
+    """Render a complete scene (sky + ground + sun disk) to an RGB image."""
+    sun_zen = 90.0 - sun_elevation_deg
+    dome = sky_dome(atmo, sun_zen, n_zenith=n_zenith, n_azimuth=n_azimuth)
+
+    if camera == "panorama":
+        az, el = panorama_grid(size[0], size[1])
+        mask = None
+    elif camera == "fisheye":
+        az, el, mask = fisheye_grid(size[0])
+    elif camera == "perspective":
+        az, el = perspective_grid(size[0], size[1], hfov_deg, pitch_deg, yaw_deg)
+        mask = None
+    else:
+        raise ValueError(f"unknown camera {camera}")
+
+    rel = (az - sun_azimuth_deg + 180.0) % 360.0 - 180.0
+    above = el >= 0.0
+    rad = sample_dome(dome, 90.0 - np.clip(el, 0.0, 90.0), rel)
+    if ground:
+        Lg, _ = ground_radiance(atmo, dome, sun_zen)
+        rad = np.where(above[..., None], rad, Lg[None, None, :])
+
     if white_xy is None:
+        white_xy = color._D65_xy
+    if adaptation is None:
         white_xy = color._D65_xy
     rgb = color.render_rgb(rad, dome["wl"], exposure=exposure, tonemap=tonemap,
                            adaptation=adaptation, white_xy=white_xy,
-                           reference_percentile=reference_percentile)
-    if sun_disk:
-        sun_zen = dome.get("sun_zenith_deg", 90.0)
-        sun_elev = 90.0 - sun_zen
-        ang = np.hypot(((azimuth - sun_azimuth_deg + 180) % 360 - 180) * np.cos(np.radians(elevation)),
-                       elevation - sun_elev)
-        disk = ang < 0.266
-        rgb[disk] = 1.0
+                           reference_percentile=reference_percentile,
+                           preserve_chromaticity=preserve_chromaticity)
+
+    if sun_disk and sun_elevation_deg > -0.9:
+        ang = np.hypot(((az - sun_azimuth_deg + 180) % 360 - 180) * np.cos(np.radians(el)),
+                       el - sun_elevation_deg)
+        rgb[ang < 0.30] = 1.0
     if mask is not None:
         rgb = rgb * mask[..., None]
     return rgb
 
 
-def save_png(rgb: np.ndarray, path, background=None):
+def save_png(rgb: np.ndarray, path):
     from PIL import Image
 
-    arr = color.to_uint8(rgb)
-    if background is not None and arr.shape[-1] == 3:
-        alpha = (np.abs(arr).sum(axis=-1) > 0).astype(np.uint8) * 255
-    im = Image.fromarray(arr)
-    im.save(path)
+    Image.fromarray(color.to_uint8(rgb)).save(path)
+    return path
+
+
+def save_hdr(radiance: np.ndarray, wl, path):
+    np.savez_compressed(path, radiance=radiance, wl=wl)
     return path
