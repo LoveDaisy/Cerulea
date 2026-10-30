@@ -19,7 +19,7 @@ FRAMES = 26
 SUN_FROM, SUN_TO = 8.0, -8.0
 #: the eye (and a camera's auto exposure) dark-adapts; without this the last
 #: frames would be black.  The model itself has no such adaptation.
-ADAPT_DECADES = 1.9
+ADAPT_DECADES = 3.2
 
 
 def main():
