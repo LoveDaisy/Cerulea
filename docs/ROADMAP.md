@@ -59,7 +59,7 @@ Monte Carlo for orders ≥ 2) on a coarse angular grid closes the gap.
 from 1500× to 1.45×.
 *Code:* `rt/twilight.py`, `docs/TWILIGHT.md`.
 
-### M6 — refraction, taken seriously
+### M6 — refraction, taken seriously (**now the default**)
 
 Ray-traced refraction (33′ at the horizon, matching Sæmundsson above 5°), then
 the full radiative-transfer treatment: the Bouguer invariant `n r sin θ = a`
@@ -68,8 +68,11 @@ turns the curved path length into the same closed form as a straight chord with
 a ray trace per photon.
 
 *Validated:* the per-shell formula against numerical path integration to 0.1 %
-(1661 km vs 1663 km for a horizontal ray).
+(1661 km vs 1663 km for a horizontal ray); the apparent-elevation table against
+the ray tracer.
 *Code:* `refraction.py`, `data/refraction.csv`, `docs/REFRACTION.md`.
+*Consequence:* twilight is 2–5× brighter, and the absolute twilight level is
+now the open question (see below).
 
 ### M7 — a cloud deck
 
@@ -80,6 +83,14 @@ which part of the deck is still lit.
 *Validated:* albedo against an independent Monte Carlo within 0.1–0.7 %
 (`g = 0`) and 1 % (`g = 0.85`, τ ≥ 5); `R + T + direct = 1` to 10⁻¹².
 *Code:* `cloud.py`, `rt/cloud.py`, `docs/CLOUD.md`.
+
+### M9 — delta-M
+
+`atmosphere.delta_m_properties()` applies the Wiscombe rescaling and
+`rt/multiple.py` uses it by default.  Fine aerosols are unaffected (f = 0);
+dust changes the multiple-scattering field by 2.7×, because 35 % of its
+scattered energy lives in the forward peak that the 32-moment truncation was
+discarding.
 
 ### M8b — the twilight question closed by a second dataset
 

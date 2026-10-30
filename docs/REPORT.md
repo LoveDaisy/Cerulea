@@ -311,7 +311,26 @@ at −3.2°.  The altostratus base goes from (0.37, 0.38) at +5° to (0.60, 0.39
 at −2.2°, with the luminance falling by five orders of magnitude over the same
 range.
 
-### 4.9 Altitude
+### 4.9 The absolute twilight level is still open
+
+A second, independent, *photopic* twilight measurement — Koomen et al. (1952),
+sea level — lets the model be compared like-for-like for the first time
+(`validation/SECOND_DATASET.md`).  With the geometric shadow the model is
+1.14× the measurement at −6°; with refraction switched on — which is the
+physically correct mode — it is **2.20×**.  A real sky includes refraction, so
+the second number is the honest one, and it says the twilight level is
+1.5–2.5× too bright.
+
+That is a change of story from the previous version of this report: the
+"1.5× excess against Patat" turned out to be mostly a site mismatch (Patat's
+site is at 2400 m, and Koomen's own data confirm a 0.24–0.27 mag altitude
+effect), but switching refraction on revealed that a lower terminator had been
+compensating for a brighter-than-real twilight.  The three candidate carriers
+of the excess — the optical depth of the grazing solar ray between 30 and
+35 km, the multiple scattering in a shadowed troposphere, and the absolute
+calibration of 1950s photometry — are listed in `docs/ROADMAP.md`.
+
+### 4.10 Altitude
 
 From 3 km the zenith gets darker and deeper blue (less air above), the horizon
 is depressed, and the whole sky gains contrast.
