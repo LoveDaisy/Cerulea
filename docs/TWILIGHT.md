@@ -213,14 +213,18 @@ range (−6° to −12°).  This is the tolerance used by `validation/check5`
 (0.5 dex) tightened by the extra physics the engine supplies.
 
 **Verdict: all four elevations are within a factor of 2, and the deep
-twilight — where the deterministic model is 23× too dark at −9° and 1900× too
-dark at −12° — is now within 1.4–1.5×.**
+twilight — where single scattering is 23× too dark at −9° and 1900× too dark
+at −12° — is now within 1.4–1.5×.**
 
-The engine passes the stated tolerance at every elevation.  The single-scattering
-column shows why the engine is needed: 0.043× the reference at −9° and
-0.0005× at −12°, against 1.39× and 1.45× for the engine.
+The engine meets the **factor-2** tolerance at every elevation.  It does *not*
+meet the preferred **factor-1.5** tolerance at −6° (1.89); it does at −9°
+(1.39) and −12° (1.45).  The single-scattering column shows why the engine is
+needed at all: 0.043× the reference at −9° and 0.0005× at −12°, against 1.39×
+and 1.45× for the engine.
 
-The remaining error is a **factor 1.4–1.9 overestimate**, not an underestimate.
+The remaining error is a **factor 1.4–1.9 overestimate**, not an
+underestimate, and at −9°/−12° it is inside the (18 % / 60 %) statistical
+error.
 At −6° it is dominated by the model-atmosphere/site mismatch described below;
 at −9° and −12° the statistical error is 18 % and 60 %, so the 1.4× ratios are
 consistent with a converged value of order 1.0–1.5 within 1–2σ.
