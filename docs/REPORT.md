@@ -142,7 +142,7 @@ See `validation/REPORT.md` for the full table.  Headlines:
 | MS/SS at the zenith, sun at 60°, clear sky | 0.31 (SOS) vs 0.31 (MC) → **pass** |
 | Twilight zenith luminance at −6°, deterministic (sea level) | 0.44 vs Koomen 0.65 cd m⁻² (0.69×); engine 0.56 (0.87×) → **pass** |
 | Twilight zenith luminance at −9°, spherical engine (medium) | 9.31 × 10⁻³ vs Patat 0.0171 (0.54×, 1σ 0.43–0.66) → **pass** (factor 2) |
-| Twilight zenith luminance at −12°, spherical engine (medium) | 5.46 × 10⁻⁴ vs 0.00146 (0.37×, 1σ 0.18–0.67) → **not conclusive** (58 % error) |
+| Twilight zenith luminance at −12°, spherical engine (medium) | 5.46 × 10⁻⁴ vs 0.00146 (0.37×, 1σ 0.16–0.59) → **not conclusive** (58 % error) |
 | Single scattering alone at −9° / −12° | ~60× / ~130× too dark → **known limitation**, the engine handles this range |
 | Horizon chromaticity vs measured Berlin spectra | Δxy = 0.018 (tolerance 0.02) → **marginal pass** |
 | Mie phase moments vs quadrature | 2e-8, `beta_1` = g to 1e-10 → **pass** |
