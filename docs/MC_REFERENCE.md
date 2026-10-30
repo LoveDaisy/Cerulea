@@ -214,7 +214,8 @@ both below 1 % of the signal here.
 All nine points agree within 1.7σ; the largest deviations are the noisiest
 points (the optical depth — and hence the number of collisions — is smallest
 at the zenith, so the relative error is largest there).  Multiple scattering
-and the ground reflection are below 1.3 % of the signal in all cases.
+is below 0.7 % of the signal in all cases, so the comparison is a genuine test
+of the first-order radiometry.
 
 The *first-order part* of the estimator was also compared with
 `rt.single` in a **normal** (not thin) atmosphere — `presets.clear`, black
