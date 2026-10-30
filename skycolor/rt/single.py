@@ -26,7 +26,7 @@ import numpy as np
 
 from .. import spectra
 from ..constants import R_EARTH
-from ..geometry import is_sunlit, path_lengths_sun
+from ..geometry import is_sunlit, path_lengths_sun, path_lengths_sun_array
 
 
 @dataclass
@@ -137,9 +137,13 @@ def sky_radiance(
     view_azimuth_deg,
     sun_azimuth_deg: float = 0.0,
     n_gauss: int = 3,
-    chunk: int = 512,
+    chunk: int = 128,
 ) -> np.ndarray:
     """Single-scattered sky radiance for a set of viewing directions.
+
+    The integrand is evaluated on a Gauss quadrature inside every atmospheric
+    shell, and the whole (sample, ray, wavelength) block is evaluated with
+    vectorised numpy.
 
     Parameters
     ----------
@@ -147,9 +151,13 @@ def sky_radiance(
     sun_zenith_deg : float
         Solar zenith angle (0 = overhead, 90 = horizon, >90 = twilight).
     view_zenith_deg, view_azimuth_deg : array_like
-        Viewing direction (zenith angle from local vertical, azimuth in degrees
-        clockwise from north).
+        Viewing direction (zenith angle from the local vertical, azimuth in
+        degrees clockwise from north).
     sun_azimuth_deg : float
+    n_gauss : int
+        Quadrature points per atmospheric shell (3 is plenty).
+    chunk : int
+        Rays per block; trades memory for speed.
 
     Returns
     -------
@@ -165,6 +173,15 @@ def sky_radiance(
     r0 = R_EARTH + atmo.elevation_km * 1e3
     r_bounds = atmo.r_bounds
     r_toa = r_bounds[-1]
+    r_mid = np.sqrt(r_bounds[:-1] * r_bounds[1:])
+    z_mid = (r_mid - R_EARTH) / 1e3
+    n_air_mid = atmo.n_air(z_mid)
+    n_o3_mid = atmo.n_o3(z_mid)
+    n_no2_mid = atmo.n_no2(z_mid)
+    aer_mid = [lay.aod550 * lay.profile(z_mid) / 1000.0 for lay in atmo.aerosols]
+    aer_optics = [lay.aerosol.relative_coefficients(atmo.wl) for lay in atmo.aerosols]
+
+    s_ray, s_o3, s_no2 = atmo._sigma_ray, atmo._sigma_o3, atmo._sigma_no2
 
     zs = np.radians(sun_zenith_deg)
     azs = np.radians(sun_azimuth_deg)
@@ -176,52 +193,71 @@ def sky_radiance(
         zv = np.radians(view_zen[sl])
         azv = np.radians(view_az[sl])
         d = np.stack([np.sin(zv) * np.sin(azv), np.sin(zv) * np.cos(azv), np.cos(zv)], axis=1)
-        mu_v = np.cos(zv)
         p = np.maximum(r0 * np.sin(zv), 1e-9)
-        d0 = r0 * mu_v
+        d0 = r0 * np.cos(zv)
         u_top = np.sqrt(np.maximum(r_toa**2 - p**2, 0.0))
-
         s_b = np.sqrt(np.maximum(r_bounds[:, None] ** 2 - p[None, :] ** 2, 0.0))
         ub = np.clip(s_b, d0[None, :], u_top[None, :])
-        u, du = _quadrature_points(ub, n_gauss)
+        u, du = _quadrature_points(ub, n_gauss)  # (n_pts, n_ray)
 
-        r_pts = np.sqrt(p[None, :] ** 2 + u**2)  # (n_pts, n_ray)
+        r_pts = np.sqrt(p[None, :] ** 2 + u**2)
         z_pts = (r_pts - R_EARTH) / 1e3
-        x_vec = (u - d0[None, :])[..., None] * d  # (n_pts, n_ray, 3)
+        x_vec = np.empty(u.shape + (3,))
+        x_vec[..., :] = d[None, :, :]
+        x_vec *= (u - d0[None, :])[..., None]
         x_vec[..., 2] += r0
-        h_pts = np.hypot(x_vec[..., 0], x_vec[..., 1]) / 1e3  # horizontal distance [km]
+        h_pts = np.hypot(x_vec[..., 0], x_vec[..., 1]) / 1e3
 
-        mu_sun = np.einsum("prc,pc->pr", x_vec, shat[None, :]) / np.maximum(r_pts, 1e-9)
-        mu_sun = np.clip(mu_sun, -1.0, 1.0)
+        mu_sun = np.clip(x_vec @ shat / np.maximum(r_pts, 1e-9),
+                         -1.0, 1.0)
         p_sun = r_pts * np.sqrt(np.maximum(1.0 - mu_sun**2, 0.0))
         lit = is_sunlit(p_sun, mu_sun)
 
-        cos_theta = np.clip(d @ shat, -1.0, 1.0)  # constant along each ray
-        p_ray = spectra.rayleigh_phase(cos_theta)  # (n_ray,)
-        p_aer = [lay.aerosol.phase(cos_theta, atmo.wl) for lay in atmo.aerosols]
+        # ---- local optical properties, shape (n_pts, n_ray, n_wl) ----------
+        beta_ray = atmo.n_air(z_pts)[..., None] * s_ray
+        beta_o3 = atmo.n_o3(z_pts)[..., None] * s_o3
+        beta_no2 = atmo.n_no2(z_pts)[..., None] * s_no2
+        beta_ae = np.zeros_like(beta_ray)
+        beta_as = np.zeros_like(beta_ray)
+        aer_w = []
+        for lay, (rel_ext, rel_sca) in zip(atmo.aerosols, aer_optics):
+            w = (lay.aod550 * lay.profile(z_pts) / 1000.0
+                 * lay.horizontal.weight(h_pts))  # (n_pts, n_ray)
+            aer_w.append(w)
+            beta_ae += w[..., None] * rel_ext
+            beta_as += w[..., None] * rel_sca
+        beta_sca = beta_ray + beta_as
+        b_ext = beta_ray + beta_ae + beta_o3 + beta_no2
 
-        tau = None
-        prev = None
-        for i in range(u.shape[0]):
-            br, bas, bae, bo3, bno2 = _local_optics_h(atmo, z_pts[i], h_pts[i])
-            b_ext = br + bae + bo3 + bno2
-            if tau is None:
-                tau = 0.5 * b_ext * du[i][:, None]
-            else:
-                tau = tau + 0.5 * (b_ext + prev) * du[i][:, None]
-            prev = b_ext
+        # ---- optical depth from the observer (trapezoid along the ray) -----
+        first = 0.5 * b_ext[0] * du[0][:, None]
+        if u.shape[0] > 1:
+            dt = 0.5 * (b_ext[1:] + b_ext[:-1]) * du[1:, :, None]
+            tau = np.concatenate([first[None], first[None] + np.cumsum(dt, axis=0)], axis=0)
+        else:
+            tau = first[None]
 
-            b_sca = br + bas
-            ph = p_ray[:, None] * (br / np.maximum(b_sca, 1e-300))
-            for j, lay in enumerate(atmo.aerosols):
-                w = lay.aod550 * lay.profile(z_pts[i]) / 1000.0 * lay.horizontal.weight(h_pts[i])
-                _, rel_sca = lay.aerosol.relative_coefficients(atmo.wl)
-                beta_as_j = w[:, None] * rel_sca[None, :]
-                ph = ph + p_aer[j] * (beta_as_j / np.maximum(b_sca, 1e-300))
+        # ---- solar optical depth ------------------------------------------
+        lengths = path_lengths_sun_array(p_sun, mu_sun, r_pts, r_bounds)  # (ns, np, nr)
+        tau_sun = (np.einsum("kpr,k->pr", lengths, n_air_mid)[..., None] * s_ray
+                   + np.einsum("kpr,k->pr", lengths, n_o3_mid)[..., None] * s_o3
+                   + np.einsum("kpr,k->pr", lengths, n_no2_mid)[..., None] * s_no2)
+        for j, (rel_ext, rel_sca) in enumerate(aer_optics):
+            col = np.einsum("kpr,k->pr", lengths, aer_mid[j])
+            tau_sun = tau_sun + col[..., None] * rel_ext
+        tau_sun = np.where(lit[..., None], tau_sun, 1e3)
 
-            lengths = path_lengths_sun(p_sun[i], mu_sun[i], r_pts[i], r_bounds)
-            cols = species_columns(atmo, lengths, r_bounds)
-            tau_sun = _tau_from_columns(atmo, cols)
-            tau_sun = np.where(lit[i][:, None], tau_sun, 1e3)
-            out[sl] += (b_sca * ph * np.exp(-tau_sun - tau) * du[i][:, None]) * F0[None, :]
+        # ---- phase function ------------------------------------------------
+        cos_theta = np.clip(d @ shat, -1.0, 1.0)
+        p_ray = spectra.rayleigh_phase(cos_theta)[None, :, None]
+        ph = p_ray * (beta_ray / np.maximum(beta_sca, 1e-300))
+        for j, lay in enumerate(atmo.aerosols):
+            pj = lay.aerosol.phase(cos_theta, atmo.wl)
+            if pj.ndim == 1:
+                pj = pj[:, None]
+            beta_as_j = aer_w[j][..., None] * aer_optics[j][1]
+            ph = ph + pj[None, :, :] * (beta_as_j / np.maximum(beta_sca, 1e-300))
+
+        contrib = beta_sca * ph * np.exp(-tau_sun - tau) * du[..., None]
+        out[sl] += contrib.sum(axis=0) * F0
     return out

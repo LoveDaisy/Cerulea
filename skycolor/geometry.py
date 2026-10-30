@@ -209,3 +209,21 @@ def sky_angles(n_zenith: int = 48, n_azimuth: int = 96, vmin_deg: float = 0.0):
     v = np.linspace(vmin_deg, 90.0, n_zenith)
     a = np.linspace(0.0, 360.0, n_azimuth, endpoint=False)
     return np.meshgrid(v, a, indexing="ij")
+
+
+def path_lengths_sun_array(p, cos_zenith_point, r_point, r_bounds) -> np.ndarray:
+    """Vectorised :func:`path_lengths_sun` for arrays of arbitrary shape.
+
+    Returns an array of shape ``(n_shell,) + np.shape(p)``.
+    """
+    rb = np.asarray(r_bounds, dtype=float)
+    p = np.asarray(p, dtype=float)
+    c = np.asarray(cos_zenith_point, dtype=float)
+    r = np.asarray(r_point, dtype=float)
+    u_point = r * np.abs(c)
+    shape = (len(rb) - 1,) + p.shape
+    s = np.sqrt(np.maximum(rb.reshape((-1,) + (1,) * p.ndim) ** 2 - p[None] ** 2, 0.0))
+    s0, s1 = s[:-1], s[1:]
+    up = np.maximum(s1 - np.maximum(s0, u_point[None]), 0.0)
+    down = np.maximum(np.minimum(s1, u_point[None]) - np.minimum(s0, u_point[None]), 0.0)
+    return up + np.where(c[None] < 0.0, down, 0.0)
