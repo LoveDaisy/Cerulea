@@ -80,8 +80,9 @@ the coarse grid, so the standard error per coarse direction scales as
 """
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
-from scipy.interpolate import PchipInterpolator
 
 from ..atmosphere import Atmosphere
 from . import mc as _mc
@@ -109,6 +110,11 @@ _BANDWIDTH = 1.6
 #: minimum number of coarse points in a local regression neighbourhood
 _MIN_NEIGHBOURS = 6
 
+#: relative systematic floor of the angular smoother, added in quadrature to
+#: the statistical error (measured against a converged coarse grid, see
+#: ``docs/TWILIGHT.md``)
+MS_BIAS = 0.03
+
 
 # ---------------------------------------------------------------------------
 # helpers
@@ -116,7 +122,10 @@ _MIN_NEIGHBOURS = 6
 def _as_directions(view_zenith_deg, view_azimuth_deg):
     """Broadcast the view angles and return the unit vectors and the angles."""
     zen = np.atleast_1d(np.asarray(view_zenith_deg, dtype=float)).ravel()
-    az = np.broadcast_to(np.asarray(view_azimuth_deg, dtype=float), zen.shape).ravel()
+    az = np.atleast_1d(np.asarray(view_azimuth_deg, dtype=float)).ravel()
+    if zen.size == 1 and az.size > 1:
+        zen = np.full(az.size, zen[0])
+    az = np.broadcast_to(az, zen.shape).ravel()
     z = np.radians(zen)
     a = np.radians(az)
     vec = np.stack([np.sin(z) * np.sin(a), np.sin(z) * np.cos(a), np.cos(z)], axis=1)
@@ -155,9 +164,12 @@ def _coarse_grid(n_zen, n_az):
     """
     n_zen = max(2, int(n_zen))
     n_az = max(2, int(n_az))
-    # denser towards the horizon, where the field varies fastest
-    u = np.linspace(0.0, 1.0, n_zen)
-    zen = _MAX_COARSE_ZENITH * u ** 1.25
+    # Cluster towards the horizon, where the field varies fastest: the last
+    # three nodes sit at 83, 86 and 88.5 degrees, the rest are uniform below.
+    n_low = max(1, n_zen - 3)
+    low = np.linspace(0.0, 78.0, n_low)
+    high = np.array([83.0, 86.0, 88.5])[:max(0, n_zen - n_low)]
+    zen = np.concatenate([low, high])
     az = np.linspace(0.0, 180.0, n_az)
     zz, aa = np.meshgrid(zen, az, indexing="ij")
     return zz.ravel(), aa.ravel()
@@ -188,7 +200,7 @@ def _tangent_basis(n):
     return t1, t2
 
 
-def _local_linear_weights(coarse_vec, query_vec, bandwidth=None):
+def _local_linear_weights(coarse_vec, query_vec, bandwidth=None, weights=None):
     """Smoother matrix of a local-linear regression on the sphere.
 
     Returns ``W`` with shape ``(n_query, n_coarse)`` such that a field ``f``
@@ -201,6 +213,11 @@ def _local_linear_weights(coarse_vec, query_vec, bandwidth=None):
     query_vec = np.atleast_2d(query_vec)
     n_q = query_vec.shape[0]
     n_c = coarse_vec.shape[0]
+    if weights is None:
+        weights = np.ones(n_c)
+    weights = np.asarray(weights, dtype=float).ravel()
+    if weights.size != n_c:
+        raise ValueError("weights must have one entry per coarse direction")
     if n_c == 0:
         raise ValueError("the coarse grid is empty")
     if bandwidth is None:
@@ -220,8 +237,8 @@ def _local_linear_weights(coarse_vec, query_vec, bandwidth=None):
         far = order[k:min(n_c, k + 6)]
         idx = np.concatenate([idx, far])
         d = gamma[idx]
-        w = np.exp(-0.5 * (d / bandwidth) ** 2)
-        if not np.any(w > 1e-8):  # pragma: no cover - degenerate grid
+        w = np.exp(-0.5 * (d / bandwidth) ** 2) * weights[idx]
+        if not np.any(w > 0.0):  # pragma: no cover - degenerate grid
             w = np.ones_like(d)
         t1, t2 = _tangent_basis(nq)
         delta = coarse_vec[idx] - nq
@@ -322,13 +339,15 @@ def multiple_scattered(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
         atmo, float(sun_zenith_deg), float(sun_azimuth_deg), cz, ca,
         cfg["n_anchor"], cfg["n_photons"], int(seed),
     )
-    coarse_vec = _unit_vectors(cz, ca, float(sun_zenith_deg), float(sun_azimuth_deg))
-
-    # Query directions in the same (relative-azimuth) parameterisation, folded
-    # onto [0, 180] by the mirror symmetry about the solar meridian.
-    rel_az = az - float(sun_azimuth_deg)
-    rel_fold = np.abs((rel_az + 180.0) % 360.0 - 180.0)
-    query_vec = _as_directions(zen, rel_fold + float(sun_azimuth_deg))[2]
+    # The field is symmetric about the solar meridian, so the half-grid is
+    # mirrored to a full grid.  The mirrored copy is the *same* measurement,
+    # not an independent one; the error estimate below pairs them.
+    n_distinct = cz.size
+    zen_all = np.concatenate([cz, cz])
+    az_all = np.concatenate([ca, -ca]) + float(sun_azimuth_deg)
+    coarse_vec = _as_directions(zen_all, az_all)[2]
+    vals_all = np.concatenate([ms_c, ms_c], axis=1)
+    query_vec = _as_directions(zen, az)[2]
 
     n_anchor = wl_a.size
     n_view = zen.size
@@ -336,50 +355,99 @@ def multiple_scattered(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
     ms_a = np.zeros((n_anchor, n_view))
     sig_a = np.zeros((n_anchor, n_view))
     bandwidth = None
-    Wq, bandwidth = _local_linear_weights(coarse_vec, query_vec)
+    # The smoother is evaluated at the coarse points themselves once, to get
+    # the residuals that drive the error estimate.
+    Wc, bandwidth = _local_linear_weights(coarse_vec, coarse_vec)
+    Wq, _ = _local_linear_weights(coarse_vec, query_vec, bandwidth=bandwidth)
+    # reduce the mirror pairs to one effective weight per independent sample
+    Wc_r = Wc[:, :n_distinct] + Wc[:, n_distinct:]
+    Wq_r = Wq[:, :n_distinct] + Wq[:, n_distinct:]
+    undetected = []
     for k in range(n_anchor):
-        vals = ms_c[k]
-        errs = err_c[k]
-        scale = float(np.max(vals)) if vals.size else 0.0
-        if scale <= 0.0:
-            continue                       # nothing was scattered at all
-        floor = 1e-10 * scale
-        z = np.log(np.maximum(vals, floor))
-        s = np.where(vals > 0, errs / np.maximum(vals, floor), 1.0)
-        zq = Wq @ z
-        var = (Wq ** 2) @ (s ** 2)
-        ms_a[k] = np.exp(zq)
-        sig_a[k] = ms_a[k] * np.sqrt(np.maximum(var, 0.0))
+        vals = vals_all[k]
+        if not np.any(vals > 0.0):
+            # No path contributed at this wavelength.  The estimate is zero,
+            # but that is a *detection limit* of the photon budget, not a
+            # measurement of zero.
+            undetected.append(float(wl_a[k]))
+            continue
+        # A *geometry only* smoother: the weights do not depend on the
+        # measured values.  Inverse-variance weighting would be catastrophic
+        # here -- in the deep-twilight heavy-tail regime a downward
+        # fluctuation also has a small sample standard deviation, so 1/sigma^2
+        # weighting promotes exactly the low outliers and biases the field
+        # down by an order of magnitude (observed at -9 deg).
+        ms_a[k] = np.maximum(Wq @ vals, 0.0)
+        # Error: propagate the *local* scatter of the coarse values.  The
+        # per-point sample standard deviation is itself unreliable for a
+        # heavy-tailed estimator, so the residual RMS over the smoothing
+        # neighbourhood is used instead.
+        resid = vals - Wc @ vals
+        resid = 0.5 * (resid[:n_distinct] + resid[n_distinct:])
+        var = (Wq_r ** 2) @ (resid ** 2)
+        # The linear smoother has a resolution bias of a few per cent (the
+        # field curves over one coarse cell).  Add it as a systematic floor so
+        # that the reported error is not optimistic.
+        sig_a[k] = np.sqrt(np.maximum(var, 0.0) + (MS_BIAS * ms_a[k]) ** 2)
 
     # --- interpolate in wavelength -----------------------------------------
     ms = np.zeros((n_view, wl.size))
     stderr = np.zeros((n_view, wl.size))
+    if not np.any(ms_a > 0.0):
+        return ms, stderr, dict(
+            undetected_wl=np.asarray(undetected), n_zen=cfg["n_zen"],
+            n_az=cfg["n_az"], n_anchor=cfg["n_anchor"],
+            n_photons=cfg["n_photons"], anchor_wl=wl_a, bandwidth=None,
+            coarse_zenith=cz, coarse_azimuth=ca,
+            coarse_values=ms_c, coarse_errors=err_c)
     if n_anchor == 1:
         ms[:] = ms_a[0][:, None]
         stderr[:] = sig_a[0][:, None]
     else:
         loga = np.log(np.maximum(ms_a, 1e-300))
-        # interpolation weights of the PCHIP basis in wavelength (n_wl, n_anchor);
-        # valid for every direction because the knots do not depend on it
+        # Piecewise-linear interpolation of log L in wavelength.  Linear (not
+        # cubic) on purpose: the weights are then a genuine partition of unity
+        # and the error propagation below is exact, while the curvature of the
+        # multiple-scattering spectrum over one anchor spacing is small (see
+        # docs/TWILIGHT.md).
         wmat = np.zeros((wl.size, n_anchor))
-        for k in range(n_anchor):
-            e = np.zeros(n_anchor)
-            e[k] = 1.0
-            wmat[:, k] = PchipInterpolator(wl_a, e, extrapolate=True)(wl)
-        ms = np.exp(np.minimum(wmat @ loga, 700.0)).T
-        stderr = np.sqrt(np.maximum((wmat ** 2) @ (sig_a ** 2), 0.0)).T
+        for j, lam in enumerate(wl):
+            k = int(np.searchsorted(wl_a, lam))
+            if k == 0:
+                wmat[j, 0] = 1.0
+            elif k >= n_anchor:
+                wmat[j, -1] = 1.0
+            else:
+                f = (lam - wl_a[k - 1]) / (wl_a[k] - wl_a[k - 1])
+                wmat[j, k - 1] = 1.0 - f
+                wmat[j, k] = f
+        log_ms = np.minimum(wmat @ loga, 700.0)
+        ms = np.exp(log_ms).T
+        rel_a = np.where(ms_a > 0.0, sig_a / np.maximum(ms_a, 1e-300), 0.0)
+        var_log = np.maximum((wmat ** 2) @ (rel_a ** 2), 0.0)
+        stderr = ms * np.sqrt(var_log).T
 
+    if undetected:
+        warnings.warn(
+            "twilight: no scattering path was detected at "
+            f"{len(undetected)} anchor wavelength(s) "
+            f"({undetected[0]:.0f}..{undetected[-1]:.0f} nm); the returned "
+            "multiple scattering is zero there.  Increase "
+            "grid['n_photons'] or the quality preset.",
+            RuntimeWarning, stacklevel=2)
     info = dict(
+        undetected_wl=np.asarray(undetected),
         n_zen=cfg["n_zen"], n_az=cfg["n_az"], n_anchor=cfg["n_anchor"],
         n_photons=cfg["n_photons"], anchor_wl=wl_a, bandwidth=bandwidth,
         coarse_zenith=cz, coarse_azimuth=ca,
+        coarse_values=ms_c, coarse_errors=err_c,
     )
     return ms, stderr, info
 
 
 def twilight_radiance(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
                       sun_azimuth_deg=0.0, quality="medium", seed=0,
-                      single=True, multiple=True):
+                      single=True, multiple=True, grid=None):
     """Total spectral sky radiance in twilight, with a statistical error bar.
 
     This is the production entry point of the spherical twilight engine.  It
@@ -403,6 +471,10 @@ def twilight_radiance(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
         Seed of the Monte Carlo; results are reproducible for a given seed.
     single, multiple : bool
         Include the deterministic first-order / the Monte Carlo higher orders.
+    grid : dict, optional
+        Advanced override of the quality preset (keys ``n_zen``, ``n_az``,
+        ``n_anchor``, ``n_photons``); mainly useful for tests and cheap
+        experiments.
 
     Returns
     -------
@@ -435,7 +507,7 @@ def twilight_radiance(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
     if multiple:
         ms, ms_err, _ = multiple_scattered(
             atmo, sun_zenith_deg, zen, az, sun_azimuth_deg=sun_azimuth_deg,
-            quality=quality, seed=seed,
+            quality=quality, seed=seed, grid=grid,
         )
         total += ms
         err += ms_err
