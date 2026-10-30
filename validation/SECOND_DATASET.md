@@ -127,15 +127,16 @@ reproduces every number below.
 Zenith luminance [cd m⁻²].  Model: sea level, 300 DU O₃; *clear* =
 AOD₅₅₀ 0.05, *pristine* = Rayleigh + O₃ only.  Deterministic
 (`sky_radiance_total`) at −3° and −6°, spherical engine
-(`twilight_radiance`, `quality="low"`) at −9° and −12°.
+(`twilight_radiance`, `quality="medium"`) at −9° and −12°; the faster
+`quality="low"` check6 run gives 0.0124 ± 0.0043 and 0.0030 ± 0.0026.
 
 | h | Koomen 1952<br>(Maryland, 30 m) | Patat 2006<br>(Paranal, 2400 m) | model<br>clear | model<br>pristine | **model / Koomen** | model / Patat |
 |---:|---:|---:|---:|---:|---:|---:|
 | 0° | 161.5 | — | 157 | — | **0.97** | — |
 | −3° | 21.53 | 40.09 † | 20.1 | 22.3 | **0.93** | 0.50 |
 | −6° | 0.6458 | 0.5164 | 0.444 | 0.498 | **0.69** | 0.86 |
-| −9° | 0.01615 | 0.01712 | 0.0124 ± 0.0043 | — | **0.77** [0.5–1.0] | 0.73 |
-| −12° | 0.001292 | 0.001460 | 0.00303 ± 0.00255 | — | **2.35** [0.9–3.8] | 2.08 |
+| −9° | 0.01615 | 0.01712 | 9.31 × 10⁻³ ± 1.91 × 10⁻³ | — | **0.58** [0.46–0.70] | 0.54 |
+| −12° | 0.001292 | 0.001460 | 5.46 × 10⁻⁴ ± 3.16 × 10⁻⁴ | — | **0.42** [0.18–0.67] | 0.37 |
 | −15° | 0.000431 | 0.000320 | 1.5 × 10⁻⁵ ‡ | — | 0.04 | 0.05 |
 
 † extrapolation of the Patat fit outside its stated 95° ≤ ζ ≤ 105° range.
@@ -144,10 +145,10 @@ the −15° row is used for the verdict.
 Brackets are the 1σ range propagated from the engine's own statistical error.
 
 **At −6° the model is 0.69× Koomen (deterministic) or 0.85× (spherical
-engine), and 0.86× Patat (deterministic) or 1.07× (engine).**  The old 1.14×
-and 2.20× were the one-branch chord (M10); the residual 15–30 % is inside the
-1950s absolute calibration and the plane-parallel multiple-scattering
-approximation.
+engine, low budget; 0.87× at medium), and 0.86× Patat (deterministic) or
+1.07× (engine; 1.09× at medium).**  The old 1.14× and 2.20× were the
+one-branch chord (M10); the residual 15–30 % is inside the 1950s absolute
+calibration and the plane-parallel multiple-scattering approximation.
 
 ### 4.2 The two references differ by 0.24 mag — and that is the altitude
 

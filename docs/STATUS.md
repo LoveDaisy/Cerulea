@@ -68,6 +68,6 @@ argument; this is the state.*
 
 `README.md` — what it is and how to run it.
 `docs/REPORT.md` — the physics and the results, with the figures.
-`docs/ROADMAP.md` — milestones M1–M9, open questions, future directions.
+`docs/ROADMAP.md` — milestones M1–M10, open questions, future directions.
 `validation/` — the checks, and the addenda recording what each round changed.
 `docs/ARCHITECTURE.md` — the module contracts.
