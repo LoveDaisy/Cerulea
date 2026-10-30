@@ -11,7 +11,7 @@ The solver is a **successive orders of scattering (SOS)** solver:
 * **Vertical grid.**  The 54 layers of `Atmosphere.z_bounds` (ground to 120 km).
   Layer optical depths are `beta_ext * dz`; the extinction includes Rayleigh,
   aerosol, ozone and NO2.  The diffuse field is **plane-parallel**.
-* **Angular grid.**  Gauss-Legendre nodes in `mu = cos(zenith)` (default 16,
+* **Angular grid.**  Gauss-Legendre nodes in `mu = cos(zenith)` (default 32,
   configurable) and a Fourier expansion in azimuth:
 
   ```
@@ -24,7 +24,8 @@ The solver is a **successive orders of scattering (SOS)** solver:
   `Atmosphere.phase_moments`, so Rayleigh and Mie are treated consistently.
   The azimuthal expansion is exact up to the mode/moment truncation; there is
   no `m = 0` approximation.  Twelve modes (default) are enough for the phase
-  functions in this package.
+  functions in this package (the result changes by < 0.1 % between 8 and 20
+  modes).
 * **Pseudo-spherical direct beam.**  For the point of the vertical column at
   radius `r` the solar ray has impact parameter `p = r sin(sza)` and direction
   cosine `mu_s = cos(sza)` (towards the sun).  Its transmittance is integrated
@@ -33,7 +34,8 @@ The solver is a **successive orders of scattering (SOS)** solver:
   are masked to zero.  This reproduces the twilight shadow boundary: at
   `sza = 96 deg` only the atmosphere above about 35 km is lit.
 * **Beam source.**  The direct beam is a delta function in angle with radiance
-  amplitude `F_sun * T(z)`.  Its contribution to the Fourier source is
+  amplitude `F_sun * T(z)` (the physical beam radiance).  Its contribution to
+  the Fourier source is
   `(omega / 4 pi) F_sun T (2 - delta_m0) p_m(mu, mu_s)`.
 * **Transfer.**  Each layer is integrated analytically assuming the source is
   constant across the layer.  The field is stored at layer mid-points; the
@@ -49,12 +51,15 @@ The solver is a **successive orders of scattering (SOS)** solver:
   The returned multiple-scattering radiance is
   `view_integral(scattering(L_total))`, which is exactly `sum_{n>=2} L^(n)`.
   Iteration stops when the per-wavelength relative field change is below
-  `tol = 1e-3` (default) or after 40 orders.
+  `tol = 1e-3` (default) or after 40 orders.  The clear and hazy presets
+  converge in 6-13 orders; the conservative `albedo = 1` stress test needs
+  about 60-80 orders at `tol = 1e-10`.
 * **View integration.**  Instead of interpolating the discrete-ordinate field
   to the requested view angle, the scattering source is evaluated directly at
   the view direction with the Legendre expansion and integrated along the view
   ray.  This gives a smooth result in view angle and avoids interpolation
-  ringing near the horizon.
+  ringing near the horizon.  A scalar zenith angle may be combined with an
+  array of azimuths.
 
 ## Approximations and limitations
 
@@ -64,49 +69,78 @@ The solver is a **successive orders of scattering (SOS)** solver:
   - near the horizon the diffuse path is longer than the true spherical path
     (airmass 28.6 at 88 deg instead of about 19), but the radiance there is
     saturated (optically thick), so the error in the multiple-scattering
-    contribution is modest;
+    contribution is only a few per cent;
   - for oblique sun the 1-D column energy budget differs from the true 3-D
     budget because the model cannot represent the horizontal divergence of the
-    beam.  The energy closure test is therefore run with the sun near the
-    zenith, where the pseudo-spherical beam reduces to the plane-parallel one.
+    beam.  The energy closure is 5.3e-4 at `sza = 0` and 8.7e-4 at
+    `sza = 30` (48 streams), but degrades to about 4e-3 at `sza = 60`.  The
+    energy test is therefore run with the sun near the zenith, where the
+    pseudo-spherical beam reduces to the plane-parallel one.
 * **Phase-function truncation.**  Default 32 Legendre moments.  For the
-  aerosol models here (`g <= 0.75`) the truncation error of the phase function
-  is below about 1e-4.  `n_moments` is capped at `2 * n_mu` so that the
-  Gauss quadrature integrates `int p dmu = 2` exactly.
+  aerosol models here (`g <= 0.75`) the truncation error is of order 1e-4 in
+  the phase function (the forward peak is the most sensitive part).
+  `n_moments` is capped at `2 * n_mu` so that the Gauss quadrature integrates
+  `int p dmu = 2` exactly; this is what makes the `m = 0` operator energy
+  conserving.  Convergence with moments is complete by 16 moments for the
+  presets in this package.
 * **No polarisation, Lambertian ground, horizontal homogeneity** for the
   diffuse field (the `HorizontalField` only affects first-order scattering).
-* **Order truncation.**  For the clear atmosphere the series converges in
-  8-10 orders.  For a conservative atmosphere with albedo 1 and
-  `tau ~ 0.4` about 80 orders are needed at `tol = 1e-10`; the default
-  `max_orders = 40` is ample for real atmospheres but not for that stress
-  test.
+* **Angular quadrature.**  The `albedo = 1` conservative stress test improves
+  from 3.8e-3 at 16 streams to 1.2e-3 at 32 and 5.3e-4 at 48 streams.  The
+  production radiance is much less sensitive: MS changes by 0.5 % between 32
+  and 48 streams.
 
 ## Validation numbers
 
-Unless stated otherwise: `presets.clear`, `n_mu = 32`, `n_modes = 12`,
-`n_moments = 32`, `tol = 1e-3`, ground albedo 0.1.
+Unless stated otherwise: `presets.clear`, monochromatic 550 nm, default
+`n_mu = 32`, `n_modes = 12`, `n_moments = 32`, `tol = 1e-3`, ground albedo 0.1.
 
 | Check | Value |
 |---|---|
 | Empty atmosphere (no Rayleigh, no aerosol) | exactly 0 (early return) |
-| `MS/SS` at zenith, 550 nm, `sza = 60` | 0.330 |
-| `MS/SS` at zenith, 550 nm, `sza = 45` | 0.254 |
-| `MS/SS` at `vza = 88 deg`, sun side (az 0), 550 nm, `sza = 45` | 0.415 |
-| `MS/SS` at `vza = 88 deg`, az 90, 550 nm, `sza = 45` | 0.925 |
-| Twilight `sza = 96`: zenith MS / SS / ratio at 550 nm | `2.42e-6` / `8.18e-6` / 0.296 |
-| Energy closure, conservative atmosphere, albedo 0, `sza = 0` | 3.7e-4 |
-| Energy closure, conservative atmosphere, albedo 1, `sza = 0`, `n_mu = 32` | 1.15e-3 |
-| Energy closure, conservative atmosphere, albedo 1, `sza = 0`, `n_mu = 48` | 6.5e-4 |
-| First-order check against `rt.single.sky_radiance` (vza <= 60, sza 60) | within 0.7 % |
-| Runtime, 1000 views x 76 wavelengths | 0.58 s (`n_mu = 32`) |
+| `MS/SS` at zenith, `sza = 45` | 0.241 |
+| `MS/SS` at zenith, `sza = 60` | 0.314 |
+| `MS/SS` at `vza = 88`, sun side (az 0), `sza = 45` | **0.400** |
+| `MS/SS` at `vza = 88`, az 90, `sza = 45` | 0.895 |
+| `MS/SS` at `vza = 88`, sun side (az 0), `sza = 60` | 0.245 |
+| Twilight `sza = 96`: zenith MS / SS / ratio | `2.19e-6` / `7.94e-6` / 0.276 |
+| Energy closure, conservative, albedo 0, `sza = 0`, `n_mu = 48` | 2.3e-4 |
+| Energy closure, conservative, albedo 1, `sza = 0`, `n_mu = 48` | 5.3e-4 |
+| Energy closure, conservative, albedo 1, `sza = 0`, `n_mu = 32` | 1.2e-3 |
+| First-order check against `rt.single.sky_radiance` (`sza = 60`, `vza <= 60`) | within 0.7 % |
+| Runtime, 1000 views x 76 wavelengths | 0.44 s |
+| Runtime, 5000 views x 76 wavelengths | 1.03 s |
 
-The `MS/SS` ratio at the horizon on the sun side (0.42) is the headline number
-for comparison with CIE 110 / turbidity-3 reference skies.  Note that
-`presets.clear` has AOD(550) = 0.05, i.e. much cleaner than a turbidity-3
-atmosphere; a hazier preset gives a larger ratio.
+The **headline number** requested for comparison with CIE 110 /
+turbidity-3 reference skies is the horizon value: for `presets.clear` at
+550 nm with `sza = 45`, looking at `vza = 88` on the sun side,
+`MS/SS = 0.400`, i.e. multiple scattering adds 40 % to the single-scattered
+radiance at the limb.
 
-## Remaining work
+The ratio depends strongly on the aerosol load.  At `sza = 45`, zenith:
 
-* Test suite in `tests/test_multiple.py`.
-* Optional: spherical view integration for a better horizon at very large
-  viewing zenith angles.
+| atmosphere | AOD(550) | MS/SS |
+|---|---|---|
+| `presets.clear` | 0.05 | 0.241 |
+| `presets.clear(aod=0.2)` | 0.20 | 0.335 |
+| `presets.hazy` | 0.30 | 0.448 |
+
+A turbidity-3 atmosphere is closer to AOD 0.2 than to the very clean default
+`clear` preset, which explains why the `clear` ratio is at the lower edge of
+the 0.25-0.45 target band while the AOD 0.2 case sits in the middle of it.
+
+On the sun side the `MS/SS` ratio is non-monotonic in viewing zenith angle:
+single scattering has a strong forward peak there (0.08 at `vza = 60`,
+`sza = 60`), so the ratio first falls and then rises again towards the limb.
+Away from the sun (azimuth 90 deg) it increases monotonically from 0.31 at the
+zenith to 0.86 at `vza = 88`.
+
+## Tests
+
+```
+.venv/bin/python -m pytest tests/test_multiple.py -q
+```
+
+12 tests cover the five acceptance criteria plus: the first-order regression
+against `rt.single`, an optically thick horizon convergence check, and the
+scalar-zenith / array-azimuth API.

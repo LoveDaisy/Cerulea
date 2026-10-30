@@ -12,8 +12,8 @@ Method
   plane-parallel, so the optical depth of a layer is
   ``beta_ext * dz``.  Rays at the observer are plane-parallel as well.
 * The angular dependence is expanded in a Fourier series in azimuth and
-  discretised with Gauss-Legendre nodes in ``mu = cos(zenith)``, exactly as
-  DISORT does.  The phase function's Legendre moments come from
+  discretised with Gauss-Legendre nodes in ``mu = cos(zenith)``, in the same
+  spirit as DISORT.  The phase function's Legendre moments come from
   :meth:`Atmosphere.phase_moments`.  The azimuthal expansion is exact (up to
   the moment truncation) -- no m = 0 approximation.
 * The **direct beam** is treated pseudo-spherically: for the point of the
@@ -23,11 +23,11 @@ Method
   :mod:`skycolor.rt.single` and :mod:`skycolor.geometry`, so rays that graze
   the Earth (twilight) are handled correctly, and layers inside the Earth's
   shadow receive no beam.
-* The beam source in a layer is normalised by the *actual* transmittance
-  difference between the layer boundaries (rather than by
-  ``exp(-tau/mu0)``).  This makes the column energy budget close exactly and
-  keeps the twilight shadow boundary smooth.  For a plane-parallel
-  atmosphere it reduces to the standard ``exp(-tau/mu0)`` source.
+* The beam source is the physical beam radiance ``F_sun T(z)`` at the layer
+  mid-point.  (An alternative normalisation by the actual transmittance
+  difference between layer boundaries would close the column energy budget
+  exactly, but it over-weights grazing twilight rays by a large factor, so it
+  is deliberately not used.  See ``docs/MULTIPLE_SCATTERING.md``.)
 * The recursion is
   ``L^(1) = transfer(source = J_direct)``,
   ``L^(n) = transfer(source = scattering(L^(n-1)))`` with a Lambertian
@@ -46,11 +46,11 @@ Approximations and known limitations
   near the horizon is therefore approximate; the exact spherical horizon is
   still provided by the first-order term.
 * The phase function is truncated at ``n_moments`` Legendre moments.  With
-  the default 32 moments the truncation error of the phase function itself is
-  below 1e-5 for the aerosol models in this package (g <= 0.75).  The number
-  of moments is capped at ``2 * n_mu`` so that the Gauss quadrature integrates
-  the energy identity ``int p dmu = 2`` exactly, which is what makes the
-  solver energy conserving.
+  the default 32 moments the truncation error is of order 1e-4 for the
+  aerosol models in this package (g <= 0.75); the forward peak is the most
+  sensitive part.  The number of moments is capped at ``2 * n_mu`` so that
+  the Gauss quadrature integrates the energy identity ``int p dmu = 2``
+  exactly, which is what makes the ``m = 0`` operator energy conserving.
 * Polarisation is neglected, and the ground is Lambertian.
 * Horizontal homogeneity is assumed for the diffuse field, so the
   ``HorizontalField`` of the aerosol layers does not enter here (it is used by
@@ -70,7 +70,7 @@ from .single import _tau_from_columns, species_columns
 __all__ = ["SOSResult", "solve", "multiple_scattering"]
 
 #: default numerical settings
-_N_MU = 16
+_N_MU = 32
 _N_MODES = 12
 _N_MOMENTS = 32
 _MAX_ORDERS = 40
@@ -201,8 +201,10 @@ def solve(
         vaz = np.zeros(0)
     else:
         vza = np.atleast_1d(np.asarray(view_zenith_deg, dtype=float)).ravel()
-        vaz = np.broadcast_to(np.asarray(view_azimuth_deg, dtype=float),
-                              vza.shape).ravel()
+        vaz_in = np.asarray(view_azimuth_deg, dtype=float)
+        if vza.size == 1 and vaz_in.size > 1:
+            vza = np.full(vaz_in.size, vza[0])
+        vaz = np.broadcast_to(vaz_in, vza.shape).ravel()
         n_view = vza.size
 
     # -- layer optics --------------------------------------------------------
@@ -217,7 +219,6 @@ def solve(
 
     mu0 = float(np.cos(np.radians(float(sun_zenith_deg))))
     mu_s = -mu0                                          # propagation cosine
-    sun_az = np.radians(float(sun_azimuth_deg))
 
     # -- pseudo-spherical direct beam ---------------------------------------
     t_bounds = _sun_transmittance_boundaries(atmo, sun_zenith_deg)  # (nz+1,n_wl)
@@ -480,7 +481,7 @@ def multiple_scattering(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
     view_zenith_deg, view_azimuth_deg : array_like
     sun_azimuth_deg : float
     **options
-        ``n_mu`` (Gauss nodes, default 16), ``n_modes`` (Fourier modes,
+        ``n_mu`` (Gauss nodes, default 32), ``n_modes`` (Fourier modes,
         default 12), ``n_moments`` (Legendre moments, default 32),
         ``max_orders`` (default 40), ``tol`` (default 1e-3) and ``chunk``
         (view chunk size, default 256).
