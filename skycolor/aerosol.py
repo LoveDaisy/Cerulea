@@ -363,15 +363,30 @@ class MieAerosol(Aerosol):
     table_mid_points: int | None = None
     table_back_points: int = 80
     moments_cache_size: int = 36
-    max_cached_wavelengths: int = 8
+    # Per-wavelength Mie states are pure functions of (wavelength,
+    # construction parameters), so refilling an evicted state reproduces the
+    # evicted values bit for bit -- capacity only trades memory for time.
+    # The default must hold the whole working grid: on the 81-wavelength /
+    # 5 nm grid (``validation.common.WL_COARSE``) the old default of 8 was
+    # smaller than the working set, the LRU thrashed, and *every* call
+    # rebuilt all 81 states -- the dominant cost of everything downstream.
+    # 256 covers that grid with 3x headroom.  Memory: a state holds one
+    # coefficient set per size node (fine modes: ~96 nodes at small ``x``,
+    # KB per state); the coarse-mode members (dust / cirrus / cloud, two
+    # 128-node modes, ``x`` up to ~500 and hence long a/b arrays) reach
+    # ~1 MB per state, so a full cache is at most of order 10^2 MB for one
+    # such instance -- and only when it is queried at 256 distinct
+    # wavelengths.
+    max_cached_wavelengths: int = 256
 
     def __post_init__(self):
         self._nodes = self._build_nodes()
         self._states: "OrderedDict[float, _State]" = OrderedDict()
         # Phase tables are cheap to keep but expensive to rebuild.  They are
-        # cached separately from the per-wavelength coefficient states, so a
-        # repeated sky_radiance() call over the same 80 wavelengths does not
-        # rebuild every table after the 8-state coefficient cache evicts.
+        # cached separately from the per-wavelength coefficient states, with
+        # their own (larger) capacity, so a repeated sky_radiance() call over
+        # the same wavelengths never rebuilds tables even when the
+        # coefficient-state cache evicts between calls.
         self._tables: "OrderedDict[float, PhaseTable]" = OrderedDict()
         self._max_tables = 512
 

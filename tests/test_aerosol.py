@@ -6,7 +6,9 @@ Covers the four things that can go wrong independently:
 2. the analytic Legendre moments (exactness, g = beta_1, physical range);
 3. the adaptive phase table (normalisation and the forward peak);
 4. the delta-M transformation (energy conservation, limits) and the documented
-   library table (Angstrom exponent, SSA, asymmetry, tau(450)/tau(650)).
+   library table (Angstrom exponent, SSA, asymmetry, tau(450)/tau(650));
+5. the per-wavelength Mie state cache and the shared preset instances
+   (capacity/eviction, bitwise reuse, no cross-contamination).
 """
 from __future__ import annotations
 
@@ -393,3 +395,26 @@ def test_angular_function_legendre_expansion():
             ref_tau = (2 * a + 1) * 0.5 * np.sum(w * tau[n] * pl)
             assert ref_pi == pytest.approx(_A_coefficient(n, a), abs=1e-10)
             assert ref_tau == pytest.approx(_B_coefficient(n, a), abs=1e-10)
+
+
+# ===========================================================================
+# 5. per-wavelength state cache and shared preset instances
+# ===========================================================================
+def test_state_cache_capacity_and_eviction():
+    """The state LRU honours ``max_cached_wavelengths``, and a wavelength
+    refilled after eviction comes back bit-identical: states are pure
+    functions of (wavelength, construction parameters), so capacity trades
+    only memory for time, never values."""
+    wl = np.array([400.0, 450.0, 500.0, 550.0, 600.0, 650.0])
+    capped = MieAerosol(
+        modes=[LogNormalMode(0.2, 2.0)], n_radii=32, max_cached_wavelengths=4
+    )
+    fresh = MieAerosol(
+        modes=[LogNormalMode(0.2, 2.0)], n_radii=32, max_cached_wavelengths=64
+    )
+    first = capped.relative_coefficients(wl)
+    assert len(capped._states) <= 4  # the 6-wavelength working set overflows
+    second = capped.relative_coefficients(wl)  # re-queries evicted states
+    reference = fresh.relative_coefficients(wl)
+    assert np.array_equal(first, second)
+    assert np.array_equal(second, reference)
