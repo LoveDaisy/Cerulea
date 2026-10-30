@@ -98,6 +98,62 @@ def test_refracted_path_below_horizon_includes_both_branches():
     assert np.allclose(L, expected, rtol=1e-12)
 
 
+def test_refracted_path_matches_ray_trace():
+    """Independent RK4 column integral along the refracted ray."""
+    from skycolor import presets
+    from skycolor.constants import R_EARTH
+    from skycolor.refraction import (
+        _Profile, geometry, refractivity_of, sun_path_lengths,
+    )
+
+    atmo = presets.clear([550.0])
+    prof = _Profile(atmo)
+    rb = atmo.r_bounds
+    zmid = (np.sqrt(rb[:-1] * rb[1:]) - R_EARTH) / 1e3
+    n_layer = 1.0 + refractivity_of(atmo, zmid)
+
+    def column(r0, theta0, ds=1000.0):
+        y = np.array([0.0, r0])
+        u = np.array([np.sin(theta0), np.cos(theta0)])
+        u /= np.linalg.norm(u)
+        col = 0.0
+
+        def accel(pos, d):
+            r = np.linalg.norm(pos)
+            n = prof.n_of(r)
+            g = prof.dndr_of(r) / n * (pos / r)
+            return d, g - d * np.dot(d, g)
+
+        for _ in range(400000):
+            if np.linalg.norm(y) >= R_EARTH + 1.2e6:
+                break
+            k1y, k1u = accel(y, u)
+            k2y, k2u = accel(y + 0.5 * ds * k1y, u + 0.5 * ds * k1u)
+            k3y, k3u = accel(y + 0.5 * ds * k2y, u + 0.5 * ds * k2u)
+            k4y, k4u = accel(y + ds * k3y, u + ds * k3u)
+            y = y + ds / 6 * (k1y + 2 * k2y + 2 * k3y + k4y)
+            un = u + ds / 6 * (k1u + 2 * k2u + 2 * k3u + k4u)
+            un /= np.linalg.norm(un)
+            z1 = (np.linalg.norm(y) - R_EARTH) / 1e3
+            z2 = (np.linalg.norm(y - ds * u) - R_EARTH) / 1e3
+            col += 0.5 * (atmo.n_air(np.array([z1]))[0]
+                          + atmo.n_air(np.array([z2]))[0]) * ds
+            u = un
+        return col
+
+    for z in (38.0, 47.0, 60.0):
+        r0 = R_EARTH + z * 1e3
+        e_app = float(geometry().apparent_elevation(
+            np.array([-6.0]), np.array([z]))[0])
+        ref = column(r0, np.pi / 2 - np.radians(e_app))
+        a = (1.0 + refractivity_of(atmo, z)) * r0 * np.cos(np.radians(e_app))
+        mu = np.sin(np.radians(e_app))
+        L = sun_path_lengths(np.array([a]), np.array([mu]), np.array([r0]),
+                             rb, n_layer)[:, 0]
+        code = float(np.sum(L * atmo.n_air(zmid)))
+        assert code == pytest.approx(ref, rel=0.03), (z, code, ref)
+
+
 def test_refraction_geometry_lookup():
     from skycolor.refraction import geometry
 

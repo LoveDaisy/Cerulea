@@ -215,10 +215,10 @@ range (−6° to −12°).  This is the tolerance used by `validation/check5`
 **Verdict: the chord fix removed the old excess and revealed a deficit at
 depth.**  At −6° the engine is 1.09× Patat (0.87× Koomen); at −9° it is
 0.54× Patat (0.58× Koomen), and at −12° 0.37× Patat (0.42× Koomen).  The
-−9° and −12° points carry 20 % and 58 % statistical error, so the −9° deficit
-is ~2σ and the −12° one ~1.5σ; they are consistent with a converged value of
-0.6–1.0 at −9° and 0.4–1.0 at −12°.  The factor-2 tolerance is met at −6° and
-−9°, not at −12°.
+−9° and −12° points carry 20 % and 58 % statistical error; the 1σ ranges
+(vs Patat) are 0.43–0.66 and 0.16–0.59.  The −9° deficit is ~4σ below 1.0 in
+the model's own error, the −12° one ~2.9σ; the −12° point is not conclusive.
+The factor-2 tolerance is met at −6° and −9°, not at −12°.
 
 The single-scattering column shows why the engine is needed at all: 0.017× the
 reference at −9° and 0.008× at −12°, against 0.54 and 0.37 for the engine.

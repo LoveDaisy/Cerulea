@@ -177,13 +177,13 @@ def path_lengths_sun(p_sun, cos_zenith_point, r_point, r_bounds) -> np.ndarray:
     * the far branch, perigee -> space, and
     * the near branch, perigee -> the point.
 
-    Both are part of the optical depth.  In this decomposition ``up`` is the
-    part of the near branch above the point and ``down`` the part below it, so
-    ``up + down`` is one complete perigee -> space traversal (the near branch,
-    numerically equal to the far one).  The full sun ray is that traversal
-    plus the near-side ``perigee -> point`` segment, i.e. ``up + 2 * down``.
-    Counting only ``up + down`` stops at the perigee and halves the optical
-    depth of every grazing twilight ray.
+    Both are part of the optical depth.  ``up`` is the part of the near branch
+    above the point, ``down`` the part below it; their sum is one complete
+    perigee -> space traversal.  The far branch is the mirror image of that
+    traversal about the perigee, so it contributes the same length shell by
+    shell.  The full sun ray is therefore ``(up + down) + down``.  Counting
+    only ``up + down`` stops at the perigee and halves the optical depth of
+    every grazing twilight ray.
 
     Returns ``(n_shell, n_points)``.
     """

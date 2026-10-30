@@ -247,8 +247,19 @@ def run():
     rad_alt = sky_radiance_total(atmo_alt, 96.0, np.array([0.0]), np.array([0.0]))
     model_at_2p4km = float(C.luminance(rad_alt[0][None, :], C.WL_COARSE)[0])
 
+    # the engine at -6 deg, so the printed engine ratios are computed, not
+    # copied from another run
+    atmo_l6 = C.atmosphere("clear", C.WL_COARSE)
+    rad_e6, err_e6 = twilight_radiance(
+        atmo_l6, 96.0, np.array([0.0]), np.array([0.0]),
+        quality="low", seed=0)
+    engine_l6 = float(C.luminance(rad_e6[0][None, :], C.WL_COARSE)[0])
+    engine_l6_err = float(C.luminance(err_e6[0][None, :], C.WL_COARSE)[0])
+
     details = dict(
         model_at_2p4km=model_at_2p4km,
+        engine_l6=engine_l6,
+        engine_l6_err=engine_l6_err,
         model={f"{h:+.0f}": model[h] for h in hs},
         model_pristine={f"{h:+.0f}": model_pristine[h] for h in hs},
         engine_error={f"{h:+.0f}": engine_err[h] for h in hs},
@@ -294,6 +305,10 @@ def main():
     print(f"  {d['model']['+0']:.3g} cd/m2 against Koomen's {d['koomen']['+0']:.3g} "
           f"({d['model']['+0'] / d['koomen']['+0']:.2f}x); and h=-15, where the measured")
     print("  sky is airglow, which the model does not contain.")
+    e6 = d["engine_l6"]
+    print(f"  Spherical engine at -6 deg (low budget): {e6:.3f} cd m-2 "
+          f"({e6 / d['koomen']['-6']:.2f}x Koomen, "
+          f"{e6 / d['patat']['-6']:.2f}x Patat).")
     print()
     print("  Model/reference in brackets is the 1-sigma range from the engine's")
     print("  own statistical error (multiple scattering only; the first order is")
@@ -329,9 +344,13 @@ def main():
     print()
     print(f"  verdict: {result.verdict}")
     print()
+    d6k = d["model"]["-6"] / d["koomen"]["-6"]
+    d6p = d["model"]["-6"] / d["patat"]["-6"]
+    e6k = d["engine_l6"] / d["koomen"]["-6"]
+    e6p = d["engine_l6"] / d["patat"]["-6"]
     print("  Read the -6 deg row first.  After the two-branch solar-chord fix (M10)")
-    print("  the model is 0.69x Koomen (deterministic) or 0.85x (spherical engine),")
-    print("  and 0.86x / 1.07x Patat.  The old 1.14x / 2.20x were the one-branch")
+    print(f"  the model is {d6k:.2f}x Koomen (deterministic) or {e6k:.2f}x (engine),")
+    print(f"  and {d6p:.2f}x / {e6p:.2f}x Patat.  The old 1.14x / 2.20x were the one-branch")
     print("  chord.  The remaining 15-30% is inside the 1950s absolute calibration")
     print("  and the plane-parallel multiple-scattering approximation.")
     print("  The altitude response is still wrong-signed: the model is slightly")

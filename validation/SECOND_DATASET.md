@@ -118,7 +118,8 @@ effect being tested.  They are therefore reported but not used for the verdict.
 
 Both datasets are in `validation/data/twilight_koomen1952.csv` and
 `validation/data/twilight_nawar2020.csv`; `validation/check6_second_dataset.py`
-reproduces every number below.
+reproduces the deterministic and `quality="low"` engine numbers below.  The
+medium-quality engine values come from `tools/twilight_benchmark.py`.
 
 ## 4. Comparison
 

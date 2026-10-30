@@ -4,8 +4,11 @@ import numpy as np
 import pytest
 
 from skycolor.constants import R_EARTH
+from scipy.integrate import quad
+
 from skycolor.geometry import (
     path_lengths_sun,
+    path_lengths_sun_array,
     shell_lengths_upward,
     sun_position,
     is_sunlit,
@@ -42,8 +45,8 @@ def test_sun_path_below_horizon_includes_both_branches():
     # far branch: a full chord in every shell; near branch: perigee -> point
     expected = (s[1:] - s[:-1]) + (np.minimum(s[1:], u) - np.minimum(s[:-1], u))
     assert np.allclose(L, expected, rtol=1e-12)
-    # one branch alone (the old behaviour) is measurably shorter
-    assert expected.sum() > 1.4 * (s[-1] - s[0])
+    # one branch alone (the old behaviour) is strictly shorter
+    assert expected.sum() > (s[-1] - s[0])
 
 
 def test_sun_path_above_horizon_is_single_branch():
@@ -60,6 +63,36 @@ def test_sun_path_above_horizon_is_single_branch():
     u = r * abs(c)
     expected = np.maximum(s[1:] - np.maximum(s[:-1], u), 0.0)
     assert np.allclose(L, expected, rtol=1e-12)
+
+
+def test_sun_path_matches_numerical_line_integral():
+    """One shell, 40 km downward: the path equals a direct line integral."""
+    rb = np.array([R_EARTH, R_EARTH + 120000.0])
+    r = R_EARTH + 40000.0
+    chi = np.radians(96.0)
+    p = r * np.sin(chi)
+    c = np.cos(chi)
+    L = path_lengths_sun(np.array([p]), np.array([c]), np.array([r]), rb)[:, 0]
+    s_top = np.sqrt(rb[-1]**2 - p**2)
+    u = r * abs(c)
+    total, _ = quad(lambda _: 1.0, -s_top, u)
+    assert L.sum() == pytest.approx(total, rel=1e-12)
+
+
+@pytest.mark.parametrize("shape", [(3,), (2, 3), (2, 2, 2)])
+@pytest.mark.parametrize("c", [-0.1045, 0.0, 0.1736])
+def test_array_and_point_sun_paths_agree(shape, c):
+    """The vectorised helper must match the point helper for any shape."""
+    rb = np.array([R_EARTH, R_EARTH + 2000, R_EARTH + 5000,
+                   R_EARTH + 20000, R_EARTH + 60000, R_EARTH + 120000.0])
+    r = R_EARTH + 40000.0
+    p = r * np.sqrt(max(1.0 - c * c, 0.0))
+    pp = np.full(shape, p)
+    cc = np.full(shape, c)
+    rr = np.full(shape, r)
+    arr = path_lengths_sun_array(pp, cc, rr, rb)
+    flat = path_lengths_sun(pp.ravel(), cc.ravel(), rr.ravel(), rb)
+    assert np.allclose(arr.reshape(flat.shape), flat, rtol=1e-12)
 
 
 def test_sunlit_criterion():

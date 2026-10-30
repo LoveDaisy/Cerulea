@@ -19,7 +19,7 @@ argument; this is the state.*
 | Colour | CIE 1931 → Bradford → ACES, tone-mapping options |
 | Cameras | panorama, fisheye, perspective; ground; sun disk |
 
-196 tests.  Environment pinned by `uv.lock` (Python 3.12, numpy 2.5, scipy 1.18).
+207 tests.  Environment pinned by `uv.lock` (Python 3.12, numpy 2.5, scipy 1.18).
 
 ## How well it is validated
 
@@ -29,8 +29,8 @@ argument; this is the state.*
 | Direct normal illuminance vs ASTM G173 / Bird | +4 to +6 % |
 | CIE 110 relative luminance, upper sky | 10.6 % RMS |
 | Horizon chromaticity vs measured spectra | Δxy = 0.018 |
-| Twilight vs sea-level photometry (Koomen 1952), −6° | **0.69×** deterministic, **0.85×** spherical engine |
-| Twilight vs Patat (2006, 2400 m), −6° | **0.86×** deterministic, **1.07×** spherical engine |
+| Twilight vs sea-level photometry (Koomen 1952), −6° | **0.69×** deterministic, **0.85×** engine (low; 0.87× medium) |
+| Twilight vs Patat (2006, 2400 m), −6° | **0.86×** deterministic, **1.07×** engine (low; 1.09× medium) |
 | Deep twilight vs Patat (2006), −9° | **0.54×** engine (medium, 1σ 0.43–0.66) |
 | Multiple scattering vs independent Monte Carlo | 1 % |
 | Cloud albedo vs independent Monte Carlo | ≤1 % |

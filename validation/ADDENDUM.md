@@ -66,6 +66,10 @@ not trustworthy.
 
 # Second addendum — after the aerosol library, refraction and the twilight engine
 
+> **Pre-M10.**  The engine values in this section predate the two-branch
+> chord fix; the corrected ones are in the sixth addendum.  The 1.39/1.45
+> rows in the summary table are historical.
+
 Three further pieces have landed since the first addendum.  The validation
 harness numbers move slightly but the verdicts do not:
 

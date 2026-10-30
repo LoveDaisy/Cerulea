@@ -88,8 +88,8 @@ skycolor/
   presets.py      named scenarios
 tools/build_data.py   rebuilds the packaged data tables from data_raw/
 experiments/          scripts that produce the figures (01..10)
-validation/           five independent checks against published references
-tests/                196 tests
+validation/           six independent checks against published references
+tests/                207 tests
 docs/                 architecture, method notes, the write-up, the roadmap
 ```
 
@@ -111,7 +111,8 @@ low by ~1.8× at −9°, and the **altitude response** has the wrong sign.
   dominated by the solar aureole)
 * Horizon chromaticity vs measured Berlin spectra: **Δxy = 0.018**
 * Twilight zenith luminance at −6°: **0.69× Koomen (1952)** deterministic,
-  **0.85×** spherical engine; 0.86× / 1.07× Patat et al. (2006)
+  **0.85×** spherical engine (low budget; 0.87× medium); 0.86× / 1.07×
+  Patat et al. (2006)
 * Multiple scattering vs an independent Monte Carlo: **31 % of single
   scattering at the zenith, both codes agree to 1 %**
 * Known failures, documented rather than hidden: the limb (≈2× too bright,

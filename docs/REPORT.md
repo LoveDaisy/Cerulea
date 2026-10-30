@@ -140,15 +140,20 @@ See `validation/REPORT.md` for the full table.  Headlines:
 | SOS energy conservation (conservative atmosphere) | 2.3 × 10⁻⁴ → **pass** |
 | MC global energy conservation | 0.9985 → **pass** |
 | MS/SS at the zenith, sun at 60°, clear sky | 0.31 (SOS) vs 0.31 (MC) → **pass** |
-| Twilight zenith luminance at −6°, full model (sea level) | 0.44 vs Koomen 0.65 cd m⁻² (0.69×); spherical engine 0.55 (0.85×) → **pass** |
-| Twilight zenith luminance at −9°, spherical engine | 0.0124 vs Patat 0.0171 (0.73×, 1σ 0.5–1.0) → **pass** |
-| Twilight zenith luminance at −12°, spherical engine | 0.0030 vs 0.00146 (2.1×, 1σ 0.9–3.8) → **not conclusive** |
+| Twilight zenith luminance at −6°, deterministic (sea level) | 0.44 vs Koomen 0.65 cd m⁻² (0.69×); engine 0.56 (0.87×) → **pass** |
+| Twilight zenith luminance at −9°, spherical engine (medium) | 9.31 × 10⁻³ vs Patat 0.0171 (0.54×, 1σ 0.43–0.66) → **pass** (factor 2) |
+| Twilight zenith luminance at −12°, spherical engine (medium) | 5.46 × 10⁻⁴ vs 0.00146 (0.37×, 1σ 0.18–0.67) → **not conclusive** (58 % error) |
 | Single scattering alone at −9° / −12° | ~60× / ~130× too dark → **known limitation**, the engine handles this range |
 | Horizon chromaticity vs measured Berlin spectra | Δxy = 0.018 (tolerance 0.02) → **marginal pass** |
 | Mie phase moments vs quadrature | 2e-8, `beta_1` = g to 1e-10 → **pass** |
 | Cloud albedo vs Monte Carlo | 0.1–0.7 % (`g=0`), ≤1 % (`g=0.85`, τ≥5) → **pass** |
 | Cloud `R + T + direct` | 1 to 1e-12 → **pass** |
 | Refraction at the horizon | 33′ (Sæmundsson 29′, classical 34′) → **pass** |
+
+`engine` in the twilight rows means the split estimator: the refracted
+deterministic first order plus geometric-ray Monte Carlo multiple scattering.
+The two halves are not fully consistent about refraction (the MC ignores it),
+which is a known limitation of the engine, not a chord issue.
 
 The two deviations are understood and documented rather than papered over:
 the last few degrees above the horizon are where the plane-parallel diffuse

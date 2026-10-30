@@ -351,8 +351,10 @@ def sun_path_lengths(a, mu_app, r_point, r_bounds, n_layer):
     :func:`skycolor.geometry.path_lengths_sun`: when the source is below the
     local horizontal (``mu_app < 0``) the ray reaches the point through the
     perigee, so the full path is the far branch (perigee -> space) plus the
-    near branch (perigee -> point).  ``up + down`` is one perigee -> space
-    traversal; the near-side ``perigee -> point`` segment adds another
+    near branch (perigee -> point).  ``up`` is the near branch above the
+    point and ``down`` the part below it; ``up + down`` is one perigee ->
+    space traversal, and the far branch is its mirror image about the
+    perigee.  The near-side ``perigee -> point`` segment adds another
     ``down``, hence the factor two.  Without it every grazing twilight ray
     is under-attenuated by half of its dense lower-atmosphere column.
 
