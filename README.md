@@ -93,6 +93,13 @@ tests/                193 tests
 docs/                 architecture, method notes, the write-up, the roadmap
 ```
 
+## Where it stands
+
+`docs/STATUS.md` is the one-page summary; `docs/ROADMAP.md` has the milestones
+and the open questions.  Short version: the daytime sky is validated to a few
+per cent, twilight timing and shape are right, and the **absolute twilight
+level** is the one number still known to be 1.5–2.5× off.
+
 ## How good is it?
 
 `validation/REPORT.md` and `validation/ADDENDUM.md` have the details.  In short:

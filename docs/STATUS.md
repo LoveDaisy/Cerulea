@@ -33,7 +33,7 @@ argument; this is the state.*
 | Deep twilight vs Patat (2006) | 1.39× at −9°, 1.45× at −12° |
 | Multiple scattering vs independent Monte Carlo | 1 % |
 | Cloud albedo vs independent Monte Carlo | ≤1 % |
-| Refraction at the horizon | 33′ (Sændersson 29′, classical 34′) |
+| Refraction at the horizon | 33′ (Sæmundsson 29′, classical 34′) |
 
 ## What is known to be wrong, and by how much
 
