@@ -279,7 +279,7 @@ class Atmosphere:
         surface_pressure: float = P0,
         z_bounds_km: np.ndarray | None = None,
         elevation_km: float = 0.0,
-        refraction: bool = False,
+        refraction: bool = True,
     ):
         self.wl = np.asarray(wl_nm, dtype=float)
         self.ozone_du = float(ozone_du)
@@ -287,15 +287,12 @@ class Atmosphere:
         self.aerosols = list(aerosols or [])
         self.surface_pressure = float(surface_pressure)
         self.elevation_km = float(elevation_km)
-        #: Whether the direct-beam shadow boundary includes atmospheric
-        #: refraction (see :mod:`skycolor.refraction`).  **Off by default.**
-        #: Refraction genuinely raises the terminator, but the extra light
-        #: comes from rays that graze the surface, and those must be traced
-        #: along their *bent* path: shifting the mask while keeping straight
-        #: rays lets the model admit surface-grazing rays whose optical depth
-        #: is ill-defined, and it over-brightens twilight by 3-6x.  Use it for
-        #: the solar position and the horizon dip; use ``False`` here until
-        #: the paths are refracted too.
+        #: Whether the direct-beam geometry includes atmospheric refraction
+        #: (see :mod:`skycolor.refraction`).  **On by default**: the ray
+        #: bending is real, the paths are integrated along the *bent* chord
+        #: (the Bouguer invariant gives a closed form per shell), and the
+        #: terminator is where it belongs.  Set ``False`` to reproduce the
+        #: geometric-shadow numbers quoted in older reports.
         self.refraction = bool(refraction)
         self.z_bounds = np.array(z_bounds_km if z_bounds_km is not None else DEFAULT_Z_BOUNDS,
                                  dtype=float)

@@ -237,3 +237,38 @@ is a −26 K stratopause, which no observed climatology supports.  A useful
 side result: the −6° zenith is lit by 35–60 km and attenuated by the shadowed
 0–20 km, so *column* changes cancel to ~0.2 % per 1 % while *profile* changes
 do not — which is why the earlier column-level tests were so unresponsive.
+
+---
+
+# Fifth addendum — refraction is now the default
+
+`Atmosphere(refraction=True)` is the default from this commit on: the ray
+bending is real, the paths are integrated along the bent chord, and the
+terminator sits where it belongs.
+
+This changes the twilight numbers quoted earlier in this file.  At 550 nm,
+`clear` preset, zenith:
+
+| solar elev. | geometric | with refraction | Koomen 1952 (sea level) | Patat 2006 (2400 m) |
+|---|---|---|---|---|
+| −3° | 37.5 | 49.4 | 21.5 | 40.1 † |
+| −6° | 0.736 | 1.42 | 0.646 | 0.516 |
+
+So the model/Koomen ratio at −6° goes from 1.14 to **2.20**, and model/Patat
+from 1.43 to **2.75**.  † Patat's −3° is an extrapolation.
+
+Read this the honest way: a real sky *does* include refraction, so the
+refracted comparison is the physical one, and it says the model's twilight is
+1.5–2.5× too bright.  The older "1.14×, therefore a site effect" conclusion
+was partly a cancellation — a terminator that sat too low compensating a
+twilight that was too bright.  Three things could carry the excess and none is
+excluded yet:
+
+1. the optical depth of the grazing solar ray at 30–35 km (the newly lit band
+   at −6° has a transmittance of only ~0.03, so the answer is sensitive to
+   how that chord is integrated);
+2. the multiple-scattering level in a shadowed troposphere;
+3. the absolute calibration of 1950s photometry (±0.2–0.4 mag is plausible).
+
+The geometric-shadow numbers remain reachable with `refraction=False`, which
+is why they are kept in the tables above.

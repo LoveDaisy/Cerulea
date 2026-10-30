@@ -29,7 +29,7 @@ radiative-transfer solver.  The output is spectral radiance
 | Near-vs-far weather | Horizontally varying aerosol optical depth along the line of sight |
 | **Red afterglow filling the sky** | A scattering layer *above the shadow* — volcanic stratospheric sulphate or cirrus |
 | **Blue sun** | Anomalous (non-monotonic) Mie extinction from a narrow size distribution |
-| **Refraction, flattened sunset sun** | Traced rays through the refractive atmosphere |
+| **Refraction, flattened sunset sun** | Traced rays through the refractive atmosphere (on by default) |
 | **Overcast / underlit cloud decks** | Delta-Eddington two-stream on a plane-parallel layer |
 
 ## Quick start
@@ -89,7 +89,7 @@ skycolor/
 tools/build_data.py   rebuilds the packaged data tables from data_raw/
 experiments/          scripts that produce the figures (01..10)
 validation/           five independent checks against published references
-tests/                192 tests
+tests/                193 tests
 docs/                 architecture, method notes, the write-up, the roadmap
 ```
 

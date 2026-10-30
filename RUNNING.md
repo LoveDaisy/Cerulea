@@ -6,7 +6,7 @@ transitive ones**, and `.python-version` pins the interpreter.
 
 ```bash
 uv sync                      # install from the lock file
-uv run pytest -q             # 192 tests
+uv run pytest -q             # 193 tests
 uv run python -m validation.run_all
 ```
 

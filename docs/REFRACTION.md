@@ -107,10 +107,11 @@ geometric model -- shifting the reference axis by 0.5 deg and raising the
 terminator by 0.5 deg are the same operation.  So the convention cannot be
 determined from this data, and it does not change the prediction.
 
-Practical consequence: the geometric shadow stays the default because it is
-free, and `Atmosphere(refraction=True)` is the mode to use whenever the
-*apparent* solar position matters -- rendering the flattened sunset sun, or
-matching a timestamped photograph.
+Practical consequence: **refraction is on by default** (`Atmosphere(refraction=True)`,
+since the physics is right and the extra cost is a division per shell).  The
+`refraction=False` switch reproduces the geometric-shadow numbers quoted in the
+older reports, which is useful because it is the mode that agrees better with
+the sea-level twilight measurement -- see the caveat below.
 
 The residual 1.5x at -6 deg survives both readings and is therefore a genuine
 discrepancy; it is tracked as open question #2 in `docs/ROADMAP.md`.

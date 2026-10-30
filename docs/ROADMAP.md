@@ -136,8 +136,17 @@ understand.  Each is worth resolving before adding new physics.
    whole of the old "1.5× excess" — the comparison was mixing a sea-level model
    with a 2400 m reference.  See `validation/SECOND_DATASET.md`.
 
-   **The live defect it exposed is different and worth a milestone of its
-   own:** the model has almost no altitude response.  Run at 2.4 km it changes
+   **Caveat, and it is the live question.**  Refraction is now on by default.
+   That raises twilight by 2–5×, and the sea-level agreement moves from 1.14×
+   to **2.2×** at −6° (Koomen) and 1.43× → 2.75× (Patat).  Since a real sky
+   includes refraction, this is honest evidence that the model's twilight
+   *level* is 1.5–2.5× too bright, and that the earlier 1.14× was partly a
+   cancellation between a terminator that was too low and a twilight that was
+   too bright.  Settling it needs the altitude sweep below plus a decision on
+   whether the optical depth of the grazing solar ray is right at 30–35 km.
+
+   **The other defect the second dataset exposed is different and worth a
+   milestone of its own:** the model has almost no altitude response.  Run at 2.4 km it changes
    by 0.3 %, while the data demand 1.25–1.39× for that pressure ratio.  The
    model is right at sea level and wrong at altitude, which means some of the
    twilight light must come from the *low* atmosphere — the shadowed
