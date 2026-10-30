@@ -1083,6 +1083,36 @@ class WaterCloudAerosol(MieAerosol):
 
 
 # ---------------------------------------------------------------------------
+# shared construction (memoised preset aerosols)
+# ---------------------------------------------------------------------------
+_SHARED_AEROSOLS: dict = {}
+
+
+def shared(cls, *args, **kwargs):
+    """Return the one shared instance of ``cls`` for these arguments.
+
+    Preset aerosols are pure functions of their constructor arguments, so
+    call sites asking for the same aerosol can share a single instance.
+    Sharing is what lets the per-wavelength Mie caches survive the frequent
+    ``Atmosphere`` rebuilds done by presets and harnesses: without it every
+    ``presets.clear(...)`` pays the full Mie pre-processing again even for
+    wavelengths that were already computed.
+
+    Consumers must treat the returned instance as read-only (everything
+    downstream only calls the :class:`Aerosol` interface); mutating a shared
+    instance would leak into every atmosphere that shares it.  The cache key
+    is ``(cls, args, sorted kwargs)`` -- exact, because the preset arguments
+    are simple floats.
+    """
+    key = (cls, args, tuple(sorted(kwargs.items())))
+    instance = _SHARED_AEROSOLS.get(key)
+    if instance is None:
+        instance = cls(*args, **kwargs)
+        _SHARED_AEROSOLS[key] = instance
+    return instance
+
+
+# ---------------------------------------------------------------------------
 # library registry
 # ---------------------------------------------------------------------------
 LIBRARY = {

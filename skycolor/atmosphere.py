@@ -315,9 +315,9 @@ class Atmosphere:
     @classmethod
     def standard(cls, wl_nm, **kw) -> "Atmosphere":
         """A clean mid-latitude atmosphere: 300 DU ozone, 0.05 AOD boundary layer."""
-        from .aerosol import HinterlandAerosol
+        from .aerosol import HinterlandAerosol, shared
 
-        kw.setdefault("aerosols", [AerosolLayer(HinterlandAerosol(), aod550=0.05,
+        kw.setdefault("aerosols", [AerosolLayer(shared(HinterlandAerosol), aod550=0.05,
                                                 profile=ExponentialProfile(1.5))])
         return cls(wl_nm, ozone_du=300.0, **kw)
 

@@ -3,6 +3,11 @@
 Every preset returns a fully configured :class:`skycolor.atmosphere.Atmosphere`
 given a spectral grid.  They are meant to be starting points: the interesting
 question is what happens between them.
+
+The aerosol instances are shared -- memoised on their construction arguments
+via :func:`skycolor.aerosol.shared` -- so the per-wavelength Mie caches
+survive across atmospheres.  Treat the aerosols as read-only: mutating one
+would leak into every atmosphere that shares it.
 """
 from __future__ import annotations
 
@@ -20,6 +25,7 @@ from .aerosol import (
     SmokeAerosol,
     UrbanAerosol,
     VolcanicStratosphericAerosol,
+    shared,
 )
 
 
@@ -31,41 +37,41 @@ def pristine(wl, ozone_du: float = 300.0) -> Atmosphere:
 def clear(wl, aod: float = 0.05, ozone_du: float = 300.0) -> Atmosphere:
     """Clean continental background."""
     return Atmosphere(wl, ozone_du=ozone_du,
-                      aerosols=[AerosolLayer(HinterlandAerosol(), aod,
+                      aerosols=[AerosolLayer(shared(HinterlandAerosol), aod,
                                              ExponentialProfile(1.5))])
 
 
 def hazy(wl, aod: float = 0.30, rh: float = 0.7, ozone_du: float = 300.0) -> Atmosphere:
     """Humid boundary layer: the classic milky horizon."""
     return Atmosphere(wl, ozone_du=ozone_du,
-                      aerosols=[AerosolLayer(HazeAerosol(rh), aod,
+                      aerosols=[AerosolLayer(shared(HazeAerosol, rh), aod,
                                              ExponentialProfile(1.2))])
 
 
 def urban(wl, aod: float = 0.35, ozone_du: float = 320.0) -> Atmosphere:
     return Atmosphere(wl, ozone_du=ozone_du,
-                      aerosols=[AerosolLayer(UrbanAerosol(), aod,
+                      aerosols=[AerosolLayer(shared(UrbanAerosol), aod,
                                              ExponentialProfile(1.0))])
 
 
 def dusty(wl, aod: float = 0.6, elevated: bool = True) -> Atmosphere:
     """Desert dust: a deep boundary layer plus an elevated residual layer."""
-    layers = [AerosolLayer(DustAerosol(), 0.6 * aod, ExponentialProfile(2.0))]
+    layers = [AerosolLayer(shared(DustAerosol), 0.6 * aod, ExponentialProfile(2.0))]
     if elevated:
-        layers.append(AerosolLayer(DustAerosol(), 0.4 * aod,
+        layers.append(AerosolLayer(shared(DustAerosol), 0.4 * aod,
                                    GaussianProfile(3.5, 1.5)))
     return Atmosphere(wl, ozone_du=290.0, aerosols=layers)
 
 
 def smoky(wl, aod: float = 0.5, ozone_du: float = 320.0) -> Atmosphere:
     return Atmosphere(wl, ozone_du=ozone_du,
-                      aerosols=[AerosolLayer(SmokeAerosol(), aod,
+                      aerosols=[AerosolLayer(shared(SmokeAerosol), aod,
                                              ExponentialProfile(2.0))])
 
 
 def marine(wl, aod: float = 0.12) -> Atmosphere:
     return Atmosphere(wl, ozone_du=280.0,
-                      aerosols=[AerosolLayer(MaritimeAerosol(), aod,
+                      aerosols=[AerosolLayer(shared(MaritimeAerosol), aod,
                                              ExponentialProfile(0.8))])
 
 
@@ -80,7 +86,7 @@ def volcanic(wl, aod: float = 0.10, center_km: float = 22.0,
     """
     return Atmosphere(wl, ozone_du=300.0,
                       aerosols=[AerosolLayer(
-                          VolcanicStratosphericAerosol(), aod,
+                          shared(VolcanicStratosphericAerosol), aod,
                           GaussianProfile(center_km, width_km))])
 
 
@@ -89,15 +95,18 @@ def cirrus(wl, aod: float = 0.30, center_km: float = 9.0,
     """A thin high ice-cloud layer (equivalent spheres, no halos)."""
     return Atmosphere(wl, ozone_du=300.0,
                       aerosols=[AerosolLayer(
-                          CirrusAerosol(), aod, GaussianProfile(center_km, width_km))])
+                          shared(CirrusAerosol), aod,
+                          GaussianProfile(center_km, width_km))])
 
 
 def dust_storm(wl, aod: float = 1.5) -> Atmosphere:
     """A deep, well-mixed desert-dust outbreak."""
     return Atmosphere(wl, ozone_du=290.0,
-                      aerosols=[AerosolLayer(DesertDustAerosol(), 0.6 * aod,
+                      aerosols=[AerosolLayer(shared(DesertDustAerosol),
+                                             0.6 * aod,
                                              ExponentialProfile(2.5)),
-                                AerosolLayer(DesertDustAerosol(), 0.4 * aod,
+                                AerosolLayer(shared(DesertDustAerosol),
+                                             0.4 * aod,
                                              GaussianProfile(4.0, 2.0))])
 
 
