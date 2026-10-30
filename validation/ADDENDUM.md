@@ -308,6 +308,10 @@ integral (geometric: 1.99 before, 1.00 after) and an RK4 ray trace (refracted:
 | −6° | 1.421 (2.20 K / 2.75 P) | 0.444 (0.69 K / 0.86 P) | 0.552 (0.85 K / 1.07 P) | 0.646 | 0.516 |
 | −9° | 0.021 (1.30 K) | — | 0.0124 (0.77 K) | 0.0162 | 0.0171 |
 
+The engine column is `quality="low"`; the medium benchmark gives 0.563 at
+−6°, 9.31 × 10⁻³ at −9° and 5.46 × 10⁻⁴ at −12° (0.87 / 1.09 at −6°,
+0.58 / 0.54 at −9°, 0.42 / 0.37 at −12°, against Koomen / Patat).
+
 The old geometric 1.14× was a partial cancellation: the chord bug made
 twilight ~2.5× too bright, the absence of refraction ~1.5× too dark, and the
 two errors left the geometric model accidentally close to Koomen.  The
