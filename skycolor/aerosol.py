@@ -973,8 +973,9 @@ class DesertDustAerosol(MieAerosol):
     behaviour: the broad coarse mode plus the iron-oxide absorption makes the
     extinction *increase* slightly towards the red, with
     ``tau(450)/tau(650) = 0.984`` (a weak blue-sun tendency; a narrow coarse
-    mode, e.g. ``r = 0.45 um`` and ``sigma_g = 1.05``, pushes the ratio down
-    to about 0.71, but that is not a realistic desert-dust width).  The
+    mode, e.g. ``r ~ 0.5 um`` and ``sigma_g ~ 1.2``, pushes the ratio down to
+    about 0.7 -- and a narrower mode to ~0.5 -- but that is not a realistic
+    desert-dust width).  The
     coarse mode has a strong forward peak; delta-M is required
     (``f_32 = 0.368``).
     """

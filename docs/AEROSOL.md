@@ -370,10 +370,11 @@ Notes:
 * `tau450/tau650 < 1` means the extinction is slightly larger in the red; the
   direct beam becomes relatively bluer after attenuation -- the "blue sun".
   Only desert dust is on the blue-sun side of unity in this library, and only
-  weakly (0.984).  A *narrow* coarse mode (e.g. `r = 0.45 um`,
-  `sigma_g = 1.05`) drives the ratio to about 0.71 and produces a much
-  stronger blue sun; that is a size-distribution choice, not a different
-  aerosol, and it is not part of the eight-member library.
+  weakly (0.984).  A *narrow* coarse mode (e.g. `r ~ 0.5 um`,
+  `sigma_g ~ 1.2`) drives the ratio to about 0.7 (and a narrower or
+  slightly different mode can reach 0.5), producing a much stronger blue
+  sun; that is a size-distribution choice, not a different aerosol, and it
+  is not part of the eight-member library.
 * `biomass_burning` is strongly blue-absorbing (`tau450/tau650 = 1.97`); it is
   the opposite of a blue-sun aerosol.
 * Delta-M is marked *required* when `f_32 > 0.2` (the 32-moment truncation
