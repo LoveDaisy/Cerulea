@@ -38,15 +38,16 @@ argument; this is the state.*
 
 ## What is known to be wrong, and by how much
 
-1. **The absolute twilight level is ~15–30 % low, not 1.5–2.5× high.**  The old
+1. **The −6° twilight level is 15–30 % low, not 1.5–2.5× high.**  The old
    2.2× was a chord-integration bug: the solar ray was followed only from the
    perigee out to space, not from the perigee back to the scattering point as
    well, so every grazing twilight ray was under-attenuated by half of its
    dense lower-atmosphere column.  Fixed in `geometry.path_lengths_sun` and
    `refraction.sun_path_lengths`; the −6° value moves from 1.42 to 0.44 cd m⁻²
-   (deterministic) and 0.55 cd m⁻² (spherical engine).  The remaining
-   difference is inside the 1950s absolute calibration and the plane-parallel
-   multiple-scattering approximation.
+   (deterministic) and 0.55 cd m⁻² (spherical engine).  The residual grows with
+   solar depression (0.58× Koomen at −9°, 0.42× at −12°), which is the same
+   low-atmosphere multiple-scattering deficit; the −6° point itself is inside
+   the 1950s calibration and the plane-parallel approximation.
 2. **The altitude response has the wrong sign.**  At 2.4 km the model is a few
    per cent *brighter*, while the data (Koomen's two stations, Patat's two
    pressures) are 0.80× darker.  The `at_altitude` helper also scales the

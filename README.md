@@ -97,9 +97,9 @@ docs/                 architecture, method notes, the write-up, the roadmap
 
 `docs/STATUS.md` is the one-page summary; `docs/ROADMAP.md` has the milestones
 and the open questions.  Short version: the daytime sky is validated to a few
-per cent, twilight timing and shape are right, and the **twilight level** is
-now within ~15–30 % after the solar-chord fix (M10).  The remaining twilight
-problem is the **altitude response**, which has the wrong sign.
+per cent, twilight timing and shape are right, and the **−6° twilight level**
+is now within ~15–30 % after the solar-chord fix (M10).  The deep twilight is
+low by ~1.8× at −9°, and the **altitude response** has the wrong sign.
 
 ## How good is it?
 

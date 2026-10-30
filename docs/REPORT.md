@@ -320,9 +320,10 @@ A second, independent, *photopic* twilight measurement — Koomen et al. (1952),
 sea level — lets the model be compared like-for-like for the first time
 (`validation/SECOND_DATASET.md`).  The −6° zenith is **0.44 cd m⁻²** in the
 deterministic model, i.e. **0.69×** Koomen (0.646) and 0.86× Patat (0.516);
-the spherical engine gives **0.55 cd m⁻²**, or **0.85×** Koomen and 1.07×
-Patat.  The residual is 15–30 %, inside the 1950s absolute calibration
-(±0.2–0.4 mag) and the plane-parallel multiple-scattering approximation.
+the spherical engine gives **0.55 cd m⁻²** (0.85× Koomen, 1.07× Patat; the
+medium-quality benchmark gives 0.563, 0.87× / 1.09×).  The residual is
+15–30 %, inside the 1950s absolute calibration (±0.2–0.4 mag) and the
+plane-parallel multiple-scattering approximation.
 
 The story changed with the M10 chord fix.  The old 2.20× (and the 1.14×
 geometric number before it) were artifacts of a solar path that returned only
