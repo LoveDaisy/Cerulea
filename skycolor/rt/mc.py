@@ -54,18 +54,19 @@ majorant changes) or is a "trial" at which a real collision is accepted with
 probability ``b_ext(x)/b_max``.  Because the tabulated extinction is
 log-linearly interpolated, the majorant (the maximum of that tabulated field
 inside the layer, with a small safety factor) is a true upper bound, so the
-sampler is unbiased.  Boundary layers are crossed shell by shell, and rays that
-hit the Earth's surface are reflected or absorbed there.
+sampler is unbiased.  Layer boundaries are crossed one shell at a time, and
+rays that hit the Earth's surface are reflected (or absorbed) there.
 
 Sampling budget
 ---------------
 ``n_photons`` is the **total** number of backward paths per wavelength; it is
-split as evenly as possible among the requested view directions.  Thus the
-work per call scales like ``n_view * n_wl * n_photons`` is avoided: it scales
-like ``n_wl * n_photons`` plus a linear factor in ``n_view`` for the bookkeeping.
-For a single direction all photons are used for that direction, which is the
-right behaviour for validation runs; for a large viewing grid use fewer
-photons (the per-direction standard error grows like 1/sqrt(n_photons/n_view)).
+split as evenly as possible among the requested view directions.  The work per
+call is therefore proportional to ``n_wl * n_photons``, independently of the
+number of view directions.  For a single direction all photons are used for
+that direction, which is the right behaviour for validation runs; for a large
+viewing grid use fewer photons (the per-direction standard error grows like
+``1/sqrt(n_photons/n_view)``).  A 100-direction x 80-wavelength call with the
+default budget takes about half a minute on a laptop.
 
 Statistical error
 -----------------
