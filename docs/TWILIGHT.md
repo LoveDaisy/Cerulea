@@ -37,6 +37,16 @@ The figure is produced by `experiments/twilight_nocturnal.py`
 deterministic model, the engine and the Patat fit, plus fisheye renders at −9°
 and −12°.
 
+> **Provenance of the committed PNG.**  It was made with `--quick` (2 anchor
+> wavelengths, 5 × 10⁶–5 × 10⁷ photons per elevation, 150 px fisheye) so that
+> the whole figure takes ~10 minutes.  At that budget the fisheyes show the
+> coarse angular cells as visible polygons (the zenith cell spans 0–39° at the
+> `low` zenith grid) and the deep points carry 40–70 % statistical error.  Run
+> the script **without** `--quick` (≈ 30–40 min) for a production-quality
+> render; the black-and-white curve panel is already converged in the quick
+> version because the Patat comparison uses 5 anchors and 3 × 10⁷ photons
+> (§2.2).
+
 ---
 
 ## 1. Estimator design
