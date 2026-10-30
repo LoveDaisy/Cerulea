@@ -33,7 +33,7 @@ Both arrays are `(n_view, n_wl)` in W m⁻² sr⁻¹ nm⁻¹ and the view angles
 broadcast against each other, exactly like `rt.solver.sky_radiance_total`.
 
 The figure is produced by `experiments/twilight_nocturnal.py`
-(`figures/08_twilight_deep.png`): the zenith brightness from 0 to −18° for the
+(`figures/11_twilight_deep.png`): the zenith brightness from 0 to −18° for the
 deterministic model, the engine and the Patat fit, plus fisheye renders at −9°
 and −12°.
 
