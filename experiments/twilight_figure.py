@@ -26,15 +26,15 @@ patat = {float(k): v for k, v in D["patat"].items()}
 pk = np.array(sorted(patat))
 pv = np.array([patat[k] for k in pk])
 
-# The engine points below are the *production* run (5 wavelength anchors x
-# 3e7 photons), from docs/TWILIGHT.md section 2.2.  The JSON written by the
-# --quick preview run is 20x cheaper and its engine values carry 40-70 %
-# statistical error, so they are not used for the figure.
+# The engine points below are the post-M10 medium-quality benchmark
+# (8 anchors x 1.2e7 photons), from docs/TWILIGHT.md section 2.2.  The JSON
+# written by the --quick preview run is 20x cheaper and its engine values carry
+# 40-70 % statistical error, so they are not used for the figure.
 ENG = {  # solar elevation [deg]: (luminance, sigma)
-    -3.0: (37.80, 0.24),
-    -6.0: (0.978, 0.018),
-    -9.0: (0.0238, 0.0043),
-    -12.0: (0.00212, 0.00128),
+    -3.0: (20.47, 0.12),
+    -6.0: (0.5625, 0.00988),
+    -9.0: (0.009311, 0.00191),
+    -12.0: (0.0005461, 0.000316),
 }
 _keys = sorted(ENG)                      # ascending, as np.interp requires
 eng_x = np.array(_keys)

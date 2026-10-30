@@ -140,15 +140,20 @@ See `validation/REPORT.md` for the full table.  Headlines:
 | SOS energy conservation (conservative atmosphere) | 2.3 × 10⁻⁴ → **pass** |
 | MC global energy conservation | 0.9985 → **pass** |
 | MS/SS at the zenith, sun at 60°, clear sky | 0.31 (SOS) vs 0.31 (MC) → **pass** |
-| Twilight zenith luminance at −6°, h = −6° | 0.567 vs 0.516 cd m⁻² (Patat et al. 2006) → +10 % → **pass** |
-| Twilight zenith luminance at −9° and below | 20×–2000× too dark → **known failure**, see below |
+| Twilight zenith luminance at −6°, deterministic (sea level) | 0.44 vs Koomen 0.65 cd m⁻² (0.69×); engine 0.56 (0.87×) → **pass** |
+| Twilight zenith luminance at −9°, spherical engine (medium) | 9.31 × 10⁻³ vs Patat 0.0171 (0.54×, 1σ 0.43–0.66) → **pass** (factor 2) |
+| Twilight zenith luminance at −12°, spherical engine (medium) | 5.46 × 10⁻⁴ vs 0.00146 (0.37×, 1σ 0.16–0.59) → **not conclusive** (58 % error) |
+| Single scattering alone at −9° / −12° | ~60× / ~130× too dark → **known limitation**, the engine handles this range |
 | Horizon chromaticity vs measured Berlin spectra | Δxy = 0.018 (tolerance 0.02) → **marginal pass** |
-| Twilight zenith luminance at −9°, spherical engine | 0.0238 vs 0.0171 cd m⁻² (1.39×) → **pass** |
-| Twilight zenith luminance at −12°, spherical engine | 2.1e-3 vs 1.46e-3 cd m⁻² (1.45×) → **pass** |
 | Mie phase moments vs quadrature | 2e-8, `beta_1` = g to 1e-10 → **pass** |
 | Cloud albedo vs Monte Carlo | 0.1–0.7 % (`g=0`), ≤1 % (`g=0.85`, τ≥5) → **pass** |
 | Cloud `R + T + direct` | 1 to 1e-12 → **pass** |
 | Refraction at the horizon | 33′ (Sæmundsson 29′, classical 34′) → **pass** |
+
+`engine` in the twilight rows means the split estimator: the refracted
+deterministic first order plus geometric-ray Monte Carlo multiple scattering.
+The two halves are not fully consistent about refraction (the MC ignores it),
+which is a known limitation of the engine, not a chord issue.
 
 The two deviations are understood and documented rather than papered over:
 the last few degrees above the horizon are where the plane-parallel diffuse
@@ -173,13 +178,16 @@ Against Patat et al. (2006):
 
 | solar elevation | deterministic | engine | Patat | engine / Patat |
 |---|---|---|---|---|
-| −3° | 37.6 | 37.8 | 40.1 | 0.94 |
-| −6° | 0.74 | 0.98 | 0.516 | 1.89 |
-| −9° | 9.6 × 10⁻⁴ | 0.024 | 0.0171 | 1.39 |
-| −12° | 9.8 × 10⁻⁷ | 2.1 × 10⁻³ | 0.00146 | 1.45 |
+| −3° | 20.1 | 20.5 | 40.1 | 0.51 |
+| −6° | 0.444 | 0.563 | 0.516 | 1.09 |
+| −9° | 5.9 × 10⁻⁴ | 9.3 × 10⁻³ | 0.0171 | 0.54 |
+| −12° | 1.2 × 10⁻⁵ | 5.5 × 10⁻⁴ | 0.00146 | 0.37 |
 
-So the deepest twilight goes from being 24× and 1500× too dark to within a
-factor of 1.5, at the cost of a few minutes of Monte Carlo per sky.
+The engine brings the single-scattering deficits of ~60× and ~130× at −9° and
+−12° down to 0.54× and 0.37× of Patat; at −6° it is 1.09×.  The residual now
+grows with solar depression (1.09 → 0.54 → 0.37) and is the same
+low-atmosphere multiple scattering that the plane-parallel solver misses.  The
+old 1.39/1.45 "excess" was the one-branch chord (M10).
 
 ## 4. What the model says
 
@@ -311,29 +319,38 @@ at −3.2°.  The altostratus base goes from (0.37, 0.38) at +5° to (0.60, 0.39
 at −2.2°, with the luminance falling by five orders of magnitude over the same
 range.
 
-### 4.9 The absolute twilight level is still open
+### 4.9 The twilight level: a chord bug, not a physical excess
 
 A second, independent, *photopic* twilight measurement — Koomen et al. (1952),
 sea level — lets the model be compared like-for-like for the first time
-(`validation/SECOND_DATASET.md`).  With the geometric shadow the model is
-1.14× the measurement at −6°; with refraction switched on — which is the
-physically correct mode — it is **2.20×**.  A real sky includes refraction, so
-the second number is the honest one, and it says the twilight level is
-1.5–2.5× too bright.
+(`validation/SECOND_DATASET.md`).  The −6° zenith is **0.44 cd m⁻²** in the
+deterministic model, i.e. **0.69×** Koomen (0.646) and 0.86× Patat (0.516);
+the spherical engine gives **0.55 cd m⁻²** (0.85× Koomen, 1.07× Patat; the
+medium-quality benchmark gives 0.563, 0.87× / 1.09×).  The residual is
+15–30 %, inside the 1950s absolute calibration (±0.2–0.4 mag) and the
+plane-parallel multiple-scattering approximation.
 
-That is a change of story from the previous version of this report: the
-"1.5× excess against Patat" turned out to be mostly a site mismatch (Patat's
-site is at 2400 m, and Koomen's own data confirm a 0.24–0.27 mag altitude
-effect), but switching refraction on revealed that a lower terminator had been
-compensating for a brighter-than-real twilight.  The three candidate carriers
-of the excess — the optical depth of the grazing solar ray between 30 and
-35 km, the multiple scattering in a shadowed troposphere, and the absolute
-calibration of 1950s photometry — are listed in `docs/ROADMAP.md`.
+The story changed with the M10 chord fix.  The old 2.20× (and the 1.14×
+geometric number before it) were artifacts of a solar path that returned only
+one perigee → space traversal: for a twilight ray the light also traverses the
+near-side perigee → point segment, so every grazing ray was under-attenuated by
+half of its dense lower-atmosphere column.  The geometric mode's missing
+refraction happened to cancel part of that error, which is why the old
+"1.14×" looked like a site effect.  See `docs/ROADMAP.md` M10 and the sixth
+addendum of `validation/ADDENDUM.md`.
+
+The altitude dependence is the remaining twilight puzzle, and the fix changed
+its sign: the model is a few per cent *brighter* at 2.4 km, while the data are
+0.80× *darker*.  The `at_altitude` helper also scales the US1976 profile by
+`p(z0)/P0`, making the density at the site 0.746× too low at 2.4 km, so the
+altitude comparison needs its own audit before it can be used as a constraint.
 
 ### 4.10 Altitude
 
 From 3 km the zenith gets darker and deeper blue (less air above), the horizon
-is depressed, and the whole sky gains contrast.
+is depressed, and the whole sky gains contrast.  The twilight altitude
+dependence is an exception and is still wrong-signed in the model (see §4.9);
+the daytime altitude behaviour is not affected by the twilight chord fix.
 
 ## 5. Limitations
 

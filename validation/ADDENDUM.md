@@ -66,6 +66,10 @@ not trustworthy.
 
 # Second addendum — after the aerosol library, refraction and the twilight engine
 
+> **Pre-M10.**  The engine values in this section predate the two-branch
+> chord fix; the corrected ones are in the sixth addendum.  The 1.39/1.45
+> rows in the summary table are historical.
+
 Three further pieces have landed since the first addendum.  The validation
 harness numbers move slightly but the verdicts do not:
 
@@ -82,6 +86,10 @@ harness numbers move slightly but the verdicts do not:
 | 5 twilight, −12° | 7.5e-7 | **2.1e-3 with the engine (1.45× of Patat)** |
 
 ## The deep twilight is fixed
+
+> **Pre-M10 values.**  The engine numbers in this section predate the
+> two-branch chord fix; the corrected ones are in the sixth addendum
+> (0.563 cd m⁻² at −6°, 9.3 × 10⁻³ at −9°, 5.5 × 10⁻⁴ at −12°).
 
 `skycolor/rt/twilight.py` (spherical Monte Carlo, split estimator: exact
 deterministic first order + Monte Carlo for orders ≥ 2) closes the largest gap
@@ -272,3 +280,48 @@ excluded yet:
 
 The geometric-shadow numbers remain reachable with `refraction=False`, which
 is why they are kept in the tables above.
+
+> **Superseded by the sixth addendum.**  The 2.20× / 2.75× above is the
+> one-branch chord, not a physical excess.
+
+---
+
+# Sixth addendum — the solar chord was one branch short
+
+The −6° "2.20× too bright" was not a physical excess.  For a scattering point
+whose sun is below the local horizontal, the ray to the sun crosses its
+perigee: the light traverses the far branch (perigee → space) and the near
+branch (perigee → point).  `path_lengths_sun` / `sun_path_lengths` returned
+only one perigee → space traversal, stopping at the perigee; the near-side
+perigee → point segment was missing.  Every grazing twilight ray was
+under-attenuated by half of its dense lower-atmosphere column.
+
+The fix is `up + 2*down` instead of `up + down` for `c < 0` in
+`geometry.path_lengths_sun`, `geometry.path_lengths_sun_array` and
+`refraction.sun_path_lengths`.  It is verified against a numerical line
+integral (geometric: 1.99 before, 1.00 after) and an RK4 ray trace (refracted:
+0.50 before, 0.995/1.010/0.984 after).
+
+| h | before (refracted) | after deterministic | after engine | Koomen | Patat |
+|---|---|---|---|---|---|
+| −3° | 49.4 (2.29 K) | 20.1 (0.93 K) | — | 21.5 | 40.1 |
+| −6° | 1.421 (2.20 K / 2.75 P) | 0.444 (0.69 K / 0.86 P) | 0.552 (0.85 K / 1.07 P) | 0.646 | 0.516 |
+| −9° | 0.021 (1.30 K) | — | 0.0124 (0.77 K) | 0.0162 | 0.0171 |
+
+The engine column is `quality="low"`; the medium benchmark gives 0.563 at
+−6°, 9.31 × 10⁻³ at −9° and 5.46 × 10⁻⁴ at −12° (0.87 / 1.09 at −6°,
+0.58 / 0.54 at −9°, 0.42 / 0.37 at −12°, against Koomen / Patat).
+
+The old geometric 1.14× was a partial cancellation: the chord bug made
+twilight ~2.5× too bright, the absence of refraction ~1.5× too dark, and the
+two errors left the geometric model accidentally close to Koomen.  The
+refraction convention is no longer degenerate: H1 (true axis) gives 0.69×
+Koomen at −6°, H2 (apparent axis) 0.29×, so the references almost certainly
+use the true solar altitude.
+
+What this does *not* fix is the altitude response.  The model is a few per cent
+brighter at 2.4 km where the data are 0.80× darker; `at_altitude` also scales
+the US1976 profile by `p(z0)/P0`, making the density at the site 0.746× too
+low.  That is the next audit.  The lesson: the Monte Carlo and the engine share
+`path_lengths_sun`, so their 1 % agreement could not catch this; the
+independent check has to be a line integral or a ray trace.

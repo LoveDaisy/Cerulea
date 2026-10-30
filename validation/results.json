@@ -271,9 +271,9 @@
       "key": "check5",
       "metrics": [
         {
-          "dev": -0.14880310293061,
+          "dev": -0.3957022540528759,
           "dev_kind": "abs",
-          "model": 28.459091820403472,
+          "model": 16.118398388137262,
           "name": "zenith luminance, h=-3deg (extrapolated ref)",
           "passed": true,
           "reference": 40.0889,
@@ -281,9 +281,9 @@
           "unit": "cd/m2"
         },
         {
-          "dev": 0.04107935817903027,
+          "dev": -0.15181601909451306,
           "dev_kind": "abs",
-          "model": 0.5676797928071042,
+          "model": 0.36408941915299564,
           "name": "zenith luminance, h=-6deg",
           "passed": true,
           "reference": 0.516445,
@@ -291,9 +291,9 @@
           "unit": "cd/m2"
         },
         {
-          "dev": -1.367063853517108,
+          "dev": -1.7659202413491026,
           "dev_kind": "abs",
-          "model": 0.0007351208195598781,
+          "model": 0.00029342852792979876,
           "name": "zenith luminance, h=-9deg",
           "passed": false,
           "reference": 0.0171168,
@@ -301,9 +301,9 @@
           "unit": "cd/m2"
         },
         {
-          "dev": -3.2876943532259206,
+          "dev": -2.1065460579302724,
           "dev_kind": "abs",
-          "model": 7.525417085248844e-07,
+          "model": 1.142033570555556e-05,
           "name": "zenith luminance, h=-12deg",
           "passed": false,
           "reference": 0.00145957,
@@ -311,9 +311,9 @@
           "unit": "cd/m2"
         },
         {
-          "dev": -8.257023039528608,
+          "dev": -1.1791960272177544,
           "dev_kind": "abs",
-          "model": 0.0,
+          "model": 1.1962639418895663e-05,
           "name": "zenith luminance, h=-18deg",
           "passed": false,
           "reference": 0.000180727,
@@ -321,9 +321,48 @@
           "unit": "cd/m2"
         }
       ],
-      "summary": "zenith L: -6deg 0.568 vs 0.516; -9deg 0.00074 vs 0.017; -12deg 8e-07 vs 0.0015 cd/m2.",
+      "summary": "zenith L: -6deg 0.364 vs 0.516; -9deg 0.00029 vs 0.017; -12deg 1e-05 vs 0.0015 cd/m2.",
       "title": "Twilight zenith luminance (Patat et al. 2006)",
       "verdict": "FAIL"
+    },
+    {
+      "error": null,
+      "key": "check6",
+      "metrics": [
+        {
+          "dev": -0.16246572800413012,
+          "dev_kind": "abs",
+          "model": 0.44427906500375836,
+          "name": "zenith luminance, h=-6deg",
+          "passed": true,
+          "reference": 0.645835,
+          "tolerance": 0.17609125905568124,
+          "unit": "cd/m2"
+        },
+        {
+          "dev": -0.11406442917626729,
+          "dev_kind": "abs",
+          "model": 0.01241646101173545,
+          "name": "zenith luminance, h=-9deg",
+          "passed": true,
+          "reference": 0.0161459,
+          "tolerance": 0.35839306019236183,
+          "unit": "cd/m2"
+        },
+        {
+          "dev": 0.3708197286709574,
+          "dev_kind": "abs",
+          "model": 0.0030336907094129233,
+          "name": "zenith luminance, h=-12deg",
+          "passed": true,
+          "reference": 0.00129167,
+          "tolerance": 0.5984266237775544,
+          "unit": "cd/m2"
+        }
+      ],
+      "summary": "model/Koomen: -6deg 0.69, -9deg 0.77, -12deg 2.35; model/Patat at -6deg 0.86.",
+      "title": "Twilight against Koomen et al. (1952)",
+      "verdict": "PASS"
     }
   ]
 }

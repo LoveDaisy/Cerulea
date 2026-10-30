@@ -88,8 +88,8 @@ skycolor/
   presets.py      named scenarios
 tools/build_data.py   rebuilds the packaged data tables from data_raw/
 experiments/          scripts that produce the figures (01..10)
-validation/           five independent checks against published references
-tests/                193 tests
+validation/           six independent checks against published references
+tests/                207 tests
 docs/                 architecture, method notes, the write-up, the roadmap
 ```
 
@@ -97,8 +97,9 @@ docs/                 architecture, method notes, the write-up, the roadmap
 
 `docs/STATUS.md` is the one-page summary; `docs/ROADMAP.md` has the milestones
 and the open questions.  Short version: the daytime sky is validated to a few
-per cent, twilight timing and shape are right, and the **absolute twilight
-level** is the one number still known to be 1.5–2.5× off.
+per cent, twilight timing and shape are right, and the **−6° twilight level**
+is now within ~15–30 % after the solar-chord fix (M10).  The deep twilight is
+low by ~1.8× at −9°, and the **altitude response** has the wrong sign.
 
 ## How good is it?
 
@@ -106,16 +107,19 @@ level** is the one number still known to be 1.5–2.5× off.
 
 * Rayleigh optical depth vs Bodhaine et al. (1999): **0.5 % RMS**
 * Direct normal illuminance vs ASTM G173 / Bird & Hulstrom: **+4 to +6 %**
-* CIE 110 relative luminance, upper sky: **3.8 % RMS** (single scattering),
-  14.5 % with multiple scattering (dominated by the solar aureole)
-* Horizon chromaticity vs measured Berlin spectra: **Δxy = 0.019**
-* Twilight zenith luminance at −6°: **+10 %** vs Patat et al. (2006)
+* CIE 110 relative luminance, upper sky: **10.6 % RMS** (multiple scattering;
+  dominated by the solar aureole)
+* Horizon chromaticity vs measured Berlin spectra: **Δxy = 0.018**
+* Twilight zenith luminance at −6°: **0.69× Koomen (1952)** deterministic,
+  **0.85×** spherical engine (low budget; 0.87× medium); 0.86× / 1.07×
+  Patat et al. (2006)
 * Multiple scattering vs an independent Monte Carlo: **31 % of single
   scattering at the zenith, both codes agree to 1 %**
 * Known failures, documented rather than hidden: the limb (≈2× too bright,
-  plane-parallel diffuse transport), the solar aureole (Henyey-Greenstein has
-  no forward peak), and deep twilight below −8° (needs horizontal transport
-  from the twilight arch, which a plane-parallel model cannot do).
+  plane-parallel diffuse transport), the solar aureole (32-moment truncation
+  without delta-fit), and the twilight **altitude response** (the model is a
+  few per cent brighter at 2.4 km where the data are 0.80× darker; the
+  `at_altitude` pressure scaling also needs an audit).
 
 ## Data provenance
 

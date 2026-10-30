@@ -25,6 +25,7 @@ CHECKS = [
     ("validation.check3_cie_luminance", "check3", "CIE 110 clear-sky luminance distribution"),
     ("validation.check4_chromaticity", "check4", "Sky chromaticity vs measured spectra"),
     ("validation.check5_twilight", "check5", "Twilight zenith luminance"),
+    ("validation.check6_second_dataset", "check6", "Twilight vs Koomen (1952)"),
 ]
 
 

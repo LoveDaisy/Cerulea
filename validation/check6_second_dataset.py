@@ -42,6 +42,15 @@ The check is a comparison, not a gate: it reports model/reference at each
 point and scores only h = -6, -9, -12 (the fitted range of the primary
 reference).  h = 0 is the sun on the horizon, h = -15 is airglow.
 
+The solar path uses the two-branch chord (M10): for a point whose sun is below
+the local horizontal the optical depth is the far branch (perigee -> space)
+plus the near branch (perigee -> point).  The one-branch version returned
+1.14x / 2.20x at -6 deg; the two-branch values are 0.69x / 0.86x.
+
+The altitude response is still wrong-signed, and ``at_altitude`` scales the
+US1976 density profile by p(z0)/P0, so the density at 2.4 km is 0.746x too
+low; the altitude comparison is diagnostic only.
+
 Runtime is a few minutes, almost all of it in the two engine points.
 
 Run:  python validation/check6_second_dataset.py
@@ -194,8 +203,11 @@ def run():
                 label="model, spherical engine (quality=low)")
 
     ax.axvline(-6.0, color="0.55", lw=0.7, ls=":")
-    ax.annotate("-6 deg:\n1.14x Koomen\n1.43x Patat", xy=(-6.0, 0.62),
-                xytext=(-8.2, 1.2), fontsize=7.5, color="0.25",
+    r6 = model[-6.0] / ref[hs.index(-6.0)]
+    p6 = model[-6.0] / patat_fit(-6.0)
+    ax.annotate(f"-6 deg:\n{r6:.2f}x Koomen\n{p6:.2f}x Patat",
+                xy=(-6.0, model[-6.0]), xytext=(-8.2, 1.2), fontsize=7.5,
+                color="0.25",
                 arrowprops=dict(arrowstyle="->", color="0.45", lw=0.7))
     ax.set_yscale("log")
     ax.set_xlim(0.5, -18.5)
@@ -235,8 +247,19 @@ def run():
     rad_alt = sky_radiance_total(atmo_alt, 96.0, np.array([0.0]), np.array([0.0]))
     model_at_2p4km = float(C.luminance(rad_alt[0][None, :], C.WL_COARSE)[0])
 
+    # the engine at -6 deg, so the printed engine ratios are computed, not
+    # copied from another run
+    atmo_l6 = C.atmosphere("clear", C.WL_COARSE)
+    rad_e6, err_e6 = twilight_radiance(
+        atmo_l6, 96.0, np.array([0.0]), np.array([0.0]),
+        quality="low", seed=0)
+    engine_l6 = float(C.luminance(rad_e6[0][None, :], C.WL_COARSE)[0])
+    engine_l6_err = float(C.luminance(err_e6[0][None, :], C.WL_COARSE)[0])
+
     details = dict(
         model_at_2p4km=model_at_2p4km,
+        engine_l6=engine_l6,
+        engine_l6_err=engine_l6_err,
         model={f"{h:+.0f}": model[h] for h in hs},
         model_pristine={f"{h:+.0f}": model_pristine[h] for h in hs},
         engine_error={f"{h:+.0f}": engine_err[h] for h in hs},
@@ -282,6 +305,10 @@ def main():
     print(f"  {d['model']['+0']:.3g} cd/m2 against Koomen's {d['koomen']['+0']:.3g} "
           f"({d['model']['+0'] / d['koomen']['+0']:.2f}x); and h=-15, where the measured")
     print("  sky is airglow, which the model does not contain.")
+    e6 = d["engine_l6"]
+    print(f"  Spherical engine at -6 deg (low budget): {e6:.3f} cd m-2 "
+          f"({e6 / d['koomen']['-6']:.2f}x Koomen, "
+          f"{e6 / d['patat']['-6']:.2f}x Patat).")
     print()
     print("  Model/reference in brackets is the 1-sigma range from the engine's")
     print("  own statistical error (multiple scattering only; the first order is")
@@ -308,19 +335,27 @@ def main():
     print()
     print(f"  Model altitude response at -6 deg: {d['model']['-6']:.3f} cd/m2 at sea level")
     print(f"  -> {d['model_at_2p4km']:.3f} cd/m2 at 2.4 km (756 hPa), i.e. "
-          f"{d['model']['-6'] / d['model_at_2p4km']:.2f}x.  The measurements give")
-    print("  1.27-1.39x for the same pressure ratio (Patat et al., CrAO vs Paranal;")
-    print("  Koomen et al., Maryland vs Sacramento Peak).  The model has almost no")
-    print("  altitude dependence; the observations do.")
+          f"{d['model_at_2p4km'] / d['model']['-6']:.2f}x brighter.")
+    print("  The measurements are the other way round: Koomen's Maryland sky is")
+    print("  1.25x brighter than Patat's Paranal sky, and Patat's own 961->743 hPa")
+    print("  pair gives 1.28x.  The model's altitude response has the wrong sign.")
+    print("  NOTE: at_altitude scales the US1976 profile by p(z0)/P0, so the")
+    print("  density at 2.4 km is 0.746x too low; this needs its own audit.")
     print()
     print(f"  verdict: {result.verdict}")
     print()
-    print("  Read the -6 deg row first.  The model is a sea-level model; Koomen's")
-    print("  Maryland station is at 30 m, Patat's Paranal at 2400 m.  The two")
-    print("  references differ by 0.24 mag at -6 deg, which is the altitude effect")
-    print("  that Patat et al. themselves measure (dV = 0.27 between 743 and 961 hPa)")
-    print("  and that Koomen's own two stations show (Sacramento Peak, 2800 m, is")
-    print("  2/3 to 1/2 as bright as Maryland).")
+    d6k = d["model"]["-6"] / d["koomen"]["-6"]
+    d6p = d["model"]["-6"] / d["patat"]["-6"]
+    e6k = d["engine_l6"] / d["koomen"]["-6"]
+    e6p = d["engine_l6"] / d["patat"]["-6"]
+    print("  Read the -6 deg row first.  After the two-branch solar-chord fix (M10)")
+    print(f"  the model is {d6k:.2f}x Koomen (deterministic) or {e6k:.2f}x (engine),")
+    print(f"  and {d6p:.2f}x / {e6p:.2f}x Patat.  The old 1.14x / 2.20x were the one-branch")
+    print("  chord.  The remaining 15-30% is inside the 1950s absolute calibration")
+    print("  and the plane-parallel multiple-scattering approximation.")
+    print("  The altitude response is still wrong-signed: the model is slightly")
+    print("  brighter at 2.4 km where the data are 0.80x darker; at_altitude needs")
+    print("  an audit.")
     return 0 if result.verdict in ("PASS", "SKIP") else 1
 
 

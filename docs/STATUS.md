@@ -11,6 +11,7 @@ argument; this is the state.*
 | Single scattering | exact, including the curved (refracted) solar ray |
 | Multiple scattering | successive orders, delta-M scaled, plane-parallel diffuse field |
 | Deep twilight (below −8°) | spherical Monte Carlo engine, split estimator |
+| Solar path | two branches (perigee→point and perigee→space), checked against a line integral and a ray trace |
 | Aerosols | 8-member Mie library, analytic Legendre moments, RH growth |
 | Refraction | ray-traced, refracted optical paths, **on by default** |
 | Clouds | one plane-parallel homogeneous deck, delta-Eddington |
@@ -18,7 +19,7 @@ argument; this is the state.*
 | Colour | CIE 1931 → Bradford → ACES, tone-mapping options |
 | Cameras | panorama, fisheye, perspective; ground; sun disk |
 
-193 tests.  Environment pinned by `uv.lock` (Python 3.12, numpy 2.5, scipy 1.18).
+207 tests.  Environment pinned by `uv.lock` (Python 3.12, numpy 2.5, scipy 1.18).
 
 ## How well it is validated
 
@@ -28,21 +29,31 @@ argument; this is the state.*
 | Direct normal illuminance vs ASTM G173 / Bird | +4 to +6 % |
 | CIE 110 relative luminance, upper sky | 10.6 % RMS |
 | Horizon chromaticity vs measured spectra | Δxy = 0.018 |
-| Twilight vs sea-level photometry (Koomen 1952), geometric | 1.14× at −6° |
-| **Twilight vs the same, refraction on (the default)** | **2.20× at −6°** |
-| Deep twilight vs Patat (2006) | 1.39× at −9°, 1.45× at −12° |
+| Twilight vs sea-level photometry (Koomen 1952), −6° | **0.69×** deterministic, **0.85×** engine (low; 0.87× medium) |
+| Twilight vs Patat (2006, 2400 m), −6° | **0.86×** deterministic, **1.07×** engine (low; 1.09× medium) |
+| Deep twilight vs Patat (2006), −9° | **0.54×** engine (medium, 1σ 0.43–0.66) |
 | Multiple scattering vs independent Monte Carlo | 1 % |
 | Cloud albedo vs independent Monte Carlo | ≤1 % |
 | Refraction at the horizon | 33′ (Sæmundsson 29′, classical 34′) |
 
 ## What is known to be wrong, and by how much
 
-1. **The absolute twilight level is 1.5–2.5× too bright** once refraction is
-   included.  The earlier "site effect" explanation was partly a cancellation.
-   Candidates: the optical depth of the grazing solar ray at 30–35 km, the
-   multiple scattering in a shadowed troposphere, the 1950s photometry.
-2. **The model has almost no altitude response** — 0.3 % for 2400 m where the
-   data demand 25–39 %.
+1. **The −6° twilight level is 15–30 % low, not 1.5–2.5× high.**  The old
+   2.2× was a chord-integration bug: the solar ray was followed only from the
+   perigee out to space, not from the perigee back to the scattering point as
+   well, so every grazing twilight ray was under-attenuated by half of its
+   dense lower-atmosphere column.  Fixed in `geometry.path_lengths_sun` and
+   `refraction.sun_path_lengths`; the −6° value moves from 1.42 to 0.44 cd m⁻²
+   (deterministic) and 0.55 cd m⁻² (spherical engine).  The residual grows with
+   solar depression (0.58× Koomen at −9°, 0.42× at −12°), which is the same
+   low-atmosphere multiple-scattering deficit; the −6° point itself is inside
+   the 1950s calibration and the plane-parallel approximation.
+2. **The altitude response has the wrong sign.**  At 2.4 km the model is a few
+   per cent *brighter*, while the data (Koomen's two stations, Patat's two
+   pressures) are 0.80× darker.  The `at_altitude` helper also scales the
+   US1976 density profile by `p(z0)/P0`, which makes the density at the site
+   0.746× too low at 2.4 km; the altitude comparison needs its own audit
+   before it is used as a constraint.
 3. **The limb is ≈ 2× brighter than the CIE 110 fit** (which may be a
    reference problem — CIE 110 is a daylighting standard, not physics).
 4. **The solar aureole is under-resolved in multiple scattering** (32-moment
@@ -58,6 +69,6 @@ argument; this is the state.*
 
 `README.md` — what it is and how to run it.
 `docs/REPORT.md` — the physics and the results, with the figures.
-`docs/ROADMAP.md` — milestones M1–M9, open questions, future directions.
+`docs/ROADMAP.md` — milestones M1–M10, open questions, future directions.
 `validation/` — the checks, and the addenda recording what each round changed.
 `docs/ARCHITECTURE.md` — the module contracts.
