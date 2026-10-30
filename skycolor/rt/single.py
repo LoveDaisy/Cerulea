@@ -20,19 +20,11 @@ Multiple scattering is added separately (see :mod:`skycolor.rt.multiple`).
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 import numpy as np
 
 from .. import spectra
 from ..constants import R_EARTH
 from ..geometry import is_sunlit, path_lengths_sun, path_lengths_sun_array
-
-
-@dataclass
-class ScatteringResult:
-    radiance: np.ndarray
-    tau_sun_observer: np.ndarray | None = None
 
 
 def _quadrature_points(ub: np.ndarray, n_gauss: int):
@@ -51,29 +43,8 @@ def _quadrature_points(ub: np.ndarray, n_gauss: int):
     return u.reshape(ns * ng, nr), du.reshape(ns * ng, nr)
 
 
-def _local_optics(atmo, z_km, wl_mask=None):
-    """Local scattering/extinction coefficients at height ``z`` [m^-1].
-
-    Returns ``(beta_ray, beta_as, beta_ae, beta_o3, beta_no2)``, each of shape
-    ``(n_points, n_wl)``.
-    """
-    z = np.atleast_1d(np.asarray(z_km, dtype=float))
-    n_air = atmo.n_air(z)
-    beta_ray = n_air[:, None] * atmo._sigma_ray[None, :]
-    beta_o3 = atmo.n_o3(z)[:, None] * atmo._sigma_o3[None, :]
-    beta_no2 = atmo.n_no2(z)[:, None] * atmo._sigma_no2[None, :]
-    beta_as = np.zeros_like(beta_ray)
-    beta_ae = np.zeros_like(beta_ray)
-    for lay in atmo.aerosols:
-        rel_ext, rel_sca = lay.aerosol.relative_coefficients(atmo.wl)
-        w = lay.aod550 * lay.profile(z) / 1000.0
-        beta_ae += w[:, None] * rel_ext[None, :]
-        beta_as += w[:, None] * rel_sca[None, :]
-    return beta_ray, beta_as, beta_ae, beta_o3, beta_no2
-
-
 def _local_optics_h(atmo, z_km, h_km, wl_mask=None):
-    """Same as :func:`_local_optics` but with the horizontal aerosol field."""
+    """Local optical properties at height ``z`` including the horizontal field."""
     z = np.atleast_1d(np.asarray(z_km, dtype=float))
     h = np.atleast_1d(np.asarray(h_km, dtype=float))
     n_air = atmo.n_air(z)
