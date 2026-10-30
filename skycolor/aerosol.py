@@ -61,9 +61,12 @@ class Aerosol:
         return np.where(ext > 0, sca / np.maximum(ext, 1e-300), 0.0)
 
     def asymmetry(self, wl_nm) -> np.ndarray:
-        """Asymmetry parameter ``g = <cos theta>``."""
+        """Asymmetry parameter ``g = <cos theta>``, one value per wavelength."""
         wl = np.atleast_1d(np.asarray(wl_nm, dtype=float))
-        return np.array([0.5 * np.sum(_GAUSS_W * _GAUSS_MU * self.phase(_GAUSS_MU, w)) for w in wl])
+        p = self.phase(_GAUSS_MU, wl)
+        if p.ndim == 1:
+            p = p[:, None]
+        return 0.5 * np.sum(_GAUSS_W[:, None] * _GAUSS_MU[:, None] * p, axis=0)
 
     def legendre_moments(self, wl_nm, n_moments: int = 32) -> np.ndarray:
         """Coefficients ``beta_l`` of ``p(cos t) = sum_l (2l+1) beta_l P_l``.

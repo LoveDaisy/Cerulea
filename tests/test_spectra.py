@@ -56,3 +56,16 @@ def test_ozone_chappuis_peak():
     cs = spectra.ozone_cross_section(np.array([600.0, 450.0])) * 1e4  # cm^2
     assert 4.5e-21 < cs[0] < 5.6e-21
     assert 0.5e-22 < cs[1] < 3e-22
+
+
+def test_aerosol_asymmetry():
+    from skycolor.aerosol import AngstromAerosol, MieAerosol, LogNormalMode
+
+    a = AngstromAerosol(g=0.65)
+    assert a.asymmetry([550.0])[0] == pytest.approx(0.65, abs=1e-3)
+    assert a.asymmetry([450.0, 550.0, 650.0]).shape == (3,)
+
+    # a Mie aerosol's quadrature asymmetry must agree with its analytic one
+    m = MieAerosol(modes=[LogNormalMode(0.15, 1.8)], refractive_index=1.53 + 0.006j)
+    g_q = m.asymmetry([550.0])[0]
+    assert 0.2 < g_q < 0.95
