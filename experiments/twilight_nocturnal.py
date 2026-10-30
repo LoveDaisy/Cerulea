@@ -59,13 +59,13 @@ def luminance(rad, wl=WL):
     return 683.0 * np.trapezoid(np.asarray(rad) * v, np.asarray(wl, float), axis=-1)
 
 
-def fisheye(atmo, sun_elevation_deg, size, quality, seed=0):
+def fisheye(atmo, sun_elevation_deg, size, quality, seed=0, grid=None):
     """Spectral radiance and RGB of an equal-area fisheye view."""
     az, el, mask = render.fisheye_grid(size)
     zen = 90.0 - el
     rad, err = twilight_radiance(atmo, 90.0 - sun_elevation_deg,
                                  zen.ravel(), az.ravel(), quality=quality,
-                                 seed=seed)
+                                 seed=seed, grid=grid)
     shape = zen.shape + (rad.shape[-1],)
     rad = rad.reshape(shape)
     # The engine's coarse angular grid can produce isolated outliers in the
@@ -127,7 +127,7 @@ def main(argv=None):
 
     # --- 1. zenith luminance through twilight ------------------------------
     elevations = np.array([-4.0, -5.0, -6.0, -7.0, -8.0, -9.0,
-                           -10.5, -12.0, -14.0, -18.0])
+                           -10.5, -12.0])
     t0 = time.time()
     det, eng, eng_err, ss = [], [], [], []
     for h in elevations:
@@ -148,7 +148,7 @@ def main(argv=None):
     renders = {}
     for h in (-9.0, -12.0):
         t = time.time()
-        renders[h] = fisheye(atmo, h, size, quality, seed=5)
+        renders[h] = fisheye(atmo, h, size, quality, seed=5, grid=grid_for(h))
         print(f"  fisheye h={h}: {time.time()-t:.0f}s  "
               f"max L={np.nanmax(renders[h]['luminance']):.2e} cd/m2")
     det12 = deterministic_fisheye(atmo, -12.0, size)
@@ -190,7 +190,7 @@ def main(argv=None):
     ax2.semilogy(-elevations, ratio, "C3o-", lw=1.6, ms=4,
                  label="engine / deterministic")
     ax2.axhline(1.0, color="0.6", lw=0.8)
-    ax2.set_xlim(3.0, 18.5)
+    ax2.set_xlim(3.0, 13.0)
     ax2.set_ylim(0.5, 1e4)
     ax2.set_xlabel("solar depression below the horizon [deg]")
     ax2.set_ylabel("ratio of zenith luminance")
@@ -215,10 +215,12 @@ def main(argv=None):
                                      (-12.0, renders[-12.0]))):
         axf = fig.add_subplot(gs[1, col])
         im = data["rgb"]
-        # stretch each panel independently: the two skies differ by four
-        # orders of magnitude in absolute luminance
-        lo, hi = np.percentile(im[data["mask"]], [2, 99.8])
-        im = np.clip((im - lo) / max(hi - lo, 1e-9), 0.0, 1.0)
+        # Clip the display at a high percentile: the Monte Carlo multiple
+        # scattering is heavy-tailed, and a single unconverged direction must
+        # not set the exposure of the whole panel.
+        vals = im[data["mask"]]
+        hi = np.percentile(vals, 99.9)
+        im = np.clip(im / max(hi, 1e-12), 0.0, 1.0) ** (1.0 / 2.2)
         axf.imshow(im, origin="upper")
         axf.set_xticks([])
         axf.set_yticks([])
@@ -226,15 +228,16 @@ def main(argv=None):
         rel = np.median(data["error"][data["mask"]]
                         / np.maximum(data["radiance"][data["mask"]], 1e-30))
         axf.set_title(
-            f"MC engine, sun {h:.0f}$^\\circ$:  L = {np.nanmax(L):.2e} cd m$^{{-2}}$ "
+            f"MC engine, sun {h:.0f}$^\\circ$:  median L = "
+            f"{np.nanmedian(L[data['mask']]):.2e} cd m$^{{-2}}$ "
             f"(auto-exposed)", fontsize=9)
 
     axf = fig.add_subplot(gs[1, 2])
     im = det12["rgb"]
     vals = im[np.any(im > 0, axis=2)]
     if vals.size:
-        lo, hi = np.percentile(vals, [2.0, 99.8])
-        im = np.clip((im - lo) / max(hi - lo, 1e-9), 0.0, 1.0)
+        hi = np.percentile(vals, 99.9)
+        im = np.clip(im / max(hi, 1e-12), 0.0, 1.0) ** (1.0 / 2.2)
     axf.imshow(im, origin="upper")
     axf.set_xticks([])
     axf.set_yticks([])
