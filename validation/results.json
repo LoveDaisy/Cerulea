@@ -60,10 +60,91 @@
     {
       "error": null,
       "key": "check3",
-      "metrics": [],
-      "summary": "not implemented (skipped)",
-      "title": "CIE 110 clear-sky luminance distribution",
-      "verdict": "SKIP"
+      "metrics": [
+        {
+          "dev": 101.43543091562863,
+          "dev_kind": "rel_pct",
+          "model": 7.355659033042477,
+          "name": "horizon sun-side / zenith, h=45deg",
+          "passed": false,
+          "reference": 3.6516212662326524,
+          "tolerance": 40.0,
+          "unit": ""
+        },
+        {
+          "dev": 4.096761048962461,
+          "dev_kind": "rel_pct",
+          "model": 2.0869715955305628,
+          "name": "horizon anti-solar / zenith, h=45deg",
+          "passed": true,
+          "reference": 2.0048381664333865,
+          "tolerance": 25.0,
+          "unit": ""
+        },
+        {
+          "dev": 3.7793695115913875,
+          "dev_kind": "abs",
+          "model": 3.7793695115913875,
+          "name": "RMS dev, theta<=60deg, h=45deg",
+          "passed": true,
+          "reference": 0.0,
+          "tolerance": 20.0,
+          "unit": "%"
+        },
+        {
+          "dev": 14.375708718445555,
+          "dev_kind": "abs",
+          "model": 14.375708718445555,
+          "name": "RMS dev, 60-75deg, h=45deg",
+          "passed": true,
+          "reference": 0.0,
+          "tolerance": 25.0,
+          "unit": "%"
+        },
+        {
+          "dev": 40.314113956090644,
+          "dev_kind": "abs",
+          "model": 40.314113956090644,
+          "name": "RMS dev, 75-90deg horizon, h=45deg",
+          "passed": false,
+          "reference": 0.0,
+          "tolerance": 30.0,
+          "unit": "%"
+        },
+        {
+          "dev": 18.44040671983706,
+          "dev_kind": "abs",
+          "model": 18.44040671983706,
+          "name": "RMS dev, whole sky, h=45deg",
+          "passed": false,
+          "reference": 0.0,
+          "tolerance": 15.0,
+          "unit": "%"
+        },
+        {
+          "dev": 137.88213604135814,
+          "dev_kind": "rel_pct",
+          "model": 19.863379412136375,
+          "name": "horizon sun-side / zenith, h=30deg",
+          "passed": false,
+          "reference": 8.350092925297648,
+          "tolerance": 50.0,
+          "unit": ""
+        },
+        {
+          "dev": 73.08852540660322,
+          "dev_kind": "rel_pct",
+          "model": 2.764066101044109,
+          "name": "horizon sun-side / zenith, h=60deg",
+          "passed": false,
+          "reference": 1.5969089196126816,
+          "tolerance": 50.0,
+          "unit": ""
+        }
+      ],
+      "summary": "h=45deg: sun-side horizon/zenith 7.36 vs CIE 3.65 (+101%); anti-solar 2.09 vs 2.00; RMS 3.8% (theta<=60deg), 40.3% (horizon band).",
+      "title": "CIE 110-1994 clear-sky luminance distribution",
+      "verdict": "FAIL"
     },
     {
       "error": null,
