@@ -9,3 +9,9 @@ dist/
 out/
 *.hdr.npy
 .DS_Store
+
+# Claude Code scratchpad (local task management)
+scratchpad/
+
+# local editor settings
+.claude/settings.local.json
