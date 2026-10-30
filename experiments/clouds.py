@@ -146,7 +146,7 @@ def figure_comparison(atmo):
                  "(panorama, sun at azimuth 0, shared exposure, no chromatic adaptation)",
                  fontsize=10)
     ax.tick_params(length=0)
-    save(fig, "09_cloud_clear_vs_overcast.png")
+    save(fig, "10_cloud_clear_vs_overcast.png")
     plt.close(fig)
     return exposure
 
@@ -179,7 +179,7 @@ def figure_fisheye(atmo):
     axes[1].legend(fontsize=8)
     axes[1].grid(alpha=0.3)
     axes[1].set_title("overcast luminance distribution", fontsize=9)
-    save(fig, "09_cloud_overcast_fisheye.png")
+    save(fig, "10_cloud_overcast_fisheye.png")
     plt.close(fig)
 
 

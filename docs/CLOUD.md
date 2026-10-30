@@ -309,10 +309,10 @@ for it), and a thick deck at the horizon hides the clear sky completely
 ### 6.1 Overcast
 
 The deck removes the Rayleigh blue and replaces it with a flat, slightly warm
-grey whose luminance peaks at the zenith. `figures/09_cloud_clear_vs_overcast.png`
+grey whose luminance peaks at the zenith. `figures/10_cloud_clear_vs_overcast.png`
 puts the clear sky and the two water decks side by side at five sun elevations
 with a single exposure, so the panels show absolute brightness as well as
-colour. `figures/09_cloud_overcast_fisheye.png` shows the fisheye and the
+colour. `figures/10_cloud_overcast_fisheye.png` shows the fisheye and the
 overcast luminance profile.
 
 ### 6.2 Sunset
@@ -444,8 +444,8 @@ a cloudy sky is the cost of the clear-sky solver it attenuates.
 | `skycolor/rt/cloud.py` | two-stream solver, illumination geometry, angular model, `sky_radiance_with_cloud` |
 | `tests/test_cloud.py` | 25 acceptance tests |
 | `experiments/clouds.py` | figures 09/10 |
-| `figures/09_cloud_clear_vs_overcast.png` | clear vs overcast, five sun elevations |
-| `figures/09_cloud_overcast_fisheye.png` | overcast fisheye and the (1+2cos θ)/3 law |
+| `figures/10_cloud_clear_vs_overcast.png` | clear vs overcast, five sun elevations |
+| `figures/10_cloud_overcast_fisheye.png` | overcast fisheye and the (1+2cos θ)/3 law |
 | `figures/10_cloud_sunset_sequence.png` | altostratus and cirrus through sunset |
 | `figures/10_cloud_albedo_and_sunset.png` | albedo validation, when the deck stays lit, cloud-base spectra |
 
