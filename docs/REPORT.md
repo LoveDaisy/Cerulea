@@ -1,5 +1,7 @@
 # The colour of the sky, from first principles
 
+> Twilight update (2026-11-01): engine benchmarks in this report precede the AOD550 slicing correction; later audits also establish distinct source/transport and observation contracts. See [STATUS.md](STATUS.md), [CURVED_TRANSPORT_AUDIT.md](CURVED_TRANSPORT_AUDIT.md) and [TWILIGHT_REFERENCE_AUDIT.md](TWILIGHT_REFERENCE_AUDIT.md) for current conclusions. Other historical measurements retain their original context.
+
 *This is the main write-up of the project.  Numbers quoted here are produced by
 the scripts in `experiments/` and `validation/`; the figures live in
 `figures/`.*
@@ -329,8 +331,9 @@ sea level — lets the model be compared like-for-like for the first time
 deterministic model, i.e. **0.69×** Koomen (0.646) and 0.86× Patat (0.516);
 the spherical engine gives **0.55 cd m⁻²** (0.85× Koomen, 1.07× Patat; the
 medium-quality benchmark gives 0.563, 0.87× / 1.09×).  The residual is
-15–30 %, inside the 1950s absolute calibration (±0.2–0.4 mag) and the
-plane-parallel multiple-scattering approximation.
+15–30 % in those historical runs. The primary photometry does not supply
+an absolute error budget that assigns this residual to calibration or to
+missing scattering; the later source audit supersedes that attribution.
 
 The story changed with the M10 chord fix.  The old 2.20× (and the 1.14×
 geometric number before it) were artifacts of a solar path that returned only

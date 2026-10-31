@@ -87,6 +87,8 @@ uv run python experiments/01_day_cycle.py
   默认 256，覆盖 81 波长工作网格；预设气溶胶通过 `shared()` 跨 `Atmosphere` 复用，
   因此 warm / 重复调用的 Mie 预处理接近零。冷启动仍需向量化/LUT（后续任务）。
   共享实例是**只读契约**，不要 mutate 气溶胶属性。
+  AOD550 的参考截面固定为实际550 nm状态；查询网格和 `Atmosphere._restrict`
+  不得重新归一介质。单波长旧归一错误已修复，见 `docs/AEROSOL_GRID_AUDIT.md`。
 - `validation/`：对照公开文献的独立检查。`results.json` 是回归护栏，物理数字变化要
   有独立证据并重跑对应 check。
 
@@ -122,6 +124,10 @@ uv run python experiments/01_day_cycle.py
 - `validation/check5_twilight.py`、`validation/check6_second_dataset.py`
 - `docs/TWILIGHT_ALTITUDE_AUDIT.md` — 高站太阳遮挡修复、海拔响应实验与参考条件
 - `docs/SOLAR_SOURCE_AUDIT.md` — 太阳衰减配对消融、逆表误差与光束角域定幅；实验结果尚未替换默认模型
+- `docs/UNIFIED_SOLAR_SOURCE_AUDIT.md` — 连续柱量、二维日面与能流独立检验；SS/MC源项闭合
+- `docs/AEROSOL_GRID_AUDIT.md` — AOD550网格一致性修复及golden/物理校验归因
+- `docs/TWILIGHT_REFERENCE_AUDIT.md` — 原始观测定义、合成通带与可裁定边界
+- `docs/CURVED_TRANSPORT_AUDIT.md` — 连续漫射折射、独立闭合、完整探索结论与剩余边界
 - `scratchpad/` — 本地实验/任务记录与临时 session 交接；旧交接已退休，长期成果维护在 tracked 文档
 
 ## 代码风格

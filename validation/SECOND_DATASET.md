@@ -1,5 +1,7 @@
 # A second twilight dataset: Koomen et al. (1952)
 
+> Historical production comparisons below predate the AOD550 anchor-optics correction. Current source/transport experiments and primary-reference contracts are in [CURVED_TRANSPORT_AUDIT.md](../docs/CURVED_TRANSPORT_AUDIT.md) and [TWILIGHT_REFERENCE_AUDIT.md](../docs/TWILIGHT_REFERENCE_AUDIT.md).
+
 *The second dataset asked for by open question #2 of `docs/ROADMAP.md`.*
 
 **Short answer.** The −6° level is no longer a factor-of-two problem.  After
@@ -8,9 +10,8 @@ the M10 chord fix the sea-level model is **0.69×** Koomen et al. (1952)
 engine gives **0.85×** Koomen and **1.07×** Patat.  The old 1.14× (geometric)
 and 2.20× (refracted) numbers were artifacts of a solar path that returned
 only one perigee → space traversal, dropping the near-side perigee → point
-segment of every grazing twilight ray.  The remaining 15–30 % is inside the
-1950s absolute calibration and the plane-parallel multiple-scattering
-approximation.
+segment of every grazing twilight ray.  The remaining difference is not causally identified; the paper does not
+provide the absolute error budget needed to assign it to calibration.
 
 The altitude interpretation was revised by the subsequent
 [audit](../docs/TWILIGHT_ALTITUDE_AUDIT.md): Step 3c fixed truncation, but
@@ -151,8 +152,8 @@ Brackets are the 1σ range propagated from the engine's own statistical error.
 **At −6° the model is 0.69× Koomen (deterministic) or 0.85× (spherical
 engine, low budget; 0.87× at medium), and 0.86× Patat (deterministic) or
 1.07× (engine; 1.09× at medium).**  The old 1.14× and 2.20× were the
-one-branch chord (M10); the residual 15–30 % is inside the 1950s absolute
-calibration and the plane-parallel multiple-scattering approximation.
+one-branch chord (M10); the residual in those runs is not independently assigned to calibration
+or to missing scattering.
 
 ### 4.2 The two references differ by 0.24 mag; the cause is not isolated
 
