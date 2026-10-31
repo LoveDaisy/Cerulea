@@ -1,0 +1,7 @@
+{
+  "baseline_commit": "a15555bd98d684264ff93153663638906ce82a74",
+  "corrected_source_commit": "c45a03ba7ac5b5f8853c81962c4f0d86c9b2038f",
+  "library_diff_sha256": "5d0708519df84caed4b892c014d18d7eac4f3032221484fbc53ba20581000ab3",
+  "diff_command": "git diff a15555b c45a03b -- skycolor",
+  "note": "Committed source reproduces the final numerical implementation. Historical pre-docstring dirty diffs were not saved; their exact hashes cannot be reconstructed from these records alone."
+}

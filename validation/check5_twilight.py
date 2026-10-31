@@ -3,7 +3,7 @@
 Reference
 ---------
 F. Patat, O. S. Ugolnikov and O. V. Postylyakov (2006), *UBVRI twilight sky
-brightness at ESO-Paranal*, Astronomy & Astrophysics 454, 229-235,
+brightness at ESO-Paranal*, Astronomy & Astrophysics 455, 385-393,
 arXiv:astro-ph/0604128.
 
 This is an absolute photometric measurement of the twilight sky in the

@@ -78,8 +78,8 @@ first-order term only) and stays silent on the default paths.
 
 | Backend | Standing approximations |
 |---|---|
-| `rt.single` | single scattering, exact spherical quadrature; horizontal field applied per scattering point |
-| `rt.multiple` | plane-parallel diffuse field; ground fixed at `z_bounds[0]` (`elevation_km` not read); horizontal field not applied |
+| `rt.single` | spherical quadrature; solar attenuation/shadow can refract, viewing rays and phase angles remain geometric; horizontal field applied per scattering point |
+| `rt.multiple` | plane-parallel diffuse field; ground fixed at `z_bounds[0]` (`elevation_km` not read); refracted shadow threshold but geometric solar optical depth; horizontal field not applied |
 | `rt.twilight` | MC assumes a horizontally uniform atmosphere; MC transport has no refraction; horizontal field in the first-order term only |
 | `rt.cloud` | homogeneous plane-parallel deck (delta-Eddington); inherits the clear solver's geometry |
 
@@ -103,14 +103,24 @@ is renormalised — single scattering (integrating from the observer), SOS and
 MC agree on where the ground is.  `elevation_km=0` is a no-op.  The
 balloon scenario (observer raised, sea-level domain kept) is the plain
 constructor with `elevation_km=z0`; the two are distinct constructions
-(`tests/test_extension_scenarios.py`).  Under the consistent construction
-the twilight altitude response at −6° is 1.21× deterministic / 1.01× engine
-vs 0.80× in the data — wrong-signed, a known multiple-scattering gap.
+(`tests/test_extension_scenarios.py`).
 
-**Open item**: the refraction shadow-threshold table is built for rays
-grazing *sea level*; aligning it with a raised site matters for horizon /
-low-altitude viewing, not for zenith twilight, and is deliberately not mixed
-into the truncation change.
+The opaque radius is **`r_bounds[0]` for both transport and solar occlusion**.
+Geometric solar masks, refracted grazing tests and shadow tables must use that
+radius; otherwise a solar ray can pass through the raised solid ground while
+its atmospheric column silently excludes the underground segment.  M12's
+truncation initially left this inconsistency in place.  M13 fixes it across
+single scattering, SOS, MC and cloud illumination without changing M10's
+two-branch solar-column integral (`tests/test_raised_ground.py`).  It affects
+zenith twilight as well as horizon views.
+
+For the recorded clear-air, refraction-on, −6° zenith comparison, the
+deterministic 2.4 km/sea-level ratio changes from the historical 1.208× to
+1.027×.  The historical low-budget engine 1.01× also predates the fix;
+multi-seed results and the distinction between domain truncation and an
+observed station comparison are in
+[TWILIGHT_ALTITUDE_AUDIT.md](TWILIGHT_ALTITUDE_AUDIT.md).  These ratios do not
+establish a missing low-altitude multiple-scattering component.
 
 ## Caching and identity
 
@@ -127,7 +137,8 @@ into the truncation change.
   *by structure* (assignment raises `FrozenInstanceError`); redefinition is
   `replace()`, returning a fresh unshared object with rebuilt caches
   (`CloudLayer.replace` explicitly drops the carried-over optics cache).
-* Refraction tables cache on the medium's `refraction_token`: inherited by
+* Refraction tables depend on the density profile **and opaque bottom radius**
+  and cache on the medium's `refraction_token`: inherited by
   `restrict()` (a wavelength subset never changes densities), fresh per
   construction ("per-construction, don't share" — one ~2.3 s table build per
   genuinely distinct medium), stored in a `WeakKeyDictionary` so entries

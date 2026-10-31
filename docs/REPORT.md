@@ -185,8 +185,10 @@ Against Patat et al. (2006):
 
 The engine brings the single-scattering deficits of ~60× and ~130× at −9° and
 −12° down to 0.54× and 0.37× of Patat; at −6° it is 1.09×.  The residual now
-grows with solar depression (1.09 → 0.54 → 0.37) and is the same
-low-atmosphere multiple scattering that the plane-parallel solver misses.  The
+grows with solar depression (1.09 → 0.54 → 0.37).  This does not establish
+its cause: the engine retains straight-line higher-order transport, and
+deep-twilight MC statistics are heavy-tailed.  See the
+[altitude audit](TWILIGHT_ALTITUDE_AUDIT.md).  The
 old 1.39/1.45 "excess" was the one-branch chord (M10).
 
 ## 4. What the model says
@@ -339,19 +341,21 @@ refraction happened to cancel part of that error, which is why the old
 "1.14×" looked like a site effect.  See `docs/ROADMAP.md` M10 and the sixth
 addendum of `validation/ADDENDUM.md`.
 
-The altitude dependence is the remaining twilight puzzle, and it is still
-wrong-signed: under the consistent (truncated) `at_altitude` construction the
-model is 1.21× *brighter* at 2.4 km (deterministic; 1.01× engine) while the
-data are 0.80× *darker*.  The old `at_altitude` — a double-scaled,
-ground-inconsistent construction — was replaced in the architecture refactor
-(Step 3c); no construction degree of freedom is left, and the missing
-low-atmosphere multiple scattering remains the physical candidate.
+The altitude audit found another construction defect after Step 3c: solar
+occultation still used sea level, allowing rays through the raised ground.
+Aligning the opaque radius changes the -6° deterministic ratio from 1.208
+to **1.027** (0.444279 → 0.456350 cd m⁻²), with sea-level results unchanged.
+The remaining station comparison is not a controlled altitude experiment:
+the often-quoted 0.80 mixes Koomen photopic and Patat V-band measurements.
+Independent full-spectrum MC, component decomposition and the original-paper
+audit are recorded in [TWILIGHT_ALTITUDE_AUDIT.md](TWILIGHT_ALTITUDE_AUDIT.md).
+The residual cannot yet be assigned to a missing physical component.
 
 ### 4.10 Altitude
 
 From 3 km the zenith gets darker and deeper blue (less air above), the horizon
 is depressed, and the whole sky gains contrast.  The twilight altitude
-dependence is an exception and is still wrong-signed in the model (see §4.9);
+dependence is sensitive to the diffuse-field approximation (see §4.9);
 the daytime altitude behaviour is not affected by the twilight chord fix.
 `at_altitude` itself now truncates the model at the site, so the daytime
 altitude figures (experiments/05) reflect one consistent ground.

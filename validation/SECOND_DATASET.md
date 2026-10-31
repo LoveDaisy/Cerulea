@@ -12,15 +12,14 @@ segment of every grazing twilight ray.  The remaining 15–30 % is inside the
 1950s absolute calibration and the plane-parallel multiple-scattering
 approximation.
 
-What *is* still a model problem is the altitude response, and the chord fix
-changed its sign: under the consistent (truncated) `at_altitude` construction
-the model is **1.21× brighter** at 2.4 km (deterministic; 1.01× engine),
-while Koomen's Maryland (30 m) and Patat's Paranal (2400 m) skies, and
-Patat's own 961 vs 743 hPa pair, are **0.80× darker**.  The old construction
-(double pressure scaling, multiple-scattering ground left at sea level) was
-replaced in the architecture refactor (Step 3c); the remaining wrong sign is
-a physics gap, not a construction artifact.  See §5 below and
-`validation/ADDENDUM.md` (sixth addendum).
+The altitude interpretation was revised by the subsequent
+[audit](../docs/TWILIGHT_ALTITUDE_AUDIT.md): Step 3c fixed truncation, but
+solar visibility still let rays cross the raised opaque ground.  Correcting
+that changes the deterministic -6° high/low ratio **1.208 → 1.027**;
+full-spectrum direct MC gives dimming instead.  The cross-study ratio 0.80
+is not a controlled pure-altitude target.  Koomen's original two-station
+table is now available and gives 0.367 at -6°, with different seasons and
+measured atmospheric transparency.  See §5 for what is and is not resolved.
 
 ---
 
@@ -40,14 +39,15 @@ is the only way to separate them.
 
 M. J. Koomen, C. Lock, D. M. Packer, R. Scolnik, R. Tousey and E. O. Hulburt,
 *Measurements of the Brightness of the Twilight Sky*, J. Opt. Soc. Am. **42**,
-353–359 (1952), DOI [10.1364/JOSA.42.000353](https://doi.org/10.1364/JOSA.42.000353).
+353–356 (1952), DOI [10.1364/JOSA.42.000353](https://doi.org/10.1364/JOSA.42.000353).
 
-From the published abstract (the article itself is paywalled):
+The original [article scan](https://static1.squarespace.com/static/54694fa6e4b0eaec4530f99d/t/5e876886cdfbaa441f538327/1585932427823/Measurements%2Bof%2Bthe%2BBrightness%2Bof%2Bthe%2BTwilight%2BSky%2B1952.pdf)
+is now available (pp. 353–354 were inspected in the altitude audit):
 
-* "a recording photometer of **photopic** sensitivity" — no filter, so the
-  measured quantity is photopic luminance, exactly what
-  `validation.common.luminance` computes from the model spectrum.  This is a
-  closer match to the model than a Johnson V magnitude;
+* a **green-filtered photomultiplier** intended to approximate photopic
+  response.  Photopic luminance is a closer comparison with
+  `validation.common.luminance` than a Johnson V magnitude, but an exact
+  instrumental response match is not established;
 * two stations: **Maryland, altitude 30 m**, and **Sacramento Peak, New
   Mexico, altitude 2800 m**;
 * solar altitude **H = +5° to −15°**, clear air, no clouds;
@@ -108,10 +108,11 @@ effect being tested.  They are therefore reported but not used for the verdict.
   and was not trusted.  The cd ft⁻² column was converted with
   `L = 10.7639 × I[cd ft⁻²]` cd m⁻².  The source's own magnitude column was
   checked against `m = −2.5 log₁₀ I + 9.9846`: maximum residual **0.0006 mag**
-  over the six rows.  The primary paper could not be read (paywalled), so the
-  numbers rest on the CC-BY reproduction; the abstract was used to confirm the
-  instrument, both sites, their altitudes and the Maryland/Sacramento Peak
-  ratio.
+  over the six rows.  Those six existing reference rows still retain their
+  original Nawar reproduction provenance.  The later original-paper audit
+  independently confirms the Maryland -6° zenith cell and adds selected
+  two-station zenith pairs in `data/twilight_altitude_audit/`; it does not
+  silently replace this validation baseline.
 * **Nawar.**  Tables 1–3 were read the same way.  Every row was checked against
   `m = −2.5 log₁₀ S₁₀ + 27.78`: maximum residual **0.055 mag** (one Abu Simbel
   blue row, where the source itself rounds 9.855 to 9.8).  Luminance from
@@ -153,36 +154,31 @@ engine, low budget; 0.87× at medium), and 0.86× Patat (deterministic) or
 one-branch chord (M10); the residual 15–30 % is inside the 1950s absolute
 calibration and the plane-parallel multiple-scattering approximation.
 
-### 4.2 The two references differ by 0.24 mag — and that is the altitude
+### 4.2 The two references differ by 0.24 mag; the cause is not isolated
 
-At −6°:
+At -6° the Maryland photopic value is 0.6458 cd m⁻² and the Paranal
+V-derived value is 0.5164 cd m⁻², a ratio of 0.800 or 0.243 mag.
+This mixes site, epoch, atmospheric transparency and spectral response.
+It cannot establish an altitude-only transfer function.
 
-* Koomen (sea level): 0.6458 cd m⁻² = 13.04 mag arcsec⁻²;
-* Patat (2400 m): 0.5164 cd m⁻² = 13.30 mag arcsec⁻²;
-* ratio 1.251, i.e. Patat is **0.243 mag** fainter (0.26 mag if one
-  compares the source magnitude columns instead of the luminances; the 0.02 mag
-  is zero-point bookkeeping, not sky).
+[Patat et al. §4–5](https://arxiv.org/html/astro-ph/0604128) compare CrAO
+(600 m, 961 hPa, three December 2002 twilights) with Paranal (743 hPa,
+a different instrument and sample).  Their mean difference of 0.27±0.03 mag
+at solar depression 5.5–11° corresponds to a flux ratio of 0.780±0.022.
+Its agreement with the pressure ratio 743/961=0.773 motivates a density
+hypothesis; it does not exclude aerosol or other station differences.
 
-This is not a discrepancy between two measurements of the same sky; it is the
-altitude effect, and both papers measure it themselves:
+Koomen's original Tables I/II provide the same-instrument zenith values:
+Sacramento Peak 2800 m / Maryland 30 m = 0.022/0.060 = **0.367** at -6°.
+The high and low stations were observed in May–June and January–March 1951,
+respectively; reported vertical solar transmission was 85–90% versus 75–85%.
+The station signal is real in these tables; its cause remains mixed.
+Machine-readable cells, source coordinates and conditions are in
+`data/twilight_altitude_audit/koomen1952_zenith_pairs.*`.
 
-| pair | pressure ratio | measured ΔV | pressure prediction<br>−2.5 log₁₀(p₁/p₂) |
-|---|---:|---:|---:|
-| CrAO 600 m (961 hPa) → Paranal 2400 m (743 hPa) *(Patat et al. §4)* | 1.293 | **0.27 ± 0.03 mag** | 0.28 mag |
-| Maryland 30 m (~1009 hPa) → Sacramento Peak 2800 m (~719 hPa) *(Koomen et al., abstract)* | 1.40 | **0.44–0.75 mag** | 0.37 mag |
-| Maryland 30 m → Paranal 2400 m (this work) | 1.36 | **0.24 mag** | 0.34 mag |
-
-The Maryland–Paranal difference (0.24 mag) is therefore within 0.1 mag of the
-0.34 mag that the pressure ratio predicts, and of the 0.27 mag that Patat et
-al. measured between their own two sites.  **The reference is not wrong; it is a 2400 m reference.**
-
-Applying that measured site factor to the model's sea-level value gives
-0.444 / 1.251 = 0.355 cd m⁻², i.e. 0.69 × Patat — the same residual as the
-direct sea-level comparison.  The raw model/Patat ratio 0.86 decomposes as
-**0.69 (model vs sea level) × 1.25 (sea level vs Paranal)**.  This is a
-diagnostic, not a prediction: the model's own altitude response has the wrong
-sign (see §5), so the scaled value is not what the model would compute at
-2400 m.
+A common photometric zero point cancels within a same-band ratio.  A
+photopic-to-Johnson-V conversion need not cancel when spectra differ.
+No numerical correction for that difference is inferred here.
 
 ### 4.3 The deep twilight
 
@@ -229,58 +225,61 @@ settle a 0.15 mag question; it is shown here as an honest measure of how large
 the systematic uncertainty of the older absolute twilight photometry is
 (≈0.5 mag), not as evidence for or against the model.
 
-## 5. The altitude response — still the real remaining problem
+## 5. The altitude audit: a fixed shadow defect and a residual comparison
 
-After the chord fix the sea-level value at −6° is 0.444 cd m⁻².  With the
-consistent (truncated) `at_altitude` construction — the layer grid starts at
-the site, the ground sits there, nothing is renormalised (architecture
-refactor Step 3c) — `at_altitude(2.4)` gives 0.537, i.e. the deterministic
-model is **1.21× brighter** at altitude (spherical engine **1.01×**).  The
-data are the other way round: Koomen's Maryland (30 m) sky is 1.25× brighter
-than Patat's Paranal (2400 m), and Patat's own 961 → 743 hPa pair gives
-1.28×.  The model's altitude response therefore still has the **wrong sign**.
+The architecture refactor removed double pressure scaling and made the
+transport bottom agree across single/SOS/MC.  Its reported 1.208 deterministic
+and 1.007 low-budget engine altitude ratios were still affected by a separate
+solar-visibility defect: rays with perigees between sea level and the raised
+bottom were treated as lit, even though they intersected the opaque ground.
+The refracted shadow table had the same sea-level boundary error.
 
-Two things have been separated.  The old numbers (1.16× deterministic,
-0.98× engine) came from a double-scaled, ground-inconsistent construction
-(`p(z0)·p(z0)/P0`, observer raised but the multiple-scattering ground still
-at sea level); that construction is gone.  What remains is the same
-low-atmosphere multiple scattering: at sea level the engine adds 0.11 cd m⁻²
-of diffuse light that the plane-parallel solver misses, and at 2.4 km that
-low layer is gone.  This is the physical gap the second dataset exposes; the
-chord fix does not close it, and with the construction now consistent there
-is no remaining audit to do — the altitude comparison still should not be
-used as a calibration constraint.  Open item: the refraction shadow
-thresholds still assume sea-level grazing rays, which matters for
-horizon/low-altitude viewing but not for the zenith points here.
+Correcting all solar masks and the refracted grazing threshold changes the
+-6° deterministic high-site result from 0.536728 to **0.456350 cd m⁻²**;
+sea level remains **0.444279**, so the ratio is now **1.027**.  The single
+term changes 0.411475→0.391830 and the SOS term 0.125253→0.064520 at altitude.
+Thus the old conclusion that this was necessarily a physical deficit, and
+that the shadow boundary could not affect zenith twilight, was incorrect.
+
+Eight independent-seed, full 81-wavelength direct MC runs bypass the engine's
+smoothing and spectral interpolation.  Their refracted-single + geometric-MS
+high/low ratio is **0.957±0.007** (empirical standard error of the mean ratio);
+the fully geometric split gives **0.920±0.009**.  The higher-order term itself
+falls to **0.744** of its sea-level value.  These results show that the
+spherical calculation does dim under this particular truncation, whereas
+the SOS approximation retains a small opposite net response.
+
+This is not a validation against a universal 0.80 law.  Truncation raises a
+global opaque sphere; an actual mountain with surrounding lowland and a
+cross-site change in atmospheric profiles are different interventions.
+Nor is the engine fully refracted: its higher orders and solar next-event
+estimates remain geometric.  The full evidence, raw runs, uncertainty
+calculation and remaining hypotheses are in
+[the audit](../docs/TWILIGHT_ALTITUDE_AUDIT.md).
 
 ## 6. Verdict
 
-**The −6° level is no longer a factor-of-two problem; the altitude response
-is.**
-
-* At sea level: model / Koomen = **0.69** (deterministic) or **0.85**
-  (spherical engine).  The model is 15–30 % low, inside the 1950s calibration.
-* Against Patat: 0.86 (deterministic) or 1.07 (engine).  The old 1.14/2.20
-  were the one-branch chord.
-* At −9° the engine is 0.58 × Koomen (0.54 × Patat, medium; 1σ ~0.46–0.70);
-  the old 1.4–1.6 × excess is gone, replaced by a ~1.7 × deficit at ~2σ.
-* The model's altitude response has the wrong sign: under the consistent
-  (truncated) `at_altitude` construction it is 1.21× / 1.01× (deterministic /
-  engine) brighter at 2.4 km where the data are 0.80× darker.  The pressure
-  double-scaling and the ground mismatch are fixed (Step 3c); the
-  low-atmosphere multiple scattering is the remaining physical candidate.
-* The practical consequence: `check5` is single-scattering only and now reads
-  0.70× Patat at −6°; compare the full model/engine, not the single-scattering
-  harness, when discussing the absolute level.
+- M10's two-branch chord correction stands.  Sea-level -6° ratios remain
+  0.69 to Koomen (deterministic), about 0.85–0.87 with the engine, and
+  0.86 / about 1.07–1.09 to Patat.  These alone do not isolate the absolute
+  calibration or site contribution to the residual.
+- The raised-ground solar-occultation defect is fixed independently of any
+  observational fit.  The old 1.208 altitude ratio is superseded by 1.027;
+  independent spherical direct MC shows dimming in this standard scene.
+- The 0.80 cross-study ratio, 0.78 Patat station ratio and 0.367 Koomen station
+  ratio represent different comparisons.  None is a controlled altitude-only
+  target for the same US76 medium.
+- The historical medium-quality deep-twilight deficits remain observations
+  of a heavy-tailed estimator, not proof of a missing specific component.
+- `check5` is single-scattering only; use the full solver/engine results when
+  discussing absolute twilight levels.
 
 ## 7. What would settle the rest
 
-* an **audit of `at_altitude`**: fix the `p(z0)/P0` scaling and re-run the
-  two-site comparison; then compare the engine (spherical MS) at 0 and 2.4 km
-  against Koomen/Patat;
-* a **measured** twilight profile at a high-altitude site with a stated
-  pressure (Paranal, Mauna Kea, Dome C) so that the model can be run at the
-  same pressure rather than corrected by a scaling law;
-* the original Koomen et al. tables (all degrees, both stations), which would
-  give a two-pressure dataset from a single instrument — the cleanest possible
-  test of the altitude response.
+- Match a **specific station**, its pressure, aerosol/profile information and
+  photometric response, rather than applying an empirical altitude factor.
+- Quantify photopic versus Johnson-V synthetic photometry from the same spectra.
+- Isolate refracted solar illumination from diffuse-path bending in the MC
+  before attributing residuals to a missing scattering mechanism.
+- For deeper twilight, use independent seeds and direct angular/spectral
+  samples to distinguish sampling variance from interpolation bias.

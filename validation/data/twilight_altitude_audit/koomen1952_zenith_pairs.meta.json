@@ -1,0 +1,28 @@
+{
+  "citation": "Koomen, M. J., Lock, C., Packer, D. M., Scolnik, R., Tousey, R., and Hulburt, E. O. (1952), Measurements of the Brightness of the Twilight Sky, Journal of the Optical Society of America 42(5), 353–356. doi:10.1364/JOSA.42.000353",
+  "source_url": "https://static1.squarespace.com/static/54694fa6e4b0eaec4530f99d/t/5e876886cdfbaa441f538327/1585932427823/Measurements%2Bof%2Bthe%2BBrightness%2Bof%2Bthe%2BTwilight%2BSky%2B1952.pdf",
+  "verified_on": "2026-10-31",
+  "evidence_page": 354,
+  "pdf_page_zero_based": 1,
+  "screenshot": "Local audit evidence: scratchpad/explore-twilight-altitude/references/koomen1952-page2.png; original PDF page 2 is the durable public source.",
+  "table": "I: Sacramento Peak; II: Maryland",
+  "columns": "Z=0 deg block, P=90 deg (zenith); H is solar altitude",
+  "transcription": "Read visual raster, not OCR. Only selected rows with ordinary decimal notation are transcribed; no interpolation.",
+  "original_units": "candles per square foot (cd ft^-2)",
+  "conversion": "multiply by 10.7639 for cd m^-2, matching existing repository conversion",
+  "observations": {
+    "high": "Seven clear, cloudless, moonless evenings, May/June 1951",
+    "low": "January/February/March 1951"
+  },
+  "instrument": "Green-filtered photomultiplier; 1.5 deg field of view; photopic response intended",
+  "conditions": {
+    "high_vertical_solar_transmission": "85–90 percent",
+    "low_vertical_solar_transmission": "75–85 percent"
+  },
+  "uncertainty": "No per-cell uncertainty provided. Tables are taken from smoothed curves through observations. Do not invent independent error bars or a pure altitude transfer law.",
+  "limitations": [
+    "Different seasons and atmospheric transparency at the two stations",
+    "Solar-angle refraction convention is not explicit in the inspected description",
+    "No direct mapping from paired station ratio to a globally truncated standard atmosphere"
+  ]
+}

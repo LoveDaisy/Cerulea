@@ -47,9 +47,10 @@ the local horizontal the optical depth is the far branch (perigee -> space)
 plus the near branch (perigee -> point).  The one-branch version returned
 1.14x / 2.20x at -6 deg; the two-branch values are 0.69x / 0.86x.
 
-The altitude response is still wrong-signed under the consistent (truncated)
-``at_altitude`` construction (deterministic 1.21x, engine 1.01x, data 0.80x);
-the altitude comparison is diagnostic only.
+The altitude response is diagnostic only: cross-site measurements do not
+isolate a pure height intervention.  Aligning solar occultation with the
+raised ground changed the deterministic -6 deg ratio from 1.208 to 1.027;
+see docs/TWILIGHT_ALTITUDE_AUDIT.md for independent MC and reference audits.
 
 Runtime is a few minutes, almost all of it in the two engine points.
 
@@ -338,10 +339,10 @@ def main():
           f"{d['model_at_2p4km'] / d['model']['-6']:.2f}x brighter.")
     print("  The measurements are the other way round: Koomen's Maryland sky is")
     print("  1.25x brighter than Patat's Paranal sky, and Patat's own 961->743 hPa")
-    print("  pair gives 1.28x.  The model's altitude response has the wrong sign.")
-    print("  NOTE: at_altitude is the consistent truncated construction (grid")
-    print("  starts at the site, nothing renormalised); the wrong sign that")
-    print("  remains is the low-atmosphere multiple-scattering gap.")
+    print("  pair gives 1.28x.  These are cross-site comparisons, not a controlled")
+    print("  intervention on altitude alone.  at_altitude raises a global opaque")
+    print("  sphere, including the solar shadow, with no column renormalisation.")
+    print("  See docs/TWILIGHT_ALTITUDE_AUDIT.md for the residual and its limits.")
     print()
     print(f"  verdict: {result.verdict}")
     print()
@@ -354,10 +355,9 @@ def main():
     print(f"  and {d6p:.2f}x / {e6p:.2f}x Patat.  The old 1.14x / 2.20x were the one-branch")
     print("  chord.  The remaining 15-30% is inside the 1950s absolute calibration")
     print("  and the plane-parallel multiple-scattering approximation.")
-    print("  The altitude response is still wrong-signed: the model is slightly")
-    print("  brighter at 2.4 km where the data are 0.80x darker, under the")
-    print("  consistent truncated construction (1.21x deterministic / 1.01x")
-    print("  engine); the gap is the low-atmosphere multiple scattering.")
+    print("  The old 1.208x altitude ratio included solar rays crossing the raised")
+    print("  opaque ground.  That defect is fixed; the current deterministic ratio")
+    print("  is printed above.  A cross-study ratio of 0.80 is not a calibration target.")
     return 0 if result.verdict in ("PASS", "SKIP") else 1
 
 

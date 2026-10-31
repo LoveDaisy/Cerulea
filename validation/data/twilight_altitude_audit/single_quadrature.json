@@ -1,0 +1,42 @@
+[
+  {
+    "elevation": 0.0,
+    "n_gauss": 3,
+    "luminance": 0.36611546094346387
+  },
+  {
+    "elevation": 0.0,
+    "n_gauss": 6,
+    "luminance": 0.3659394991244882
+  },
+  {
+    "elevation": 0.0,
+    "n_gauss": 12,
+    "luminance": 0.3682234910898583
+  },
+  {
+    "elevation": 0.0,
+    "n_gauss": 24,
+    "luminance": 0.36840321496118766
+  },
+  {
+    "elevation": 2.4,
+    "n_gauss": 3,
+    "luminance": 0.39182999425086806
+  },
+  {
+    "elevation": 2.4,
+    "n_gauss": 6,
+    "luminance": 0.3913741889853462
+  },
+  {
+    "elevation": 2.4,
+    "n_gauss": 12,
+    "luminance": 0.39353075895601847
+  },
+  {
+    "elevation": 2.4,
+    "n_gauss": 24,
+    "luminance": 0.3936221641850766
+  }
+]

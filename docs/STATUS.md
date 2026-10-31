@@ -35,8 +35,9 @@ site.  `rt.solver.solve` dispatches explicitly to clear / twilight / cloud and
 returns a traceable `SkyResult`; `render` consumes any spectral field through
 a `radiance_field` closure (one display path for clear and cloudy skies).
 `MieAerosol` / `CloudLayer` are frozen (shared instances read-only by
-structure); refraction tables cache on the medium's density-definition
-identity.  Contracts: `docs/ARCHITECTURE.md`.
+structure); refraction tables cache on the medium's construction identity,
+covering its density profile and opaque bottom radius.  Contracts:
+`docs/ARCHITECTURE.md`.
 
 ## How well it is validated
 
@@ -47,7 +48,7 @@ identity.  Contracts: `docs/ARCHITECTURE.md`.
 | CIE 110 relative luminance, upper sky | 10.6 % RMS |
 | Horizon chromaticity vs measured spectra | Δxy = 0.018 |
 | Twilight vs sea-level photometry (Koomen 1952), −6° | **0.69×** deterministic, **0.85×** engine (low; 0.87× medium) |
-| Twilight vs Patat (2006, 2400 m), −6° | **0.86×** deterministic, **1.07×** engine (low; 1.09× medium) |
+| Sea-level model / Patat (2006, 2400 m), −6° | **0.86×** deterministic, **1.07×** engine (low; 1.09× medium); different site conditions |
 | Deep twilight vs Patat (2006), −9° | **0.54×** engine (medium, 1σ 0.43–0.66) |
 | Multiple scattering vs independent Monte Carlo | 1 % |
 | Cloud albedo vs independent Monte Carlo | ≤1 % |
@@ -62,19 +63,22 @@ identity.  Contracts: `docs/ARCHITECTURE.md`.
    dense lower-atmosphere column.  Fixed in `geometry.path_lengths_sun` and
    `refraction.sun_path_lengths`; the −6° value moves from 1.42 to 0.44 cd m⁻²
    (deterministic) and 0.55 cd m⁻² (spherical engine).  The residual grows with
-   solar depression (0.58× Koomen at −9°, 0.42× at −12°), which is the same
-   low-atmosphere multiple-scattering deficit; the −6° point itself is inside
-   the 1950s calibration and the plane-parallel approximation.
-2. **The altitude response has the wrong sign.**  `at_altitude` now truncates
-   the model at the site (Step 3c): the layer grid starts at z0, the ground sits
-   at z0 and nothing is renormalised, so single/SOS/MC share one ground for the
-   first time.  Under that consistent construction the zenith luminance ratio
-   at −6° is **1.21×** deterministic / **1.01×** engine while the data
-   (Koomen's two stations, Patat's two pressures) are **0.80×** darker — the
-   remaining gap is the same low-atmosphere multiple-scattering deficit, not a
-   construction artifact.  (The old 1.16×/0.98× came from the double-scaled,
-   ground-inconsistent construction.)  Open item: the refraction shadow
-   thresholds still assume sea-level grazing rays.
+   solar depression in the recorded medium-budget run (0.58× Koomen at −9°,
+   0.42× at −12°); deep-twilight MC statistics are heavy-tailed, so neither
+   the exact deficit nor its physical cause is established by one run.
+2. **The altitude comparison is unresolved; a raised-ground shadow defect is
+   fixed.**  M12's site truncation removed double pressure scaling, but solar
+   visibility still used the sea-level opaque radius.  M13 fixes geometric
+   masks, refracted grazing tests and shadow tables to use the model bottom.
+   For clear air, 81 wavelengths, refraction on, sun −6° and zenith view, the
+   deterministic high-site/sea-level ratio changes from the historical
+   **1.208× to 1.027×** (0.456350/0.444279 cd m⁻²).  The old engine 1.01× is
+   also a pre-fix estimate; updated multi-seed results are in
+   `docs/TWILIGHT_ALTITUDE_AUDIT.md`.  The often quoted 0.80× combines different
+   studies/sites/observables; Koomen's same-instrument stations give about
+   0.37× at −6°, with different seasons and transparency.  Neither is a
+   controlled altitude-only target.  Missing low-altitude multiple scattering
+   is not an established explanation of the remaining difference.
 3. **The limb is ≈ 2× brighter than the CIE 110 fit** (which may be a
    reference problem — CIE 110 is a daylighting standard, not physics).
 4. **The solar aureole is under-resolved in multiple scattering** (32-moment
@@ -96,6 +100,7 @@ identity.  Contracts: `docs/ARCHITECTURE.md`.
 
 `README.md` — what it is and how to run it.
 `docs/REPORT.md` — the physics and the results, with the figures.
-`docs/ROADMAP.md` — milestones M1–M10, open questions, future directions.
+`docs/ROADMAP.md` — completed milestones, open questions, future directions.
 `validation/` — the checks, and the addenda recording what each round changed.
 `docs/ARCHITECTURE.md` — the module contracts.
+`docs/TWILIGHT_ALTITUDE_AUDIT.md` — raised-ground correction and altitude evidence.
