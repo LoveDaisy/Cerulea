@@ -339,11 +339,13 @@ refraction happened to cancel part of that error, which is why the old
 "1.14×" looked like a site effect.  See `docs/ROADMAP.md` M10 and the sixth
 addendum of `validation/ADDENDUM.md`.
 
-The altitude dependence is the remaining twilight puzzle, and the fix changed
-its sign: the model is a few per cent *brighter* at 2.4 km, while the data are
-0.80× *darker*.  The `at_altitude` helper also scales the US1976 profile by
-`p(z0)/P0`, making the density at the site 0.746× too low at 2.4 km, so the
-altitude comparison needs its own audit before it can be used as a constraint.
+The altitude dependence is the remaining twilight puzzle, and it is still
+wrong-signed: under the consistent (truncated) `at_altitude` construction the
+model is 1.21× *brighter* at 2.4 km (deterministic; 1.01× engine) while the
+data are 0.80× *darker*.  The old `at_altitude` — a double-scaled,
+ground-inconsistent construction — was replaced in the architecture refactor
+(Step 3c); no construction degree of freedom is left, and the missing
+low-atmosphere multiple scattering remains the physical candidate.
 
 ### 4.10 Altitude
 
@@ -351,6 +353,8 @@ From 3 km the zenith gets darker and deeper blue (less air above), the horizon
 is depressed, and the whole sky gains contrast.  The twilight altitude
 dependence is an exception and is still wrong-signed in the model (see §4.9);
 the daytime altitude behaviour is not affected by the twilight chord fix.
+`at_altitude` itself now truncates the model at the site, so the daytime
+altitude figures (experiments/05) reflect one consistent ground.
 
 ## 5. Limitations
 

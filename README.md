@@ -118,8 +118,8 @@ low by ~1.8× at −9°, and the **altitude response** has the wrong sign.
 * Known failures, documented rather than hidden: the limb (≈2× too bright,
   plane-parallel diffuse transport), the solar aureole (32-moment truncation
   without delta-fit), and the twilight **altitude response** (the model is a
-  few per cent brighter at 2.4 km where the data are 0.80× darker; the
-  `at_altitude` pressure scaling also needs an audit).
+  a few per cent brighter at 2.4 km where the data are 0.80× darker, under
+  the consistent (truncated) `at_altitude` construction).
 
 ## Data provenance
 

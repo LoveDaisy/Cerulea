@@ -48,12 +48,16 @@ argument; this is the state.*
    solar depression (0.58× Koomen at −9°, 0.42× at −12°), which is the same
    low-atmosphere multiple-scattering deficit; the −6° point itself is inside
    the 1950s calibration and the plane-parallel approximation.
-2. **The altitude response has the wrong sign.**  At 2.4 km the model is a few
-   per cent *brighter*, while the data (Koomen's two stations, Patat's two
-   pressures) are 0.80× darker.  The `at_altitude` helper also scales the
-   US1976 density profile by `p(z0)/P0`, which makes the density at the site
-   0.746× too low at 2.4 km; the altitude comparison needs its own audit
-   before it is used as a constraint.
+2. **The altitude response has the wrong sign.**  `at_altitude` now truncates
+   the model at the site (Step 3c): the layer grid starts at z0, the ground sits
+   at z0 and nothing is renormalised, so single/SOS/MC share one ground for the
+   first time.  Under that consistent construction the zenith luminance ratio
+   at −6° is **1.21×** deterministic / **1.01×** engine while the data
+   (Koomen's two stations, Patat's two pressures) are **0.80×** darker — the
+   remaining gap is the same low-atmosphere multiple-scattering deficit, not a
+   construction artifact.  (The old 1.16×/0.98× came from the double-scaled,
+   ground-inconsistent construction.)  Open item: the refraction shadow
+   thresholds still assume sea-level grazing rays.
 3. **The limb is ≈ 2× brighter than the CIE 110 fit** (which may be a
    reference problem — CIE 110 is a daylighting standard, not physics).
 4. **The solar aureole is under-resolved in multiple scattering** (32-moment

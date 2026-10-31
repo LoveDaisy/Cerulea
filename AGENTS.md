@@ -69,9 +69,10 @@ uv run python experiments/01_day_cycle.py
 
 ### 核心模块说明
 
-- `atmosphere.py`：`Atmosphere` 是贯穿全库的大气描述。`pressure()` 是
-  `us76_pressure(z) * surface_pressure / P0`；`at_altitude(z0)` 用于把观察者放到山上，
-  目前已知有 pressure 双重缩放问题（见交接文档，待修）。
+- `atmosphere.py`：`Atmosphere` 是 facade：物理介质在 frozen `Medium`（`skycolor/medium.py`），
+  观察场景在 frozen `Scene`（`skycolor/scene.py`）。`at_altitude(z0)` 已改为一致截断
+  （`z_bounds` 自 z0 起、地面=z0、不重标定任何柱量，Step 3c）——single/SOS/MC 首次对
+  “地面在哪”同源；高度响应仍反号属已知物理缺口，不是构造问题。
 - `geometry.py` / `refraction.py`：太阳弦长是暮光的关键。M10 修复后，太阳在局部水平
   以下时走“远侧 perigee→space + 近侧 perigee→point”（`up + 2*down`）。不要重做。
 - `rt/single.py`：一次散射从观察者半径 `r0` 开始积分；折射开启时用
@@ -96,7 +97,8 @@ uv run python experiments/01_day_cycle.py
   的 `up + 2*down`）。
 - 不要用关闭折射来“修”暮光；`refraction=False` 只用于复现旧报告数字。
 - 不要为了跑得快把 `n_moments` 默认降到 16 而不检查 aureole / dust。
-- 不要在 `at_altitude` 审计完成前把“高度响应”当作定标约束（已知 pressure 双重缩放）。
+- 不要把“高度响应反号”当作待修的构造问题：`at_altitude` 已改一致截断
+  （确定性 1.21×/引擎 1.01×，数据 0.80×，仍反号），残差是低层多次散射缺口。
 - 不要在没有独立证据时改动 `validation/results.json` 或弦长修复的物理数字。
 
 ### DO

@@ -129,6 +129,21 @@ def main() -> None:
           total_err=res["total_err"], wl=atmo.wl)
     print(f"  mc: {time.perf_counter() - t0:.1f} s")
 
+    # Truncation semantics (plan Step 3c): a NEW-semantics baseline at
+    # z0=2.4 km, generated after the at_altitude fix and never compared
+    # against pre-Step-3c fixtures.  It gives the truncated default the same
+    # bit-exact protection the elevation=0 fixtures give the old domain.
+    t0 = time.perf_counter()
+    atmo = presets.clear(WL7).at_altitude(2.4)
+    rad = sky_radiance_total(atmo, 85.0, 45.0, 135.0)
+    _save("altitude",
+          dict(atmo="presets.clear(WL7).at_altitude(2.4)",
+               entry="rt.solver.sky_radiance_total",
+               sun_zenith_deg=85.0, view_zenith_deg=45.0, view_azimuth_deg=135.0,
+               elevation_km=2.4),
+          radiance=rad, wl=atmo.wl, z_bounds=atmo.z_bounds)
+    print(f"  altitude: {time.perf_counter() - t0:.1f} s")
+
 
 if __name__ == "__main__":
     main()

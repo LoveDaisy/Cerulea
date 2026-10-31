@@ -250,23 +250,46 @@ class Atmosphere:
     def at_altitude(self, elevation_km: float) -> "Atmosphere":
         """Return a copy of this atmosphere seen from ``elevation_km``.
 
-        The pressure profile is renormalised to the hydrostatic pressure at
-        that altitude and the optical-depth normalisation of every aerosol
-        layer is adjusted for the column that remains above the observer.
+        The model is **truncated at the site**: the layer grid starts at
+        ``z0``, the ground (and with it every solver's bottom boundary)
+        sits at ``z0``, and the observer radius coincides with the first
+        shell boundary.  The single-scattering solver integrates from the
+        observer, the SOS solver and the Monte Carlo fix their ground at
+        ``z_bounds[0]`` -- truncation is what makes those three agree for
+        the first time.  Nothing is renormalised: the column above the site
+        is already the integral of the untouched profiles over the
+        truncated domain, so rescaling ozone/NO2 or aerosol columns (the
+        old behaviour) would shrink it a second time, and
+        ``surface_pressure`` keeps its meaning as the scaling of the whole
+        US76 profile rather than "the pressure at the ground".
+
+        This replaces the old construction, which both double-scaled the
+        pressure (``p(z0) * p(z0)/P0``) and left the multiple-scattering
+        ground at sea level.  It does **not** fix the physical altitude
+        response: under the consistent construction the zenith luminance
+        ratio (2.4 km / sea level) at -6 deg is ~1.21 deterministic /
+        ~1.01 engine while the data say ~0.80 -- still wrong-signed, a
+        known gap of the low-altitude multiple scattering (see
+        ``validation/SECOND_DATASET.md``).  Open item: the refraction
+        shadow-threshold table is still built for rays grazing *sea
+        level*, which matters for horizon/low-altitude viewing, not for
+        zenith twilight.
+
+        ``elevation_km=0`` returns an equivalent atmosphere (a fresh copy,
+        as the method always has).
         """
         z0 = float(elevation_km)
-        p0 = float(us76_pressure(np.array([z0]))[0])
-        # rescale aerosol layers to the column remaining above the observer
-        layers = []
-        for lay in self.aerosols:
-            frac = lay.profile.column(z0, np.inf)
-            layers.append(AerosolLayer(lay.aerosol, aod550=lay.aod550 * frac,
-                                       profile=lay.profile, horizontal=lay.horizontal))
+        zb = (np.concatenate(([z0], self.z_bounds[self.z_bounds > z0]))
+              if z0 > 0 else self.z_bounds)
+        medium = self._medium
         return Atmosphere(
             self.wl, ozone_du=self.ozone_du, no2_column=self.no2_column,
-            aerosols=layers, ground_albedo=self.ground_albedo,
-            surface_pressure=p0, z_bounds_km=self.z_bounds,
+            aerosols=list(self.aerosols), ground_albedo=self.ground_albedo,
+            surface_pressure=self.surface_pressure, z_bounds_km=zb,
             elevation_km=z0, refraction=self.refraction,
+            ozone_profile=medium.ozone_profile,
+            no2_profile=medium.no2_profile,
+            air_profile=medium.air_profile,
         )
 
     def _prepare_ozone(self) -> None:

@@ -13,12 +13,14 @@ segment of every grazing twilight ray.  The remaining 15–30 % is inside the
 approximation.
 
 What *is* still a model problem is the altitude response, and the chord fix
-changed its sign: the model is a few per cent **brighter** at 2.4 km, while
-Koomen's Maryland (30 m) and Patat's Paranal (2400 m) skies, and Patat's own
-961 vs 743 hPa pair, are **0.80× darker**.  The `at_altitude` helper also
-scales the US1976 density profile by `p(z0)/P0`, so the density at the 2.4 km
-site is 0.746× too low; the altitude comparison needs its own audit before it
-can be used as a constraint.  See `validation/ADDENDUM.md` (sixth addendum).
+changed its sign: under the consistent (truncated) `at_altitude` construction
+the model is **1.21× brighter** at 2.4 km (deterministic; 1.01× engine),
+while Koomen's Maryland (30 m) and Patat's Paranal (2400 m) skies, and
+Patat's own 961 vs 743 hPa pair, are **0.80× darker**.  The old construction
+(double pressure scaling, multiple-scattering ground left at sea level) was
+replaced in the architecture refactor (Step 3c); the remaining wrong sign is
+a physics gap, not a construction artifact.  See §5 below and
+`validation/ADDENDUM.md` (sixth addendum).
 
 ---
 
@@ -229,24 +231,27 @@ the systematic uncertainty of the older absolute twilight photometry is
 
 ## 5. The altitude response — still the real remaining problem
 
-After the chord fix the sea-level value at −6° is 0.444 cd m⁻² and
-`at_altitude(2.4)` gives 0.515, i.e. the model is **1.16× brighter** at
-altitude.  The data are the other way round: Koomen's Maryland (30 m) sky is
-1.25× brighter than Patat's Paranal (2400 m), and Patat's own 961 → 743 hPa
-pair gives 1.28×.  The model's altitude response therefore has the **wrong
-sign**.
+After the chord fix the sea-level value at −6° is 0.444 cd m⁻².  With the
+consistent (truncated) `at_altitude` construction — the layer grid starts at
+the site, the ground sits there, nothing is renormalised (architecture
+refactor Step 3c) — `at_altitude(2.4)` gives 0.537, i.e. the deterministic
+model is **1.21× brighter** at altitude (spherical engine **1.01×**).  The
+data are the other way round: Koomen's Maryland (30 m) sky is 1.25× brighter
+than Patat's Paranal (2400 m), and Patat's own 961 → 743 hPa pair gives
+1.28×.  The model's altitude response therefore still has the **wrong sign**.
 
-Two things need separating.  First, the model's own `at_altitude` helper scales
-the US1976 density profile by `p(z0)/P0`, so the density at the 2.4 km site is
-0.746× too low; with a plain US1976 profile (observer moved to 2.4 km, no
-pressure rescaling) the deterministic model gives 0.470 (1.06×) and the
-spherical engine 0.541 (0.98×), i.e. the sign is closer but still not the
-data's 0.80×.  Second, the remaining difference is the same low-atmosphere
-multiple scattering: at sea level the engine adds 0.11 cd m⁻² of diffuse light
-that the plane-parallel solver misses, and at 2.4 km that low layer is gone.
-This is the physical gap the second dataset exposes; the chord fix does not
-close it, and the altitude comparison should not be used as a calibration
-constraint until `at_altitude` is audited.
+Two things have been separated.  The old numbers (1.16× deterministic,
+0.98× engine) came from a double-scaled, ground-inconsistent construction
+(`p(z0)·p(z0)/P0`, observer raised but the multiple-scattering ground still
+at sea level); that construction is gone.  What remains is the same
+low-atmosphere multiple scattering: at sea level the engine adds 0.11 cd m⁻²
+of diffuse light that the plane-parallel solver misses, and at 2.4 km that
+low layer is gone.  This is the physical gap the second dataset exposes; the
+chord fix does not close it, and with the construction now consistent there
+is no remaining audit to do — the altitude comparison still should not be
+used as a calibration constraint.  Open item: the refraction shadow
+thresholds still assume sea-level grazing rays, which matters for
+horizon/low-altitude viewing but not for the zenith points here.
 
 ## 6. Verdict
 
@@ -259,10 +264,11 @@ is.**
   were the one-branch chord.
 * At −9° the engine is 0.58 × Koomen (0.54 × Patat, medium; 1σ ~0.46–0.70);
   the old 1.4–1.6 × excess is gone, replaced by a ~1.7 × deficit at ~2σ.
-* The model's altitude response has the wrong sign: it is slightly brighter at
-  2.4 km where the data are 0.80× darker.  `at_altitude` has a pressure-scaling
-  bug (density 0.746× too low at 2.4 km); the low-atmosphere multiple
-  scattering is the physical candidate.
+* The model's altitude response has the wrong sign: under the consistent
+  (truncated) `at_altitude` construction it is 1.21× / 1.01× (deterministic /
+  engine) brighter at 2.4 km where the data are 0.80× darker.  The pressure
+  double-scaling and the ground mismatch are fixed (Step 3c); the
+  low-atmosphere multiple scattering is the remaining physical candidate.
 * The practical consequence: `check5` is single-scattering only and now reads
   0.70× Patat at −6°; compare the full model/engine, not the single-scattering
   harness, when discussing the absolute level.

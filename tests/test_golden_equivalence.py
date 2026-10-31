@@ -120,3 +120,17 @@ def test_mc_split(clear7):
     for key in ("total", "single", "multiple", "total_err"):
         assert np.array_equal(res[key], golden[key]), key
     assert np.array_equal(clear7.wl, golden["wl"])
+
+
+def test_altitude_truncated_baseline(clear7):
+    """Step 3c truncation semantics, pinned as a NEW-semantics baseline:
+    generated after the at_altitude fix and never compared with the
+    elevation=0 fixtures.  The observer radius must coincide with the first
+    shell boundary (single integrates from it, SOS/MC ground is z_bounds[0])."""
+    golden = _load("altitude")
+    atmo = clear7.at_altitude(2.4)
+    rad = sky_radiance_total(atmo, 85.0, 45.0, 135.0)
+    assert atmo.z_bounds[0] == pytest.approx(2.4)
+    np.testing.assert_array_equal(atmo.z_bounds, golden["z_bounds"])
+    assert np.array_equal(rad, golden["radiance"])
+    assert np.array_equal(atmo.wl, golden["wl"])

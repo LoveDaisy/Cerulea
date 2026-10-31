@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from skycolor.atmosphere import Atmosphere, us76_pressure, us76_temperature
-from skycolor.constants import DU, WL_COARSE
+from skycolor.constants import DU, R_EARTH, WL_COARSE
 
 
 def test_us76_reference_values():
@@ -53,15 +53,6 @@ def test_phase_moments_normalised():
     assert np.allclose(m[:, 0, :], 1.0)
 
 
-def test_elevation_rescales_aerosol_column():
-    at = Atmosphere.standard(WL_COARSE)
-    high = at.at_altitude(3.0)
-    beta = high.aerosol_coefficients(high.z_mid)[0]
-    tau = np.sum(beta * np.diff(high.z_bounds)[:, None] * 1e3, axis=0)
-    i = np.argmin(abs(high.wl - 550))
-    assert 0 < tau[i] < 0.05
-
-
 # ---------------------------------------------------------------------------
 # facade completeness (architecture-refactor Step 3a)
 # ---------------------------------------------------------------------------
@@ -102,3 +93,51 @@ def test_medium_arrays_are_read_only():
     # the aerosols setter remains the sanctioned redefinition path
     at.aerosols = []
     assert at.aerosols == []
+
+
+# ---------------------------------------------------------------------------
+# at_altitude: consistent truncation semantics (plan Step 3c, HANDOFF §2.3)
+# ---------------------------------------------------------------------------
+def test_at_altitude_truncates_at_the_site():
+    a = Atmosphere.standard(WL_COARSE)
+    b = a.at_altitude(2.4)
+    assert b.z_bounds[0] == pytest.approx(2.4)
+    assert b.r_bounds[0] == pytest.approx(R_EARTH + 2400.0)
+    # site pressure is the US76 value at 2.4 km -- no double scaling
+    assert b.pressure(2.4) == pytest.approx(75625.67696512025, rel=1e-3)
+    # density at the site equals the base atmosphere's -- no renormalisation
+    assert b.n_air(2.4) == pytest.approx(a.n_air(2.4), rel=1e-3)
+    # no column rescaling: ozone and aerosol amounts are carried untouched
+    assert b.ozone_du == a.ozone_du
+    assert b.aerosols[0].aod550 == pytest.approx(a.aerosols[0].aod550)
+    # the observer coincides with the bottom boundary for every backend
+    assert b.elevation_km == 2.4
+
+
+def test_at_altitude_zero_is_identity():
+    a = Atmosphere.standard(WL_COARSE)
+    b = a.at_altitude(0.0)
+    np.testing.assert_array_equal(b.z_bounds, a.z_bounds)
+    assert b.pressure(2.4) == pytest.approx(a.pressure(2.4))
+    assert b.n_air(2.4) == pytest.approx(a.n_air(2.4))
+
+
+def test_elevation_truncates_aerosol_column():
+    """AOD above the site is the untouched profile's remaining column, not a
+    rescaled copy (the old construction shrank it a second time)."""
+    from skycolor.aerosol import HinterlandAerosol
+    from skycolor.atmosphere import AerosolLayer, ExponentialProfile
+    from skycolor.constants import R_EARTH
+
+    wl = np.array([550.0])
+    aod = 0.25
+    at = Atmosphere(wl, aerosols=[AerosolLayer(HinterlandAerosol(), aod,
+                                               ExponentialProfile(1.5))])
+    high = at.at_altitude(3.0)
+    assert high.z_bounds[0] == pytest.approx(3.0)
+    beta = high.aerosol_coefficients(high.z_mid)[0]
+    tau = np.sum(beta * np.diff(high.z_bounds)[:, None] * 1e3, axis=0)[0]
+    remaining = float(np.exp(-3.0 / 1.5))   # fraction of an exp(1.5 km) column above 3 km
+    # the layer-midpoint quadrature on the 1 km first layer is ~1.7 % coarse
+    # for this profile; the point is "no second rescale", not exactness
+    assert tau == pytest.approx(aod * remaining, rel=3e-2)

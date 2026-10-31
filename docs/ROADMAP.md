@@ -177,15 +177,16 @@ understand.  Each is worth resolving before adding new physics.
    `validation/ADDENDUM.md`.
 
    **The defect the second dataset exposed is still open, and the chord fix
-   changed its sign.**  Run at 2.4 km, the deterministic model is 1.06×
-   *brighter* and the spherical engine 0.98×, while the data (Koomen Maryland
-   30 m vs Patat Paranal 2400 m; Patat's own 961 vs 743 hPa pair) are 0.80×
-   *darker*.  The model's altitude response therefore has the wrong sign.  Part
-   of the problem is the `at_altitude` helper: it scales the US1976 density
-   profile by `p(z0)/P0`, so the density at the 2.4 km site comes out 0.746×
-   too low.  The altitude comparison needs its own audit before it can be used
-   as a constraint; the missing low-atmosphere multiple scattering remains the
-   physical candidate.
+   changed its sign.**  `at_altitude` has been rewritten as a consistent
+   truncation (architecture-refactor Step 3c): the layer grid starts at the
+   site, the ground sits there, and nothing is renormalised, so all three
+   backends share one ground.  Under that construction the deterministic model
+   is 1.21× *brighter* at 2.4 km and the spherical engine 1.01×, while the
+   data (Koomen Maryland 30 m vs Patat Paranal 2400 m; Patat's own 961 vs
+   743 hPa pair) are 0.80× *darker* — still the wrong sign, with no
+   construction-degree-of-freedom left.  The missing low-atmosphere multiple
+   scattering remains the physical candidate.  Open item: the refraction
+   shadow thresholds are still built for sea-level grazing rays.
 
 3. **The limb.**  The model's horizon is ≈ 2× brighter than the CIE 110 fit.
    The CIE formula is a daylighting standard, not a physical model, so this may
