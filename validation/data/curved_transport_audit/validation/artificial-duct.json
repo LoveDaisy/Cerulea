@@ -1,0 +1,17 @@
+{
+  "layer_km": 0.5,
+  "inner_height_km": 4.5,
+  "outer_height_km": 5.0,
+  "n_in": 1.0001716205825644,
+  "n_out": 1.0001625818806208,
+  "q_inner_side": 6377094.25283443,
+  "q_outer_side": 6377036.622070838,
+  "invariant": 6377065.437452635,
+  "perigee_km": 4.971189562668092,
+  "initial_height_km": 4.985594781333581,
+  "initial_apparent_deg": 0.12179346211546245,
+  "outer_tir": true,
+  "perigee_above_inner_boundary": true,
+  "continuous_profile_q_prime_positive": true,
+  "note": "Discrete q jump creates a trapped radial interval despite monotonic continuous q; exact Snell step model has an artificial cavity."
+}

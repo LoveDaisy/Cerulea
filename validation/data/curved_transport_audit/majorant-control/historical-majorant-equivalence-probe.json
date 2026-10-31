@@ -1,0 +1,112 @@
+{
+  "rows": [
+    {
+      "ground_km": 0.0,
+      "fine_grid_points": 761,
+      "dense_heights": 24241,
+      "wavelength_count": 81,
+      "coarse_bounds_km": [
+        0.0,
+        1.0,
+        4.0,
+        12.0,
+        40.0,
+        120.0,
+        200.0
+      ],
+      "global_bounds_km": [
+        0.0,
+        200.0
+      ],
+      "optical_and_phase_table_build_code_identical": true,
+      "ground_scatter_RR_order_cap_commit_code_identical_after_direction_rename": true,
+      "global_fine_grid_function_is_native": true,
+      "phase3_and_current_full81_aerosol_coefficients_bit_identical": true,
+      "max_native_interpolated_beta_over_major": 0.9950248756218923,
+      "max_global_interpolated_beta_over_major": 0.9950248756218916,
+      "native_majorant_violations": 0,
+      "global_majorant_violations": 0,
+      "max_native_continuous_beta_over_major": 0.9950248756218908,
+      "native_max_boundary_skip_optical_depth_per_event": 1.0106122152363175e-08,
+      "fine_grid_sha256": "585652b39e6333ee92dcfe4bbbf48675574f053953234540b1fab720237916a9",
+      "beta_ext_sha256": "d06618ebcb270bf31d9a66392be6645375197e5ac6bdb57d0a9e597842fd0ae4"
+    },
+    {
+      "ground_km": 2.4,
+      "fine_grid_points": 760,
+      "dense_heights": 24301,
+      "wavelength_count": 81,
+      "coarse_bounds_km": [
+        2.4,
+        3.4,
+        6.4,
+        14.4,
+        42.4,
+        122.4,
+        200.0
+      ],
+      "global_bounds_km": [
+        2.4,
+        200.0
+      ],
+      "optical_and_phase_table_build_code_identical": true,
+      "ground_scatter_RR_order_cap_commit_code_identical_after_direction_rename": true,
+      "global_fine_grid_function_is_native": true,
+      "phase3_and_current_full81_aerosol_coefficients_bit_identical": true,
+      "max_native_interpolated_beta_over_major": 0.9950248756218925,
+      "max_global_interpolated_beta_over_major": 0.9950248756218917,
+      "native_majorant_violations": 0,
+      "global_majorant_violations": 0,
+      "max_native_continuous_beta_over_major": 0.9950248756218908,
+      "native_max_boundary_skip_optical_depth_per_event": 5.129607631757003e-09,
+      "fine_grid_sha256": "400e97796fa9f3c4f6c822d030f9577b2006aebd21e33984a98bca499604fa44",
+      "beta_ext_sha256": "5cf5d8138773770c2f98ec54fd2a70e720299117d2f314d74f630604efe96c93"
+    }
+  ],
+  "independent_seed_comparison": [
+    {
+      "height_km": 0.0,
+      "native_mean": 0.4932334049981595,
+      "native_se": 0.0030808206675594072,
+      "global_mean": 0.4921022235568998,
+      "global_se": 0.002616641432477848,
+      "independent_difference": -0.0011311814412596766,
+      "combined_se": 0.004042062390886726,
+      "difference_over_combined_se": -0.27985254354560424,
+      "deterministic_SS_all_bit_identical": true,
+      "source_NPZ_sha_identical": true
+    },
+    {
+      "height_km": 2.4,
+      "native_mean": 0.45976942736651516,
+      "native_se": 0.0034744238356529417,
+      "global_mean": 0.45092510579498124,
+      "global_se": 0.0018593741871094425,
+      "independent_difference": -0.00884432157153392,
+      "combined_se": 0.003940671688613783,
+      "difference_over_combined_se": -2.2443690493396833,
+      "deterministic_SS_all_bit_identical": true,
+      "source_NPZ_sha_identical": true
+    }
+  ],
+  "source_solar_disk_geometry_scatter_ground_and_deterministic_SS_AST_identical_to_phase3": true,
+  "native_max_scatter_default": 50,
+  "constants": {
+    "_N_FINE": 700,
+    "_MAJORANT_SAFETY": 1.005,
+    "_EPS_MOVE": 0.0001,
+    "_MAX_STEPS": 200000,
+    "_RR_WEIGHT": 0.05,
+    "_RR_START": 10,
+    "_RR_SURVIVE": 0.75
+  },
+  "production_library_changes_since_phase3": [
+    "skycolor/aerosol.py"
+  ],
+  "implementation_sha256": {
+    "skycolor/rt/mc.py": "30db2a561fd3428074774bb6096148f21dc40de139d8199335761db3676a6f03",
+    "tools/continuous_curved_mc.py": "27558a178876fd2a4ec65d4eb148654f4c087d7d613b8509ab30f6385e3843a2",
+    "tools/unified_solar_transport.py": "6ed1b03c3c49ad748540064d90ce8306b8855f08d2409ba9a1cc51e1a654dea2"
+  },
+  "scope": "No MC run; source/flight clones and fine-grid coefficient evaluations only"
+}

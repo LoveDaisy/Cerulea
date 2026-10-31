@@ -1,0 +1,3 @@
+{"step_m": 2000.0, "view_deg": 70.0, "radiance": 4.85297711451311e-05, "n_quad": 2128}
+{"step_m": 2000.0, "seed": 7300, "counts": [32], "single": [0.00028032468316933754], "single_var": [7.370291546541262e-08], "multiple": [0.0], "seconds": 0.13199145905673504, "total_equals_single": true, "rk_ray_steps": 5531}
+{"step_m": 2000.0, "seed": 7301, "counts": [32], "single": [0.0], "single_var": [0.0], "multiple": [0.0], "seconds": 0.11142537498380989, "total_equals_single": true, "rk_ray_steps": 4813}

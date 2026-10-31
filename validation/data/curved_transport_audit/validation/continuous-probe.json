@@ -1,0 +1,422 @@
+{
+  "head": "7ed71a62cea038dfad1e491420f0e4c014b74068",
+  "tool_sha256": "27558a178876fd2a4ec65d4eb148654f4c087d7d613b8509ab30f6385e3843a2",
+  "rows": [
+    {
+      "ground_km": 0.0,
+      "height_km": 38.0,
+      "apparent_deg": -5.487342769121213,
+      "max_step_m": 4000.0,
+      "rk_true_elevation_deg": -6.0000000601793175,
+      "true_elevation_deg": -5.9999994675165444,
+      "angle_error_deg": 5.926627730801215e-07,
+      "relative_bouguer_error": 4.687488175392218e-10,
+      "escaped": true,
+      "hit_ground": false,
+      "travel_m": 2244195.2939128224,
+      "rk_ray_steps": 562
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 38.0,
+      "apparent_deg": -5.487342769121213,
+      "max_step_m": 2000.0,
+      "rk_true_elevation_deg": -6.0000000601793175,
+      "true_elevation_deg": -5.999999999676153,
+      "angle_error_deg": 6.050316425643132e-08,
+      "relative_bouguer_error": 1.0627010382791013e-10,
+      "escaped": true,
+      "hit_ground": false,
+      "travel_m": 2244195.3625184787,
+      "rk_ray_steps": 1123
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 38.0,
+      "apparent_deg": -5.487342769121213,
+      "max_step_m": 1000.0,
+      "rk_true_elevation_deg": -6.0000000601793175,
+      "true_elevation_deg": -6.000000078125376,
+      "angle_error_deg": -1.794605886118461e-08,
+      "relative_bouguer_error": -5.4115600889304005e-12,
+      "escaped": true,
+      "hit_ground": false,
+      "travel_m": 2244195.374136309,
+      "rk_ray_steps": 2245
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 47.0,
+      "apparent_deg": -5.7677034867361385,
+      "max_step_m": 4000.0,
+      "rk_true_elevation_deg": -6.000000007585967,
+      "true_elevation_deg": -5.999999986307225,
+      "angle_error_deg": 2.127874232371596e-08,
+      "relative_bouguer_error": 7.634115561927501e-12,
+      "escaped": true,
+      "hit_ground": false,
+      "travel_m": 2221122.895780596,
+      "rk_ray_steps": 556
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 47.0,
+      "apparent_deg": -5.7677034867361385,
+      "max_step_m": 2000.0,
+      "rk_true_elevation_deg": -6.000000007585967,
+      "true_elevation_deg": -6.00000000000669,
+      "angle_error_deg": 7.579277649938376e-09,
+      "relative_bouguer_error": -8.559819519859957e-13,
+      "escaped": true,
+      "hit_ground": false,
+      "travel_m": 2221122.89753063,
+      "rk_ray_steps": 1111
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 47.0,
+      "apparent_deg": -5.7677034867361385,
+      "max_step_m": 1000.0,
+      "rk_true_elevation_deg": -6.000000007585967,
+      "true_elevation_deg": -6.000000007792481,
+      "angle_error_deg": -2.0651391707815492e-10,
+      "relative_bouguer_error": -5.162537064506978e-14,
+      "escaped": true,
+      "hit_ground": false,
+      "travel_m": 2221122.898377072,
+      "rk_ray_steps": 2222
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 0.0,
+      "apparent_deg": 0.2,
+      "max_step_m": 4000.0,
+      "rk_true_elevation_deg": -0.31203442431980477,
+      "true_elevation_deg": -0.31203435762008275,
+      "angle_error_deg": 6.669972202333341e-08,
+      "relative_bouguer_error": -1.0787415405388856e-10,
+      "escaped": true,
+      "hit_ground": false,
+      "travel_m": 1636676.3510714571,
+      "rk_ray_steps": 410
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 0.0,
+      "apparent_deg": 0.2,
+      "max_step_m": 2000.0,
+      "rk_true_elevation_deg": -0.31203442431980477,
+      "true_elevation_deg": -0.3120346742687802,
+      "angle_error_deg": -2.4994897540597805e-07,
+      "relative_bouguer_error": 2.3093016388031629e-10,
+      "escaped": true,
+      "hit_ground": false,
+      "travel_m": 1636676.3777013083,
+      "rk_ray_steps": 819
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 0.0,
+      "apparent_deg": 0.2,
+      "max_step_m": 1000.0,
+      "rk_true_elevation_deg": -0.31203442431980477,
+      "true_elevation_deg": -0.31203445145703745,
+      "angle_error_deg": -2.713723268321644e-08,
+      "relative_bouguer_error": 2.652766895039349e-11,
+      "escaped": true,
+      "hit_ground": false,
+      "travel_m": 1636676.358101266,
+      "rk_ray_steps": 1637
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 0.0,
+      "apparent_deg": 30.0,
+      "max_step_m": 4000.0,
+      "rk_true_elevation_deg": 29.972544376579727,
+      "true_elevation_deg": 29.972541561727663,
+      "angle_error_deg": -2.8148520634374563e-06,
+      "relative_bouguer_error": 2.81328320639318e-08,
+      "escaped": true,
+      "hit_ground": false,
+      "travel_m": 383498.455899522,
+      "rk_ray_steps": 96
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 0.0,
+      "apparent_deg": 30.0,
+      "max_step_m": 2000.0,
+      "rk_true_elevation_deg": 29.972544376579727,
+      "true_elevation_deg": 29.972558446168,
+      "angle_error_deg": 1.4069588274878697e-05,
+      "relative_bouguer_error": -1.4280547977474356e-07,
+      "escaped": true,
+      "hit_ground": false,
+      "travel_m": 383498.28944917774,
+      "rk_ray_steps": 192
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 0.0,
+      "apparent_deg": 30.0,
+      "max_step_m": 1000.0,
+      "rk_true_elevation_deg": 29.972544376579727,
+      "true_elevation_deg": 29.972541299315502,
+      "angle_error_deg": -3.07726422477117e-06,
+      "relative_bouguer_error": 3.1023598356938464e-08,
+      "escaped": true,
+      "hit_ground": false,
+      "travel_m": 383498.45648724615,
+      "rk_ray_steps": 384
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 38.0,
+      "apparent_deg": -5.487342769121213,
+      "max_step_m": 4000.0,
+      "rk_true_elevation_deg": -6.0000000601793175,
+      "true_elevation_deg": -5.9999994675165444,
+      "angle_error_deg": 5.926627730801215e-07,
+      "relative_bouguer_error": 4.687488175392218e-10,
+      "escaped": true,
+      "hit_ground": false,
+      "travel_m": 2244195.2939128224,
+      "rk_ray_steps": 562
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 38.0,
+      "apparent_deg": -5.487342769121213,
+      "max_step_m": 2000.0,
+      "rk_true_elevation_deg": -6.0000000601793175,
+      "true_elevation_deg": -5.999999999676153,
+      "angle_error_deg": 6.050316425643132e-08,
+      "relative_bouguer_error": 1.0627010382791013e-10,
+      "escaped": true,
+      "hit_ground": false,
+      "travel_m": 2244195.3625184787,
+      "rk_ray_steps": 1123
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 38.0,
+      "apparent_deg": -5.487342769121213,
+      "max_step_m": 1000.0,
+      "rk_true_elevation_deg": -6.0000000601793175,
+      "true_elevation_deg": -6.000000078125376,
+      "angle_error_deg": -1.794605886118461e-08,
+      "relative_bouguer_error": -5.4115600889304005e-12,
+      "escaped": true,
+      "hit_ground": false,
+      "travel_m": 2244195.374136309,
+      "rk_ray_steps": 2245
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 47.0,
+      "apparent_deg": -5.7677034867361385,
+      "max_step_m": 4000.0,
+      "rk_true_elevation_deg": -6.000000007585967,
+      "true_elevation_deg": -5.999999986307225,
+      "angle_error_deg": 2.127874232371596e-08,
+      "relative_bouguer_error": 7.634115561927501e-12,
+      "escaped": true,
+      "hit_ground": false,
+      "travel_m": 2221122.895780596,
+      "rk_ray_steps": 556
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 47.0,
+      "apparent_deg": -5.7677034867361385,
+      "max_step_m": 2000.0,
+      "rk_true_elevation_deg": -6.000000007585967,
+      "true_elevation_deg": -6.00000000000669,
+      "angle_error_deg": 7.579277649938376e-09,
+      "relative_bouguer_error": -8.559819519859957e-13,
+      "escaped": true,
+      "hit_ground": false,
+      "travel_m": 2221122.89753063,
+      "rk_ray_steps": 1111
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 47.0,
+      "apparent_deg": -5.7677034867361385,
+      "max_step_m": 1000.0,
+      "rk_true_elevation_deg": -6.000000007585967,
+      "true_elevation_deg": -6.000000007792481,
+      "angle_error_deg": -2.0651391707815492e-10,
+      "relative_bouguer_error": -5.162537064506978e-14,
+      "escaped": true,
+      "hit_ground": false,
+      "travel_m": 2221122.898377072,
+      "rk_ray_steps": 2222
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 2.4,
+      "apparent_deg": 0.2,
+      "max_step_m": 4000.0,
+      "rk_true_elevation_deg": -0.20981095996754107,
+      "true_elevation_deg": -0.20980998234187112,
+      "angle_error_deg": 9.776256699456365e-07,
+      "relative_bouguer_error": -8.625683500795844e-10,
+      "escaped": true,
+      "hit_ground": false,
+      "travel_m": 1617231.5288790904,
+      "rk_ray_steps": 405
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 2.4,
+      "apparent_deg": 0.2,
+      "max_step_m": 2000.0,
+      "rk_true_elevation_deg": -0.20981095996754107,
+      "true_elevation_deg": -0.20981097035440283,
+      "angle_error_deg": -1.0386861759581478e-08,
+      "relative_bouguer_error": -2.694511280765255e-13,
+      "escaped": true,
+      "hit_ground": false,
+      "travel_m": 1617231.6168190455,
+      "rk_ray_steps": 809
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 2.4,
+      "apparent_deg": 0.2,
+      "max_step_m": 1000.0,
+      "rk_true_elevation_deg": -0.20981095996754107,
+      "true_elevation_deg": -0.20981095290304802,
+      "angle_error_deg": 7.064493046105014e-09,
+      "relative_bouguer_error": -5.249689571940053e-12,
+      "escaped": true,
+      "hit_ground": false,
+      "travel_m": 1617231.6150044675,
+      "rk_ray_steps": 1618
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 2.4,
+      "apparent_deg": 30.0,
+      "max_step_m": 4000.0,
+      "rk_true_elevation_deg": 29.978330788718218,
+      "true_elevation_deg": 29.978253886119784,
+      "angle_error_deg": -7.690259843329272e-05,
+      "relative_bouguer_error": 7.786493390060656e-07,
+      "escaped": true,
+      "hit_ground": false,
+      "travel_m": 379024.62264526,
+      "rk_ray_steps": 95
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 2.4,
+      "apparent_deg": 30.0,
+      "max_step_m": 2000.0,
+      "rk_true_elevation_deg": 29.978330788718218,
+      "true_elevation_deg": 29.978344969337353,
+      "angle_error_deg": 1.4180619135828465e-05,
+      "relative_bouguer_error": -1.4332992614995987e-07,
+      "escaped": true,
+      "hit_ground": false,
+      "travel_m": 379023.73169406474,
+      "rk_ray_steps": 190
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 2.4,
+      "apparent_deg": 30.0,
+      "max_step_m": 1000.0,
+      "rk_true_elevation_deg": 29.978330788718218,
+      "true_elevation_deg": 29.97832952472293,
+      "angle_error_deg": -1.2639952871040805e-06,
+      "relative_bouguer_error": 1.3058304659807618e-08,
+      "escaped": true,
+      "hit_ground": false,
+      "travel_m": 379023.8823262148,
+      "rk_ray_steps": 380
+    }
+  ],
+  "constant_index": [
+    {
+      "n": 1.0,
+      "all_fields_bit_exact": true
+    },
+    {
+      "n": 1.000278,
+      "all_fields_bit_exact": true
+    }
+  ],
+  "near_tangent_ground": [
+    {
+      "max_step_m": 4000.0,
+      "ground_hit": true,
+      "first_hit_distance_m": 126.54486384822064,
+      "turn_min_checks": 1
+    },
+    {
+      "max_step_m": 2000.0,
+      "ground_hit": true,
+      "first_hit_distance_m": 126.54486384822064,
+      "turn_min_checks": 1
+    },
+    {
+      "max_step_m": 1000.0,
+      "ground_hit": true,
+      "first_hit_distance_m": 126.54486878333316,
+      "turn_min_checks": 1
+    }
+  ],
+  "near_tangent_miss_correct": true,
+  "top_first_event_correct": true,
+  "radial_reference_ground_distance_m": 126.54487869416842,
+  "clone_smoke_finite": true,
+  "straight_global_majorant_mc_bit_exact": true,
+  "path_invariants": [
+    {
+      "height_km": 38.0,
+      "app_elevation_deg": -5.487342769121213,
+      "max_step_m": 4000.0,
+      "maximum_relative_bouguer_error": 4.889433302679436e-10
+    },
+    {
+      "height_km": 38.0,
+      "app_elevation_deg": -5.487342769121213,
+      "max_step_m": 2000.0,
+      "maximum_relative_bouguer_error": 1.0998668642514531e-10
+    },
+    {
+      "height_km": 38.0,
+      "app_elevation_deg": -5.487342769121213,
+      "max_step_m": 1000.0,
+      "maximum_relative_bouguer_error": 7.275957614183426e-12
+    },
+    {
+      "height_km": 0.0,
+      "app_elevation_deg": 0.2,
+      "max_step_m": 4000.0,
+      "maximum_relative_bouguer_error": 7.464355800124167e-10
+    },
+    {
+      "height_km": 0.0,
+      "app_elevation_deg": 0.2,
+      "max_step_m": 2000.0,
+      "maximum_relative_bouguer_error": 2.566800105796574e-10
+    },
+    {
+      "height_km": 0.0,
+      "app_elevation_deg": 0.2,
+      "max_step_m": 1000.0,
+      "maximum_relative_bouguer_error": 2.8098856574843012e-11
+    }
+  ],
+  "performance": {
+    "rays": 1000,
+    "max_step_m": 2000.0,
+    "seconds": 0.03043816692661494,
+    "rk_ray_steps": 25818,
+    "turn_min_checks": 0
+  }
+}

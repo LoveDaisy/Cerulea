@@ -1,0 +1,2 @@
+{"stage": "table_and_single", "mode": "unified", "elevation": 0.0, "single_photopic": 0.2769240195985393, "table_build_seconds": 136.37411562504712, "seconds": 1.6276098329108208}
+{"mode": "unified", "elevation": 0.0, "seed": 310, "photopic_integrals": {"total": 0.5102770382662956, "single": 0.27479928536841847, "multiple": 0.23547775289787715, "split_total": 0.5124017724964164}, "seconds": 144.75220091699157}

@@ -1,0 +1,23 @@
+{
+  "counterexample": [
+    {
+      "table": "sea_table",
+      "app_deg": -0.007662551104895554,
+      "T550": 0.017040738329449502,
+      "G": 0.8590392366864266,
+      "lit": true
+    },
+    {
+      "table": "high_table",
+      "app_deg": -0.000999,
+      "T550": 0.0,
+      "G": 0.0,
+      "lit": false
+    }
+  ],
+  "old_behavior": "Accepted same wavelength grid but wrong table.atmo; observed before constructor guard patch.",
+  "new_wrong_medium_rejection": "Solar table must be loaded or built for this construction medium",
+  "same_facade_changed_medium_rejection": "Solar table medium changed after its construction",
+  "correct_binding_accepted": true,
+  "patched_source_sha256": "6ed1b03c3c49ad748540064d90ce8306b8855f08d2409ba9a1cc51e1a654dea2"
+}

@@ -1,0 +1,60 @@
+{
+  "assessment_date": "2026-11-01",
+  "maintained_entry": "tools/check_curved_hamiltonian.py",
+  "checker_sha256": "e570c72c3a701bb549f990085503ef1a6ed8e24b0c63f9c92332d25ffd03d4e6",
+  "repository_head_at_portable_rerun": "6ded511b3888e73c166174066bf03959ffd17304",
+  "historical_initial": {
+    "checker": "historical-initial-probes.py",
+    "checker_sha256": "63601f68d09c7cb476513e38a53677c1ef95f47bafe05341191694a6c024c296",
+    "results": "independent-final-probes.json",
+    "results_sha256": "b5391a5a8a83c08dc7e29d78eb2fa1331da3194e93924b2d04dd62f5d24efca5",
+    "runtime_source_sha256": {
+      "tools/continuous_curved_mc.py": "27558a178876fd2a4ec65d4eb148654f4c087d7d613b8509ab30f6385e3843a2",
+      "tools/unified_solar_transport.py": "5d25bf55d731054acbb9589ebc9904dc2eef7f4a21e18c17da1fa5fd77d39e69",
+      "tools/point_solar_table.py": "c189f8c043a2da0b234b57c36d3e1b5f5c6ed459a7c7a45e3b7048f4bf51d084",
+      "skycolor/rt/mc.py": "30db2a561fd3428074774bb6096148f21dc40de139d8199335761db3676a6f03"
+    },
+    "note": "The initial source hash predates the binding guard. Historical results/log/source were copied byte-for-byte,not relabelled."
+  },
+  "current_run": {
+    "results": "hamiltonian-probes.json",
+    "results_sha256": "b19a3e989dda975cb30f4bfd471fd97dee9aaace70db72f19116fd9e9ec318b9",
+    "runtime_source_sha256": {
+      "tools/continuous_curved_mc.py": "27558a178876fd2a4ec65d4eb148654f4c087d7d613b8509ab30f6385e3843a2",
+      "tools/unified_solar_transport.py": "6ed1b03c3c49ad748540064d90ce8306b8855f08d2409ba9a1cc51e1a654dea2",
+      "tools/point_solar_table.py": "c189f8c043a2da0b234b57c36d3e1b5f5c6ed459a7c7a45e3b7048f4bf51d084",
+      "skycolor/rt/mc.py": "30db2a561fd3428074774bb6096148f21dc40de139d8199335761db3676a6f03"
+    },
+    "additional_dependency_sha256": {
+      "skycolor/aerosol.py": "92107771f079e5cccdc768fb1812b0d73af809eea9ff5371dbd5e67b055e10fd",
+      "skycolor/refraction.py": "8bb2641830d9de3d97db45076f488bc7dafd1d5b128442dd29a35527ce5e6e38",
+      "skycolor/medium.py": "68dad80d8be5a241c4e87a4e5906926a506973075728489b9294f3ccb4f86cf8"
+    },
+    "MC_paths_run": 0
+  },
+  "runtime_source_changes": {
+    "tools/unified_solar_transport.py": {
+      "initial": "5d25bf55d731054acbb9589ebc9904dc2eef7f4a21e18c17da1fa5fd77d39e69",
+      "current": "6ed1b03c3c49ad748540064d90ce8306b8855f08d2409ba9a1cc51e1a654dea2"
+    }
+  },
+  "version_explanation": {
+    "guard_patch": "../source-binding-guard.patch",
+    "guard_patch_sha256": "fd0eeb7f5a4790169225e7c2e5d6da208d52e9239bf97de71923410a3f59c7d2",
+    "runtime_provenance": "../runtime-source-provenance.json",
+    "note": "The only initial/current runtime source difference is the source-table precondition guard. It is not used by these flight/phase probes and changes no numerical kernel."
+  },
+  "portability": {
+    "working_directory": "/tmp",
+    "entry": "uv run --project <repo> python <repo>/tools/check_curved_hamiltonian.py --out <file>",
+    "results": "portable-hamiltonian-probes.json",
+    "log": "portable-hamiltonian-probes.log",
+    "full_json_equal_to_root_run": true,
+    "flight_and_phase_arrays_equal_to_initial": true
+  },
+  "contract_recheck": {
+    "results": "independent-final-contract.json",
+    "note": "Independent wrong-ground/table and same-facade/changed-medium rejection checks after the guard; no Monte Carlo."
+  },
+  "scope": "Sampled standard-profile ray trajectories and rural aerosol moments. This is not a full-order MC ensemble convergence approval."
+}

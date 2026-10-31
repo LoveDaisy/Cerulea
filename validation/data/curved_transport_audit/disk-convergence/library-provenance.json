@@ -1,0 +1,8 @@
+{
+  "disk16_head": "7ed71a62cea038dfad1e491420f0e4c014b74068",
+  "disk64_head": "2255b461fd8022690a667c939c7418ca039cd4f4",
+  "disk16_dirty_patch_sha256": "1bfea4d56bbefc54b7ba0d547659fcded8d4abac3224db1b33be7dd08fe4d588",
+  "committed_library_diff_sha256": "1bfea4d56bbefc54b7ba0d547659fcded8d4abac3224db1b33be7dd08fe4d588",
+  "identical_library_worktree_proven": true,
+  "explanation": "The old recorded dirty aerosol fix is exactly the committed library difference between the run heads; candidate library diff is empty."
+}

@@ -1,0 +1,7 @@
+{
+  "before_commit": "7ed71a62cea038dfad1e491420f0e4c014b74068",
+  "after_fix_commit": "5d6f793",
+  "before_aerosol_sha256": "90ccc6997592cd6b300518cfc8f59803349a3f06a7640d4db9f4f193bda54a71",
+  "after_aerosol_sha256": "92107771f079e5cccdc768fb1812b0d73af809eea9ff5371dbd5e67b055e10fd",
+  "note": "Original before/after probe recorded the same HEAD while the after file was dirty. The preserved exact library-fix.patch maps the committed before file to the fixed file; full-grid baseline arrays and old-method fixture replay provide independent numerical attribution."
+}

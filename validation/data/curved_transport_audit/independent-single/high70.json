@@ -1,0 +1,368 @@
+{
+  "wavelength_nm": 550.0,
+  "full_grid": [
+    380.0,
+    385.0,
+    390.0,
+    395.0,
+    400.0,
+    405.0,
+    410.0,
+    415.0,
+    420.0,
+    425.0,
+    430.0,
+    435.0,
+    440.0,
+    445.0,
+    450.0,
+    455.0,
+    460.0,
+    465.0,
+    470.0,
+    475.0,
+    480.0,
+    485.0,
+    490.0,
+    495.0,
+    500.0,
+    505.0,
+    510.0,
+    515.0,
+    520.0,
+    525.0,
+    530.0,
+    535.0,
+    540.0,
+    545.0,
+    550.0,
+    555.0,
+    560.0,
+    565.0,
+    570.0,
+    575.0,
+    580.0,
+    585.0,
+    590.0,
+    595.0,
+    600.0,
+    605.0,
+    610.0,
+    615.0,
+    620.0,
+    625.0,
+    630.0,
+    635.0,
+    640.0,
+    645.0,
+    650.0,
+    655.0,
+    660.0,
+    665.0,
+    670.0,
+    675.0,
+    680.0,
+    685.0,
+    690.0,
+    695.0,
+    700.0,
+    705.0,
+    710.0,
+    715.0,
+    720.0,
+    725.0,
+    730.0,
+    735.0,
+    740.0,
+    745.0,
+    750.0,
+    755.0,
+    760.0,
+    765.0,
+    770.0,
+    775.0,
+    780.0
+  ],
+  "table_label": "phase3-clear-81-ground0-refined",
+  "table_sha256": "1e6bef75ad5d17d66e3c6ed73f9979c53fb8727f657a02d6ac272b443d16b313",
+  "sun_elevation_deg": -6.0,
+  "ground_km": 0.0,
+  "views_deg": [
+    70.0
+  ],
+  "optical_definition": "MC fine-grid log-linear beta fields, full81 relative coefficients",
+  "single_semantics": "first atmospheric collision and zero previous ground reflections; max_scatter=1",
+  "deterministic": [
+    {
+      "radiance": 4.85297711451311e-05,
+      "step_m": 2000.0,
+      "n_gauss": 8,
+      "distance_m": 530430.4150549117,
+      "final_tau": 0.5042496112206385,
+      "n_quad": 2128,
+      "n_ode": 14837,
+      "direction_norm_error": 7.327471962526033e-15,
+      "max_bouguer_relative_drift": 1.1873790839445064e-10,
+      "phase_and_reduced_radiance_checks": [
+        {
+          "height_km": 19.06133290415071,
+          "source_kernel": 5.037588555002358e-09,
+          "vector_kernel": 5.037588555002485e-09,
+          "relative_error": 2.531308496145357e-14,
+          "reduced_radiance_factor": 1.0005097250828743
+        },
+        {
+          "height_km": 47.06177814219799,
+          "source_kernel": 0.42125838849786623,
+          "vector_kernel": 0.42125838849786623,
+          "relative_error": 0.0,
+          "reduced_radiance_factor": 1.0005554377364678
+        },
+        {
+          "height_km": 76.18123846221157,
+          "source_kernel": 1.3283203936232946,
+          "vector_kernel": 1.3283203936232943,
+          "relative_error": -2.220446049250313e-16,
+          "reduced_radiance_factor": 1.0005560679451813
+        },
+        {
+          "height_km": 106.07886720242165,
+          "source_kernel": 1.3415614013673145,
+          "vector_kernel": 1.341561401367314,
+          "relative_error": -3.3306690738754696e-16,
+          "reduced_radiance_factor": 1.0005560810386867
+        },
+        {
+          "height_km": 136.70463157411106,
+          "source_kernel": 1.3422167093574835,
+          "vector_kernel": 1.3422167093574835,
+          "relative_error": 0.0,
+          "reduced_radiance_factor": 1.0005560811022447
+        },
+        {
+          "height_km": 168.18691818960477,
+          "source_kernel": 1.3423428717727632,
+          "vector_kernel": 1.3423428717727632,
+          "relative_error": 0.0,
+          "reduced_radiance_factor": 1.0005560811037204
+        },
+        {
+          "height_km": 199.99648212661128,
+          "source_kernel": 1.3423592446990713,
+          "vector_kernel": 1.3423592446990715,
+          "relative_error": 2.220446049250313e-16,
+          "reduced_radiance_factor": 1.0005560811039016
+        }
+      ],
+      "view_deg": 70.0
+    }
+  ],
+  "mc": [
+    {
+      "step_m": 2000.0,
+      "seed": 7400,
+      "counts": [
+        50000
+      ],
+      "single": [
+        4.4815962046504543e-05
+      ],
+      "single_var": [
+        9.361669769681653e-12
+      ],
+      "multiple": [
+        0.0
+      ],
+      "seconds": 6.535402625100687,
+      "total_equals_single": true,
+      "rk_ray_steps": 8604653
+    },
+    {
+      "step_m": 2000.0,
+      "seed": 7401,
+      "counts": [
+        50000
+      ],
+      "single": [
+        5.128381121234704e-05
+      ],
+      "single_var": [
+        1.2277567704010155e-11
+      ],
+      "multiple": [
+        0.0
+      ],
+      "seconds": 6.5784070829395205,
+      "total_equals_single": true,
+      "rk_ray_steps": 8600436
+    },
+    {
+      "step_m": 2000.0,
+      "seed": 7402,
+      "counts": [
+        50000
+      ],
+      "single": [
+        4.858416131310177e-05
+      ],
+      "single_var": [
+        9.404563080283528e-12
+      ],
+      "multiple": [
+        0.0
+      ],
+      "seconds": 6.569052707985975,
+      "total_equals_single": true,
+      "rk_ray_steps": 8626593
+    },
+    {
+      "step_m": 2000.0,
+      "seed": 7403,
+      "counts": [
+        50000
+      ],
+      "single": [
+        4.6884812940582886e-05
+      ],
+      "single_var": [
+        9.03661999887891e-12
+      ],
+      "multiple": [
+        0.0
+      ],
+      "seconds": 6.571560582960956,
+      "total_equals_single": true,
+      "rk_ray_steps": 8554410
+    },
+    {
+      "step_m": 2000.0,
+      "seed": 7404,
+      "counts": [
+        50000
+      ],
+      "single": [
+        5.0531371147215325e-05
+      ],
+      "single_var": [
+        1.1336485010472945e-11
+      ],
+      "multiple": [
+        0.0
+      ],
+      "seconds": 6.6674919170327485,
+      "total_equals_single": true,
+      "rk_ray_steps": 8615708
+    },
+    {
+      "step_m": 2000.0,
+      "seed": 7405,
+      "counts": [
+        50000
+      ],
+      "single": [
+        5.180588748846617e-05
+      ],
+      "single_var": [
+        1.2770758881262469e-11
+      ],
+      "multiple": [
+        0.0
+      ],
+      "seconds": 6.61091633408796,
+      "total_equals_single": true,
+      "rk_ray_steps": 8599943
+    },
+    {
+      "step_m": 2000.0,
+      "seed": 7406,
+      "counts": [
+        50000
+      ],
+      "single": [
+        4.6191449032680056e-05
+      ],
+      "single_var": [
+        9.275172044742764e-12
+      ],
+      "multiple": [
+        0.0
+      ],
+      "seconds": 6.645123291993514,
+      "total_equals_single": true,
+      "rk_ray_steps": 8588774
+    },
+    {
+      "step_m": 2000.0,
+      "seed": 7407,
+      "counts": [
+        50000
+      ],
+      "single": [
+        4.6200043830783476e-05
+      ],
+      "single_var": [
+        8.218119831154401e-12
+      ],
+      "multiple": [
+        0.0
+      ],
+      "seconds": 6.6090147090144455,
+      "total_equals_single": true,
+      "rk_ray_steps": 8628423
+    }
+  ],
+  "seconds": 53.45956954197027,
+  "comparison": [
+    {
+      "step_m": 2000.0,
+      "mc_mean": [
+        4.828718737646015e-05
+      ],
+      "seed_se": [
+        9.377966763298676e-07
+      ],
+      "reported_se": [
+        1.12971896616265e-06
+      ],
+      "deterministic": [
+        4.85297711451311e-05
+      ],
+      "relative_difference": [
+        -0.0049986588221379025
+      ],
+      "z_score": [
+        -0.2586741612481641
+      ]
+    }
+  ],
+  "medium_probe": {
+    "heights_km": [
+      0.0,
+      0.037,
+      0.5,
+      1.0,
+      2.4,
+      5.0,
+      10.0,
+      20.0,
+      30.0,
+      40.0,
+      50.0,
+      80.0,
+      100.0,
+      150.0,
+      199.0
+    ],
+    "extinction_log_grid_vs_direct_max_relative": 0.0002934197041190023,
+    "scattering_log_grid_vs_direct_max_relative": 3.2501974703835756e-05,
+    "full_vs_restricted_aerosol_bitwise": true
+  },
+  "source_sha256": {
+    "tools/check_curved_single.py": "fefc5b798507da1ee57b451fff9921577c447276279a61af839e5aad568323d2",
+    "tools/continuous_curved_mc.py": "27558a178876fd2a4ec65d4eb148654f4c087d7d613b8509ab30f6385e3843a2",
+    "tools/unified_solar_transport.py": "5d25bf55d731054acbb9589ebc9904dc2eef7f4a21e18c17da1fa5fd77d39e69",
+    "skycolor/aerosol.py": "92107771f079e5cccdc768fb1812b0d73af809eea9ff5371dbd5e67b055e10fd",
+    "skycolor/rt/mc.py": "30db2a561fd3428074774bb6096148f21dc40de139d8199335761db3676a6f03"
+  },
+  "head": "5d6f793495f25350925bce11502bd0fa7796fd01"
+}

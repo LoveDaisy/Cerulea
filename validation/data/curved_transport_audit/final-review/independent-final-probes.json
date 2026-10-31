@@ -1,0 +1,695 @@
+{
+  "scope": "No Monte Carlo; independent Hamiltonian DOP853 flights and exact inverse-CDF cell moments.",
+  "source_sha256": {
+    "tools/continuous_curved_mc.py": "27558a178876fd2a4ec65d4eb148654f4c087d7d613b8509ab30f6385e3843a2",
+    "tools/unified_solar_transport.py": "5d25bf55d731054acbb9589ebc9904dc2eef7f4a21e18c17da1fa5fd77d39e69",
+    "tools/point_solar_table.py": "c189f8c043a2da0b234b57c36d3e1b5f5c6ed459a7c7a45e3b7048f4bf51d084",
+    "skycolor/rt/mc.py": "30db2a561fd3428074774bb6096148f21dc40de139d8199335761db3676a6f03"
+  },
+  "flights": [
+    {
+      "ground_km": 0.0,
+      "height_km": 1e-05,
+      "elevation_deg": -0.005,
+      "sampled_distance_m": 2000.0,
+      "step_m": 2000.0,
+      "reference_event": "ground",
+      "event": "ground",
+      "travel_error_m": -1.8194214888467286e-05,
+      "position_error_m": 1.819421477478045e-05,
+      "direction_error_rad": 8.302906004133364e-12,
+      "hamiltonian_norm_error": 0.0,
+      "reference_nfev": 65
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 1e-05,
+      "elevation_deg": -0.005,
+      "sampled_distance_m": 2000.0,
+      "step_m": 1000.0,
+      "reference_event": "ground",
+      "event": "ground",
+      "travel_error_m": -1.325910237426342e-05,
+      "position_error_m": 1.3259102203733164e-05,
+      "direction_error_rad": 1.690988265695129e-12,
+      "hamiltonian_norm_error": 0.0,
+      "reference_nfev": 65
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 5e-05,
+      "elevation_deg": -0.005,
+      "sampled_distance_m": 2000.0,
+      "step_m": 2000.0,
+      "reference_event": "trial",
+      "event": "trial",
+      "travel_error_m": 0.0,
+      "position_error_m": 1.5916157281026244e-12,
+      "direction_error_rad": 1.1105030395813493e-16,
+      "hamiltonian_norm_error": 2.220446049250313e-16,
+      "reference_nfev": 74
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 5e-05,
+      "elevation_deg": -0.005,
+      "sampled_distance_m": 2000.0,
+      "step_m": 1000.0,
+      "reference_event": "trial",
+      "event": "trial",
+      "travel_error_m": 0.0,
+      "position_error_m": 9.313239346376907e-10,
+      "direction_error_rad": 1.1102231569740467e-16,
+      "hamiltonian_norm_error": 2.220446049250313e-16,
+      "reference_nfev": 74
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 0.0,
+      "elevation_deg": 0.2,
+      "sampled_distance_m": 2000000.0,
+      "step_m": 2000.0,
+      "reference_event": "top",
+      "event": "top",
+      "travel_error_m": 0.02180281816981733,
+      "position_error_m": 0.02248191048025353,
+      "direction_error_rad": 4.34217313511152e-09,
+      "hamiltonian_norm_error": 5.375699885235008e-13,
+      "reference_nfev": 6209
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 0.0,
+      "elevation_deg": 0.2,
+      "sampled_distance_m": 2000000.0,
+      "step_m": 1000.0,
+      "reference_event": "top",
+      "event": "top",
+      "travel_error_m": 0.0022027757950127125,
+      "position_error_m": 0.0022716491408011534,
+      "direction_error_rad": 4.5337461316488217e-10,
+      "hamiltonian_norm_error": 5.375699885235008e-13,
+      "reference_nfev": 6209
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 38.0,
+      "elevation_deg": -5.487342769121213,
+      "sampled_distance_m": 2000000.0,
+      "step_m": 2000.0,
+      "reference_event": "trial",
+      "event": "trial",
+      "travel_error_m": 0.0,
+      "position_error_m": 0.00213442599905679,
+      "direction_error_rad": 1.102771524510371e-09,
+      "hamiltonian_norm_error": 1.5836221223253233e-12,
+      "reference_nfev": 7262
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 38.0,
+      "elevation_deg": -5.487342769121213,
+      "sampled_distance_m": 2000000.0,
+      "step_m": 1000.0,
+      "reference_event": "trial",
+      "event": "trial",
+      "travel_error_m": 0.0,
+      "position_error_m": 0.0003991592195302885,
+      "direction_error_rad": 2.663739328634323e-10,
+      "hamiltonian_norm_error": 1.5836221223253233e-12,
+      "reference_nfev": 7262
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 100.0,
+      "elevation_deg": -9.48538509285,
+      "sampled_distance_m": 2000000.0,
+      "step_m": 2000.0,
+      "reference_event": "trial",
+      "event": "trial",
+      "travel_error_m": 0.0,
+      "position_error_m": 0.0002522636215414737,
+      "direction_error_rad": 2.3728354764477617e-10,
+      "hamiltonian_norm_error": 5.136557845730749e-12,
+      "reference_nfev": 6362
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 100.0,
+      "elevation_deg": -9.48538509285,
+      "sampled_distance_m": 2000000.0,
+      "step_m": 1000.0,
+      "reference_event": "trial",
+      "event": "trial",
+      "travel_error_m": 0.0,
+      "position_error_m": 3.0152126516777335e-05,
+      "direction_error_rad": 1.2754487759764477e-11,
+      "hamiltonian_norm_error": 5.136557845730749e-12,
+      "reference_nfev": 6362
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 47.0,
+      "elevation_deg": -20.0,
+      "sampled_distance_m": 2000000.0,
+      "step_m": 2000.0,
+      "reference_event": "ground",
+      "event": "ground",
+      "travel_error_m": -0.019838240841636434,
+      "position_error_m": 0.020961271055893394,
+      "direction_error_rad": 1.9787874475480347e-07,
+      "hamiltonian_norm_error": 2.8877122915105247e-11,
+      "reference_nfev": 1673
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 47.0,
+      "elevation_deg": -20.0,
+      "sampled_distance_m": 2000000.0,
+      "step_m": 1000.0,
+      "reference_event": "ground",
+      "event": "ground",
+      "travel_error_m": 0.00013075623428449035,
+      "position_error_m": 0.00013715703182007232,
+      "direction_error_rad": 1.4087225421659412e-09,
+      "hamiltonian_norm_error": 2.8877122915105247e-11,
+      "reference_nfev": 1673
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 2.0,
+      "elevation_deg": 89.0,
+      "sampled_distance_m": 25000.0,
+      "step_m": 2000.0,
+      "reference_event": "trial",
+      "event": "trial",
+      "travel_error_m": 0.0,
+      "position_error_m": 2.881836665725616e-05,
+      "direction_error_rad": 2.264215238612902e-09,
+      "hamiltonian_norm_error": 1.9124979377949103e-10,
+      "reference_nfev": 698
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 2.0,
+      "elevation_deg": 89.0,
+      "sampled_distance_m": 25000.0,
+      "step_m": 1000.0,
+      "reference_event": "trial",
+      "event": "trial",
+      "travel_error_m": 0.0,
+      "position_error_m": 2.687115173362545e-05,
+      "direction_error_rad": 1.6559320355814639e-09,
+      "hamiltonian_norm_error": 1.9124979377949103e-10,
+      "reference_nfev": 698
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 3.0,
+      "elevation_deg": -2.0,
+      "sampled_distance_m": 50000.0,
+      "step_m": 2000.0,
+      "reference_event": "trial",
+      "event": "trial",
+      "travel_error_m": 0.0,
+      "position_error_m": 2.794052987673724e-09,
+      "direction_error_rad": 6.007929200297255e-14,
+      "hamiltonian_norm_error": 2.886579864025407e-15,
+      "reference_nfev": 182
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 3.0,
+      "elevation_deg": -2.0,
+      "sampled_distance_m": 50000.0,
+      "step_m": 1000.0,
+      "reference_event": "trial",
+      "event": "trial",
+      "travel_error_m": 0.0,
+      "position_error_m": 2.7940056192020167e-09,
+      "direction_error_rad": 7.892027540295772e-14,
+      "hamiltonian_norm_error": 2.886579864025407e-15,
+      "reference_nfev": 182
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 2.40001,
+      "elevation_deg": -0.005,
+      "sampled_distance_m": 2000.0,
+      "step_m": 2000.0,
+      "reference_event": "ground",
+      "event": "ground",
+      "travel_error_m": -2.1631625472195992e-05,
+      "position_error_m": 2.163162544961189e-05,
+      "direction_error_rad": 7.508574493776246e-12,
+      "hamiltonian_norm_error": 4.440892098500626e-16,
+      "reference_nfev": 65
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 2.40001,
+      "elevation_deg": -0.005,
+      "sampled_distance_m": 2000.0,
+      "step_m": 1000.0,
+      "reference_event": "ground",
+      "event": "ground",
+      "travel_error_m": -1.6829277555530098e-05,
+      "position_error_m": 1.6829277510245253e-05,
+      "direction_error_rad": 1.1208538844243929e-12,
+      "hamiltonian_norm_error": 4.440892098500626e-16,
+      "reference_nfev": 65
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 2.40005,
+      "elevation_deg": -0.005,
+      "sampled_distance_m": 2000.0,
+      "step_m": 2000.0,
+      "reference_event": "trial",
+      "event": "trial",
+      "travel_error_m": 0.0,
+      "position_error_m": 1.3642420526593924e-12,
+      "direction_error_rad": 1.1249341107836512e-16,
+      "hamiltonian_norm_error": 2.220446049250313e-16,
+      "reference_nfev": 74
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 2.40005,
+      "elevation_deg": -0.005,
+      "sampled_distance_m": 2000.0,
+      "step_m": 1000.0,
+      "reference_event": "trial",
+      "event": "trial",
+      "travel_error_m": 0.0,
+      "position_error_m": 1.3642420526593924e-12,
+      "direction_error_rad": 1.110889995077575e-16,
+      "hamiltonian_norm_error": 2.220446049250313e-16,
+      "reference_nfev": 74
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 2.4,
+      "elevation_deg": 0.2,
+      "sampled_distance_m": 2000000.0,
+      "step_m": 2000.0,
+      "reference_event": "top",
+      "event": "top",
+      "travel_error_m": 0.0012615346349775791,
+      "position_error_m": 0.0012996295512995692,
+      "direction_error_rad": 1.9796263150786647e-10,
+      "hamiltonian_norm_error": 3.164135620181696e-13,
+      "reference_nfev": 5885
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 2.4,
+      "elevation_deg": 0.2,
+      "sampled_distance_m": 2000000.0,
+      "step_m": 1000.0,
+      "reference_event": "top",
+      "event": "top",
+      "travel_error_m": -0.0005530433263629675,
+      "position_error_m": 0.0005709001655895642,
+      "direction_error_rad": 1.0662096929946633e-10,
+      "hamiltonian_norm_error": 3.164135620181696e-13,
+      "reference_nfev": 5885
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 38.0,
+      "elevation_deg": -5.487342769121213,
+      "sampled_distance_m": 2000000.0,
+      "step_m": 2000.0,
+      "reference_event": "trial",
+      "event": "trial",
+      "travel_error_m": 0.0,
+      "position_error_m": 0.00213442599905679,
+      "direction_error_rad": 1.102771524510371e-09,
+      "hamiltonian_norm_error": 1.5836221223253233e-12,
+      "reference_nfev": 7262
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 38.0,
+      "elevation_deg": -5.487342769121213,
+      "sampled_distance_m": 2000000.0,
+      "step_m": 1000.0,
+      "reference_event": "trial",
+      "event": "trial",
+      "travel_error_m": 0.0,
+      "position_error_m": 0.0003991592195302885,
+      "direction_error_rad": 2.663739328634323e-10,
+      "hamiltonian_norm_error": 1.5836221223253233e-12,
+      "reference_nfev": 7262
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 100.0,
+      "elevation_deg": -9.48538509285,
+      "sampled_distance_m": 2000000.0,
+      "step_m": 2000.0,
+      "reference_event": "trial",
+      "event": "trial",
+      "travel_error_m": 0.0,
+      "position_error_m": 0.0002522636215414737,
+      "direction_error_rad": 2.3728354764477617e-10,
+      "hamiltonian_norm_error": 5.136557845730749e-12,
+      "reference_nfev": 6362
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 100.0,
+      "elevation_deg": -9.48538509285,
+      "sampled_distance_m": 2000000.0,
+      "step_m": 1000.0,
+      "reference_event": "trial",
+      "event": "trial",
+      "travel_error_m": 0.0,
+      "position_error_m": 3.0152126516777335e-05,
+      "direction_error_rad": 1.2754487759764477e-11,
+      "hamiltonian_norm_error": 5.136557845730749e-12,
+      "reference_nfev": 6362
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 47.0,
+      "elevation_deg": -20.0,
+      "sampled_distance_m": 2000000.0,
+      "step_m": 2000.0,
+      "reference_event": "ground",
+      "event": "ground",
+      "travel_error_m": -0.01549379140487872,
+      "position_error_m": 0.01637665359412391,
+      "direction_error_rad": 1.9744242436955174e-07,
+      "hamiltonian_norm_error": 3.327071951275684e-11,
+      "reference_nfev": 1649
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 47.0,
+      "elevation_deg": -20.0,
+      "sampled_distance_m": 2000000.0,
+      "step_m": 1000.0,
+      "reference_event": "ground",
+      "event": "ground",
+      "travel_error_m": 0.00010008324170485139,
+      "position_error_m": 0.00010502566865526236,
+      "direction_error_rad": 1.3873986209330984e-09,
+      "hamiltonian_norm_error": 3.327071951275684e-11,
+      "reference_nfev": 1649
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 4.4,
+      "elevation_deg": 89.0,
+      "sampled_distance_m": 25000.0,
+      "step_m": 2000.0,
+      "reference_event": "trial",
+      "event": "trial",
+      "travel_error_m": 0.0,
+      "position_error_m": 0.0002830903596134006,
+      "direction_error_rad": 1.5563366635965806e-08,
+      "hamiltonian_norm_error": 1.008613192965413e-10,
+      "reference_nfev": 950
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 4.4,
+      "elevation_deg": 89.0,
+      "sampled_distance_m": 25000.0,
+      "step_m": 1000.0,
+      "reference_event": "trial",
+      "event": "trial",
+      "travel_error_m": 0.0,
+      "position_error_m": 4.2661702015787526e-05,
+      "direction_error_rad": 2.3825037915724444e-09,
+      "hamiltonian_norm_error": 1.008613192965413e-10,
+      "reference_nfev": 950
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 5.4,
+      "elevation_deg": -2.0,
+      "sampled_distance_m": 50000.0,
+      "step_m": 2000.0,
+      "reference_event": "trial",
+      "event": "trial",
+      "travel_error_m": 0.0,
+      "position_error_m": 2.9103830456733704e-11,
+      "direction_error_rad": 2.1801982561743546e-14,
+      "hamiltonian_norm_error": 1.5543122344752192e-15,
+      "reference_nfev": 182
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 5.4,
+      "elevation_deg": -2.0,
+      "sampled_distance_m": 50000.0,
+      "step_m": 1000.0,
+      "reference_event": "trial",
+      "event": "trial",
+      "travel_error_m": 0.0,
+      "position_error_m": 9.313509958912413e-10,
+      "direction_error_rad": 4.7525914858991635e-14,
+      "hamiltonian_norm_error": 1.5543122344752192e-15,
+      "reference_nfev": 182
+    }
+  ],
+  "aerosol_sampling": [
+    {
+      "wavelength_nm": 450.0,
+      "N_PHASE": 2049,
+      "half_integral_phase": 0.9999730963136327,
+      "sampled_moments": [
+        0.9999999999999999,
+        0.7290517458925944,
+        0.5278795393143135,
+        0.34618696566453777,
+        0.2282517698775728
+      ],
+      "analytic_moments": [
+        1.0,
+        0.7290653905604426,
+        0.5279028728967139,
+        0.3462157841791303,
+        0.22828307152081717
+      ],
+      "moment_errors": [
+        -1.1102230246251565e-16,
+        -1.364466784825602e-05,
+        -2.3333582400364428e-05,
+        -2.881851459252127e-05,
+        -3.1301643244358024e-05
+      ]
+    },
+    {
+      "wavelength_nm": 450.0,
+      "N_PHASE": 8193,
+      "half_integral_phase": 0.9999646902005856,
+      "sampled_moments": [
+        1.0,
+        0.7290508049871104,
+        0.5278787507803919,
+        0.3461870912198165,
+        0.22825312845841475
+      ],
+      "analytic_moments": [
+        1.0,
+        0.7290653905604426,
+        0.5279028728967139,
+        0.3462157841791303,
+        0.22828307152081717
+      ],
+      "moment_errors": [
+        0.0,
+        -1.4585573332226431e-05,
+        -2.412211632196737e-05,
+        -2.86929593137919e-05,
+        -2.994306240242106e-05
+      ]
+    },
+    {
+      "wavelength_nm": 450.0,
+      "N_PHASE": 32769,
+      "half_integral_phase": 0.9999640781142485,
+      "sampled_moments": [
+        0.9999999999999999,
+        0.7290507248523772,
+        0.5278786596037435,
+        0.34618704238009257,
+        0.22825314311355005
+      ],
+      "analytic_moments": [
+        1.0,
+        0.7290653905604426,
+        0.5279028728967139,
+        0.3462157841791303,
+        0.22828307152081717
+      ],
+      "moment_errors": [
+        -1.1102230246251565e-16,
+        -1.46657080654089e-05,
+        -2.4213292970420852e-05,
+        -2.874179903772367e-05,
+        -2.9928407267121315e-05
+      ]
+    },
+    {
+      "wavelength_nm": 550.0,
+      "N_PHASE": 2049,
+      "half_integral_phase": 0.9999707418648067,
+      "sampled_moments": [
+        0.9999999999999999,
+        0.7140708667924184,
+        0.49855447345127896,
+        0.3134846816741498,
+        0.1956845084420173
+      ],
+      "analytic_moments": [
+        1.0,
+        0.7140849605432531,
+        0.4985772586271348,
+        0.31351129694780827,
+        0.19571127718212206
+      ],
+      "moment_errors": [
+        -1.1102230246251565e-16,
+        -1.4093750834720531e-05,
+        -2.2785175855855044e-05,
+        -2.6615273658492367e-05,
+        -2.6768740104765598e-05
+      ]
+    },
+    {
+      "wavelength_nm": 550.0,
+      "N_PHASE": 8193,
+      "half_integral_phase": 0.9999656347558343,
+      "sampled_moments": [
+        0.9999999999999998,
+        0.7140704725259601,
+        0.49855446638166295,
+        0.3134855174239195,
+        0.1956863120226264
+      ],
+      "analytic_moments": [
+        1.0,
+        0.7140849605432531,
+        0.4985772586271348,
+        0.31351129694780827,
+        0.19571127718212206
+      ],
+      "moment_errors": [
+        -2.220446049250313e-16,
+        -1.448801729297955e-05,
+        -2.2792245471858763e-05,
+        -2.577952388876925e-05,
+        -2.4965159495654587e-05
+      ]
+    },
+    {
+      "wavelength_nm": 550.0,
+      "N_PHASE": 32769,
+      "half_integral_phase": 0.9999652704638768,
+      "sampled_moments": [
+        1.0000000000000002,
+        0.7140704361363375,
+        0.4985544412370874,
+        0.31348553589303624,
+        0.19568638207699188
+      ],
+      "analytic_moments": [
+        1.0,
+        0.7140849605432531,
+        0.4985772586271348,
+        0.31351129694780827,
+        0.19571127718212206
+      ],
+      "moment_errors": [
+        2.220446049250313e-16,
+        -1.4524406915628063e-05,
+        -2.2817390047391584e-05,
+        -2.5761054772033276e-05,
+        -2.489510513017934e-05
+      ]
+    },
+    {
+      "wavelength_nm": 650.0,
+      "N_PHASE": 2049,
+      "half_integral_phase": 0.9999718329838629,
+      "sampled_moments": [
+        0.9999999999999998,
+        0.6926898656701328,
+        0.4633967995583996,
+        0.2746949851717603,
+        0.1591545072968097
+      ],
+      "analytic_moments": [
+        1.0,
+        0.6927035524577965,
+        0.4634176100357791,
+        0.2747173164751893,
+        0.15917477006858904
+      ],
+      "moment_errors": [
+        -2.220446049250313e-16,
+        -1.3686787663669264e-05,
+        -2.081047737950703e-05,
+        -2.2331303429046212e-05,
+        -2.026277177935576e-05
+      ]
+    },
+    {
+      "wavelength_nm": 650.0,
+      "N_PHASE": 8193,
+      "half_integral_phase": 0.9999686300380507,
+      "sampled_moments": [
+        0.9999999999999999,
+        0.6926897432004153,
+        0.4633971065065087,
+        0.27469596612517366,
+        0.15915615909172334
+      ],
+      "analytic_moments": [
+        1.0,
+        0.6927035524577965,
+        0.4634176100357791,
+        0.2747173164751893,
+        0.15917477006858904
+      ],
+      "moment_errors": [
+        -1.1102230246251565e-16,
+        -1.3809257381147688e-05,
+        -2.0503529270354814e-05,
+        -2.135035001565866e-05,
+        -1.861097686570168e-05
+      ]
+    },
+    {
+      "wavelength_nm": 650.0,
+      "N_PHASE": 32769,
+      "half_integral_phase": 0.9999684023226082,
+      "sampled_moments": [
+        1.0,
+        0.6926897279577489,
+        0.46339711031204794,
+        0.27469600662693705,
+        0.15915623610962615
+      ],
+      "analytic_moments": [
+        1.0,
+        0.6927035524577965,
+        0.4634176100357791,
+        0.2747173164751893,
+        0.15917477006858904
+      ],
+      "moment_errors": [
+        0.0,
+        -1.3824500047610044e-05,
+        -2.049972373113773e-05,
+        -2.1309848252271113e-05,
+        -1.8533958962896335e-05
+      ]
+    }
+  ]
+}
