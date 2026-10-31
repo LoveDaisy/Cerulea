@@ -74,9 +74,9 @@
           "unit": "W/m2"
         },
         {
-          "dev": 6.545808858951897,
+          "dev": 6.545808858951895,
           "dev_kind": "abs",
-          "model": 6.545808858951897,
+          "model": 6.545808858951895,
           "name": "DNI spectral RMS, 400-700 nm",
           "passed": true,
           "reference": 0.0,
