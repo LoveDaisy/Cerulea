@@ -49,24 +49,6 @@ def _quadrature_points(ub: np.ndarray, n_gauss: int):
     return u.reshape(ns * ng, nr), du.reshape(ns * ng, nr)
 
 
-def _local_optics_h(atmo, z_km, h_km, wl_mask=None):
-    """Local optical properties at height ``z`` including the horizontal field."""
-    z = np.atleast_1d(np.asarray(z_km, dtype=float))
-    h = np.atleast_1d(np.asarray(h_km, dtype=float))
-    n_air = atmo.n_air(z)
-    beta_ray = n_air[:, None] * atmo._sigma_ray[None, :]
-    beta_o3 = atmo.n_o3(z)[:, None] * atmo._sigma_o3[None, :]
-    beta_no2 = atmo.n_no2(z)[:, None] * atmo._sigma_no2[None, :]
-    beta_as = np.zeros_like(beta_ray)
-    beta_ae = np.zeros_like(beta_ray)
-    for lay in atmo.aerosols:
-        rel_ext, rel_sca = lay.aerosol.relative_coefficients(atmo.wl)
-        w = lay.aod550 * lay.profile(z) / 1000.0 * lay.horizontal.weight(h)
-        beta_ae += w[:, None] * rel_ext[None, :]
-        beta_as += w[:, None] * rel_sca[None, :]
-    return beta_ray, beta_as, beta_ae, beta_o3, beta_no2
-
-
 def _tau_from_columns(atmo, cols: np.ndarray) -> np.ndarray:
     """Optical depth of species column amounts; thin wrapper over the shared
     column algebra in :mod:`skycolor.optics` (the single source of the

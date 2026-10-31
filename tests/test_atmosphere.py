@@ -60,3 +60,45 @@ def test_elevation_rescales_aerosol_column():
     tau = np.sum(beta * np.diff(high.z_bounds)[:, None] * 1e3, axis=0)
     i = np.argmin(abs(high.wl - 550))
     assert 0 < tau[i] < 0.05
+
+
+# ---------------------------------------------------------------------------
+# facade completeness (architecture-refactor Step 3a)
+# ---------------------------------------------------------------------------
+#: every name the pre-Medium ``Atmosphere`` exposed, captured at the
+#: pre-refactor baseline so the facade cannot silently drop one
+FACADE_METHODS = frozenset({
+    "_prepare_no2", "_prepare_ozone", "_restrict", "aerosol_coefficients",
+    "at_altitude", "delta_m_moments", "delta_m_properties", "layer_properties",
+    "n_air", "n_no2", "n_o3", "no2_coefficient", "ozone_coefficient",
+    "phase_moments", "pressure", "r_bounds", "rayleigh_coefficient",
+    "standard", "temperature",
+})
+FACADE_ATTRIBUTES = frozenset({
+    "wl", "ozone_du", "no2_column", "aerosols", "surface_pressure",
+    "elevation_km", "refraction", "z_bounds", "z_mid", "ground_albedo",
+    "_sigma_ray", "_sigma_o3", "_sigma_no2", "_ray_phase",
+    "_o3_scale", "_no2_scale",
+})
+
+
+def test_facade_preserves_public_surface():
+    """Every pre-refactor name must still resolve on the facade."""
+    for name in FACADE_METHODS:
+        assert hasattr(Atmosphere, name), name
+    at = Atmosphere(np.array([400.0, 550.0, 650.0]), ozone_du=300.0, aerosols=[])
+    for name in FACADE_ATTRIBUTES:
+        assert hasattr(at, name), name
+
+
+def test_medium_arrays_are_read_only():
+    """``_sigma_*``/``wl`` are derived Medium state: assignment must fail
+    loudly instead of silently desynchronising the facade from its Medium."""
+    at = Atmosphere(np.array([400.0, 550.0]), ozone_du=300.0, aerosols=[])
+    with pytest.raises(AttributeError):
+        at._sigma_ray = at._sigma_ray
+    with pytest.raises(AttributeError):
+        at.wl = at.wl
+    # the aerosols setter remains the sanctioned redefinition path
+    at.aerosols = []
+    assert at.aerosols == []

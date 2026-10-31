@@ -52,11 +52,10 @@ def _conservative_atmosphere(wl, albedo: float) -> Atmosphere:
 # ---------------------------------------------------------------------------
 # 1. empty atmosphere
 # ---------------------------------------------------------------------------
-def test_empty_atmosphere_is_exactly_zero():
+def test_empty_atmosphere_is_exactly_zero(thin_atmosphere_factory):
     """No Rayleigh and no aerosol -> no scattering -> exactly zero."""
-    atmo = Atmosphere(np.array([450.0, 550.0, 650.0]), ozone_du=300.0,
-                      aerosols=[])
-    atmo._sigma_ray = np.zeros_like(atmo._sigma_ray)  # kill Rayleigh
+    atmo = thin_atmosphere_factory(np.array([450.0, 550.0, 650.0]),
+                                   scale_ray=0.0)  # kill Rayleigh
     ms = multiple.multiple_scattering(
         atmo, 60.0, [0.0, 30.0, 60.0, 85.0], [0.0, 90.0, 180.0, 270.0]
     )

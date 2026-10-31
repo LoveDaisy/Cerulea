@@ -26,12 +26,16 @@ def scaled_atmosphere(atmo, factor: float) -> Atmosphere:
 
     Both the molecular cross sections and the aerosol optical depths are
     scaled, so the result is a genuinely thinner atmosphere, not just a
-    fainter one.
+    fainter one.  Test-only transitional fixture (plan Step 3a): the scaled
+    arrays are patched into the frozen Medium because ``_sigma_*`` are
+    read-only now; such objects must never enter a shared or identity-keyed
+    cache.  (Step 3b replaces this with per-species density injection.)
     """
     thin = copy.deepcopy(atmo)
-    thin._sigma_ray = np.array(atmo._sigma_ray) * factor
-    thin._sigma_o3 = np.array(atmo._sigma_o3) * factor
-    thin._sigma_no2 = np.array(atmo._sigma_no2) * factor
+    medium = thin._medium
+    object.__setattr__(medium, "_sigma_ray", np.array(atmo._sigma_ray) * factor)
+    object.__setattr__(medium, "_sigma_o3", np.array(atmo._sigma_o3) * factor)
+    object.__setattr__(medium, "_sigma_no2", np.array(atmo._sigma_no2) * factor)
     for lay in thin.aerosols:
         lay.aod550 = lay.aod550 * factor
     return thin
