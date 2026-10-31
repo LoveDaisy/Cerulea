@@ -39,7 +39,9 @@ Estimator design
    :func:`skycolor.rt.mc.mc_radiance_split`, i.e. every path that scattered
    twice or more *or* touched the ground.  That is exactly
    ``total - single`` as defined by ``rt.single``, so adding it to the
-   deterministic first-order term is unbiased for the total radiance.  The
+   deterministic first-order term matches the same transport model when
+   refraction is off.  With refraction on this is a hybrid: solar-refraction
+   first order plus geometric higher orders, not all-order refracted RT.  The
    first-scattering contribution (numerically the largest and the noisiest) is
    never estimated stochastically.
 2. **Coarse angular grid + spherical smoothing.**  The multiple-scattering
@@ -49,7 +51,7 @@ Estimator design
    ``L(theta, phi_s + dphi) = L(theta, phi_s - dphi)`` because both the
    atmosphere and the ground are azimuthally uniform (in the same sense as
    ``rt.multiple``: the aerosol ``HorizontalField`` is not used).  A
-   local-linear regression on the sphere, in log space, smooths the noisy
+   local-linear regression on the sphere, in linear space, smooths the noisy
    coarse values and interpolates them to the requested directions.  The
    regression weights give the error propagation for free.
 3. **Spectral interpolation.**  Wavelengths are independent Monte Carlo

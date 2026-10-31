@@ -37,7 +37,8 @@ from ..optics import (
 CAPABILITIES = {
     "scattering": "single scattering, exact spherical-shell quadrature",
     "horizontal_field": "applied at every scattering point",
-    "refraction": "solar chord and view path when atmo.refraction",
+    "refraction": "solar attenuation/shadow when enabled; straight viewing rays "
+                  "and geometric scattering angles",
 }
 
 
@@ -84,7 +85,7 @@ def direct_sun_transmittance(atmo, sun_zenith_deg: float) -> np.ndarray:
                                atmo.r_bounds)[:, 0]
     cols = species_columns(atmo, lengths[:, None], atmo.r_bounds)
     tau = _tau_from_columns(atmo, cols)[0]
-    lit = is_sunlit(p_sun, c)
+    lit = is_sunlit(p_sun, c, r_earth=atmo.r_bounds[0])
     return np.exp(-tau) if lit else np.zeros_like(tau)
 
 
@@ -146,7 +147,7 @@ def sky_radiance(
         from ..refraction import refractivity_of
 
         n_layer = 1.0 + refractivity_of(atmo, z_mid)
-        n_surface = 1.0 + refractivity_of(atmo, atmo.elevation_km)
+        n_surface = 1.0 + refractivity_of(atmo, atmo.z_bounds[0])
     else:
         n_layer = None
         n_surface = 1.0
@@ -186,10 +187,12 @@ def sky_radiance(
             e_app = _refr_geometry().apparent_elevation(e_true, z_pts)
             mu_app = np.sin(np.radians(e_app))
             p_sun = (1.0 + refractivity_of(atmo, z_pts)) * r_pts * np.cos(np.radians(e_app))
-            lit = (mu_app >= 0.0) | (p_sun > n_surface * R_EARTH)
+            # The opaque surface is the model bottom, including a raised site.
+            # Using sea level here lets solar rays cross the truncated ground.
+            lit = (mu_app >= 0.0) | (p_sun > n_surface * r_bounds[0])
             c_sun = mu_app
         else:
-            lit = is_sunlit(p_sun, mu_sun)
+            lit = is_sunlit(p_sun, mu_sun, r_earth=r_bounds[0])
             c_sun = mu_sun
 
         # ---- local optical properties, shape (n_pts, n_ray, n_wl) ----------

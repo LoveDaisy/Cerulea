@@ -371,7 +371,7 @@ def sun_transmittance_to_height(atmo, height_km: float, sun_zenith_deg: float):
     cols = shell_species_columns(lengths[:, None],
                                  shell_species_weights(atmo, atmo.r_bounds))
     tau = tau_from_columns(cols, species_extinction_weights(atmo))[0]
-    lit = bool(is_sunlit(np.array([p]), np.array([c]))[0])
+    lit = bool(is_sunlit(np.array([p]), np.array([c]), r_earth=atmo.r_bounds[0])[0])
     return (np.exp(-tau), lit) if lit else (np.zeros_like(tau), False)
 
 
@@ -419,19 +419,19 @@ class CloudIllumination:
         return self.geometry != "none"
 
 
-def shadow_height_km(sun_zenith_deg: float) -> float:
-    """Altitude of the terminator of a spherical Earth.
+def shadow_height_km(sun_zenith_deg: float, ground_km: float = 0.0) -> float:
+    """Altitude of the terminator above a spherical opaque ground.
 
     A point at height ``z`` is sunlit when its solar ray misses the Earth,
-    i.e. when ``(R + z) sin(theta) > R``.  The terminator is therefore at
-    ``z = R (1/sin(theta) - 1)`` for ``theta > 90``, and at the ground for a
-    sun above the horizon.
+    i.e. when ``(R + z) sin(theta) > R + ground_km * 1000``.  The
+    terminator is at ``z = (r_ground / sin(theta) - R) / 1000`` km for
+    ``theta > 90``, and at ``ground_km`` for a sun above the horizon.
     """
     theta = np.radians(float(sun_zenith_deg))
     if theta <= np.pi / 2.0:
-        return 0.0
+        return float(ground_km)
     s = np.sin(theta)
-    return float(R_EARTH * (1.0 / max(s, 1e-9) - 1.0) / 1000.0)
+    return float(((R_EARTH + ground_km * 1e3) / max(s, 1e-9) - R_EARTH) / 1000.0)
 
 
 def illuminate_cloud(atmo, cloud: CloudLayer, sun_zenith_deg: float,
@@ -462,7 +462,7 @@ def illuminate_cloud(atmo, cloud: CloudLayer, sun_zenith_deg: float,
     f0 = spectra.solar_irradiance(wl)
     zeros = np.zeros_like(f0)
 
-    z_shadow = shadow_height_km(sun_zenith_deg)
+    z_shadow = shadow_height_km(sun_zenith_deg, ground_km=float(atmo.z_bounds[0]))
 
     if z_shadow >= cloud.top_km or abs(mu) < 1e-8:
         # the whole deck is inside the Earth's shadow (or the sun is exactly

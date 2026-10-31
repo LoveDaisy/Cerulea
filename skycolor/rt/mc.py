@@ -222,7 +222,7 @@ def _sun_transmittance(atmo, x, sun_hat, dens, tau_w) -> np.ndarray:
     lengths = path_lengths_sun(p, mu, r, atmo.r_bounds)  # (n_shell, n)
     cols = lengths.T @ dens                               # (n, n_species)
     tau = cols @ tau_w
-    lit = is_sunlit(p, mu)
+    lit = is_sunlit(p, mu, r_earth=atmo.r_bounds[0])
     return np.where(lit, np.exp(-tau), 0.0)
 
 
