@@ -42,7 +42,8 @@ Mie coefficients with the Gaunt/Wigner 3-j expansion implemented in
 from __future__ import annotations
 
 from collections import OrderedDict
-from dataclasses import dataclass, field
+import copy
+from dataclasses import dataclass, field, fields as dataclasses_fields
 from typing import Callable, Sequence
 
 import numpy as np
@@ -315,9 +316,15 @@ class LogNormalMode:
     refractive_index: Callable | complex | None = None
 
 
-@dataclass
+@dataclass(frozen=True)
 class MieAerosol(Aerosol):
     """Aerosol described by log-normal size modes and a refractive index.
+
+    Frozen value object: the optical definition (modes, index, grids) never
+    changes after construction, which is what makes ``shared()`` instances
+    safe to reuse across atmospheres.  The per-wavelength caches below are
+    mutable *contents* behind an immutable binding -- redefining an aerosol
+    is :meth:`replace`, never attribute assignment.
 
     The size distribution is integrated with Mie theory.  The Legendre moments
     of the resulting phase function are computed **analytically** from the Mie
@@ -380,15 +387,39 @@ class MieAerosol(Aerosol):
     max_cached_wavelengths: int = 256
 
     def __post_init__(self):
-        self._nodes = self._build_nodes()
-        self._states: "OrderedDict[float, _State]" = OrderedDict()
+        # frozen dataclass: the internal cache slots are set in place here
+        # (contents mutate later, the binding never does)
+        object.__setattr__(self, "_nodes", self._build_nodes())
+        object.__setattr__(self, "_states", OrderedDict())
         # Phase tables are cheap to keep but expensive to rebuild.  They are
         # cached separately from the per-wavelength coefficient states, with
         # their own (larger) capacity, so a repeated sky_radiance() call over
         # the same wavelengths never rebuilds tables even when the
         # coefficient-state cache evicts between calls.
-        self._tables: "OrderedDict[float, PhaseTable]" = OrderedDict()
-        self._max_tables = 512
+        object.__setattr__(self, "_tables", OrderedDict())
+        object.__setattr__(self, "_max_tables", 512)
+
+    def replace(self, **kw) -> "MieAerosol":
+        """A copy of this aerosol with the given parameters redefined.
+
+        Implemented with ``copy.copy`` + field writes rather than
+        ``dataclasses.replace`` so it also works for the preset subclasses
+        whose ``__init__`` takes different keywords.  The derived nodes and
+        the per-wavelength caches are rebuilt for the new definition; the
+        old object (and any shared instance of it) is untouched.
+        """
+        field_names = {f.name for f in dataclasses_fields(type(self))}
+        unknown = set(kw) - field_names
+        if unknown:
+            raise TypeError(f"unknown field(s): {sorted(unknown)}")
+        new = copy.copy(self)
+        for k, v in kw.items():
+            object.__setattr__(new, k, v)
+        object.__setattr__(new, "_nodes", new._build_nodes())
+        object.__setattr__(new, "_states", OrderedDict())
+        object.__setattr__(new, "_tables", OrderedDict())
+        object.__setattr__(new, "_max_tables", 512)
+        return new
 
     # -- construction --------------------------------------------------------
     def _build_nodes(self):
@@ -1098,11 +1129,13 @@ def shared(cls, *args, **kwargs):
     ``presets.clear(...)`` pays the full Mie pre-processing again even for
     wavelengths that were already computed.
 
-    Consumers must treat the returned instance as read-only (everything
-    downstream only calls the :class:`Aerosol` interface); mutating a shared
-    instance would leak into every atmosphere that shares it.  The cache key
-    is ``(cls, args, sorted kwargs)`` -- exact, because the preset arguments
-    are simple floats.
+    Read-only by *structure*, not by convention: :class:`MieAerosol` is a
+    frozen dataclass, so attribute assignment raises
+    ``FrozenInstanceError`` instead of silently leaking into every
+    atmosphere that shares the instance.  Redefining an aerosol is
+    :meth:`MieAerosol.replace`, which returns a fresh (unshared) object.
+    The cache key is ``(cls, args, sorted kwargs)`` -- exact, because the
+    preset arguments are simple floats.
     """
     key = (cls, args, tuple(sorted(kwargs.items())))
     instance = _SHARED_AEROSOLS.get(key)

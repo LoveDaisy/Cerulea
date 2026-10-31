@@ -461,3 +461,18 @@ def test_no_cross_contamination_across_rh_and_wavelength():
     _ = a8.relative_coefficients(np.array([700.0]))
     assert np.array_equal(a5.relative_coefficients(wl)[0], c5)
     assert np.array_equal(a8.relative_coefficients(wl)[0], c8)
+
+
+def test_mie_aerosol_is_frozen():
+    """The optical definition is immutable: assignment must raise, and
+    ``replace`` returns a fresh object with rebuilt caches (task Step 5)."""
+    from dataclasses import FrozenInstanceError
+
+    a = MieAerosol(modes=[LogNormalMode(0.2, 2.0)], n_radii=32)
+    with pytest.raises(FrozenInstanceError):
+        a.n_radii = 64
+    b = a.replace(n_radii=64)
+    assert b.n_radii == 64 and a.n_radii == 32
+    assert b is not a
+    with pytest.raises(TypeError):
+        a.replace(nope=1)

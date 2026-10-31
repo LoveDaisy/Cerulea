@@ -332,3 +332,18 @@ def test_underlit_deck_is_not_seen_through_its_shadow(atmo):
     top_view = rtcloud.cloud_radiance(illum, [0.0])[0, I550]
     low_view = rtcloud.cloud_radiance(illum, [85.0])[0, I550]
     assert low_view < top_view                          # attenuated towards the horizon
+
+
+def test_cloud_layer_is_frozen_and_replace_drops_optics():
+    """The deck definition is immutable, and ``replace`` must NOT carry the
+    computed optics of the old definition into the new one (the tau scaling
+    would silently stay at the old value)."""
+    from dataclasses import FrozenInstanceError
+
+    layer = cloud.get_preset("stratus")
+    with pytest.raises(FrozenInstanceError):
+        layer.tau550 = 5.0
+    slim = layer.replace(tau550=5.0)
+    wl3 = np.array([450.0, 550.0, 650.0])
+    fat, thin = layer.optics(wl3), slim.optics(wl3)
+    np.testing.assert_allclose(thin.tau / fat.tau, 5.0 / 20.0, rtol=1e-12)

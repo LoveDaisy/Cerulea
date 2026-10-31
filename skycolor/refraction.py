@@ -53,7 +53,7 @@ REFRACTIVITY_STD = 2.78e-4
 _PROFILE_TOP = 1.2e6
 
 
-class _Profile:
+class RefractiveProfile:
     """Cached refractive index profile ``n(r)`` for one atmosphere."""
 
     def __init__(self, atmo, n_points: int = 4000):
@@ -117,13 +117,31 @@ def _trace(profile: _Profile, r0: float, theta0: float, r_earth: float,
     return hit, r_min, theta_inf, total
 
 
+#: backward-compatibility alias; ``RefractiveProfile`` is the public name
+_Profile = RefractiveProfile
+
+
+def refractive_profile(atmo, n_points: int = 4000) -> RefractiveProfile:
+    """Build the cached refractive index profile of ``atmo``.
+
+    Public building block for callers that trace many rays through one
+    atmosphere (the data pipeline); :func:`trace_ray` builds its own
+    profile when none is given.
+    """
+    return RefractiveProfile(atmo, n_points=n_points)
+
+
 def trace_ray(atmo, r0: float, theta0: float, r_earth: float = R_EARTH,
               r_top: float = R_EARTH + 1.2e6, ds: float = 2000.0,
-              max_steps: int = 100000):
+              max_steps: int = 100000, profile: RefractiveProfile | None = None):
     """Trace one ray through the refractive atmosphere.
 
     Parameters
     ----------
+    profile : RefractiveProfile, optional
+        A prebuilt profile (see :func:`refractive_profile`); callers tracing
+        many rays through one atmosphere pass one instead of paying the
+        per-call rebuild.
     r0 : start radius [m]
     theta0 : *apparent* zenith angle at the start point [rad]; 0 is straight
         up, pi/2 is horizontal, > pi/2 points below the local horizon.
@@ -134,7 +152,8 @@ def trace_ray(atmo, r0: float, theta0: float, r_earth: float = R_EARTH,
     ray makes with the initial local vertical once it reaches space, i.e. the
     *true* zenith angle of the source) and ``bending`` (total turning, rad).
     """
-    profile = _Profile(atmo)
+    if profile is None:
+        profile = RefractiveProfile(atmo)
     hit, r_min, theta_inf, bending = _trace(profile, r0, theta0, r_earth, r_top,
                                             ds, max_steps)
     return dict(hit_earth=hit, r_min=r_min, theta_inf=theta_inf, bending=bending)
@@ -165,7 +184,7 @@ class RefractionTables:
     """
 
     def __init__(self, atmo, n_elev: int = 61, alt_km=None):
-        profile = _Profile(atmo)
+        profile = RefractiveProfile(atmo)
         self.profile = profile
         self._n_elev = n_elev
         self._elev_table = None
