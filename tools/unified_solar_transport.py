@@ -61,6 +61,12 @@ class FiniteSolarSource:
         self.table = table
         if not np.array_equal(atmo.wl, table.wl):
             raise ValueError("The explicit solar source and medium must share their wavelength grid")
+        if table.atmo is not atmo:
+            raise ValueError("Solar table must be loaded or built for this construction medium")
+        if hasattr(table, "definition"):
+            from tools.point_solar_table import _signature
+            if table.definition != _signature(atmo):
+                raise ValueError("Solar table medium changed after its construction")
         self._medium_identity = getattr(atmo, "_medium", None)
         self._scene_identity = getattr(atmo, "_scene", None)
         self.n_radial = n_radial
@@ -171,8 +177,12 @@ class FiniteSolarSource:
 
 
 @contextmanager
-def mc_solar_source(source, *, legacy=False):
-    """Scope source-only changes to a tracer clone, leaving every RNG call intact."""
+def mc_solar_source(source, *, legacy=False, transport=None):
+    """Compose an experimental source and optional flight rewrite in one clone.
+
+    With no transport callback every RNG call and geometric path is unchanged.
+    A callback receives (code, atmo) and returns (code, namespace additions).
+    """
     code = inspect.getsource(mc._trace_wavelength)
     anchor = "    n_view = dirs.shape[0]"
     assert code.count(anchor) == 1
@@ -203,6 +213,9 @@ def mc_solar_source(source, *, legacy=False):
             "                nee = wa[ci] * albedo * illumination * f0\n"
         ) + code[end:]
         namespace = dict(mc.__dict__, _audit_source=source)
+    if transport is not None:
+        code, additions = transport(code, source.atmo)
+        namespace.update(additions)
     exec(compile(code, str(mc.__file__), "exec"), namespace)
     with patch.object(mc, "_trace_wavelength", namespace["_trace_wavelength"]):
         yield source

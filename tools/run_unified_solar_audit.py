@@ -59,12 +59,17 @@ def main():
     parser.add_argument("--disk-radius", type=float, default=16/60)
     parser.add_argument("--ss-gauss", type=int, default=8)
     parser.add_argument("--ss-segment", type=float, default=.5)
+    parser.add_argument("--transport", choices=["native", "global-straight", "continuous"],
+                        default="native")
+    parser.add_argument("--flight-step", type=float, default=2000., help="RK arc step in metres")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
     library_diff = subprocess.check_output(["git", "diff", "HEAD", "--", "skycolor"], cwd=root)
     tools = ["point_solar_table.py", "continuous_solar_columns.py", "radial_solar_mapping.py",
              "unified_solar_transport.py", "run_unified_solar_audit.py"]
+    if args.transport != "native":
+        tools.append("continuous_curved_mc.py")
     source_hashes = {name: hashlib.sha256((root/"tools"/name).read_bytes()).hexdigest()
                      for name in tools}
     args.out.parent.mkdir(parents=True, exist_ok=True)
@@ -86,6 +91,8 @@ def main():
             entry = manifest.get(mode, {}).get(str(float(height)))
             if entry:
                 path = Path(entry["path"])
+                if not path.is_absolute():
+                    path = args.tables_manifest.parent / path
                 table = PointSolarTable.load(path, atmo, expected_label=entry["label"])
             else:
                 table, path = table_for(atmo, args.table_dir, mode == "unified",
@@ -107,7 +114,15 @@ def main():
                 table, path, single, ss_info = prepared[mode]
                 source = FiniteSolarSource(atmo, table, **source_options)
                 started = time.perf_counter()
-                with mc_solar_source(source, legacy=mode == "legacy"):
+                flight = []
+                def transport_rewrite(code, medium):
+                    from tools.continuous_curved_mc import rewrite_transport
+                    rewritten, extras = rewrite_transport(code, medium,
+                        max_step_m=args.flight_step, bend=args.transport == "continuous")
+                    flight.append(extras["_continuous_flight"])
+                    return rewritten, extras
+                with mc_solar_source(source, legacy=mode == "legacy",
+                        transport=None if args.transport == "native" else transport_rewrite):
                     result = mc.mc_radiance_split(atmo, 90-args.sun, [0], [0],
                         n_photons=args.photons, seed=seed)
                 fp = source.fingerprint.hexdigest()
@@ -129,6 +144,10 @@ def main():
                     path_fingerprint=fp, n_nee_calls=source.n_calls, n_nee_points=source.n_points,
                     fields={k: val.tolist() for k, val in fields.items()},
                     photopic_integrals=integrals, seconds=time.perf_counter()-started)
+                if flight:
+                    record["flight_stats"] = {key: getattr(flight[0], key) for key in
+                        ["calls", "rk_steps", "rk_ray_steps", "turn_min_checks",
+                         "ground_hits", "top_escapes"]}
                 with args.out.open("a") as stream:
                     stream.write(json.dumps(record, allow_nan=False)+"\n")
                 print(json.dumps({key: record[key] for key in

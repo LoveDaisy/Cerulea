@@ -191,6 +191,24 @@ def test_transport_rejects_an_anchor_subset_or_modified_scene():
         source.validate_transport(atmo)
 
 
+def test_source_rejects_same_grid_table_bound_to_another_medium():
+    sea, high = atmosphere(), atmosphere(observer_km=2.4)
+    with pytest.raises(ValueError, match="construction medium"):
+        FiniteSolarSource(high, ToyTable(sea))
+
+
+def test_source_rejects_a_table_after_medium_definition_drift():
+    from dataclasses import replace
+    from tools.point_solar_table import _signature
+
+    atmo = Atmosphere([500., 600.], aerosols=[])
+    table = ToyTable(atmo)
+    table.definition = _signature(atmo)
+    atmo._medium = replace(atmo._medium, ozone_du=350.)
+    with pytest.raises(ValueError, match="changed after"):
+        FiniteSolarSource(atmo, table)
+
+
 @pytest.mark.parametrize("n_quad", [8, 16, 32])
 def test_radial_derivative_resolves_profile_spline_knots(n_quad):
     """Cartesian DOP853 anchors constrain a previously aliased tangent ray."""
