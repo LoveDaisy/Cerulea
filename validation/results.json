@@ -340,27 +340,27 @@
           "unit": "cd/m2"
         },
         {
-          "dev": -0.11406442917626729,
+          "dev": 0.05101754479460124,
           "dev_kind": "abs",
-          "model": 0.01241646101173545,
+          "model": 0.01815849300810152,
           "name": "zenith luminance, h=-9deg",
           "passed": true,
           "reference": 0.0161459,
-          "tolerance": 0.35839306019236183,
+          "tolerance": 0.3424789097558873,
           "unit": "cd/m2"
         },
         {
-          "dev": 0.3708197286709574,
+          "dev": -0.22845926426368565,
           "dev_kind": "abs",
-          "model": 0.0030336907094129233,
+          "model": 0.0007632948085905504,
           "name": "zenith luminance, h=-12deg",
           "passed": true,
           "reference": 0.00129167,
-          "tolerance": 0.5984266237775544,
+          "tolerance": 0.743612024670147,
           "unit": "cd/m2"
         }
       ],
-      "summary": "model/Koomen: -6deg 0.69, -9deg 0.77, -12deg 2.35; model/Patat at -6deg 0.86.",
+      "summary": "model/Koomen: -6deg 0.69, -9deg 1.12, -12deg 0.59; model/Patat at -6deg 0.86.",
       "title": "Twilight against Koomen et al. (1952)",
       "verdict": "PASS"
     }

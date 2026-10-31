@@ -1,0 +1,30 @@
+........................................................................ [ 22%]
+........................................................................ [ 45%]
+......................................F......
+clear sky, 550 nm, sun zenith 60 deg, zenith view
+  total     0.01894 +/- 0.00005 W m^-2 sr^-1 nm^-1
+  single    0.01440 +/- 0.00003   (deterministic 0.01440)
+  multiple  0.00454 +/- 0.00003
+  MS / SS = 31.5 %   MS / total = 24.0 %
+........................... [ 68%]
+........................................................................ [ 91%]
+..........................                                               [100%]
+=================================== FAILURES ===================================
+________________________________ test_twilight _________________________________
+
+clear7 = Atmosphere(nwl=7, ozone=300.0 DU, aerosol_layers=1)
+
+    def test_twilight(clear7):
+        golden = _load("twilight")
+        rad, err = twilight_radiance(clear7, 96.0, np.array([0.0, 30.0, 70.0]),
+                                     np.array([0.0, 90.0, 180.0]),
+                                     quality="low", grid=TINY, seed=0)
+>       assert np.array_equal(rad, golden["radiance"])
+E       assert False
+E        +  where False = <function array_equal at 0x111051230>(array([[2.10436983e-05, 1.72901565e-05, 1.18332182e-05, 6.83560881e-06,\n        4.66316162e-06, 6.64393856e-06, 8.6205...52774016e-05, 2.25476259e-05, 1.95782446e-05, 1.62590558e-05,\n        9.89311802e-07, 2.16920211e-06, 3.58414446e-06]]), array([[1.93353512e-05, 1.66818325e-05, 1.16707288e-05, 6.83560881e-06,\n        5.37466696e-06, 8.00880930e-06, 1.0607...49981443e-07, 1.73928370e-06, 1.99673978e-06, 1.62590558e-05,\n        2.29045272e-05, 3.45000341e-05, 5.12808099e-05]]))
+E        +    where <function array_equal at 0x111051230> = np.array_equal
+
+tests/test_golden_equivalence.py:111: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_golden_equivalence.py::test_twilight - assert False
+1 failed, 313 passed in 355.34s (0:05:55)

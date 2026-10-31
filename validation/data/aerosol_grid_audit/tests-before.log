@@ -1,0 +1,426 @@
+FFFFFFFF..FFFFF.                                                         [100%]
+=================================== FAILURES ===================================
+________ test_mie_grid_partition_preserves_the_material_spectrum[rural] ________
+
+name = 'rural'
+
+    @pytest.mark.parametrize("name", LIBRARY_NAMES)
+    def test_mie_grid_partition_preserves_the_material_spectrum(name):
+        aerosol = get_aerosol(name)
+        wl = np.arange(380., 781., 5.)
+        full = np.array(aerosol.relative_coefficients(wl))
+        # The single-wavelength path is what twilight's MC anchor loops consume.
+        single = np.array([aerosol.relative_coefficients([w]) for w in wl])[:, :, 0].T
+>       np.testing.assert_array_equal(single, full)
+E       AssertionError: 
+E       Arrays are not equal
+E       
+E       Mismatched elements: 160 / 162 (98.8%)
+E       First 5 mismatches are at indices:
+E        [0, 0]: 1.0 (ACTUAL), 1.4535370583693719 (DESIRED)
+E        [0, 1]: 1.0 (ACTUAL), 1.43943381495408 (DESIRED)
+E        [0, 2]: 1.0 (ACTUAL), 1.4253479668989035 (DESIRED)
+E        [0, 3]: 1.0 (ACTUAL), 1.411700303393102 (DESIRED)
+E        [0, 4]: 1.0 (ACTUAL), 1.3982791098470662 (DESIRED)
+E       Max absolute difference among violations: 0.45353706
+E       Max relative difference among violations: 0.77437754
+E        ACTUAL: array([[1.      , 1.      , 1.      , 1.      , 1.      , 1.      ,
+E               1.      , 1.      , 1.      , 1.      , 1.      , 1.      ,
+E               1.      , 1.      , 1.      , 1.      , 1.      , 1.      ,...
+E        DESIRED: array([[1.453537, 1.439434, 1.425348, 1.4117  , 1.398279, 1.384696,
+E               1.370951, 1.357195, 1.343346, 1.329309, 1.315267, 1.301441,
+E               1.287923, 1.274516, 1.260983, 1.247376, 1.233828, 1.220259,...
+
+tests/test_aerosol_grid_invariance.py:24: AssertionError
+________ test_mie_grid_partition_preserves_the_material_spectrum[urban] ________
+
+name = 'urban'
+
+    @pytest.mark.parametrize("name", LIBRARY_NAMES)
+    def test_mie_grid_partition_preserves_the_material_spectrum(name):
+        aerosol = get_aerosol(name)
+        wl = np.arange(380., 781., 5.)
+        full = np.array(aerosol.relative_coefficients(wl))
+        # The single-wavelength path is what twilight's MC anchor loops consume.
+        single = np.array([aerosol.relative_coefficients([w]) for w in wl])[:, :, 0].T
+>       np.testing.assert_array_equal(single, full)
+E       AssertionError: 
+E       Arrays are not equal
+E       
+E       Mismatched elements: 160 / 162 (98.8%)
+E       First 5 mismatches are at indices:
+E        [0, 0]: 1.0 (ACTUAL), 1.432966121154441 (DESIRED)
+E        [0, 1]: 1.0 (ACTUAL), 1.419603321509468 (DESIRED)
+E        [0, 2]: 1.0 (ACTUAL), 1.4062489889397205 (DESIRED)
+E        [0, 3]: 1.0 (ACTUAL), 1.3932660460022674 (DESIRED)
+E        [0, 4]: 1.0 (ACTUAL), 1.3804727129448557 (DESIRED)
+E       Max absolute difference among violations: 0.43296612
+E       Max relative difference among violations: 0.73871475
+E        ACTUAL: array([[1.      , 1.      , 1.      , 1.      , 1.      , 1.      ,
+E               1.      , 1.      , 1.      , 1.      , 1.      , 1.      ,
+E               1.      , 1.      , 1.      , 1.      , 1.      , 1.      ,...
+E        DESIRED: array([[1.432966, 1.419603, 1.406249, 1.393266, 1.380473, 1.367535,
+E               1.354454, 1.341359, 1.328181, 1.314837, 1.301487, 1.28832 ,
+E               1.275418, 1.26261 , 1.249692, 1.23671 , 1.223779, 1.21083 ,...
+
+tests/test_aerosol_grid_invariance.py:24: AssertionError
+______ test_mie_grid_partition_preserves_the_material_spectrum[maritime] _______
+
+name = 'maritime'
+
+    @pytest.mark.parametrize("name", LIBRARY_NAMES)
+    def test_mie_grid_partition_preserves_the_material_spectrum(name):
+        aerosol = get_aerosol(name)
+        wl = np.arange(380., 781., 5.)
+        full = np.array(aerosol.relative_coefficients(wl))
+        # The single-wavelength path is what twilight's MC anchor loops consume.
+        single = np.array([aerosol.relative_coefficients([w]) for w in wl])[:, :, 0].T
+>       np.testing.assert_array_equal(single, full)
+E       AssertionError: 
+E       Arrays are not equal
+E       
+E       Mismatched elements: 160 / 162 (98.8%)
+E       First 5 mismatches are at indices:
+E        [0, 0]: 1.0 (ACTUAL), 1.1819512970455195 (DESIRED)
+E        [0, 1]: 1.0 (ACTUAL), 1.1746072280691058 (DESIRED)
+E        [0, 2]: 1.0 (ACTUAL), 1.1708707790133408 (DESIRED)
+E        [0, 3]: 1.0 (ACTUAL), 1.1659693542117786 (DESIRED)
+E        [0, 4]: 1.0 (ACTUAL), 1.1612202706491608 (DESIRED)
+E       Max absolute difference among violations: 0.1956158
+E       Max relative difference among violations: 0.24318702
+E        ACTUAL: array([[1.      , 1.      , 1.      , 1.      , 1.      , 1.      ,
+E               1.      , 1.      , 1.      , 1.      , 1.      , 1.      ,
+E               1.      , 1.      , 1.      , 1.      , 1.      , 1.      ,...
+E        DESIRED: array([[1.181951, 1.174607, 1.170871, 1.165969, 1.16122 , 1.156017,
+E               1.148191, 1.145538, 1.139911, 1.133175, 1.129668, 1.122036,
+E               1.117282, 1.110755, 1.107945, 1.103165, 1.096381, 1.090672,...
+
+tests/test_aerosol_grid_invariance.py:24: AssertionError
+_____ test_mie_grid_partition_preserves_the_material_spectrum[desert_dust] _____
+
+name = 'desert_dust'
+
+    @pytest.mark.parametrize("name", LIBRARY_NAMES)
+    def test_mie_grid_partition_preserves_the_material_spectrum(name):
+        aerosol = get_aerosol(name)
+        wl = np.arange(380., 781., 5.)
+        full = np.array(aerosol.relative_coefficients(wl))
+        # The single-wavelength path is what twilight's MC anchor loops consume.
+        single = np.array([aerosol.relative_coefficients([w]) for w in wl])[:, :, 0].T
+>       np.testing.assert_array_equal(single, full)
+E       AssertionError: 
+E       Arrays are not equal
+E       
+E       Mismatched elements: 160 / 162 (98.8%)
+E       First 5 mismatches are at indices:
+E        [0, 0]: 1.0 (ACTUAL), 0.985357588071656 (DESIRED)
+E        [0, 1]: 1.0 (ACTUAL), 0.986023727633682 (DESIRED)
+E        [0, 2]: 1.0 (ACTUAL), 0.9873252911369286 (DESIRED)
+E        [0, 3]: 1.0 (ACTUAL), 0.9864049494995706 (DESIRED)
+E        [0, 4]: 1.0 (ACTUAL), 0.9875252786592433 (DESIRED)
+E       Max absolute difference among violations: 0.01777987
+E       Max relative difference among violations: 0.01746927
+E        ACTUAL: array([[1.      , 1.      , 1.      , 1.      , 1.      , 1.      ,
+E               1.      , 1.      , 1.      , 1.      , 1.      , 1.      ,
+E               1.      , 1.      , 1.      , 1.      , 1.      , 1.      ,...
+E        DESIRED: array([[0.985358, 0.986024, 0.987325, 0.986405, 0.987525, 0.988521,
+E               0.987575, 0.988829, 0.990007, 0.988907, 0.989965, 0.991458,
+E               0.990892, 0.990735, 0.992956, 0.992635, 0.991502, 0.993428,...
+
+tests/test_aerosol_grid_invariance.py:24: AssertionError
+___ test_mie_grid_partition_preserves_the_material_spectrum[biomass_burning] ___
+
+name = 'biomass_burning'
+
+    @pytest.mark.parametrize("name", LIBRARY_NAMES)
+    def test_mie_grid_partition_preserves_the_material_spectrum(name):
+        aerosol = get_aerosol(name)
+        wl = np.arange(380., 781., 5.)
+        full = np.array(aerosol.relative_coefficients(wl))
+        # The single-wavelength path is what twilight's MC anchor loops consume.
+        single = np.array([aerosol.relative_coefficients([w]) for w in wl])[:, :, 0].T
+>       np.testing.assert_array_equal(single, full)
+E       AssertionError: 
+E       Arrays are not equal
+E       
+E       Mismatched elements: 160 / 162 (98.8%)
+E       First 5 mismatches are at indices:
+E        [0, 0]: 1.0 (ACTUAL), 1.7307107843315908 (DESIRED)
+E        [0, 1]: 1.0 (ACTUAL), 1.7059993318335474 (DESIRED)
+E        [0, 2]: 1.0 (ACTUAL), 1.6813217500790532 (DESIRED)
+E        [0, 3]: 1.0 (ACTUAL), 1.6566890227354283 (DESIRED)
+E        [0, 4]: 1.0 (ACTUAL), 1.632121184086802 (DESIRED)
+E       Max absolute difference among violations: 0.73071078
+E       Max relative difference among violations: 1.20016491
+E        ACTUAL: array([[1.      , 1.      , 1.      , 1.      , 1.      , 1.      ,
+E               1.      , 1.      , 1.      , 1.      , 1.      , 1.      ,
+E               1.      , 1.      , 1.      , 1.      , 1.      , 1.      ,...
+E        DESIRED: array([[1.730711, 1.705999, 1.681322, 1.656689, 1.632121, 1.60765 ,
+E               1.583308, 1.559137, 1.535196, 1.511535, 1.488161, 1.46505 ,
+E               1.44217 , 1.419495, 1.397009, 1.374705, 1.352585, 1.330653,...
+
+tests/test_aerosol_grid_invariance.py:24: AssertionError
+_ test_mie_grid_partition_preserves_the_material_spectrum[volcanic_stratospheric] _
+
+name = 'volcanic_stratospheric'
+
+    @pytest.mark.parametrize("name", LIBRARY_NAMES)
+    def test_mie_grid_partition_preserves_the_material_spectrum(name):
+        aerosol = get_aerosol(name)
+        wl = np.arange(380., 781., 5.)
+        full = np.array(aerosol.relative_coefficients(wl))
+        # The single-wavelength path is what twilight's MC anchor loops consume.
+        single = np.array([aerosol.relative_coefficients([w]) for w in wl])[:, :, 0].T
+>       np.testing.assert_array_equal(single, full)
+E       AssertionError: 
+E       Arrays are not equal
+E       
+E       Mismatched elements: 160 / 162 (98.8%)
+E       First 5 mismatches are at indices:
+E        [0, 0]: 1.0 (ACTUAL), 0.9053530714098407 (DESIRED)
+E        [0, 1]: 1.0 (ACTUAL), 0.912308569039561 (DESIRED)
+E        [0, 2]: 1.0 (ACTUAL), 0.9077116506344642 (DESIRED)
+E        [0, 3]: 1.0 (ACTUAL), 0.9165202571237516 (DESIRED)
+E        [0, 4]: 1.0 (ACTUAL), 0.9137536748735108 (DESIRED)
+E       Max absolute difference among violations: 0.1230813
+E       Max relative difference among violations: 0.10959251
+E        ACTUAL: array([[1.      , 1.      , 1.      , 1.      , 1.      , 1.      ,
+E               1.      , 1.      , 1.      , 1.      , 1.      , 1.      ,
+E               1.      , 1.      , 1.      , 1.      , 1.      , 1.      ,...
+E        DESIRED: array([[0.905353, 0.912309, 0.907712, 0.91652 , 0.913754, 0.920229,
+E               0.922936, 0.920448, 0.929124, 0.923971, 0.936206, 0.927328,
+E               0.937696, 0.935894, 0.944787, 0.937931, 0.94803 , 0.947048,...
+
+tests/test_aerosol_grid_invariance.py:24: AssertionError
+_______ test_mie_grid_partition_preserves_the_material_spectrum[cirrus] ________
+
+name = 'cirrus'
+
+    @pytest.mark.parametrize("name", LIBRARY_NAMES)
+    def test_mie_grid_partition_preserves_the_material_spectrum(name):
+        aerosol = get_aerosol(name)
+        wl = np.arange(380., 781., 5.)
+        full = np.array(aerosol.relative_coefficients(wl))
+        # The single-wavelength path is what twilight's MC anchor loops consume.
+        single = np.array([aerosol.relative_coefficients([w]) for w in wl])[:, :, 0].T
+>       np.testing.assert_array_equal(single, full)
+E       AssertionError: 
+E       Arrays are not equal
+E       
+E       Mismatched elements: 160 / 162 (98.8%)
+E       First 5 mismatches are at indices:
+E        [0, 0]: 1.0 (ACTUAL), 0.9887538516647619 (DESIRED)
+E        [0, 1]: 1.0 (ACTUAL), 0.9892425012249997 (DESIRED)
+E        [0, 2]: 1.0 (ACTUAL), 0.9900997780783745 (DESIRED)
+E        [0, 3]: 1.0 (ACTUAL), 0.9895076102906176 (DESIRED)
+E        [0, 4]: 1.0 (ACTUAL), 0.9912214690377164 (DESIRED)
+E       Max absolute difference among violations: 0.01489161
+E       Max relative difference among violations: 0.0146731
+E        ACTUAL: array([[1.      , 1.      , 1.      , 1.      , 1.      , 1.      ,
+E               1.      , 1.      , 1.      , 1.      , 1.      , 1.      ,
+E               1.      , 1.      , 1.      , 1.      , 1.      , 1.      ,...
+E        DESIRED: array([[0.988754, 0.989243, 0.9901  , 0.989508, 0.991221, 0.990442,
+E               0.990259, 0.991434, 0.992085, 0.991736, 0.992332, 0.992446,
+E               0.993587, 0.993544, 0.993466, 0.994271, 0.993168, 0.994091,...
+
+tests/test_aerosol_grid_invariance.py:24: AssertionError
+_____ test_mie_grid_partition_preserves_the_material_spectrum[water_cloud] _____
+
+name = 'water_cloud'
+
+    @pytest.mark.parametrize("name", LIBRARY_NAMES)
+    def test_mie_grid_partition_preserves_the_material_spectrum(name):
+        aerosol = get_aerosol(name)
+        wl = np.arange(380., 781., 5.)
+        full = np.array(aerosol.relative_coefficients(wl))
+        # The single-wavelength path is what twilight's MC anchor loops consume.
+        single = np.array([aerosol.relative_coefficients([w]) for w in wl])[:, :, 0].T
+>       np.testing.assert_array_equal(single, full)
+E       AssertionError: 
+E       Arrays are not equal
+E       
+E       Mismatched elements: 160 / 162 (98.8%)
+E       First 5 mismatches are at indices:
+E        [0, 0]: 1.0 (ACTUAL), 0.9884012543186361 (DESIRED)
+E        [0, 1]: 1.0 (ACTUAL), 0.9895068276840218 (DESIRED)
+E        [0, 2]: 1.0 (ACTUAL), 0.9910075597520321 (DESIRED)
+E        [0, 3]: 1.0 (ACTUAL), 0.9891992582176324 (DESIRED)
+E        [0, 4]: 1.0 (ACTUAL), 0.988800964215545 (DESIRED)
+E       Max absolute difference among violations: 0.01337517
+E       Max relative difference among violations: 0.01319864
+E        ACTUAL: array([[1.      , 1.      , 1.      , 1.      , 1.      , 1.      ,
+E               1.      , 1.      , 1.      , 1.      , 1.      , 1.      ,
+E               1.      , 1.      , 1.      , 1.      , 1.      , 1.      ,...
+E        DESIRED: array([[0.988401, 0.989507, 0.991008, 0.989199, 0.988801, 0.989997,
+E               0.990686, 0.990915, 0.991524, 0.990964, 0.991283, 0.992616,
+E               0.994597, 0.993546, 0.992492, 0.993144, 0.992129, 0.993942,...
+
+tests/test_aerosol_grid_invariance.py:24: AssertionError
+________ test_angstrom_coefficients_equal_the_analytic_aod550_law[wl2] _________
+
+wl = array([450., 650.])
+
+    @pytest.mark.parametrize("wl", [[450.], [650.], [450., 650.], [650., 450.],
+                                    [380., 545., 555., 780.]])
+    def test_angstrom_coefficients_equal_the_analytic_aod550_law(wl):
+        aerosol = AngstromAerosol(alpha=1.3, ssa=.94, ssa_slope=1e-4)
+        wl = np.array(wl)
+        ext, sca = aerosol.relative_coefficients(wl)
+        truth = (wl / 550.) ** -1.3
+>       np.testing.assert_array_equal(ext, truth)
+E       AssertionError: 
+E       Arrays are not equal
+E       
+E       Mismatched elements: 2 / 2 (100%)
+E       Mismatch at indices:
+E        [0]: 1.2345709314078304 (ACTUAL), 1.2980613784440833 (DESIRED)
+E        [1]: 0.7654290685921695 (ACTUAL), 0.8047928933049724 (DESIRED)
+E       Max absolute difference among violations: 0.06349045
+E       Max relative difference among violations: 0.04891174
+E        ACTUAL: array([1.234571, 0.765429])
+E        DESIRED: array([1.298061, 0.804793])
+
+tests/test_aerosol_grid_invariance.py:42: AssertionError
+________ test_angstrom_coefficients_equal_the_analytic_aod550_law[wl3] _________
+
+wl = array([650., 450.])
+
+    @pytest.mark.parametrize("wl", [[450.], [650.], [450., 650.], [650., 450.],
+                                    [380., 545., 555., 780.]])
+    def test_angstrom_coefficients_equal_the_analytic_aod550_law(wl):
+        aerosol = AngstromAerosol(alpha=1.3, ssa=.94, ssa_slope=1e-4)
+        wl = np.array(wl)
+        ext, sca = aerosol.relative_coefficients(wl)
+        truth = (wl / 550.) ** -1.3
+>       np.testing.assert_array_equal(ext, truth)
+E       AssertionError: 
+E       Arrays are not equal
+E       
+E       Mismatched elements: 2 / 2 (100%)
+E       Mismatch at indices:
+E        [0]: 0.6199960238164043 (ACTUAL), 0.8047928933049724 (DESIRED)
+E        [1]: 1.0 (ACTUAL), 1.2980613784440833 (DESIRED)
+E       Max absolute difference among violations: 0.29806138
+E       Max relative difference among violations: 0.2296204
+E        ACTUAL: array([0.619996, 1.      ])
+E        DESIRED: array([0.804793, 1.298061])
+
+tests/test_aerosol_grid_invariance.py:42: AssertionError
+________ test_angstrom_coefficients_equal_the_analytic_aod550_law[wl4] _________
+
+wl = array([380., 545., 555., 780.])
+
+    @pytest.mark.parametrize("wl", [[450.], [650.], [450., 650.], [650., 450.],
+                                    [380., 545., 555., 780.]])
+    def test_angstrom_coefficients_equal_the_analytic_aod550_law(wl):
+        aerosol = AngstromAerosol(alpha=1.3, ssa=.94, ssa_slope=1e-4)
+        wl = np.array(wl)
+        ext, sca = aerosol.relative_coefficients(wl)
+        truth = (wl / 550.) ** -1.3
+>       np.testing.assert_array_equal(ext, truth)
+E       AssertionError: 
+E       Arrays are not equal
+E       
+E       Mismatched elements: 4 / 4 (100%)
+E       Mismatch at indices:
+E        [0]: 1.6169595664533711 (ACTUAL), 1.6171593673471767 (DESIRED)
+E        [1]: 1.0118179571764674 (ACTUAL), 1.0119429832664244 (DESIRED)
+E        [2]: 0.9881820428235328 (ACTUAL), 0.9883041483229498 (DESIRED)
+E        [3]: 0.6348846868731084 (ACTUAL), 0.6349631369039764 (DESIRED)
+E       Max absolute difference among violations: 0.0001998
+E       Max relative difference among violations: 0.00012355
+E        ACTUAL: array([1.61696 , 1.011818, 0.988182, 0.634885])
+E        DESIRED: array([1.617159, 1.011943, 0.988304, 0.634963])
+
+tests/test_aerosol_grid_invariance.py:42: AssertionError
+_________ test_atmosphere_restrict_preserves_optical_coefficients[mie] _________
+
+kind = 'mie'
+
+    @pytest.mark.parametrize("kind", ["mie", "angstrom"])
+    def test_atmosphere_restrict_preserves_optical_coefficients(kind):
+        aerosol = (get_aerosol("rural") if kind == "mie" else
+                   AngstromAerosol(alpha=1.3, ssa=.94, ssa_slope=1e-4))
+        atmo = Atmosphere(np.array([450., 550., 650.]), aerosols=[
+            AerosolLayer(aerosol, .12, ExponentialProfile(1.5))])
+        full = atmo.layer_properties()
+        heights = np.array([0., .037, 1., 2.4, 10.])
+        ext, sca = atmo.aerosol_coefficients(heights)
+        for index in [[0], [1], [2], [0, 2], [2, 0, 2]]:
+            restricted = atmo._restrict(index)
+            for key, values in restricted.layer_properties().items():
+                if key != "z":
+>                   np.testing.assert_array_equal(values, full[key][:, index], err_msg=key)
+E                   AssertionError: 
+E                   Arrays are not equal
+E                   beta_ae
+E                   Mismatched elements: 62 / 62 (100%)
+E                   First 5 mismatches are at indices:
+E                    [0, 0]: 7.737728803856047e-05 (ACTUAL), 9.757142174155336e-05 (DESIRED)
+E                    [1, 0]: 7.11905416790419e-05 (ACTUAL), 8.977004160075828e-05 (DESIRED)
+E                    [2, 0]: 6.230406264571238e-05 (ACTUAL), 7.85643452583591e-05 (DESIRED)
+E                    [3, 0]: 5.27392504160355e-05 (ACTUAL), 6.650328248919754e-05 (DESIRED)
+E                    [4, 0]: 4.464281166160376e-05 (ACTUAL), 5.629381327234371e-05 (DESIRED)
+E                   Max absolute difference among violations: 2.01941337e-05
+E                   Max relative difference among violations: 0.20696771
+E                    ACTUAL: array([[7.737729e-05],
+E                          [7.119054e-05],
+E                          [6.230406e-05],...
+E                    DESIRED: array([[9.757142e-05],
+E                          [8.977004e-05],
+E                          [7.856435e-05],...
+
+tests/test_aerosol_grid_invariance.py:59: AssertionError
+______ test_atmosphere_restrict_preserves_optical_coefficients[angstrom] _______
+
+kind = 'angstrom'
+
+    @pytest.mark.parametrize("kind", ["mie", "angstrom"])
+    def test_atmosphere_restrict_preserves_optical_coefficients(kind):
+        aerosol = (get_aerosol("rural") if kind == "mie" else
+                   AngstromAerosol(alpha=1.3, ssa=.94, ssa_slope=1e-4))
+        atmo = Atmosphere(np.array([450., 550., 650.]), aerosols=[
+            AerosolLayer(aerosol, .12, ExponentialProfile(1.5))])
+        full = atmo.layer_properties()
+        heights = np.array([0., .037, 1., 2.4, 10.])
+        ext, sca = atmo.aerosol_coefficients(heights)
+        for index in [[0], [1], [2], [0, 2], [2, 0, 2]]:
+            restricted = atmo._restrict(index)
+            for key, values in restricted.layer_properties().items():
+                if key != "z":
+>                   np.testing.assert_array_equal(values, full[key][:, index], err_msg=key)
+E                   AssertionError: 
+E                   Arrays are not equal
+E                   beta_ae
+E                   Mismatched elements: 124 / 124 (100%)
+E                   First 5 mismatches are at indices:
+E                    [0, 0]: 9.552775056357757e-05 (ACTUAL), 0.00010044046917159867 (DESIRED)
+E                    [0, 1]: 5.922682551354336e-05 (ACTUAL), 6.227269151664531e-05 (DESIRED)
+E                    [1, 0]: 8.788977334812272e-05 (ACTUAL), 9.240969266407809e-05 (DESIRED)
+E                    [1, 1]: 5.4491310009961065e-05 (ACTUAL), 5.7293642013824355e-05 (DESIRED)
+E                    [2, 0]: 7.691878465100895e-05 (ACTUAL), 8.087449744055993e-05 (DESIRED)
+E                   Max absolute difference among violations: 4.91271861e-06
+E                   Max relative difference among violations: 0.04891174
+E                    ACTUAL: array([[9.552775e-05, 5.922683e-05],
+E                          [8.788977e-05, 5.449131e-05],
+E                          [7.691878e-05, 4.768934e-05],...
+E                    DESIRED: array([[1.004405e-04, 6.227269e-05],
+E                          [9.240969e-05, 5.729364e-05],
+E                          [8.087450e-05, 5.014187e-05],...
+
+tests/test_aerosol_grid_invariance.py:59: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_aerosol_grid_invariance.py::test_mie_grid_partition_preserves_the_material_spectrum[rural]
+FAILED tests/test_aerosol_grid_invariance.py::test_mie_grid_partition_preserves_the_material_spectrum[urban]
+FAILED tests/test_aerosol_grid_invariance.py::test_mie_grid_partition_preserves_the_material_spectrum[maritime]
+FAILED tests/test_aerosol_grid_invariance.py::test_mie_grid_partition_preserves_the_material_spectrum[desert_dust]
+FAILED tests/test_aerosol_grid_invariance.py::test_mie_grid_partition_preserves_the_material_spectrum[biomass_burning]
+FAILED tests/test_aerosol_grid_invariance.py::test_mie_grid_partition_preserves_the_material_spectrum[volcanic_stratospheric]
+FAILED tests/test_aerosol_grid_invariance.py::test_mie_grid_partition_preserves_the_material_spectrum[cirrus]
+FAILED tests/test_aerosol_grid_invariance.py::test_mie_grid_partition_preserves_the_material_spectrum[water_cloud]
+FAILED tests/test_aerosol_grid_invariance.py::test_angstrom_coefficients_equal_the_analytic_aod550_law[wl2]
+FAILED tests/test_aerosol_grid_invariance.py::test_angstrom_coefficients_equal_the_analytic_aod550_law[wl3]
+FAILED tests/test_aerosol_grid_invariance.py::test_angstrom_coefficients_equal_the_analytic_aod550_law[wl4]
+FAILED tests/test_aerosol_grid_invariance.py::test_atmosphere_restrict_preserves_optical_coefficients[mie]
+FAILED tests/test_aerosol_grid_invariance.py::test_atmosphere_restrict_preserves_optical_coefficients[angstrom]
+13 failed, 3 passed in 9.36s

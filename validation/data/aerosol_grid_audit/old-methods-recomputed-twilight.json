@@ -1,0 +1,9 @@
+{
+  "baseline_commit": "7ed71a62cea038dfad1e491420f0e4c014b74068",
+  "method_source": "AST-extracted exact baseline Mie/Angstrom relative_coefficients; no hand transcription",
+  "fixture_match": {
+    "radiance": true,
+    "stderr": true,
+    "wl": true
+  }
+}

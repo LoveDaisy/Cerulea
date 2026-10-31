@@ -1,0 +1,9 @@
+{
+  "golden_altitude.npz": "58b58fa59ea1b82327999c8a4707ede782f6641bc454c51e54ca97506b5d43d8",
+  "golden_clear_direction.npz": "4492c7bad0afd820b5e099127b80e8f7b6f59682a010a8bb2987af86822606ff",
+  "golden_cloud.npz": "c4a551550768eb78078a8ad346147d631e18beda970e32dd19a487579c9b9aa1",
+  "golden_dome.npz": "d3bf8072335cedd1b2cef445e9fc026ca8e5878e84dd992c9eed838961e5e659",
+  "golden_mc.npz": "2a96a9fb504656ddabb8fd7c61a427e1c71f21f0c26b291dcbad4bb4a18bc244",
+  "golden_sos.npz": "f91c8da91d14745f65d744f99b6c34b0afccaaee304289738b30f5e7d47d581a",
+  "golden_twilight.npz": "a976e3fa09c0a9b137e7aef6f75f9f2d79b3e88a4a047963594534b6f3e5037f"
+}
