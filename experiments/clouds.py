@@ -6,11 +6,10 @@
     compared with the delta-Eddington analytic solution and with Monte Carlo.
 
 The cloud radiance comes from :func:`skycolor.rt.cloud.sky_radiance_with_cloud`,
-which is a drop-in replacement for ``rt.solver.sky_radiance_total`` (same
-``(n_view, n_wl)`` contract).  ``render.py`` is used unchanged: this script
-builds the dome itself and then reuses ``render``'s cameras, sampling and
-colour pipeline.  Wiring the cloud into ``render.sky_dome`` would be a
-one-line change for whoever owns that file.
+bound into a ``radiance_field`` closure and displayed through the standard
+``render`` pipeline (:func:`render.sky_dome` / :func:`render.render_scene`)
+-- one display path for clear and cloudy skies; this script only binds the
+medium and the deck into the field callable the display layer consumes.
 """
 from __future__ import annotations
 
@@ -25,8 +24,6 @@ from skycolor import cloud, color, presets, render
 from skycolor.rt.cloud import (delta_eddington, illuminate_cloud,
                                sky_radiance_with_cloud)
 from skycolor.rt.single import direct_sun_transmittance
-from skycolor.rt.solver import sky_radiance_total
-from skycolor.spectra import solar_irradiance
 
 #: Monte-Carlo reference albedos (conservative layer, mu0 = 1, black ground).
 #: 2e5-4e5 photons, 1 sigma <= 0.001; see docs/CLOUD.md.
@@ -36,61 +33,51 @@ MC_TAU = np.array([1.0, 2.0, 5.0, 10.0, 20.0])
 
 
 # ---------------------------------------------------------------------------
-# rendering helpers (render.py is untouched)
+# medium-side bindings (the display pipeline itself lives in render.py)
 # ---------------------------------------------------------------------------
-def cloud_dome(atmo, cloud_layer, sun_zenith_deg, n_zenith=40, n_azimuth=49):
-    """A sky dome including the cloud, in the same format as ``render.sky_dome``."""
-    zen = np.linspace(0.0, 90.0, n_zenith)
-    az = np.linspace(0.0, 180.0, n_azimuth)
-    Z, A = np.meshgrid(zen, az, indexing="ij")
-    shape = Z.shape + (len(atmo.wl),)
-    clear = sky_radiance_total(atmo, sun_zenith_deg, Z.ravel(), A.ravel(),
-                               multiple=True)
+def _cloud_field(atmo, cloud_layer, sun_zenith_deg):
+    """Bind the medium and the deck into the ``radiance_field`` callable that
+    :func:`render.sky_dome` / :func:`render.render_scene` consume; the
+    display layer sees only ``(zen, az_rel) -> (n_view, n_wl)``."""
+    def field(zen, az_rel):
+        return sky_radiance_with_cloud(atmo, cloud_layer, sun_zenith_deg,
+                                       zen, az_rel)
+    return field
+
+
+def _cloud_direct_transmittance(atmo, cloud_layer, sun_zenith_deg):
+    """Clear-sky direct beam attenuated by the deck (for the ground display)."""
+    T = direct_sun_transmittance(atmo, float(sun_zenith_deg))
     if cloud_layer is None:
-        rad = clear
-    else:
-        rad = sky_radiance_with_cloud(atmo, cloud_layer, sun_zenith_deg,
-                                      Z.ravel(), A.ravel(), clear_radiance=clear)
-    return dict(zenith=zen, azimuth_rel=az, radiance=rad.reshape(shape),
-                clear=clear.reshape(shape), wl=atmo.wl,
-                sun_zenith_deg=sun_zenith_deg)
+        return T
+    cosz = max(np.cos(np.radians(float(sun_zenith_deg))), 0.0)
+    optics = cloud_layer.optics(atmo.wl)
+    return T * np.exp(-optics.tau / cosz) if cosz > 0 else np.zeros_like(T)
 
 
-def _ground_radiance(atmo, dome, cloud_layer, sun_zenith_deg):
-    """Lambertian ground lit by the (possibly cloudy) sky and the direct beam."""
-    E_diff = render.hemispherical_irradiance(dome["radiance"], dome["zenith"],
-                                             dome["azimuth_rel"])
-    sza = float(sun_zenith_deg)
-    T = direct_sun_transmittance(atmo, sza)
-    cosz = max(np.cos(np.radians(sza)), 0.0)
-    if cloud_layer is not None:
-        optics = cloud_layer.optics(atmo.wl)
-        if cosz > 0:
-            T = T * np.exp(-optics.tau / cosz)
-        else:
-            T = np.zeros_like(T)
-    E_dir = solar_irradiance(atmo.wl) * T * cosz
-    return atmo.ground_albedo / np.pi * (E_dir + E_diff)
+def _cloud_panorama(atmo, cloud_layer, sun_elevation_deg, size=(420, 170),
+                    exposure=None, sun_disk=False):
+    """One panorama through the standard render path, with the deck-attenuated
+    ground; ``exposure=None`` renders with render_scene's own auto-exposure.
+    ``cloud_layer=None`` renders the plain clear sky through the built-in
+    field (render's default path)."""
+    sza = 90.0 - float(sun_elevation_deg)
+    has_deck = cloud_layer is not None
+    return render.render_scene(
+        atmo, sun_elevation_deg=float(sun_elevation_deg), camera="panorama",
+        size=size, exposure=exposure, tonemap="aces", adaptation=None,
+        sun_disk=sun_disk, ground=True,
+        radiance_field=_cloud_field(atmo, cloud_layer, sza) if has_deck else None,
+        ground_direct_transmittance=_cloud_direct_transmittance(atmo, cloud_layer, sza)
+        if has_deck else None)
 
 
-def render_panorama(dome, atmo, cloud_layer=None, size=(420, 170),
-                    exposure=1.0, sun_disk=False, percentile=95.0):
-    """Render a panorama from a (possibly cloudy) dome, with ground."""
-    az, el = render.panorama_grid(size[0], size[1])
-    rel = (az + 180.0) % 360.0 - 180.0
-    above = el >= 0.0
-    rad = render.sample_dome(dome, 90.0 - np.clip(el, 0.0, 90.0), rel)
-    Lg = _ground_radiance(atmo, dome, cloud_layer, dome["sun_zenith_deg"])
-    rad = np.where(above[..., None], rad, Lg[None, None, :])
-    rgb = color.render_rgb(rad, dome["wl"], exposure=exposure, tonemap="aces",
-                           adaptation=None, preserve_chromaticity=True)
-    if sun_disk:
-        sun_el = 90.0 - dome["sun_zenith_deg"]
-        if sun_el > -0.9:
-            ang = np.hypot(((az + 180.0) % 360.0 - 180.0) * np.cos(np.radians(el)),
-                           el - sun_el)
-            rgb[ang < 0.30] = 1.0
-    return rgb
+def _cloud_dome(atmo, cloud_layer, sun_zenith_deg, n_zenith=40, n_azimuth=49):
+    """A cloudy sky dome through :func:`render.sky_dome` (for exposure pick)."""
+    return render.sky_dome(atmo, float(sun_zenith_deg), n_zenith=n_zenith,
+                           n_azimuth=n_azimuth,
+                           radiance_field=_cloud_field(atmo, cloud_layer,
+                                                       float(sun_zenith_deg)))
 
 
 def _exposure(dome, percentile=97.0):
@@ -108,7 +95,7 @@ def figure_comparison(atmo):
     scenarios = [("clear", None), ("stratus", cloud.get_preset("stratus")),
                  ("altostratus", cloud.get_preset("altostratus"))]
     # one exposure from the clear noon sky, shared by every panel
-    ref = cloud_dome(atmo, None, 90.0 - elevations[0])
+    ref = render.sky_dome(atmo, 90.0 - elevations[0])
     exposure = _exposure(ref)
     print(f"  shared exposure = {exposure:.3e}")
 
@@ -116,13 +103,13 @@ def figure_comparison(atmo):
     for name, layer in scenarios:
         row = []
         for elev in elevations:
-            dome = cloud_dome(atmo, layer, 90.0 - elev)
-            img = render_panorama(dome, atmo, layer, exposure=exposure,
+            img = _cloud_panorama(atmo, layer, elev, exposure=exposure,
                                   sun_disk=(layer is None))
             row.append(img)
             if layer is not None:
-                lum = color.luminance(color.spectrum_to_xyz(
-                    dome["radiance"][0, 0], dome["wl"]))
+                prof = sky_radiance_with_cloud(atmo, layer, 90.0 - elev,
+                                               [0.0], [0.0])
+                lum = color.luminance(color.spectrum_to_xyz(prof[0], atmo.wl))
                 print(f"  {name:12s} sun {elev:+5.1f} deg  zenith luminance "
                       f"{lum:9.1f} cd/m2")
         panels.append(row)
@@ -154,13 +141,11 @@ def figure_comparison(atmo):
 def figure_fisheye(atmo):
     """A fisheye of the overcast sky, to show the overcast luminance law."""
     layer = cloud.get_preset("stratus")
-    dome = cloud_dome(atmo, layer, 90.0 - 45.0, n_zenith=48, n_azimuth=61)
-    az, el, mask = render.fisheye_grid(420)
-    rel = (az + 180.0) % 360.0 - 180.0
-    rad = render.sample_dome(dome, 90.0 - np.clip(el, 0.0, 90.0), rel)
-    rgb = color.render_rgb(rad, dome["wl"], exposure=_exposure(dome),
-                           tonemap="aces", adaptation=None)
-    rgb = rgb * mask[..., None]
+    dome = _cloud_dome(atmo, layer, 90.0 - 45.0, n_zenith=48, n_azimuth=61)
+    rgb = render.render_scene(atmo, sun_elevation_deg=45.0, camera="fisheye",
+                              size=(420, 420), exposure=_exposure(dome), tonemap="aces",
+                              adaptation=None, sun_disk=False, ground=False,
+                              radiance_field=_cloud_field(atmo, layer, 45.0))
 
     # luminance profile across the sky: the (1 + 2 cos theta)/3 law
     zen = np.linspace(0.0, 90.0, 91)
@@ -198,8 +183,9 @@ def figure_sunset(atmo):
         row, row_notes = [], []
         for elev in elevations:
             sza = 90.0 - elev
-            dome = cloud_dome(atmo, layer, sza)
-            row.append(render_panorama(dome, atmo, layer, exposure=_exposure(dome)))
+            dome = _cloud_dome(atmo, layer, sza)
+            row.append(_cloud_panorama(atmo, layer, elev,
+                                       exposure=_exposure(dome)))
             illum = illuminate_cloud(atmo, layer, sza)
             if illum.geometry == "none":
                 row_notes.append((elev, "none", None, 0.0))

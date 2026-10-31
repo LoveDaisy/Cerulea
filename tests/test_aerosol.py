@@ -461,3 +461,34 @@ def test_no_cross_contamination_across_rh_and_wavelength():
     _ = a8.relative_coefficients(np.array([700.0]))
     assert np.array_equal(a5.relative_coefficients(wl)[0], c5)
     assert np.array_equal(a8.relative_coefficients(wl)[0], c8)
+
+
+def test_mie_aerosol_is_frozen():
+    """The optical definition is immutable: assignment must raise, and
+    ``replace`` returns a fresh object with rebuilt caches (task Step 5)."""
+    from dataclasses import FrozenInstanceError
+
+    a = MieAerosol(modes=[LogNormalMode(0.2, 2.0)], n_radii=32)
+    with pytest.raises(FrozenInstanceError):
+        a.n_radii = 64
+    b = a.replace(n_radii=64)
+    assert b.n_radii == 64 and a.n_radii == 32
+    assert b is not a
+    with pytest.raises(TypeError):
+        a.replace(nope=1)
+
+
+def test_replace_is_field_level_preset_knobs_need_construction():
+    """``replace`` maps dataclass fields only; the hygroscopic preset knobs
+    (``rh``) are constructor keywords, not fields -- varying them means
+    constructing a new (shared) instance.  This pins the real contract the
+    replace docstring describes."""
+    from skycolor.aerosol import RuralAerosol, shared
+
+    rural = shared(RuralAerosol, rh=0.6)
+    with pytest.raises(TypeError, match="unknown field"):
+        rural.replace(rh=0.9)
+    # field-level replace works and leaves the shared instance untouched
+    variant = rural.replace(n_radii=48)
+    assert variant.n_radii == 48
+    assert shared(RuralAerosol, rh=0.6).n_radii == rural.n_radii

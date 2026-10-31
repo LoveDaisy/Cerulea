@@ -39,6 +39,8 @@ effect being modelled.
 """
 from __future__ import annotations
 
+import weakref
+
 import numpy as np
 from scipy.interpolate import CubicSpline
 
@@ -51,7 +53,7 @@ REFRACTIVITY_STD = 2.78e-4
 _PROFILE_TOP = 1.2e6
 
 
-class _Profile:
+class RefractiveProfile:
     """Cached refractive index profile ``n(r)`` for one atmosphere."""
 
     def __init__(self, atmo, n_points: int = 4000):
@@ -115,13 +117,31 @@ def _trace(profile: _Profile, r0: float, theta0: float, r_earth: float,
     return hit, r_min, theta_inf, total
 
 
+#: backward-compatibility alias; ``RefractiveProfile`` is the public name
+_Profile = RefractiveProfile
+
+
+def refractive_profile(atmo, n_points: int = 4000) -> RefractiveProfile:
+    """Build the cached refractive index profile of ``atmo``.
+
+    Public building block for callers that trace many rays through one
+    atmosphere (the data pipeline); :func:`trace_ray` builds its own
+    profile when none is given.
+    """
+    return RefractiveProfile(atmo, n_points=n_points)
+
+
 def trace_ray(atmo, r0: float, theta0: float, r_earth: float = R_EARTH,
               r_top: float = R_EARTH + 1.2e6, ds: float = 2000.0,
-              max_steps: int = 100000):
+              max_steps: int = 100000, profile: RefractiveProfile | None = None):
     """Trace one ray through the refractive atmosphere.
 
     Parameters
     ----------
+    profile : RefractiveProfile, optional
+        A prebuilt profile (see :func:`refractive_profile`); callers tracing
+        many rays through one atmosphere pass one instead of paying the
+        per-call rebuild.
     r0 : start radius [m]
     theta0 : *apparent* zenith angle at the start point [rad]; 0 is straight
         up, pi/2 is horizontal, > pi/2 points below the local horizon.
@@ -132,7 +152,8 @@ def trace_ray(atmo, r0: float, theta0: float, r_earth: float = R_EARTH,
     ray makes with the initial local vertical once it reaches space, i.e. the
     *true* zenith angle of the source) and ``bending`` (total turning, rad).
     """
-    profile = _Profile(atmo)
+    if profile is None:
+        profile = RefractiveProfile(atmo)
     hit, r_min, theta_inf, bending = _trace(profile, r0, theta0, r_earth, r_top,
                                             ds, max_steps)
     return dict(hit_earth=hit, r_min=r_min, theta_inf=theta_inf, bending=bending)
@@ -154,11 +175,16 @@ def boundary_theta(profile: _Profile, r0: float, r_earth: float = R_EARTH) -> fl
 
 
 class RefractionTables:
-    """Apparent/true conversion and shadow thresholds for one atmosphere."""
+    """Apparent/true conversion and shadow thresholds for one atmosphere.
+
+    The tables depend only on the *air-density profile*: the observer's
+    altitude and the wavelength grid play no role.  They therefore cache
+    against the density-definition identity token of the atmosphere's
+    :class:`~skycolor.medium.Medium` (see :func:`get_tables`).
+    """
 
     def __init__(self, atmo, n_elev: int = 61, alt_km=None):
-        self.atmo = atmo
-        profile = _Profile(atmo)
+        profile = RefractiveProfile(atmo)
         self.profile = profile
         self._n_elev = n_elev
         self._elev_table = None
@@ -237,22 +263,38 @@ class RefractionTables:
         return np.degrees(np.arccos(R_EARTH / (R_EARTH + z * 1e3)))
 
 
-_CACHE: dict[tuple, RefractionTables] = {}
-
-
-def _key(atmo):
-    # refraction only depends on the density profile, which is the same for
-    # every atmosphere with the same surface pressure and observer altitude
-    return (round(float(getattr(atmo, "surface_pressure", 101325.0)), 3),
-            round(float(getattr(atmo, "elevation_km", 0.0)), 6))
+_CACHE: "weakref.WeakKeyDictionary[object, RefractionTables]" = weakref.WeakKeyDictionary()
 
 
 def get_tables(atmo) -> RefractionTables:
-    """Cached :class:`RefractionTables` for the density profile of ``atmo``."""
-    key = _key(atmo)
-    if key not in _CACHE:
-        _CACHE[key] = RefractionTables(atmo)
-    return _CACHE[key]
+    """Cached :class:`RefractionTables` for the density profile of ``atmo``.
+
+    Cache identity is the ``refraction_token`` of the atmosphere's
+    :class:`~skycolor.medium.Medium` -- its *construction* identity (any
+    redefinition through the facade, aerosol layers included, replaces the
+    medium and rotates the token), never a value proxy.  The tables only
+    read the air-density profile, so a redefinition that leaves it untouched
+    costs one rebuild but is never wrong.  Consequences, both deliberate:
+
+    * two media built from different custom profiles but the same
+      ``surface_pressure``/``elevation_km`` never share tables (the old
+      two-number proxy key silently did);
+    * two separately constructed but otherwise identical media each build
+      their own tables ("per-construction, don't share"), while a
+      wavelength-restricted medium inherits its source's token and shares
+      them.  Entries live in a ``WeakKeyDictionary`` keyed on the token, so
+      they are reclaimed with the medium that owns them -- long batch runs
+      do not accumulate tables.  The cost of "per-construction, don't share"
+      is one table build per genuinely distinct medium (~2.3 s measured: the
+      shadow-threshold ray traces dominate; before the identity-key change
+      the proxy key deduplicated constructions sharing (pressure, altitude)).
+    """
+    token = atmo._medium.refraction_token
+    tables = _CACHE.get(token)
+    if tables is None:
+        tables = RefractionTables(atmo)
+        _CACHE[token] = tables
+    return tables
 
 
 def apparent_solar_zenith(atmo, true_zenith_deg, refraction=True):

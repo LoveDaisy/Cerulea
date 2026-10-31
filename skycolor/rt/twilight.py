@@ -84,9 +84,17 @@ import warnings
 
 import numpy as np
 
-from ..atmosphere import Atmosphere
 from . import mc as _mc
 from .single import sky_radiance as _single
+
+#: standing approximations of this backend
+CAPABILITIES = {
+    "scattering": "split estimator: exact spherical first order + MC higher orders",
+    "horizontal_field": "first-order term only",
+    "ms_geometry": "Monte Carlo assumes a horizontally uniform atmosphere",
+    "mc_refraction": "none (straight-line photon transport)",
+    "ss_refraction": "solar chord when atmo.refraction",
+}
 
 __all__ = ["twilight_radiance", "multiple_scattered", "QUALITY"]
 
@@ -135,28 +143,19 @@ def _as_directions(view_zenith_deg, view_azimuth_deg):
 def _sub_atmosphere(atmo, index):
     """A copy of ``atmo`` restricted to ``wl[index]``.
 
-    The aerosol objects and the vertical grid are shared; only the spectral
-    grid is sliced, which is all that a single-wavelength Monte Carlo run
-    needs.
+    ``_restrict`` is the only path: it slices the spectral arrays on a copy
+    (preserving any injected custom profiles) while sharing aerosols and the
+    vertical grid, which is all that a single-wavelength Monte Carlo run
+    needs.  Atmosphere-like objects without ``_restrict`` fail loudly here
+    instead of being silently rebuilt into a plain ``Atmosphere`` -- the old
+    rebuild fallback dropped custom profiles and produced a hybrid
+    single-/multiple-scattering field.
     """
     wl = np.asarray(atmo.wl, dtype=float)
     idx = np.asarray(index, dtype=int)
     if np.array_equal(idx, np.arange(wl.size)):
         return atmo
-    if hasattr(atmo, "_restrict"):
-        # preserves subclass overrides of n_o3 / n_air; rebuilding drops them
-        return atmo._restrict(idx)
-    ground = np.asarray(atmo.ground_albedo, dtype=float)
-    return Atmosphere(
-        wl[idx],
-        ozone_du=getattr(atmo, "ozone_du", 300.0),
-        no2_column=getattr(atmo, "no2_column", 0.0),
-        aerosols=list(atmo.aerosols),
-        ground_albedo=ground[idx],
-        surface_pressure=getattr(atmo, "surface_pressure", 101325.0),
-        z_bounds_km=np.asarray(atmo.z_bounds, dtype=float),
-        elevation_km=float(getattr(atmo, "elevation_km", 0.0)),
-    )
+    return atmo._restrict(idx)
 
 
 def _coarse_grid(n_zen, n_az):
@@ -462,7 +461,8 @@ def multiple_scattered(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
 
 def twilight_radiance(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
                       sun_azimuth_deg=0.0, quality="medium", seed=0,
-                      single=True, multiple=True, grid=None):
+                      single=True, multiple=True, grid=None,
+                      return_info=False):
     """Total spectral sky radiance in twilight, with a statistical error bar.
 
     This is the production entry point of the spherical twilight engine.  It
@@ -495,7 +495,9 @@ def twilight_radiance(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
     -------
     radiance, stderr : ndarray ``(n_view, n_wl)``
         Spectral radiance and its 1-sigma statistical uncertainty, in
-        W m^-2 sr^-1 nm^-1.
+        W m^-2 sr^-1 nm^-1.  With ``return_info=True`` a third element is
+        appended: the Monte Carlo ``info`` dict (anchor wavelengths,
+        ``undetected_wl``, grid, coarse field).
 
     Notes
     -----
@@ -515,15 +517,18 @@ def twilight_radiance(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
     n_wl = len(atmo.wl)
     total = np.zeros((n_view, n_wl))
     err = np.zeros((n_view, n_wl))
+    info: dict = {}
 
     if single:
         total += _single(atmo, sun_zenith_deg, zen, az,
                          sun_azimuth_deg=sun_azimuth_deg)
     if multiple:
-        ms, ms_err, _ = multiple_scattered(
+        ms, ms_err, info = multiple_scattered(
             atmo, sun_zenith_deg, zen, az, sun_azimuth_deg=sun_azimuth_deg,
             quality=quality, seed=seed, grid=grid,
         )
         total += ms
         err += ms_err
+    if return_info:
+        return total, err, info
     return total, err

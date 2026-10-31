@@ -19,7 +19,24 @@ argument; this is the state.*
 | Colour | CIE 1931 → Bradford → ACES, tone-mapping options |
 | Cameras | panorama, fisheye, perspective; ground; sun disk |
 
-210 tests.  Environment pinned by `uv.lock` (Python 3.12, numpy 2.5, scipy 1.18).
+Test suite: `uv run pytest -q` (see that command's output for the current
+count; docs do not track absolute numbers).  Environment pinned by `uv.lock`
+(Python 3.12, numpy 2.5, scipy 1.18).
+
+## Architecture (post-refactor)
+
+The physical medium is a frozen `Medium` (`skycolor/medium.py`), the observing
+scenario a frozen `Scene` (`skycolor/scene.py`); `Atmosphere` is the facade.
+Species listing and column algebra are single-sourced in `skycolor/optics.py`
+(no backend imports another's privates; the MC's transport/sampling/estimator
+stay deliberately independent).  Custom gas profiles are injected callables
+(`ozone_profile=` / `air_profile=`); `at_altitude` truncates the model at the
+site.  `rt.solver.solve` dispatches explicitly to clear / twilight / cloud and
+returns a traceable `SkyResult`; `render` consumes any spectral field through
+a `radiance_field` closure (one display path for clear and cloudy skies).
+`MieAerosol` / `CloudLayer` are frozen (shared instances read-only by
+structure); refraction tables cache on the medium's density-definition
+identity.  Contracts: `docs/ARCHITECTURE.md`.
 
 ## How well it is validated
 
@@ -48,12 +65,16 @@ argument; this is the state.*
    solar depression (0.58× Koomen at −9°, 0.42× at −12°), which is the same
    low-atmosphere multiple-scattering deficit; the −6° point itself is inside
    the 1950s calibration and the plane-parallel approximation.
-2. **The altitude response has the wrong sign.**  At 2.4 km the model is a few
-   per cent *brighter*, while the data (Koomen's two stations, Patat's two
-   pressures) are 0.80× darker.  The `at_altitude` helper also scales the
-   US1976 density profile by `p(z0)/P0`, which makes the density at the site
-   0.746× too low at 2.4 km; the altitude comparison needs its own audit
-   before it is used as a constraint.
+2. **The altitude response has the wrong sign.**  `at_altitude` now truncates
+   the model at the site (Step 3c): the layer grid starts at z0, the ground sits
+   at z0 and nothing is renormalised, so single/SOS/MC share one ground for the
+   first time.  Under that consistent construction the zenith luminance ratio
+   at −6° is **1.21×** deterministic / **1.01×** engine while the data
+   (Koomen's two stations, Patat's two pressures) are **0.80×** darker — the
+   remaining gap is the same low-atmosphere multiple-scattering deficit, not a
+   construction artifact.  (The old 1.16×/0.98× came from the double-scaled,
+   ground-inconsistent construction.)  Open item: the refraction shadow
+   thresholds still assume sea-level grazing rays.
 3. **The limb is ≈ 2× brighter than the CIE 110 fit** (which may be a
    reference problem — CIE 110 is a daylighting standard, not physics).
 4. **The solar aureole is under-resolved in multiple scattering** (32-moment

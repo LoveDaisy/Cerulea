@@ -133,10 +133,10 @@ def build_refraction() -> None:
     """
     from skycolor.atmosphere import Atmosphere, us76_pressure, us76_temperature
     from skycolor.constants import N_STD_AIR, R_EARTH
-    from skycolor.refraction import REFRACTIVITY_STD, _Profile, _trace
+    from skycolor.refraction import refractive_profile, trace_ray
 
     atmo = Atmosphere(np.array([550.0]), aerosols=[])
-    prof = _Profile(atmo)
+    prof = refractive_profile(atmo)
     rows = []
     for h in _REFRACT_ALT:
         r0 = R_EARTH + h * 1e3
@@ -144,11 +144,12 @@ def build_refraction() -> None:
         for e in _REFRACT_ELEV:
             if e < -dip - 1e-9:
                 continue          # the ray hits the ground
-            hit, _, _, bend = _trace(prof, r0, np.pi / 2 - np.radians(e),
-                                     R_EARTH, R_EARTH + 1.2e6, 2000.0, 400000)
-            if hit:
+            out = trace_ray(atmo, r0, np.pi / 2 - np.radians(e),
+                            R_EARTH, R_EARTH + 1.2e6, 2000.0, 400000,
+                            profile=prof)
+            if out["hit_earth"]:
                 continue
-            rows.append((h, e, e - np.degrees(bend)))
+            rows.append((h, e, e - np.degrees(out["bending"])))
     path = OUT / "refraction.csv"
     with path.open("w", newline="") as fh:
         fh.write("altitude_km,apparent_elevation_deg,true_elevation_deg\n")

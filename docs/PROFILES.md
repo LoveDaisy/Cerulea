@@ -205,18 +205,19 @@ that does not exist.**
 continuous) still gives 0.794 at ΔT = −20 K instead of 0.732, so ~60 % of the
 effect survives — it is the scale height, not the jump.
 
-(ii) **The spherical engine cannot be fixed this way at all.**  The engine's
-Monte Carlo term does not see these variants unpatched:
-`skycolor.rt.twilight._sub_atmosphere` rebuilds a *plain* `Atmosphere` from
-`ozone_du` / `surface_pressure` before each single-wavelength run, which
-silently discards any subclass override of `n_o3` or `n_air`.  The evidence is
-unambiguous — `twilight_radiance(..., single=False)` returns
+(ii) **The spherical engine cannot be fixed this way at all.**  *(Historical
+account — the defect described here is fixed; see the "engine, current" note
+at the end of this item.)*  The engine's Monte Carlo term did not see the
+variants: `skycolor.rt.twilight._sub_atmosphere` used to rebuild a *plain*
+`Atmosphere` from `ozone_du` / `surface_pressure` before each
+single-wavelength run, silently discarding any custom profile.  The evidence
+was unambiguous — `twilight_radiance(..., single=False)` returned
 **bit-identical** multiple scattering, 0.3262779066, for ΔT = 0 and
-ΔT = −20 K — and the defect matters beyond this experiment: *any* profile
-study run through the engine is a hybrid of a corrected first-order term and
-an uncorrected multiple-scattering term.  `skycolor/` is read-only here, so
-`experiments/profile_variants.py` installs a run-time patch
-(`install_twilight_profile_support`) that routes `_sub_atmosphere` through the
+ΔT = −20 K — and the defect mattered beyond this experiment: *any* profile
+study run through the engine was a hybrid of a corrected first-order term and
+an uncorrected multiple-scattering term.  `skycolor/` was read-only here, so
+`experiments/profile_variants.py` installed a run-time patch
+(`install_twilight_profile_support`) that routed `_sub_atmosphere` through the
 variant's `_restrict` method; the upstream fix is the same one line.
 With the patch, ΔT = −20 K takes the engine's multiple scattering from 0.326
 to 0.337 (within its 5 % statistical error, nominally *up*, because the thinner
@@ -228,6 +229,14 @@ and the −26 K offset that fixes the deterministic model leaves the engine at
 signal is first order, driving the engine to the Patat level by temperature
 alone would need far more than −40 K.  The deterministic −26 K is a *lower bound*
 on what the engine would need, and the engine never gets there.
+
+**Engine, current (architecture refactor Step 3b).**  The rebuild fallback and
+the run-time patch are both retired: custom profiles are now injected as data
+(``Atmosphere(ozone_profile=..., air_profile=...)``) and the engine reads them
+through its native `_restrict` wavelength subsets — no patching, no hybrid
+term (`docs/ARCHITECTURE.md` migration map).  `experiments/12` runs the
+engine check patch-free: reference L(−6°) 0.554 vs ΔT = −20 K 0.458, the
+multiple-scattering terms distinct (0.153 vs 0.165).
 
 (iii) A −26 K offset does not even fit the *shape* of the Patat fit across the
 measured range: it fixes −6° (and, coincidentally, the extrapolated −3°), but

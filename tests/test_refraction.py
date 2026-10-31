@@ -190,19 +190,66 @@ def test_delta_m_scales_coarse_aerosol():
     assert np.allclose(props["moments"][:, 0, :], 1.0)
 
 
-def test_restrict_preserves_subclass_overrides():
-    """`_restrict` must keep subclass profiles: rebuilding silently drops them."""
+def test_restrict_preserves_custom_air_profile():
+    """A custom air profile injected as data must survive the wavelength
+    subset the twilight engine takes (historically: subclass overrides,
+    which a rebuild silently dropped)."""
     from skycolor.atmosphere import Atmosphere
     from skycolor.constants import WL_COARSE
 
-    class Cold(Atmosphere):
-        def n_air(self, z):
-            zz = np.asarray(z, dtype=float)
-            return super().n_air(z) * np.exp(-np.maximum(zz - 20.0, 0.0) * (1 / 6.0 - 1 / 6.5))
+    base = Atmosphere(WL_COARSE, ozone_du=300.0, aerosols=[])
 
-    at = Cold(WL_COARSE, ozone_du=300.0, aerosols=[])
+    def cold_air(z):
+        zz = np.asarray(z, dtype=float)
+        return base.n_air(z) * np.exp(-np.maximum(zz - 20.0, 0.0) * (1 / 6.0 - 1 / 6.5))
+
+    at = Atmosphere(WL_COARSE, ozone_du=300.0, aerosols=[], air_profile=cold_air)
     sub = at._restrict([0, 1, 2])
-    assert isinstance(sub, Cold)
     assert sub.wl.size == 3
-    assert sub.n_air(np.array([40.0]))[0] != at.n_air(np.array([40.0]))[0] * 0 + \
-        Atmosphere(WL_COARSE[:3], ozone_du=300.0, aerosols=[]).n_air(np.array([40.0]))[0]
+    # the injected profile survives the subset, unchanged
+    assert np.array_equal(sub.n_air(np.array([40.0])), at.n_air(np.array([40.0])))
+    # ... and still differs from the US76 default
+    plain = Atmosphere(WL_COARSE[:3], ozone_du=300.0, aerosols=[])
+    assert not np.array_equal(sub.n_air(np.array([40.0])), plain.n_air(np.array([40.0])))
+
+
+def test_refraction_cache_identity():
+    """Cache identity is the medium's density definition, not a proxy.
+
+    (a) media with different custom profiles but the same surface pressure /
+        observer altitude must NOT share tables (the old two-number proxy
+        key silently conflated them);
+    (b) a wavelength-restricted medium shares its source's tables (the
+        density definition is untouched by a spectral subset), while two
+        separately constructed identical media each own their tables.
+    """
+    from skycolor.atmosphere import Atmosphere
+    from skycolor.constants import WL_COARSE
+    from skycolor.refraction import get_tables
+
+    base = Atmosphere(WL_COARSE, ozone_du=300.0, aerosols=[])
+
+    def profile_a(z):
+        return base.n_air(z) * 1.0
+
+    def profile_b(z):
+        return base.n_air(z) * (1.0 + 1e-3)
+
+    a = Atmosphere(WL_COARSE, ozone_du=300.0, aerosols=[],
+                   surface_pressure=101325.0, elevation_km=0.0,
+                   air_profile=profile_a)
+    b = Atmosphere(WL_COARSE, ozone_du=300.0, aerosols=[],
+                   surface_pressure=101325.0, elevation_km=0.0,
+                   air_profile=profile_b)
+    # (a) different density definitions, same proxy numbers -> no sharing
+    assert get_tables(a) is not get_tables(b)
+    # (b1) restrict inherits the source token
+    assert get_tables(a._restrict([0, 1, 2])) is get_tables(a)
+    # (b2) same definition, separately constructed -> own tables by design
+    a2 = Atmosphere(WL_COARSE, ozone_du=300.0, aerosols=[],
+                    surface_pressure=101325.0, elevation_km=0.0,
+                    air_profile=profile_a)
+    assert get_tables(a2) is not get_tables(a)
+    # ... and the rebuilt tables agree with the first ones
+    assert np.array_equal(get_tables(a2).shadow_zenith_true(5.0),
+                          get_tables(a).shadow_zenith_true(5.0))

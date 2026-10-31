@@ -1,10 +1,18 @@
 """Independent Monte Carlo reference solver for the total spectral sky radiance.
 
-This module exists to *validate* the deterministic radiative-transfer code.  It
-is written from scratch on purpose: apart from the pure geometry helpers in
-:mod:`skycolor.geometry` (ray/shell intersections, solar position) it shares no
-code with :mod:`skycolor.rt.single`.  It is slow and slightly noisy, but it is
-simple enough that its correctness can be checked by reading it.
+This module exists to *validate* the deterministic radiative-transfer code.
+Its transport, sampling and estimator are written from scratch on purpose:
+apart from the pure geometry helpers in :mod:`skycolor.geometry` (ray/shell
+intersections, solar position) and the shared species/column algebra of
+:mod:`skycolor.optics` (which species exist, their shell column weights and
+their extinction weights), it shares no code with the deterministic solvers.
+It is slow and slightly noisy, but it is simple enough that its correctness
+can be checked by reading it.
+
+The shared parts are a known blind spot of the MC-vs-deterministic
+cross-check: agreement between the two cannot cover a common failure mode
+in the shared geometry or species definitions.  Independent evidence for
+those lives in ``validation/`` (against external references), not here.
 
 What it computes
 ----------------
@@ -94,6 +102,7 @@ import numpy as np
 from .. import spectra
 from ..constants import DEPOLARIZATION, R_EARTH
 from ..geometry import is_sunlit, path_lengths_sun
+from ..optics import shell_species_weights, species_extinction_weights
 
 __all__ = ["mc_radiance", "mc_radiance_split", "mc_flux"]
 
@@ -180,23 +189,23 @@ def _shell_species_density(atmo) -> np.ndarray:
 
     Multiplying the per-shell geometric path lengths by this matrix gives the
     column amounts (molecules m^-2 for the gases, 550 nm optical depth for the
-    aerosol layers) used to evaluate the direct solar beam.
+    aerosol layers) used to evaluate the direct solar beam.  Thin wrapper over
+    the shared registry slice in :mod:`skycolor.optics`.
     """
-    rb = atmo.r_bounds
-    r_mid = np.sqrt(rb[:-1] * rb[1:])
-    z_mid = (r_mid - R_EARTH) / 1.0e3
-    cols = [atmo.n_air(z_mid), atmo.n_o3(z_mid), atmo.n_no2(z_mid)]
-    for lay in atmo.aerosols:
-        cols.append(lay.aod550 * lay.profile(z_mid) / 1000.0)
-    return np.stack(cols, axis=1)
+    return shell_species_weights(atmo, atmo.r_bounds)
 
 
 def _species_tau_weights(atmo, iw: int, rel) -> np.ndarray:
-    """Optical-depth weight of every species at wavelength index ``iw``."""
-    w = [atmo._sigma_ray[iw], atmo._sigma_o3[iw], atmo._sigma_no2[iw]]
-    for ext, _ in rel:
-        w.append(ext[iw])
-    return np.asarray(w, dtype=float)
+    """Optical-depth weight of every species at wavelength index ``iw``.
+
+    Column ``iw`` of the shared extinction matrix
+    (:func:`skycolor.optics.species_extinction_weights`); ``rel`` passes the
+    precomputed aerosol curves so the per-wavelength loop does not rebuild
+    them.  The MC transport applies these weights with its own ``cols @ w``
+    product -- a performance variant of :func:`skycolor.optics.tau_from_columns`
+    (same semantics, kept because the transport calls it per wavelength batch).
+    """
+    return species_extinction_weights(atmo, [e for e, _ in rel])[:, iw]
 
 
 def _sun_transmittance(atmo, x, sun_hat, dens, tau_w) -> np.ndarray:

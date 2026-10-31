@@ -74,9 +74,9 @@
           "unit": "W/m2"
         },
         {
-          "dev": 6.545808858951897,
+          "dev": 6.545808858951895,
           "dev_kind": "abs",
-          "model": 6.545808858951897,
+          "model": 6.545808858951895,
           "name": "DNI spectral RMS, 400-700 nm",
           "passed": true,
           "reference": 0.0,
@@ -84,9 +84,9 @@
           "unit": "%"
         },
         {
-          "dev": 40.99012452686409,
+          "dev": 41.01102814730652,
           "dev_kind": "rel_pct",
-          "model": 9.761149425168322,
+          "model": 9.76259664257699,
           "name": "DHI illuminance, h=30deg (CIE 110, T=2.2)",
           "passed": false,
           "reference": 6.92328590950953,
@@ -94,9 +94,9 @@
           "unit": "klx"
         },
         {
-          "dev": 45.8754791177525,
+          "dev": 45.88089681636883,
           "dev_kind": "rel_pct",
-          "model": 11.580394471012923,
+          "model": 11.58082455760103,
           "name": "DHI illuminance, h=60deg (CIE 110, T=2.2)",
           "passed": false,
           "reference": 7.9385476853619,
@@ -133,9 +133,9 @@
       "key": "check3",
       "metrics": [
         {
-          "dev": 141.70607839909928,
+          "dev": 141.73547847012844,
           "dev_kind": "rel_pct",
-          "model": 8.826190560598477,
+          "model": 8.827264139844464,
           "name": "horizon sun-side / zenith, h=45deg",
           "passed": false,
           "reference": 3.6516212662326524,
@@ -143,9 +143,9 @@
           "unit": ""
         },
         {
-          "dev": 68.3877700310229,
+          "dev": 68.39810544942328,
           "dev_kind": "rel_pct",
-          "model": 3.375902281188027,
+          "model": 3.3761094896007786,
           "name": "horizon anti-solar / zenith, h=45deg",
           "passed": false,
           "reference": 2.0048381664333865,
@@ -153,9 +153,9 @@
           "unit": ""
         },
         {
-          "dev": 10.556922606837093,
+          "dev": 10.555507200467837,
           "dev_kind": "abs",
-          "model": 10.556922606837093,
+          "model": 10.555507200467837,
           "name": "RMS dev, theta<=60deg, h=45deg",
           "passed": true,
           "reference": 0.0,
@@ -163,9 +163,9 @@
           "unit": "%"
         },
         {
-          "dev": 32.62145552841671,
+          "dev": 32.6190595549129,
           "dev_kind": "abs",
-          "model": 32.62145552841671,
+          "model": 32.6190595549129,
           "name": "RMS dev, 60-75deg, h=45deg",
           "passed": false,
           "reference": 0.0,
@@ -173,9 +173,9 @@
           "unit": "%"
         },
         {
-          "dev": 74.2782463432531,
+          "dev": 74.2800131176415,
           "dev_kind": "abs",
-          "model": 74.2782463432531,
+          "model": 74.2800131176415,
           "name": "RMS dev, 75-90deg horizon, h=45deg",
           "passed": false,
           "reference": 0.0,
@@ -183,9 +183,9 @@
           "unit": "%"
         },
         {
-          "dev": 35.282848141026065,
+          "dev": 35.2829895954133,
           "dev_kind": "abs",
-          "model": 35.282848141026065,
+          "model": 35.2829895954133,
           "name": "RMS dev, whole sky, h=45deg",
           "passed": false,
           "reference": 0.0,
@@ -193,9 +193,9 @@
           "unit": "%"
         },
         {
-          "dev": 171.08029104025962,
+          "dev": 171.17427299519227,
           "dev_kind": "rel_pct",
-          "model": 22.635456204028994,
+          "model": 22.64330378459888,
           "name": "horizon sun-side / zenith, h=30deg",
           "passed": false,
           "reference": 8.350092925297648,
@@ -203,9 +203,9 @@
           "unit": ""
         },
         {
-          "dev": 120.03187901853649,
+          "dev": 120.03853166733349,
           "dev_kind": "rel_pct",
-          "model": 3.513708702038394,
+          "model": 3.513814938780423,
           "name": "horizon sun-side / zenith, h=60deg",
           "passed": false,
           "reference": 1.5969089196126816,
@@ -222,9 +222,9 @@
       "key": "check4",
       "metrics": [
         {
-          "dev": 0.008275977361904677,
+          "dev": 0.008263290843190566,
           "dev_kind": "abs",
-          "model": 0.29953869805286665,
+          "model": 0.29952601153415254,
           "name": "mean delta x, horizon",
           "passed": true,
           "reference": 0.29126272069096204,
@@ -232,9 +232,9 @@
           "unit": "xy"
         },
         {
-          "dev": 0.011154926167809784,
+          "dev": 0.011138396419486704,
           "dev_kind": "abs",
-          "model": 0.32390846176824845,
+          "model": 0.3238919320199254,
           "name": "mean delta y, horizon",
           "passed": true,
           "reference": 0.3127535356004388,
@@ -242,9 +242,9 @@
           "unit": "xy"
         },
         {
-          "dev": 0.018405433976030748,
+          "dev": 0.018390741380470265,
           "dev_kind": "abs",
-          "model": 0.018405433976030748,
+          "model": 0.018390741380470265,
           "name": "RMS delta xy, horizon",
           "passed": true,
           "reference": 0.0,
@@ -252,9 +252,9 @@
           "unit": "xy"
         },
         {
-          "dev": 0.010509078225979164,
+          "dev": 0.010501274635492205,
           "dev_kind": "abs",
-          "model": 0.010509078225979164,
+          "model": 0.010501274635492205,
           "name": "RMS delta u'v', horizon",
           "passed": true,
           "reference": 0.0,

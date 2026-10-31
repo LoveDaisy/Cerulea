@@ -61,7 +61,19 @@ from .. import spectra
 from ..cloud import CloudLayer, CloudOptics, delta_m
 from ..constants import R_EARTH
 from ..geometry import is_sunlit, path_lengths_sun
-from .single import _tau_from_columns, species_columns
+from ..optics import (
+    shell_species_columns,
+    shell_species_weights,
+    species_extinction_weights,
+    tau_from_columns,
+)
+
+#: standing approximations of this backend
+CAPABILITIES = {
+    "geometry": "plane-parallel homogeneous deck, delta-Eddington two-stream",
+    "horizontal_field": "inherited from the clear-sky solver for the clear part",
+    "refraction": "inherited from the clear-sky direct beam",
+}
 
 __all__ = [
     "TwoStream",
@@ -356,8 +368,9 @@ def sun_transmittance_to_height(atmo, height_km: float, sun_zenith_deg: float):
     p = r * np.sin(sza)
     lengths = path_lengths_sun(np.array([p]), np.array([c]), np.array([r]),
                                atmo.r_bounds)[:, 0]
-    cols = species_columns(atmo, lengths[:, None], atmo.r_bounds)
-    tau = _tau_from_columns(atmo, cols)[0]
+    cols = shell_species_columns(lengths[:, None],
+                                 shell_species_weights(atmo, atmo.r_bounds))
+    tau = tau_from_columns(cols, species_extinction_weights(atmo))[0]
     lit = bool(is_sunlit(np.array([p]), np.array([c]))[0])
     return (np.exp(-tau), lit) if lit else (np.zeros_like(tau), False)
 

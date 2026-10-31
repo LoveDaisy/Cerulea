@@ -89,8 +89,9 @@ FORWARD_SPAN = 12.0  #: forward quadrature spans theta < FORWARD_SPAN / x_max
 N_MOMENTS = 64
 
 
-class _Distribution:
-    """Log-normal droplet size distribution on a Gauss-Legendre grid in ln r."""
+class SizeDistribution:
+    """Log-normal droplet size distribution on a Gauss-Legendre grid in ln r
+    (public name; ``_Distribution`` is kept as a compatibility alias)."""
 
     def __init__(self, r_eff_um: float, sigma_g: float, n_radii: int):
         if r_eff_um <= 0:
@@ -211,6 +212,8 @@ def mie_coefficients(x, m: complex):
     return dict(a=a, b=b, qext=qext, qsca=qsca, g=g)
 
 
+_Distribution = SizeDistribution  #: backward-compatibility alias
+
 def _mie_amplitudes(theta, a, b):
     """Mie scattering amplitudes ``S1``, ``S2`` at the angles ``theta``.
 
@@ -276,7 +279,7 @@ def _legendre_all(mu: np.ndarray, n_moments: int) -> np.ndarray:
 
 def mie_optics(
     wl_nm: float,
-    distribution: _Distribution,
+    distribution: SizeDistribution,
     refractive_index: complex,
     n_moments: int = N_MOMENTS,
     n_forward: int = N_FORWARD,
@@ -435,9 +438,15 @@ class CloudOptics:
 # ---------------------------------------------------------------------------
 # the cloud layer
 # ---------------------------------------------------------------------------
-@dataclass
+@dataclass(frozen=True)
 class CloudLayer:
     """A homogeneous plane-parallel cloud deck.
+
+    Frozen value object: the deck definition never changes after
+    construction; :meth:`replace` derives a new deck and drops its optics
+    cache.  The computed optics are cached behind an immutable binding
+    (contents computed lazily, never rebound after the first build for a
+    given coarse grid).
 
     Parameters
     ----------
@@ -503,7 +512,7 @@ class CloudLayer:
         return RHO_WATER if self.phase == "water" else RHO_ICE
 
     def distribution(self) -> _Distribution:
-        return _Distribution(self.r_eff_um, self.sigma_g_effective, self.n_radii)
+        return SizeDistribution(self.r_eff_um, self.sigma_g_effective, self.n_radii)
 
     # -- microphysical diagnostics ------------------------------------------
     @property
@@ -536,7 +545,7 @@ class CloudLayer:
         coarse = _coarse_grid(wl)
         key = tuple(np.round(coarse, 6))
         if self._optics is None or not np.array_equal(self._optics.wl, coarse):
-            self._optics = self._compute_optics(coarse)
+            object.__setattr__(self, "_optics", self._compute_optics(coarse))
         return self._optics.at(wl)
 
     def _compute_optics(self, wl: np.ndarray) -> CloudOptics:
@@ -579,8 +588,11 @@ class CloudLayer:
         return np.exp(-self.optics(wl_nm).tau / mu)
 
     def replace(self, **kw) -> "CloudLayer":
+        # dataclasses.replace carries *all* current field values over,
+        # including a computed _optics -- which would silently reuse the old
+        # definition's optics for the new one.  Drop it explicitly.
         new = replace(self, **kw)
-        new._optics = None
+        object.__setattr__(new, "_optics", None)
         return new
 
     def describe(self) -> str:

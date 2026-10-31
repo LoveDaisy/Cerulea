@@ -47,9 +47,9 @@ the local horizontal the optical depth is the far branch (perigee -> space)
 plus the near branch (perigee -> point).  The one-branch version returned
 1.14x / 2.20x at -6 deg; the two-branch values are 0.69x / 0.86x.
 
-The altitude response is still wrong-signed, and ``at_altitude`` scales the
-US1976 density profile by p(z0)/P0, so the density at 2.4 km is 0.746x too
-low; the altitude comparison is diagnostic only.
+The altitude response is still wrong-signed under the consistent (truncated)
+``at_altitude`` construction (deterministic 1.21x, engine 1.01x, data 0.80x);
+the altitude comparison is diagnostic only.
 
 Runtime is a few minutes, almost all of it in the two engine points.
 
@@ -339,8 +339,9 @@ def main():
     print("  The measurements are the other way round: Koomen's Maryland sky is")
     print("  1.25x brighter than Patat's Paranal sky, and Patat's own 961->743 hPa")
     print("  pair gives 1.28x.  The model's altitude response has the wrong sign.")
-    print("  NOTE: at_altitude scales the US1976 profile by p(z0)/P0, so the")
-    print("  density at 2.4 km is 0.746x too low; this needs its own audit.")
+    print("  NOTE: at_altitude is the consistent truncated construction (grid")
+    print("  starts at the site, nothing renormalised); the wrong sign that")
+    print("  remains is the low-atmosphere multiple-scattering gap.")
     print()
     print(f"  verdict: {result.verdict}")
     print()
@@ -354,8 +355,9 @@ def main():
     print("  chord.  The remaining 15-30% is inside the 1950s absolute calibration")
     print("  and the plane-parallel multiple-scattering approximation.")
     print("  The altitude response is still wrong-signed: the model is slightly")
-    print("  brighter at 2.4 km where the data are 0.80x darker; at_altitude needs")
-    print("  an audit.")
+    print("  brighter at 2.4 km where the data are 0.80x darker, under the")
+    print("  consistent truncated construction (1.21x deterministic / 1.01x")
+    print("  engine); the gap is the low-atmosphere multiple scattering.")
     return 0 if result.verdict in ("PASS", "SKIP") else 1
 
 
