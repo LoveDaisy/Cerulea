@@ -1,0 +1,123 @@
+{
+  "assessment_date": "2026-11-01",
+  "scope": "Read-only reference audit plus postprocessing of frozen phase-three minus-six-degree spectra; no validation target edits or new MC.",
+  "Patat2006": {
+    "doi": "10.1051/0004-6361:20064992",
+    "publisher_pdf": "https://www.aanda.org/articles/aa/pdf/2006/31/aa4992-06.pdf",
+    "html": "https://arxiv.org/html/astro-ph/0604128",
+    "download": {
+      "url": "https://arxiv.org/pdf/astro-ph/0604128",
+      "sha256": "c8aac2b8d5d243fe4cce02ce6b22c2338893075e771babe8d5b220e587ab5c75",
+      "bytes": 593091,
+      "repository_file": null,
+      "note": "Not duplicated in git; URL/hash permit retrieving the original scan/preprint."
+    },
+    "pages": "Published pp387 section3 calibration; pp387-389 section4 and Table1 fit; pp389-390 Fig10 station comparison; p391 section5 and appendix assumptions; p393 A.5 night emission addition.",
+    "observable": "Total observed Johnson-Cousins V surface brightness, no documented astronomical night-background subtraction; sky selection within 40 degrees zenith distance for polynomial.",
+    "V_fit": {
+      "expression": "11.84 + 1.518*(zeta-95) - .057*(zeta-95)**2",
+      "units": "mag/arcsec2",
+      "valid_solar_zenith_deg": [
+        95,
+        105
+      ],
+      "sample_RMS_mag": 0.18
+    },
+    "station_comparison": {
+      "high": "Paranal2600m, within20deg zenith distance",
+      "low": "CrAO600m, zenith, morning2002-12-09..11",
+      "depression_range_deg": [
+        5.5,
+        11
+      ],
+      "delta_V_mag": 0.27,
+      "reported_plus_minus_mag": 0.03,
+      "high_pressure_hPa": 743,
+      "low_pressure_hPa": 961,
+      "causal_identification": false
+    },
+    "axis": "Solar true/apparent and centre/upper-limb convention not explicitly locked down by paper. Do not infer from fit agreement."
+  },
+  "Patat2003": {
+    "doi": "10.1051/0004-6361:20030030",
+    "publisher_pdf": "https://www.aanda.org/articles/aa/pdf/2003/12/aa3223.pdf",
+    "download": {
+      "url": "https://arxiv.org/pdf/astro-ph/0301115",
+      "sha256": "ba4f1b6fd68810723ec434e53228a7e4fa968a3e877b16c9bfa056ed3edf4a59",
+      "bytes": 923913,
+      "repository_file": null,
+      "note": "Not duplicated in git; URL/hash permit retrieving the original scan/preprint."
+    },
+    "pages": "Published p1190 section5/Table4 and zodiacal-bias discussion.",
+    "historical_V_night_mag_arcsec2": 21.61,
+    "sample_RMS_mag": 0.2,
+    "listed_unapplied_zodiacal_bias_correction_mag": 0.18,
+    "note": "2000-2001 night sample, not simultaneous twilight baseline; the minus12 dark-fraction example is not a matched measured subtraction."
+  },
+  "Koomen1952": {
+    "doi": "10.1364/JOSA.42.000353",
+    "download": {
+      "url": "https://static1.squarespace.com/static/54694fa6e4b0eaec4530f99d/t/5e876886cdfbaa441f538327/1585932427823/Measurements%2Bof%2Bthe%2BBrightness%2Bof%2Bthe%2BTwilight%2BSky%2B1952.pdf",
+      "sha256": "ddd2903e60bc9c6de8cb46d7eb6d3498c4000c12bb613ecf504550071a9d7e05",
+      "bytes": 474456,
+      "repository_file": null,
+      "note": "Not duplicated in git; URL/hash permit retrieving the original scan/preprint."
+    },
+    "pages": "p353 instrument/calibration/site conditions; p354 TablesI/II and solar altitude definition; p355 smoothed-observation discussion.",
+    "observable": "Photopic-intended green-filter photomultiplier,1.5deg FoV; smoothed station observations,not a controlled altitude intervention.",
+    "axis": "Only solar altitude relative to horizon given; true/apparent and centre/limb unspecified.",
+    "late_twilight_caveat": "Authors mention unapplied photometric correction below .003 candle/ft2, without a quantified error budget. Minus6 zenith values exceed this threshold."
+  },
+  "ESO_BESS_V": {
+    "download": {
+      "url": "https://www.hq.eso.org/sci/facilities/paranal/instruments/fors/inst/Filters/M_BESS_V.txt",
+      "sha256": "a40dc33f9e5e0bb2c7cf926a231a0967850c62bd32382b0c6a7b326ea2c41b49",
+      "bytes": 2037,
+      "repository_file": "validation/data/twilight_reference_audit/references/fors-bess-v.txt",
+      "note": null
+    },
+    "index": "https://www.hq.eso.org/sci/facilities/paranal/instruments/fors/inst/Filters/curves.html",
+    "units": [
+      "nm",
+      "dimensionless filter transmission"
+    ],
+    "response_limit": "Filter only; no old FORS1 TK2048 QE, optics or standard-star transformation. Use 380-780nm only for these model spectra. Not the 2007 HIGH filter series."
+  },
+  "CALSPEC_Vega": {
+    "download": {
+      "url": "https://ssb.stsci.edu/cdbs/calspec/alpha_lyr_stis_011.fits",
+      "sha256": "60aebf5c193223f69061cd176d6309730c3210051fffad0dd6ad44475199ceaa",
+      "bytes": 288000,
+      "repository_file": "validation/data/twilight_reference_audit/references/alpha_lyr_stis_011.fits",
+      "note": null
+    },
+    "version": "alpha_lyr_stis_011,2022-10-25 header; fixed version,not latest",
+    "native_units": [
+      "Angstrom",
+      "erg/s/cm2/Angstrom"
+    ],
+    "flux_conversion_to_W_m2_nm": 0.01,
+    "adopted_V_mag": 0.031,
+    "V_magnitude_source": "https://etc.stsci.edu/etcstatic/users_guide/1_ref_2_spectral_distribution.html",
+    "note": "Current ETC table uses version012. Adopting V=.031 with fixed011 defines an explicit approximation,not reconstruction of Patat historical zero points."
+  },
+  "AB": {
+    "zero_Jy": 3631,
+    "Jy_W_m2_Hz": 1e-26,
+    "source": "https://www.sdss4.org/dr14/algorithms/fluxcal/",
+    "response_definition": "Integrate photon counts lambda*Llambda*T dlambda; independent frequency-domain check uses fnu*T/nu dnu."
+  },
+  "results": {
+    "script": "tools/summarize_bandpass_audit.py",
+    "default_raw_directory": "validation/data/unified_solar_source_audit/raw",
+    "primary_field": "split_total=deterministic_single+multiple",
+    "frozen_input_hashes": "inputs.sha256.json",
+    "derived_outputs": [
+      "bandpass-audit.json",
+      "bandpass-audit.csv",
+      "reference-calculations.json"
+    ],
+    "interpretation": "docs/TWILIGHT_REFERENCE_AUDIT.md",
+    "scope_limit": "Only clear-scene solar elevation minus6 degrees; does not determine a causal altitude response or band correction at minus9/minus12."
+  }
+}

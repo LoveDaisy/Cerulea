@@ -1,0 +1,38 @@
+{
+  "derived": [
+    {
+      "h_deg": -6,
+      "mV_total_fit": 13.301,
+      "V_equiv_cd_m2": 0.5164446175191805,
+      "historical_dark_fraction_V": 0.0004746789794829222,
+      "dm_ddepression": 1.404,
+      "flux_ratio_for_plus_16_arcmin_brightness_shift": 1.4117571631755266,
+      "delta_deg_for_20pct_brightness": 0.14099224723579917,
+      "delta_deg_for_30pct_brightness": 0.20289058459194587
+    },
+    {
+      "h_deg": -9,
+      "mV_total_fit": 17.0,
+      "V_equiv_cd_m2": 0.017116846478579997,
+      "historical_dark_fraction_V": 0.014321878992735439,
+      "dm_ddepression": 1.062,
+      "flux_ratio_for_plus_16_arcmin_brightness_shift": 1.2980158630230338,
+      "delta_deg_for_20pct_brightness": 0.18639653024393787,
+      "delta_deg_for_30pct_brightness": 0.2682282304774877
+    },
+    {
+      "h_deg": -12,
+      "mV_total_fit": 19.673000000000002,
+      "V_equiv_cd_m2": 0.0014595660584469606,
+      "historical_dark_fraction_V": 0.16795773139880882,
+      "dm_ddepression": 0.72,
+      "flux_ratio_for_plus_16_arcmin_brightness_shift": 1.1934383792107954,
+      "delta_deg_for_20pct_brightness": 0.27493488210980843,
+      "delta_deg_for_30pct_brightness": 0.39563663995429443
+    }
+  ],
+  "station_high_over_low_from_deltaV": 0.7798301105232587,
+  "pressure_ratio": 0.7731529656607701,
+  "historical_dark_V_equiv_cd_m2": 0.0002451454040034527,
+  "label": "Arithmetic from published V fits/historical mean; not matched-baseline subtraction or causal altitude identification"
+}
