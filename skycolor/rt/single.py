@@ -32,6 +32,14 @@ from ..optics import (
     tau_from_columns,
 )
 
+#: standing approximations of this backend (see rt.solver.solve for the
+#: request-level checks)
+CAPABILITIES = {
+    "scattering": "single scattering, exact spherical-shell quadrature",
+    "horizontal_field": "applied at every scattering point",
+    "refraction": "solar chord and view path when atmo.refraction",
+}
+
 
 def _quadrature_points(ub: np.ndarray, n_gauss: int):
     """Gauss points inside every shell segment, ordered along the ray.

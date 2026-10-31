@@ -68,6 +68,13 @@ from ..optics import (
     tau_from_columns,
 )
 
+#: standing approximations of this backend
+CAPABILITIES = {
+    "geometry": "plane-parallel homogeneous deck, delta-Eddington two-stream",
+    "horizontal_field": "inherited from the clear-sky solver for the clear part",
+    "refraction": "inherited from the clear-sky direct beam",
+}
+
 __all__ = [
     "TwoStream",
     "CloudIllumination",

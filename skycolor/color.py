@@ -63,6 +63,9 @@ def chromaticity(xyz) -> np.ndarray:
 # ---------------------------------------------------------------------------
 _D65 = np.array([0.95047, 1.0, 1.08883])
 _D65_xy = np.array([0.31271, 0.32902])
+#: the D65 white point in chromaticity coordinates -- the public spelling of
+#: ``_D65_xy`` for callers outside this module (render, experiments)
+D65_XY = _D65_xy
 
 
 def xy_to_xyz(xy, Y: float = 1.0) -> np.ndarray:

@@ -11,7 +11,7 @@ from . import color
 # ---------------------------------------------------------------------------
 def sky_dome(atmo, sun_zenith_deg: float, n_zenith: int = 46, n_azimuth: int = 91,
              n_gauss: int = 3, chunk: int = 512, min_zenith_deg: float = 0.0,
-             multiple: bool = True):
+             multiple: bool = True, radiance_field=None):
     """Radiance of the whole sky on a (zenith, relative azimuth) grid.
 
     The atmosphere is horizontally homogeneous, so the radiance only depends on
@@ -19,18 +19,33 @@ def sky_dome(atmo, sun_zenith_deg: float, n_zenith: int = 46, n_azimuth: int = 9
     relative azimuths 0..180 degrees.  Returns a dict with ``zenith``,
     ``azimuth_rel``, ``radiance`` (n_zenith, n_azimuth, n_wl), ``wl`` and
     ``sun_zenith_deg``.
+
+    ``radiance_field`` decouples the display from the solver: a callable
+    ``(zen_flat, az_rel_flat) -> (n_view, n_wl)`` consulted instead of the
+    built-in clear-sky solver.  The medium and the solar geometry are bound
+    in the caller's closure, so the display layer needs no notion of what
+    produced the field (a cloudy sky, an experiment, a validation harness).
+    With a field given, ``atmo`` is used only for the ``wl`` metadata.
     """
     zen = np.linspace(min_zenith_deg, 90.0, n_zenith)
     az = np.linspace(0.0, 180.0, n_azimuth)
     Z, A = np.meshgrid(zen, az, indexing="ij")
-    rad = sky_radiance_grid(atmo, sun_zenith_deg, Z, A, n_gauss=n_gauss, chunk=chunk,
-                            multiple=multiple)
+    if radiance_field is not None:
+        rad = np.asarray(radiance_field(Z.ravel(), A.ravel()), dtype=float)
+        rad = rad.reshape(Z.shape + (rad.shape[-1],))
+    else:
+        rad = sky_radiance_grid(atmo, sun_zenith_deg, Z, A, n_gauss=n_gauss,
+                                chunk=chunk, multiple=multiple)
     return dict(zenith=zen, azimuth_rel=az, radiance=rad, wl=atmo.wl,
                 sun_zenith_deg=sun_zenith_deg)
 
 
 def sky_radiance_grid(atmo, sun_zenith_deg, Z, A, n_gauss=3, chunk=512,
-                      sun_azimuth_deg=0.0, multiple=True):
+                      sun_azimuth_deg=0.0, multiple=True, radiance_field=None):
+    if radiance_field is not None:
+        rad = np.asarray(radiance_field(np.ravel(Z), np.ravel(A)), dtype=float)
+        return rad.reshape(np.shape(Z) + (rad.shape[-1],))
+
     from .rt.solver import sky_radiance_total
 
     shape = np.shape(Z)
@@ -125,15 +140,23 @@ def perspective_grid(width: int, height: int, hfov_deg: float = 90.0,
 # ---------------------------------------------------------------------------
 # high level renderer
 # ---------------------------------------------------------------------------
-def ground_radiance(atmo, dome, sun_zenith_deg, ground_albedo=None):
-    """Spectral radiance of a Lambertian ground illuminated by sun + sky."""
+def ground_radiance(atmo, dome, sun_zenith_deg, ground_albedo=None,
+                    direct_transmittance=None):
+    """Spectral radiance of a Lambertian ground illuminated by sun + sky.
+
+    ``direct_transmittance`` overrides the clear-sky direct-beam
+    transmittance -- e.g. a cloud-deck attenuated beam, so the display of a
+    cloudy scene can keep its physically darkened ground without reaching
+    into the solver.
+    """
     from .rt.single import direct_sun_transmittance
     from .spectra import solar_irradiance
 
     albedo = (atmo.ground_albedo if ground_albedo is None
               else np.full(len(atmo.wl), ground_albedo))
     E_diff = hemispherical_irradiance(dome["radiance"], dome["zenith"], dome["azimuth_rel"])
-    T = direct_sun_transmittance(atmo, sun_zenith_deg)
+    T = (direct_sun_transmittance(atmo, sun_zenith_deg)
+         if direct_transmittance is None else np.asarray(direct_transmittance, dtype=float))
     cosz = max(np.cos(np.radians(sun_zenith_deg)), 0.0)
     E_dir = solar_irradiance(atmo.wl) * T * cosz
     return np.asarray(albedo) / np.pi * (E_dir + E_diff), E_dir + E_diff
@@ -145,10 +168,18 @@ def render_scene(atmo, sun_elevation_deg: float, sun_azimuth_deg: float = 0.0,
                  reference_percentile: float = 92.0, sun_disk: bool = True,
                  ground: bool = True, n_zenith: int = 50, n_azimuth: int = 91,
                  hfov_deg: float = 90.0, pitch_deg: float = 0.0, yaw_deg: float = 0.0,
-                 white_xy=None, preserve_chromaticity: bool = True):
-    """Render a complete scene (sky + ground + sun disk) to an RGB image."""
+                 white_xy=None, preserve_chromaticity: bool = True,
+                 radiance_field=None, ground_direct_transmittance=None):
+    """Render a complete scene (sky + ground + sun disk) to an RGB image.
+
+    ``radiance_field`` / ``ground_direct_transmittance`` have the same
+    meaning as in :func:`sky_dome` / :func:`ground_radiance`: they let a
+    cloudy or otherwise non-default spectral field flow through the same
+    display path instead of a duplicated one.
+    """
     sun_zen = 90.0 - sun_elevation_deg
-    dome = sky_dome(atmo, sun_zen, n_zenith=n_zenith, n_azimuth=n_azimuth)
+    dome = sky_dome(atmo, sun_zen, n_zenith=n_zenith, n_azimuth=n_azimuth,
+                    radiance_field=radiance_field)
 
     if camera == "panorama":
         az, el = panorama_grid(size[0], size[1])
@@ -165,13 +196,14 @@ def render_scene(atmo, sun_elevation_deg: float, sun_azimuth_deg: float = 0.0,
     above = el >= 0.0
     rad = sample_dome(dome, 90.0 - np.clip(el, 0.0, 90.0), rel)
     if ground:
-        Lg, _ = ground_radiance(atmo, dome, sun_zen)
+        Lg, _ = ground_radiance(atmo, dome, sun_zen,
+                                direct_transmittance=ground_direct_transmittance)
         rad = np.where(above[..., None], rad, Lg[None, None, :])
 
     if white_xy is None:
-        white_xy = color._D65_xy
+        white_xy = color.D65_XY
     if adaptation is None:
-        white_xy = color._D65_xy
+        white_xy = color.D65_XY
     rgb = color.render_rgb(rad, dome["wl"], exposure=exposure, tonemap=tonemap,
                            adaptation=adaptation, white_xy=white_xy,
                            reference_percentile=reference_percentile,

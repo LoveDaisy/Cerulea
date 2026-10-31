@@ -73,6 +73,13 @@ from ..optics import (
     tau_from_columns,
 )
 
+#: standing approximations of this backend
+CAPABILITIES = {
+    "scattering": "orders >= 2, plane-parallel discrete ordinates (delta-M)",
+    "domain": "ground fixed at z_bounds[0]; atmosphere.elevation_km is not read",
+    "horizontal_field": "not applied",
+}
+
 __all__ = ["SOSResult", "solve", "multiple_scattering"]
 
 #: default numerical settings

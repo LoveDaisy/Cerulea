@@ -87,6 +87,15 @@ import numpy as np
 from . import mc as _mc
 from .single import sky_radiance as _single
 
+#: standing approximations of this backend
+CAPABILITIES = {
+    "scattering": "split estimator: exact spherical first order + MC higher orders",
+    "horizontal_field": "first-order term only",
+    "ms_geometry": "Monte Carlo assumes a horizontally uniform atmosphere",
+    "mc_refraction": "none (straight-line photon transport)",
+    "ss_refraction": "solar chord when atmo.refraction",
+}
+
 __all__ = ["twilight_radiance", "multiple_scattered", "QUALITY"]
 
 #: quality presets: (n_zen, n_az, n_anchor, photons per anchor wavelength)
@@ -452,7 +461,8 @@ def multiple_scattered(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
 
 def twilight_radiance(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
                       sun_azimuth_deg=0.0, quality="medium", seed=0,
-                      single=True, multiple=True, grid=None):
+                      single=True, multiple=True, grid=None,
+                      return_info=False):
     """Total spectral sky radiance in twilight, with a statistical error bar.
 
     This is the production entry point of the spherical twilight engine.  It
@@ -485,7 +495,9 @@ def twilight_radiance(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
     -------
     radiance, stderr : ndarray ``(n_view, n_wl)``
         Spectral radiance and its 1-sigma statistical uncertainty, in
-        W m^-2 sr^-1 nm^-1.
+        W m^-2 sr^-1 nm^-1.  With ``return_info=True`` a third element is
+        appended: the Monte Carlo ``info`` dict (anchor wavelengths,
+        ``undetected_wl``, grid, coarse field).
 
     Notes
     -----
@@ -505,15 +517,18 @@ def twilight_radiance(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
     n_wl = len(atmo.wl)
     total = np.zeros((n_view, n_wl))
     err = np.zeros((n_view, n_wl))
+    info: dict = {}
 
     if single:
         total += _single(atmo, sun_zenith_deg, zen, az,
                          sun_azimuth_deg=sun_azimuth_deg)
     if multiple:
-        ms, ms_err, _ = multiple_scattered(
+        ms, ms_err, info = multiple_scattered(
             atmo, sun_zenith_deg, zen, az, sun_azimuth_deg=sun_azimuth_deg,
             quality=quality, seed=seed, grid=grid,
         )
         total += ms
         err += ms_err
+    if return_info:
+        return total, err, info
     return total, err
