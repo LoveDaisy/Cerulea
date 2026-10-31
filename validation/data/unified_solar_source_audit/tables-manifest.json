@@ -1,0 +1,32 @@
+{
+  "unified": {
+    "0.0": {
+      "path": "tables/point-source-clear81-ground0-refined.npz",
+      "label": "phase3-clear-81-ground0-refined"
+    },
+    "2.4": {
+      "path": "tables/point-source-clear81-ground2p4-refined.npz",
+      "label": "phase3-clear-81-ground2p4-refined"
+    }
+  },
+  "geometric": {
+    "0.0": {
+      "path": "tables/point-source-clear81-ground0-geometric.npz",
+      "label": "phase3-clear-81-ground0-geometric"
+    },
+    "2.4": {
+      "path": "tables/point-source-clear81-ground2p4-geometric.npz",
+      "label": "phase3-clear-81-ground2p4-geometric"
+    }
+  },
+  "legacy": {
+    "0.0": {
+      "path": "tables/point-source-clear81-ground0-refined.npz",
+      "label": "phase3-clear-81-ground0-refined"
+    },
+    "2.4": {
+      "path": "tables/point-source-clear81-ground2p4-refined.npz",
+      "label": "phase3-clear-81-ground2p4-refined"
+    }
+  }
+}

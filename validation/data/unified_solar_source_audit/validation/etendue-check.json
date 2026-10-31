@@ -1,0 +1,179 @@
+{
+  "head": "596aaba811b0df7e78df9fd86ab124acb6323175",
+  "method": "DOP853 parallel-ray-tube area, no angular derivative in energy gain",
+  "integration_rtol": 2e-13,
+  "standard_profile": [
+    {
+      "height_km": 38.0,
+      "true_elevation_deg": -6.0,
+      "apparent_elevation_deg": -5.4873427322353665,
+      "closure_true_elevation_deg": -6.000000001738007,
+      "centre_return_error_m": 2.57273795157249e-05,
+      "n_point": 1.0000011771189776,
+      "n_inf": 1.0,
+      "angular_formula_gain": 0.616740989733287,
+      "area_tube_results": [
+        {
+          "offset_m": 5.0,
+          "local_over_far_area": 1.6214266445622936,
+          "beam_gain_from_energy": 0.6167408210255182
+        },
+        {
+          "offset_m": 20.0,
+          "local_over_far_area": 1.6214258735644025,
+          "beam_gain_from_energy": 0.6167411142895398
+        },
+        {
+          "offset_m": 80.0,
+          "local_over_far_area": 1.6214245009169979,
+          "beam_gain_from_energy": 0.6167416364033288
+        }
+      ],
+      "max_relative_gain_difference": 1.0485277492922052e-06
+    },
+    {
+      "height_km": 40.0,
+      "true_elevation_deg": -6.0,
+      "apparent_elevation_deg": -5.5551168140916865,
+      "closure_true_elevation_deg": -6.000000000586158,
+      "centre_return_error_m": 1.3230064515991162e-05,
+      "n_point": 1.000000873949396,
+      "n_inf": 1.0,
+      "angular_formula_gain": 0.651366490610733,
+      "area_tube_results": [
+        {
+          "offset_m": 5.0,
+          "local_over_far_area": 1.5352361913073582,
+          "beam_gain_from_energy": 0.6513655720612161
+        },
+        {
+          "offset_m": 20.0,
+          "local_over_far_area": 1.535232063774415,
+          "beam_gain_from_energy": 0.6513673232836665
+        },
+        {
+          "offset_m": 80.0,
+          "local_over_far_area": 1.5351862128125597,
+          "beam_gain_from_energy": 0.6513867774828017
+        }
+      ],
+      "max_relative_gain_difference": 3.114509628776574e-05
+    },
+    {
+      "height_km": 47.0,
+      "true_elevation_deg": -6.0,
+      "apparent_elevation_deg": -5.767703481115231,
+      "closure_true_elevation_deg": -6.000000000029703,
+      "centre_return_error_m": 4.9433415739872725e-06,
+      "n_point": 1.0000003241239326,
+      "n_inf": 1.0,
+      "angular_formula_gain": 0.6931171036341295,
+      "area_tube_results": [
+        {
+          "offset_m": 5.0,
+          "local_over_far_area": 1.4427558541612984,
+          "beam_gain_from_energy": 0.6931179638715236
+        },
+        {
+          "offset_m": 20.0,
+          "local_over_far_area": 1.442758035565254,
+          "beam_gain_from_energy": 0.6931169158993544
+        },
+        {
+          "offset_m": 80.0,
+          "local_over_far_area": 1.4427715654996802,
+          "beam_gain_from_energy": 0.6931104160301818
+        }
+      ],
+      "max_relative_gain_difference": 9.64859172092325e-06
+    },
+    {
+      "height_km": 0.5,
+      "true_elevation_deg": 10.0,
+      "apparent_elevation_deg": 10.082364041473507,
+      "closure_true_elevation_deg": 10.000000000806466,
+      "centre_return_error_m": 4.4646687344958686e-07,
+      "n_point": 1.0002649003849555,
+      "n_inf": 1.0,
+      "angular_formula_gain": 0.9925286680946139,
+      "area_tube_results": [
+        {
+          "offset_m": 5.0,
+          "local_over_far_area": 1.0075276179748818,
+          "beam_gain_from_energy": 0.9925286236917136
+        },
+        {
+          "offset_m": 20.0,
+          "local_over_far_area": 1.0075275365296448,
+          "beam_gain_from_energy": 0.9925287039244874
+        },
+        {
+          "offset_m": 80.0,
+          "local_over_far_area": 1.007527592461952,
+          "beam_gain_from_energy": 0.9925286488248347
+        }
+      ],
+      "max_relative_gain_difference": 4.473714643182802e-08
+    }
+  ],
+  "constant_profiles": [
+    {
+      "height_km": 38.0,
+      "true_elevation_deg": -6.0,
+      "apparent_elevation_deg": -5.999999999999999,
+      "closure_true_elevation_deg": -6.0,
+      "centre_return_error_m": 3.7771756241085034e-09,
+      "n_point": 1.0,
+      "n_inf": 1.0,
+      "angular_formula_gain": 0.999999999999666,
+      "area_tube_results": [
+        {
+          "offset_m": 5.0,
+          "local_over_far_area": 1.000000000148857,
+          "beam_gain_from_energy": 0.9999999998511431
+        },
+        {
+          "offset_m": 20.0,
+          "local_over_far_area": 1.0000000000343556,
+          "beam_gain_from_energy": 0.9999999999656444
+        }
+      ],
+      "max_relative_gain_difference": 1.4852297169909434e-10
+    },
+    {
+      "height_km": 38.0,
+      "true_elevation_deg": -6.0,
+      "apparent_elevation_deg": -6.0,
+      "closure_true_elevation_deg": -6.000000000000001,
+      "centre_return_error_m": 3.758482866062659e-09,
+      "n_point": 1.000278,
+      "n_inf": 1.000278,
+      "angular_formula_gain": 0.999999999999666,
+      "area_tube_results": [
+        {
+          "offset_m": 5.0,
+          "local_over_far_area": 1.0000000001515474,
+          "beam_gain_from_energy": 0.9999999998484526
+        },
+        {
+          "offset_m": 20.0,
+          "local_over_far_area": 1.0000000000334288,
+          "beam_gain_from_energy": 0.9999999999665712
+        }
+      ],
+      "max_relative_gain_difference": 1.5121348617697095e-10
+    }
+  ],
+  "solar_disk": {
+    "radius_arcmin": 16.0,
+    "radial_nodes": 8,
+    "azimuth_nodes": 16,
+    "solid_angle_sr": 6.805206191413374e-05,
+    "normalised_weights_sum": 0.9999999999999998,
+    "mean_cosrho": 0.9999945845889792,
+    "scalar_angular_over_normal_irradiance": 1.0000054154403475,
+    "recovered_normal_irradiance": 0.9999999999999998,
+    "note": "For F_inf normal to the disk centre, L_inf=F_inf/(pi sin(alpha)^2)."
+  },
+  "seconds": 19.785665667033754
+}
