@@ -9,12 +9,11 @@ Run with ``pytest tests/test_mc.py`` (a few seconds) or
 """
 from __future__ import annotations
 
-import copy
 
 import numpy as np
 
 from skycolor import presets, spectra
-from skycolor.atmosphere import Atmosphere
+from skycolor.atmosphere import AerosolLayer, Atmosphere
 from skycolor.rt import mc, single
 
 
@@ -24,21 +23,25 @@ from skycolor.rt import mc, single
 def scaled_atmosphere(atmo, factor: float) -> Atmosphere:
     """Return a copy of ``atmo`` with every optical depth scaled by ``factor``.
 
-    Both the molecular cross sections and the aerosol optical depths are
-    scaled, so the result is a genuinely thinner atmosphere, not just a
-    fainter one.  Test-only transitional fixture (plan Step 3a): the scaled
-    arrays are patched into the frozen Medium because ``_sigma_*`` are
-    read-only now; such objects must never enter a shared or identity-keyed
-    cache.  (Step 3b replaces this with per-species density injection.)
+    Both the molecular densities and the aerosol optical depths are scaled,
+    so the result is a genuinely thinner atmosphere, not just a fainter one.
+    Data path (plan Step 3b): the scaled profiles are injected as callables,
+    which is linear in the column amounts, so the result matches the
+    historical cross-section scaling to within floating-point association.
+    Assumes the input ozone/NO2 scale linearly with ``ozone_du``/
+    ``no2_column`` (true for the built-in and callable-shaped profiles).
     """
-    thin = copy.deepcopy(atmo)
-    medium = thin._medium
-    object.__setattr__(medium, "_sigma_ray", np.array(atmo._sigma_ray) * factor)
-    object.__setattr__(medium, "_sigma_o3", np.array(atmo._sigma_o3) * factor)
-    object.__setattr__(medium, "_sigma_no2", np.array(atmo._sigma_no2) * factor)
-    for lay in thin.aerosols:
-        lay.aod550 = lay.aod550 * factor
-    return thin
+    layers = [AerosolLayer(lay.aerosol, aod550=lay.aod550 * factor,
+                           profile=lay.profile, horizontal=lay.horizontal)
+              for lay in atmo.aerosols]
+    return Atmosphere(
+        atmo.wl, ozone_du=atmo.ozone_du * factor,
+        no2_column=atmo.no2_column * factor, aerosols=layers,
+        ground_albedo=atmo.ground_albedo,
+        surface_pressure=atmo.surface_pressure, z_bounds_km=atmo.z_bounds,
+        elevation_km=atmo.elevation_km, refraction=atmo.refraction,
+        air_profile=lambda z: atmo.n_air(z) * factor,
+    )
 
 
 def global_power_balance(albedo, wl, n_theta=12, n_mu=10, n_az=4,

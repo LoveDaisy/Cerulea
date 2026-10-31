@@ -153,6 +153,20 @@ def _column_normalisation(table: np.ndarray) -> float:
     return float(np.trapezoid(n, z * 1e3))
 
 
+#: column-normalisation grid for user-supplied profile *shapes*.  This is the
+#: grid the profile-shape experiments have always used (``_Z_DIAG`` there);
+#: keeping it makes the data path bit-comparable with the historical subclass
+#: path.  The built-in tables above normalise on their own finer grid, which
+#: their numbers have always been pinned to.
+_PROFILE_COLUMN_GRID = np.linspace(0.0, Z_TOA / 1e3, 4001)
+
+
+def _column_of_shape(shape: Callable[[np.ndarray], np.ndarray]) -> float:
+    """Column [m^-2] of a user profile *shape* in arbitrary units."""
+    return float(np.trapezoid(np.asarray(shape(_PROFILE_COLUMN_GRID), dtype=float),
+                              _PROFILE_COLUMN_GRID * 1e3))
+
+
 #: density-callable injection type of the transitional subclass protocol
 DensityFn = Callable[[np.ndarray], np.ndarray]
 
@@ -160,6 +174,15 @@ DensityFn = Callable[[np.ndarray], np.ndarray]
 # ---------------------------------------------------------------------------
 # The medium
 # ---------------------------------------------------------------------------
+class _RefractionToken:
+    """Identity sentinel for the refraction-table cache.
+
+    A dedicated class (rather than a bare ``object()``) because cache keys
+    must be weak-referenceable: the cache holds its entries only while some
+    living medium holds the token.
+    """
+
+
 @dataclass(frozen=True)
 class Medium:
     """A spherically stratified atmosphere as a frozen value object.
@@ -177,6 +200,16 @@ class Medium:
     aerosols : sequence of AerosolLayer
     surface_pressure : float
         Sea-level pressure scaling of the air profile.
+    ozone_profile, no2_profile : callable, optional
+        Vertical *shape* of the species in arbitrary units, column-normalised
+        to ``ozone_du`` / ``no2_column`` exactly like the built-in tables.
+        This is the sanctioned extension point for custom profiles (the
+        inheritance-based protocol it replaces was retired with Step 3b).
+    air_profile : callable, optional
+        Complete dry-air number density [m^-3] as a function of height [km];
+        replaces the US76 pressure/temperature construction outright.  When
+        given, the ``pressure()``/``temperature()`` accessors still report
+        the *default* US76 profiles and no longer describe this medium.
     """
 
     wl: np.ndarray
@@ -185,11 +218,23 @@ class Medium:
     no2_column: float = 0.0
     aerosols: Sequence = ()
     surface_pressure: float = P0
+    ozone_profile: Callable[[np.ndarray], np.ndarray] | None = None
+    no2_profile: Callable[[np.ndarray], np.ndarray] | None = None
+    air_profile: Callable[[np.ndarray], np.ndarray] | None = None
 
     def __post_init__(self):
+        # identity token of the density definition, handed to the refraction
+        # table cache (see :mod:`skycolor.refraction`).  Deliberately NOT a
+        # dataclass field: a freshly constructed medium gets a fresh token
+        # ("separately constructed media never share refraction tables"),
+        # while restrict() shares the source's token through copy.copy --
+        # a wavelength subset never changes the density definition.
+        object.__setattr__(self, "_refraction_token", _RefractionToken())
         # profile normalisations
-        o3_col = _column_normalisation(_O3_PROFILE)
-        no2_col = _column_normalisation(_NO2_PROFILE)
+        o3_col = (_column_of_shape(self.ozone_profile) if self.ozone_profile is not None
+                  else _column_normalisation(_O3_PROFILE))
+        no2_col = (_column_of_shape(self.no2_profile) if self.no2_profile is not None
+                   else _column_normalisation(_NO2_PROFILE))
         object.__setattr__(self, "_o3_scale", self.ozone_du * DU / o3_col)
         object.__setattr__(self, "_no2_scale",
                            (self.no2_column / no2_col) if no2_col > 0 else 0.0)
@@ -208,6 +253,11 @@ class Medium:
     def r_bounds(self) -> np.ndarray:
         return R_EARTH + self.z_bounds * 1e3
 
+    @property
+    def refraction_token(self) -> object:
+        """Identity token of the density definition (see ``__post_init__``)."""
+        return self._refraction_token
+
     # -- vertical profiles ----------------------------------------------------
     def pressure(self, z_km):
         z = np.asarray(z_km, dtype=float)
@@ -224,6 +274,9 @@ class Medium:
         only so the facade can forward subclass overrides (transitional
         protocol, removed in Step 3b).
         """
+        if self.air_profile is not None:
+            return np.asarray(self.air_profile(np.asarray(z_km, dtype=float)),
+                              dtype=float)
         pressure = self.pressure if pressure is None else pressure
         temperature = self.temperature if temperature is None else temperature
         z = np.asarray(z_km, dtype=float)
@@ -234,9 +287,15 @@ class Medium:
         return np.where(z > THERMOSPHERE_START_KM, tail, n)
 
     def n_o3(self, z_km):
+        if self.ozone_profile is not None:
+            return (np.asarray(self.ozone_profile(np.asarray(z_km, dtype=float)),
+                               dtype=float) * self._o3_scale)
         return _log_interp(_O3_PROFILE, z_km) * 1e6 * self._o3_scale
 
     def n_no2(self, z_km):
+        if self.no2_profile is not None:
+            return (np.asarray(self.no2_profile(np.asarray(z_km, dtype=float)),
+                               dtype=float) * self._no2_scale)
         return _log_interp(_NO2_PROFILE, z_km) * 1e6 * self._no2_scale
 
     # -- optical properties ---------------------------------------------------
@@ -381,8 +440,9 @@ class Medium:
         The wavelength-dependent arrays are *sliced*, not recomputed, both for
         speed and because slicing is bit-exact where a recomputation through
         the tables is only guaranteed elementwise-equal.  Everything the
-        restriction does not touch (profiles, aerosols, ``z_bounds``) is
-        shared with the source medium.
+        restriction does not touch (profiles, aerosols, ``z_bounds``, and the
+        refraction identity token -- a wavelength subset never changes the
+        density definition) is shared with the source medium.
         """
         idx = np.asarray(index, dtype=int)
         new = copy.copy(self)

@@ -39,6 +39,8 @@ effect being modelled.
 """
 from __future__ import annotations
 
+import weakref
+
 import numpy as np
 from scipy.interpolate import CubicSpline
 
@@ -154,10 +156,15 @@ def boundary_theta(profile: _Profile, r0: float, r_earth: float = R_EARTH) -> fl
 
 
 class RefractionTables:
-    """Apparent/true conversion and shadow thresholds for one atmosphere."""
+    """Apparent/true conversion and shadow thresholds for one atmosphere.
+
+    The tables depend only on the *air-density profile*: the observer's
+    altitude and the wavelength grid play no role.  They therefore cache
+    against the density-definition identity token of the atmosphere's
+    :class:`~skycolor.medium.Medium` (see :func:`get_tables`).
+    """
 
     def __init__(self, atmo, n_elev: int = 61, alt_km=None):
-        self.atmo = atmo
         profile = _Profile(atmo)
         self.profile = profile
         self._n_elev = n_elev
@@ -237,22 +244,35 @@ class RefractionTables:
         return np.degrees(np.arccos(R_EARTH / (R_EARTH + z * 1e3)))
 
 
-_CACHE: dict[tuple, RefractionTables] = {}
-
-
-def _key(atmo):
-    # refraction only depends on the density profile, which is the same for
-    # every atmosphere with the same surface pressure and observer altitude
-    return (round(float(getattr(atmo, "surface_pressure", 101325.0)), 3),
-            round(float(getattr(atmo, "elevation_km", 0.0)), 6))
+_CACHE: "weakref.WeakKeyDictionary[object, RefractionTables]" = weakref.WeakKeyDictionary()
 
 
 def get_tables(atmo) -> RefractionTables:
-    """Cached :class:`RefractionTables` for the density profile of ``atmo``."""
-    key = _key(atmo)
-    if key not in _CACHE:
-        _CACHE[key] = RefractionTables(atmo)
-    return _CACHE[key]
+    """Cached :class:`RefractionTables` for the density profile of ``atmo``.
+
+    Cache identity is the ``refraction_token`` of the atmosphere's
+    :class:`~skycolor.medium.Medium` -- the identity of its *density
+    definition*, not a proxy.  Consequences, both deliberate:
+
+    * two media built from different custom profiles but the same
+      ``surface_pressure``/``elevation_km`` never share tables (the old
+      two-number proxy key silently did);
+    * two separately constructed but otherwise identical media each build
+      their own tables ("per-construction, don't share"), while a
+      wavelength-restricted medium inherits its source's token and shares
+      them.  Entries live in a ``WeakKeyDictionary`` keyed on the token, so
+      they are reclaimed with the medium that owns them -- long batch runs
+      do not accumulate tables.  The cost of "per-construction, don't share"
+      is one table build per genuinely distinct medium (~2.3 s measured: the
+      shadow-threshold ray traces dominate; before the identity-key change
+      the proxy key deduplicated constructions sharing (pressure, altitude)).
+    """
+    token = atmo._medium.refraction_token
+    tables = _CACHE.get(token)
+    if tables is None:
+        tables = RefractionTables(atmo)
+        _CACHE[token] = tables
+    return tables
 
 
 def apparent_solar_zenith(atmo, true_zenith_deg, refraction=True):

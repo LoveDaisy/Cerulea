@@ -41,6 +41,7 @@ from .medium import (  # noqa: F401  (re-exported for backward compatibility)
     us76_pressure,
     us76_temperature,
 )
+from .scene import Scene
 
 # ---------------------------------------------------------------------------
 # Vertical profiles for aerosols
@@ -154,11 +155,11 @@ class AerosolLayer:
 class Atmosphere:
     """A spherically stratified atmosphere with spectral optical properties.
 
-    The physical medium is a frozen :class:`skycolor.medium.Medium`; this
-    object attaches the observing scenario and forwards every query.  The
-    scenario fields (``elevation_km``, ``ground_albedo``, ``refraction``)
-    stay mutable facade state until the ``Scene`` split; the medium is
-    replaced wholesale (never mutated) when a species definition changes.
+    The physical medium is a frozen :class:`skycolor.medium.Medium` and the
+    observing scenario a frozen :class:`skycolor.scene.Scene`; this object
+    attaches the two and forwards every query, so the rest of the library
+    keeps its ``atmo`` interface unchanged.  Both parts are replaced
+    wholesale on redefinition (through the property setters), never patched.
 
     Parameters
     ----------
@@ -176,6 +177,15 @@ class Atmosphere:
         observer on a mountain.
     z_bounds_km : array, optional
         Layer boundaries of the discretisation.
+    ozone_profile, no2_profile : callable, optional
+        Vertical *shape* of the species (arbitrary units), column-normalised
+        to ``ozone_du`` / ``no2_column`` exactly like the built-in tables --
+        the sanctioned extension point for custom gas profiles.
+    air_profile : callable, optional
+        Complete dry-air number density [m^-3] vs height [km]; replaces the
+        US76 pressure/temperature construction.  With it in place,
+        ``pressure()``/``temperature()`` keep reporting the *default* US76
+        profiles and no longer describe this atmosphere.
     """
 
     def __init__(
@@ -189,6 +199,9 @@ class Atmosphere:
         z_bounds_km: np.ndarray | None = None,
         elevation_km: float = 0.0,
         refraction: bool = True,
+        ozone_profile=None,
+        no2_profile=None,
+        air_profile=None,
     ):
         self._medium = Medium(
             wl=np.asarray(wl_nm, dtype=float),
@@ -198,21 +211,23 @@ class Atmosphere:
             no2_column=float(no2_column),
             aerosols=tuple(aerosols or ()),
             surface_pressure=float(surface_pressure),
+            ozone_profile=ozone_profile,
+            no2_profile=no2_profile,
+            air_profile=air_profile,
         )
-        self.elevation_km = float(elevation_km)
         #: Whether the direct-beam geometry includes atmospheric refraction
         #: (see :mod:`skycolor.refraction`).  **On by default**: the ray
         #: bending is real, the paths are integrated along the *bent* chord
         #: (the Bouguer invariant gives a closed form per shell), and the
         #: terminator is where it belongs.  Set ``False`` to reproduce the
         #: geometric-shadow numbers quoted in older reports.
-        self.refraction = bool(refraction)
-
         if np.ndim(ground_albedo) == 0:
-            self.ground_albedo = np.full(self.wl.shape, float(ground_albedo))
+            albedo = np.full(self.wl.shape, float(ground_albedo))
         else:
-            self.ground_albedo = np.broadcast_to(np.asarray(ground_albedo, float),
-                                                 self.wl.shape).copy()
+            albedo = np.broadcast_to(np.asarray(ground_albedo, float),
+                                     self.wl.shape).copy()
+        self._scene = Scene(observer_elevation_km=float(elevation_km),
+                            ground_albedo=albedo, refraction=bool(refraction))
 
         # Transitional subclass protocol (removed in Step 3b): subclasses may
         # override these to install custom profile scales.  The base density
@@ -320,6 +335,36 @@ class Atmosphere:
     def _ray_phase(self) -> np.ndarray:
         return self._medium._ray_phase
 
+    # -- scenario delegation ----------------------------------------------------
+    @property
+    def elevation_km(self) -> float:
+        return self._scene.observer_elevation_km
+
+    @elevation_km.setter
+    def elevation_km(self, value) -> None:
+        self._scene = _dc_replace(self._scene,
+                                  observer_elevation_km=float(value))
+
+    @property
+    def refraction(self) -> bool:
+        return self._scene.refraction
+
+    @refraction.setter
+    def refraction(self, value) -> None:
+        self._scene = _dc_replace(self._scene, refraction=bool(value))
+
+    @property
+    def ground_albedo(self) -> np.ndarray:
+        return self._scene.ground_albedo
+
+    @ground_albedo.setter
+    def ground_albedo(self, value) -> None:
+        if np.ndim(value) == 0:
+            albedo = np.full(self.wl.shape, float(value))
+        else:
+            albedo = np.broadcast_to(np.asarray(value, float), self.wl.shape).copy()
+        self._scene = _dc_replace(self._scene, ground_albedo=albedo)
+
     # -- vertical profiles ---------------------------------------------------
     def pressure(self, z_km):
         return self._medium.pressure(z_km)
@@ -420,7 +465,9 @@ class Atmosphere:
 
         new = copy.copy(self)
         new._medium = self._medium.restrict(index)
-        new.ground_albedo = np.asarray(self.ground_albedo)[np.asarray(index, dtype=int)]
+        idx = np.asarray(index, dtype=int)
+        new._scene = _dc_replace(
+            self._scene, ground_albedo=np.asarray(self._scene.ground_albedo)[idx])
         return new
 
     # -- column helpers ------------------------------------------------------

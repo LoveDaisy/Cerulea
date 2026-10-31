@@ -43,7 +43,11 @@ def test_direct_transmittance(atmo):
     assert Tlow[i550] < T[i550]
 
 
-def test_thin_atmosphere_scales_linearly(thin_atmosphere_factory):
-    thin = thin_atmosphere_factory(WL_COARSE, scale_ray=1e-3)
+def test_thin_atmosphere_scales_linearly():
+    #: probe medium for the unperturbed US76 air density (n_air needs only
+    #: the pressure/temperature profiles, not the spectral grid)
+    probe = Atmosphere(WL_COARSE, ozone_du=0.0, aerosols=[])
+    thin = Atmosphere(WL_COARSE, ozone_du=300.0, aerosols=[],
+                      air_profile=lambda z: probe.n_air(z) * 1e-3)
     rad = sky_radiance(thin, 30.0, np.array([0.0]), np.array([180.0]))
     assert np.all(rad >= 0)

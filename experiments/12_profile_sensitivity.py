@@ -57,7 +57,6 @@ from profile_variants import (  # noqa: E402
     OzoneShapeAtmosphere,
     air_diagnostics,
     gaussian_shape,
-    install_twilight_profile_support,
     ozone_diagnostics,
     shifted_shape,
     tropospheric_shape,
@@ -197,14 +196,12 @@ def contribution_function(h_deg: float = -6.0):
 def engine_check():
     """Engine totals at -6 deg for the reference and a -20 K stratosphere.
 
-    The engine's Monte Carlo term reconstructs a plain ``Atmosphere`` before
-    each single-wavelength run and therefore needs the run-time patch from
-    ``profile_variants.install_twilight_profile_support`` to see a subclass
-    profile.  Costs ~1.5 min at ``quality="low"``.
+    The injected air profile flows through the engine's native
+    ``Atmosphere._restrict`` wavelength subsets, so no engine patching is
+    needed.  Costs ~1.5 min at ``quality="low"``.
     """
     from skycolor.rt.twilight import twilight_radiance
 
-    install_twilight_profile_support()
     out = {}
     for label, dT in (("reference", 0.0), ("dT=-20 K", -20.0)):
         atmo = (Atmosphere(WL, **base_kw()) if dT == 0.0 else
@@ -227,9 +224,8 @@ def engine_check():
         out[label]["multiple_6"] = out[label]["luminance_6"] - single[label]
     out["ratio_dT_minus20_over_reference"] = (
         out["dT=-20 K"]["luminance_6"] / out["reference"]["luminance_6"])
-    out["note"] = ("unpatched, the engine returns bit-identical multiple "
-                   "scattering for both profiles; install_twilight_profile_support "
-                   "is required for these numbers")
+    out["note"] = ("the injected air profile reaches the engine's Monte Carlo "
+                   "through the native _restrict wavelength subsets")
     return out
 
 
