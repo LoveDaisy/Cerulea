@@ -1,0 +1,13 @@
+{
+  "disk16-curved-ground0.jsonl": "ec9bdc11b2c1a96b8442d237b7a524b59cca8d7eeb58bc4a252f42f2a5e7e1cd",
+  "disk16-curved-ground2p4.jsonl": "cab7662a8e79b9d45aea83a0ac8a63cc87e145e562fced49ccb9a40e3426788d",
+  "disk64-curved-ground0.jsonl": "5d5e786938da4ddc9a93f70ab50d2e0151679aa8848245f49992cfc6a8623ac8",
+  "disk64-curved-ground0.log": "1a16f3d4041756d7315e9cb52d48857a4b7fb4fe36b00c5f6f52914ad8705d05",
+  "disk64-curved-ground2p4.jsonl": "f631ac19a385e925bed1a78a106e445d8360dca502f1ddf169c8260bb8cca2e5",
+  "disk64-curved-ground2p4.log": "77b68e88f722f93fb41d9fee9f2e9abcc13af61b2cadf00b6fa38c33451b8752",
+  "disk64-global-straight.jsonl": "e5cc959b98f832275e7ec86b4135b09020102305ab44e34dad50e72c182ef581",
+  "disk64-global-straight.log": "8b07f97e6017c442606cdcaec2a688ec460bed2821e73d200c7334d4ffc0fea0",
+  "global-straight.jsonl": "e6edcca6146f2afc9f8416094096073afd2589da96704825b119f0d7e5d89506",
+  "library-provenance.json": "46f32ab891950e980a1e87075e2963a368c24cb3f8f67d57ca138d6b7734e59b",
+  "recorded-library.patch": "1bfea4d56bbefc54b7ba0d547659fcded8d4abac3224db1b33be7dd08fe4d588"
+}

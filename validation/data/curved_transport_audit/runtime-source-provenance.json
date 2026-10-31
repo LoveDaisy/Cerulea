@@ -1,0 +1,5 @@
+{
+  "before_guard_sha256": "5d25bf55d731054acbb9589ebc9904dc2eef7f4a21e18c17da1fa5fd77d39e69",
+  "after_guard_sha256": "6ed1b03c3c49ad748540064d90ce8306b8855f08d2409ba9a1cc51e1a654dea2",
+  "note": "Before-guard source hash matches runtime records exactly. Patch adds construction checks only; the original load pipeline already verified table/medium signatures. No numerical estimator changes."
+}

@@ -313,9 +313,12 @@ on one night:
 | model, ΔT = −26.3 K | 78.2 |
 | Patat et al. (2006) fit | 77.6 |
 
-No absolute calibration and no V-band conversion enters a ratio, so every grey
-error cancels; a temperature change moves it by up to 50 % (ozone by less than
-6 %).  If the measured ratio is ≈52 the model's *decay* is right and the 1.5×
+An instrument's common multiplicative zero point cancels in this ratio.
+The photopic-to-V conversion need not cancel when the spectrum changes with
+solar depression: both spectra must be integrated through the same response
+before comparing their decay.  A temperature change moves the model ratio
+by up to 50 % (ozone by less than 6 %).  If a same-band measured ratio is ≈52
+the model's *decay* is right and the 1.5×
 is a level error (candidate 2).  If it is ≈78 the decay is wrong — and no
 vertical profile fixes it: the temperature lever crosses the reference at −6°
 but misses −5° and −7° (§4.2), and the spherical engine cannot be moved that

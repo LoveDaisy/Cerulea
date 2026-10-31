@@ -7,6 +7,13 @@ The organising question has not changed: **ignoring clouds and polarisation,
 can we predict the colour of the sky from first principles, and can we say how
 confident we are?**  Everything below is measured against that.
 
+This tracked document records completed milestones and their evidence, including
+conclusions superseded by later work.  [STATUS.md](STATUS.md) is the current
+snapshot; topic documents carry reproducible methods, results and limitations.
+Session handoffs in `scratchpad/` are temporary navigation aids, not a second
+source of project state.  Once consumed, their durable findings belong here or
+in the relevant topic document; their historical instructions are retired.
+
 ---
 
 ## Milestones reached
@@ -93,15 +100,22 @@ dust changes the multiple-scattering field by 2.7×, because 35 % of its
 scattered energy lives in the forward peak that the 32-moment truncation was
 discarding.
 
-### M8b — the twilight question closed by a second dataset
+### M8b — a second twilight dataset and a new altitude question
 
 A single reference cannot separate a model error from a reference bias.  A
 second, independent, *photopic* twilight measurement (Koomen et al. 1952,
-sea level) showed that the model is 1.14× the measurement like-for-like, and
-that the remaining factor is the 2400 m altitude of the original reference.
-(M10 later showed the 1.14 was a partial cancellation; see below.)
-The search also turned up the one thing that is wrong: the model has almost no
-altitude response.  See `validation/SECOND_DATASET.md`.
+sea level) enabled a comparison closer to the model's observable.  At this
+stage the geometric model was 1.14× Koomen, and the difference from the
+high-altitude Patat reference was attributed to altitude.  M10 subsequently
+invalidated that explanation: the 1.14× agreement partly cancelled a chord
+bug against missing refraction.  The two-site comparison remains useful, but
+it is not a controlled experiment that changes only observer altitude; air
+clarity, bandpass and calibration also differ.
+
+The durable result is the independent reference dataset and an unresolved
+altitude-response question, not closure of the twilight problem.
+See `validation/SECOND_DATASET.md` and
+[the altitude audit](TWILIGHT_ALTITUDE_AUDIT.md).
 
 ### M8 — the physics of red skies and blue suns
 
@@ -139,18 +153,238 @@ and the absence of refraction (too dark).
 1 % agreement could not catch this; the independent check has to be a line
 integral or a ray trace.
 
+### M11 — Mie working-set caching and shared preset optics (2026-10-31)
+
+Profiling separated optical pre-processing from radiative transfer.  The
+per-wavelength LRU held eight Mie states while the usual 5 nm working grid
+contained 81 wavelengths, so repeated traversals rebuilt every state.  The
+capacity was raised to 256, and preset/default atmospheres began sharing
+their aerosol definitions and caches.
+
+*Recorded measurements:* Python 3.12 on the development machine, 81 wavelengths,
+clear atmosphere unless specified.  Warm single scattering for one direction
+fell from 0.353 to 0.003 s; a second `delta_m_properties(32)` from 6.810 to
+0.002 s; dusty moments through a second preset instance from 40.858 s to
+below 1 ms.  Ten saved output arrays were bit-identical; the milestone's
+full test run passed.  Peak RSS rose from 171 to 194 MiB.  These are historical
+measurements, not timing requirements for every machine.
+
+*Limits:* cold Mie construction was unchanged; the dusty moment build still
+cost about 40 s and a full cold dusty one-direction solve about 178 s in the
+recorded workloads.  A 401-wavelength grid exceeds the 256-state capacity.
+Refraction-table interpolation was measured at sub-millisecond cost for the
+single-scattering query size, so the proposed interpolation rewrite was
+withdrawn.  No reduction in the default moment order was used.
+
+*Commits:* `6003af8` (capacity), `dbc49b8` (sharing), merge `f366245`.
+*Reproduce:* `uv run python tools/perf_bench.py`; it reports separate cold and
+repeat operations.  Shared definitions became frozen in M12.
+
+### M12 — explicit core boundaries and consistent site truncation (2026-10-31)
+
+The architecture refactor established frozen `Medium` and `Scene` definitions,
+an `Atmosphere` facade, single-source species-column algebra in `optics`,
+explicit backend dispatch returning `SkyResult`, and a solver-independent
+spectral-field input to the existing renderer.  Custom density profiles are
+injected data rather than subclass/monkey-patch protocols.  Aerosol/cloud
+definitions are frozen with replacement APIs; refraction-table lifetime and
+identity follow medium construction rather than pressure/elevation proxies.
+
+The intentional physical behavior change was `at_altitude(z0)`: truncate the
+layer grid at the site, put the ground at z0, preserve the density profiles and
+do not renormalise any column.  This removes double pressure scaling and the
+inconsistent ground locations of single scattering, SOS and MC.  At 2.4 km,
+pressure is 756.26 hPa and density equals the original profile at that height.
+A raised observer over a sea-level domain remains a distinct balloon scenario.
+
+*Verified at the milestone:* seven golden-equivalence cases, extension cases,
+and a full run of 257 tests passed at `3401930`; repeat optics timings retained
+M11's gains.  The six-check physical validation kept the prior 3 PASS / 3 FAIL
+pattern: the diffuse-illuminance, CIE distribution and single-scattering
+twilight checks still failed.  Preserved regression results do not resolve
+those physical discrepancies.  At −6°, the recorded high-site/sea-level ratio
+was 1.208 for the deterministic solver and 1.007 for the low-budget spherical
+engine (seed 0).  The engine point estimate does not establish a statistically
+significant brightening, and neither result by itself identifies the cause of
+the difference from the approximately 0.80 cross-site reference ratio.  These
+ratios describe the M12 baseline: M13 subsequently found that solar-visibility
+tests still allowed rays through the raised ground.  The earlier claim that
+no construction issue remained, and the attribution to a missing low-altitude
+diffuse component, were therefore premature.
+
+*Commits:* `f8f07ac` (optics), `55a3fca` / `12f148f` (medium/scene), `22e847f`
+(site truncation), `451d877` (results/display), `ddb2e16` (frozen optics),
+merge `a15555b`.  See [ARCHITECTURE.md](ARCHITECTURE.md) for current contracts.
+The temporary 2026-10-30 handoff has been consumed; M11/M12 supersede its
+instructions to implement caching or truncation.  The remaining physical
+questions and follow-up experiments live in
+[TWILIGHT_ALTITUDE_AUDIT.md](TWILIGHT_ALTITUDE_AUDIT.md).
+
+### M13 — raised-ground solar occlusion and altitude diagnostics (2026-10-31)
+
+An independent audit of the high-site comparison found a second boundary
+inconsistency after M12: transport ended at the raised ground, but several
+solar-visibility tests still treated sea level as the opaque surface.  The
+geometric masks, refracted grazing invariant and shadow tables now use the
+model bottom radius.  Single scattering, SOS, MC and cloud illumination follow
+that boundary; the M10 two-branch solar-column integration is unchanged.
+
+*Measured effect:* for `clear`, 81 wavelengths (380–780 nm in 5 nm steps),
+refraction on, sun −6°, zenith view, the sea-level deterministic luminance
+remains 0.444279 cd m⁻².  At 2.4 km the single-scattering component changes
+from 0.411475 to 0.391830 and the SOS component from 0.125253 to 0.064520
+cd m⁻².  Their total changes from 0.536728 to 0.456350, so the high/low ratio
+falls from 1.208 to **1.027**.  This is a zenith-twilight effect: the former
+claim that raised-ground shadow alignment mattered only near the horizon was
+incorrect.  Multi-seed spherical-engine results and their photon budgets are
+reported separately in [the audit](TWILIGHT_ALTITUDE_AUDIT.md).
+
+The audit also distinguishes the experiment from the references.  The often
+quoted 0.80 is a Maryland/Paranal ratio spanning different studies and
+observables.  Koomen's original same-instrument station table instead gives
+0.022/0.060 ≈ 0.37 at −6°, but the stations also differ in observation season
+and atmospheric transparency.  Neither is a controlled derivative obtained
+by removing only the bottom 2.4 km of one atmosphere.  Fixing the occlusion
+defect does not by itself validate the remaining physical model or identify
+the cause of its difference from either station comparison.
+
+*Code and evidence:* `rt/single.py`, `rt/multiple.py`, `rt/mc.py`,
+`rt/cloud.py`, `refraction.py`, `tests/test_raised_ground.py`, and
+`tools/twilight_altitude_audit.py`.  The topic report records the source audit,
+controlled experiments and limits of the conclusion.
+*Fix commit:* `c45a03b`.
+
 ---
+
+### M14 — isolate solar-source approximations (2026-11-01)
+
+Paired, full-spectrum direct MC holds every diffuse path fixed while changing
+only solar attenuation/shadow to the current single-scattering prescription.
+Higher orders increase 29.0% at sea level and 25.5% at 2.4 km; the hybrid
+altitude ratio changes 0.9568±0.0071 → 0.9292±0.0072 (empirical standard errors).
+All 16 mode pairs have identical next-event position fingerprints, and their
+geometric baselines reproduce M13's spectra bit-for-bit.
+
+Independent RK shooting and a separate radial-curvature integral then show
+that this source prescription itself needs refinement: sparse inverse-table
+angles can miss by 0.1–0.3°, and the refracted solar disk's angular amplitude
+is not represented by transmittance alone.  At −6°, the controlled sea-level
+first order changes from 0.3684 to 0.3506 with refined angles, then 0.2719
+with a point-beam angular Jacobian; a vertical finite-disk approximation gives
+0.2772 cd m⁻².  These are source ablations, not a new all-order sky prediction.
+
+*Outcome:* validate one angular/energy-consistent solar source before
+calibrating absolute levels or investing in a new diffuse solver.  Production
+defaults and prior physical validation remain unchanged in this phase.
+Tools, raw data, assumptions and independent checks are in
+[SOLAR_SOURCE_AUDIT.md](SOLAR_SOURCE_AUDIT.md).
+*Experiment commit:* `af235a7`.
+
+### M15 — one finite solar source, independently checked (2026-11-01)
+
+Continuous radial columns, a shadow-aligned adaptive direction table, the
+angular Jacobian and a two-dimensional 16′ solar disk now form one experimental
+source.  Independent Cartesian ray tubes check energy, separate RK density
+integrals check columns, and a spline-knot counterexample tightened the angular
+oracle before differentiation.  Source gain and detector transfer consistently
+use conservation of reduced radiance `L/n²`.
+
+Across 48 full-spectrum records (81 wavelengths, 100k paths/wavelength/seed,
+eight seeds, two heights, three source definitions), source-only variants have
+identical transport fingerprints.  The unified source gives SS+MS
+0.493233±0.003081 / 0.459769±0.003474 cd m⁻² and high/sea 0.932154±0.007479.
+Deterministic and MC photopic first orders differ by 0.12/0.23 seed-SE.
+These are straight-diffuse-path reference experiments, not a new production
+default or an identified station-altitude law.
+
+*Code checkpoint:* `7ed71a6`; *evidence:* `2255b46` and
+[UNIFIED_SOLAR_SOURCE_AUDIT.md](UNIFIED_SOLAR_SOURCE_AUDIT.md).
+
+### M16 — wavelength slicing preserves AOD550 (2026-11-01)
+
+An independent definition check found that monochromatic Mie queries reset
+the extinction reference to the queried wavelength.  Twilight's anchor loop
+therefore changed the medium.  Mie now always divides by actual `ce(550 nm)`;
+the already-normalized Angstrom law no longer gets an interpolated correction.
+Eight members' full81/full401 optical arrays are bit-identical; all sampled
+single/subset queries now match their full-grid values exactly.
+
+New tests give 13 fail / 3 pass before, 16 pass after; related tests 28 pass.  Full
+regression gives 313 pass plus one expected old twilight golden, which passed
+after isolated attribution/update; the other six golden files are unchanged.
+Six physical checks remain 3 PASS / 3 FAIL; only check6's two low-budget deep points
+change.  The corrected definition, not better observational fit, justifies the
+update.  *Fix:* `5d6f793`; *evidence:* `73031e3` and
+[AEROSOL_GRID_AUDIT.md](AEROSOL_GRID_AUDIT.md).
+
+### M17 — establish what the twilight references measure (2026-11-01)
+
+Primary papers distinguish Patat's total V-band sky background from pure
+solar scattering, and show both station comparisons confound height with
+other conditions.  A historical night-background illustration contributes
+0.0475% at −6° and 16.8% at −12°; it is not a measured same-night subtraction.
+The solar true/apparent and centre/limb contracts remain unverified.
+
+Offline synthesis of all 48 existing spectra through an explicitly limited
+ESO V-filter/CALSPEC approximation changes unified −6° total luminance by only
+−0.46%/−0.65%, height ratio by −0.19%.  It does not explain the remaining
+10–25% cross-scene residual, nor replace the missing complete instrument
+response.  No atmosphere, axis shift or zero point was fitted.  See
+[TWILIGHT_REFERENCE_AUDIT.md](TWILIGHT_REFERENCE_AUDIT.md).
+
+### M18 — continuous diffuse refraction and a bounded conclusion (2026-11-01)
+
+Thin-index Snell layers were rejected after concrete artificial-TIR/duct
+counterexamples.  Continuous arc-length RK flights now compose with M15's
+source.  Independent Hamiltonian trajectories and oblique DOP853 first-order
+integrals check directions, optical depth, first boundary and reduced-radiance
+transfer.  Source-table construction also now rejects wrong-medium bindings;
+the original experiment loader had already checked those contracts.
+
+At−6°, 81 wavelengths, eight seeds, curved SS+MS is
+0.489009±0.007777 / 0.467331±0.011337 cd m⁻², high/sea 0.955669±0.035776.
+Compared with matched-source global-straight controls, corrections are
+−0.63%±1.63% /+3.64%±2.67%; their conditional 95% intervals include zero.
+This budget does not identify the curvature correction's sign or explain
+the observational residual.  Actual MC-vertex 16→64 solar-disk checks and
+2→1km flight refinement are much smaller than sampling uncertainty.
+
+The final full regression passes 316 tests; production physical checks remain
+3 PASS / 3 FAIL.  One native process exit 139 remains unexplained, with saved partial
+records and a successful faulthandler continuation; it is not concealed as a
+completed run.  The experimental backend has not replaced production defaults.
+See [CURVED_TRANSPORT_AUDIT.md](CURVED_TRANSPORT_AUDIT.md) and its frozen evidence.
+
+### Next work justified by this exploration
+
+1. **One production solar-source definition.** Replace the known mixed source
+   prescriptions with the independently checked direction/column/energy
+   contract, retaining separate transport verification.  A deliverable must
+   preserve the declared atmosphere under spectral restriction and expose
+   approximation limits across the intended scene range.
+2. **Stable higher-order uncertainty.** Obtain reproducible estimates and
+   useful confidence intervals for rare-path twilight at a practical runtime.
+   More photons alone may be expensive; judge any estimator or acceleration
+   by time to a stable physical estimate, not throughput or one reported SE.
+3. **Matched absolute validation.** Acquire observing-time/solar-axis metadata,
+   the instrument response and site atmospheric conditions before assigning
+   the cross-study residual to pressure, aerosols or missing scattering.
+4. **Cold optical startup remains separate.** M11's warm-cache success stands;
+   optimise cold Mie work independently while preserving the physical contract.
+
+These are proposed engineering/research scopes, not scratchpad tasks already
+started.  The completed exploration and raw evidence are durable here; local
+session handoffs are not a substitute for this record.
 
 ## Open questions that matter now
 
 These are not roadmap items, they are the things we do not currently
 understand.  Each is worth resolving before adding new physics.
 
-1. **Resolved, but the old answer was a bug artifact: the solar-altitude
-   convention.**  The previous version of this page found H1 and H2 nearly
-   degenerate.  That was computed with the one-branch chord (M10), which
-   over-brightened twilight by ~2× and happened to compensate the 0.5° axis
-   shift.  After the fix the two readings are far apart (ratios to Koomen):
+1. **The solar-altitude convention remains an observational contract to
+   establish.**  M10 changed the model's sensitivity to this choice.  The
+   historical calculations below are model sensitivities, not evidence that
+   identifies the convention used by either instrument (ratios to Koomen):
 
    | reading | −3° | −6° |
    |---|---|---|
@@ -158,10 +392,11 @@ understand.  Each is worth resolving before adding new physics.
    | H2: reference axis is *apparent* altitude, refraction on | — | 0.29× |
    | geometric model (refraction off, true axis) | 0.75× | 0.46× |
 
-   H2 is now much too dark.  The references almost certainly tabulate the
-   **true** (ephemeris) solar altitude, so use H1; refraction stays on by
-   default, and the geometric mode is kept only to reproduce old numbers.  The
-   convention is now a ~10 % systematic, not a factor of two.
+   The primary papers do not explicitly settle true/apparent altitude or
+   disk centre/limb.  A better fit cannot establish that contract.  Current
+   experiments explicitly assume true solar-centre elevation, keep refraction
+   on, and do not fit an axis shift.  This assumption needs metadata or an
+   independent observing convention before it becomes a verified fact.
 2. **The twilight level was a chord bug, not a site effect and not a physical
    excess.**  A second, independent, *photopic* measurement — Koomen et al.
    (1952), JOSA 42, 353, Maryland, 30 m — lets the model be compared like for
@@ -170,31 +405,38 @@ understand.  Each is worth resolving before adding new physics.
    0.86× / 1.07× Patat.  The old 2.20× (and the 1.14× geometric before it)
    were artifacts: the missing near-side perigee→point segment made every
    grazing ray too bright, and the geometric mode's missing refraction partly
-   cancelled it.  The residual 15–30 % is inside the 1950s absolute
-   calibration (±0.2–0.4 mag) and the plane-parallel multiple-scattering
-   approximation; it is no longer a factor-of-two problem.  See
+   cancelled it.  These are historical production-model values, not a
+   measurement of the remaining transport error.  Koomen does not supply an
+   absolute error budget that justifies assigning ±0.2–0.4 mag to its −6°
+   point.  Source consistency, bandpass and site conditions must be examined
+   before interpreting the residual.  See
    `validation/SECOND_DATASET.md` and the sixth addendum of
    `validation/ADDENDUM.md`.
 
-   **The defect the second dataset exposed is still open, and the chord fix
-   changed its sign.**  `at_altitude` has been rewritten as a consistent
-   truncation (architecture-refactor Step 3c): the layer grid starts at the
-   site, the ground sits there, and nothing is renormalised, so all three
-   backends share one ground.  Under that construction the deterministic model
-   is 1.21× *brighter* at 2.4 km and the spherical engine 1.01×, while the
-   data (Koomen Maryland 30 m vs Patat Paranal 2400 m; Patat's own 961 vs
-   743 hPa pair) are 0.80× *darker* — still the wrong sign, with no
-   construction-degree-of-freedom left.  The missing low-atmosphere multiple
-   scattering remains the physical candidate.  Open item: the refraction
-   shadow thresholds are still built for sea-level grazing rays.
+   **The altitude comparison remains unresolved, but its construction defect
+   is now demonstrated.**  M12 fixed domain truncation and double scaling;
+   M13 additionally made solar occlusion respect that raised ground.  The
+   deterministic high-site/sea-level ratio at −6° changes from the historical
+   1.208× to 1.027×.  The old low-budget engine ratio 1.01× also predates the
+   occlusion fix; updated multi-seed results are in
+   [the audit](TWILIGHT_ALTITUDE_AUDIT.md).  An observed station ratio is not a
+   controlled altitude-only target: the 0.80× Maryland/Paranal comparison mixes
+   studies and observables, while Koomen's same-instrument 0.37× comparison
+   also changes season and transparency.  Transport approximations, sampling
+   uncertainty and site conditions remain to be separated before attributing
+   the residual to missing low-altitude multiple scattering.
 
 3. **The limb.**  The model's horizon is ≈ 2× brighter than the CIE 110 fit.
    The CIE formula is a daylighting standard, not a physical model, so this may
    be a reference problem — but a measured clear-sky luminance scan would settle
    it, and we do not have one.
 4. **The V band vs the photopic integral.**  Twilight spectra are strongly
-   coloured; comparing a photopic integral with a Johnson-V magnitude is a
-   10–20 % systematic that nobody has quantified here.
+   coloured; Johnson-V equivalent luminance and a photopic integral are
+   different observables.  Their difference must be calculated from a stated
+   response curve, not assigned a generic percentage.  Patat's fit also
+   includes the night background; this is negligible at −6° but material in
+   deep twilight.  The original instrument's full response is still needed
+   for a definitive synthetic-photometry comparison.
 5. **Performance.**  The bottleneck is Mie pre-processing, not the
    multiple-scattering solve: a cold dusty ``delta_m(32)`` costs ~40 s on
    the reference machine (phase tables + analytic Legendre moments), while
@@ -225,7 +467,8 @@ with the aerosol.  This is:
   polarised phase matrix, and the multiple-scattering solver carrying four
   components instead of one).
 
-Effort: large.  It is the natural "M9".
+Effort: large; a separate physics milestone once the present validation
+questions have been scoped.
 
 ### B. Comparison with real photographs
 
@@ -242,12 +485,15 @@ rendering — a 3D grid, delta tracking, denoising — and it is a different pro
 from "the colour of the sky".  A thin 3D layer (cirrus with structure) might be
 tractable; a cumulus field is not.
 
-### D. A faster multiple-scattering solver
+### D. Faster cold optics and twilight transport
 
-The plane-parallel SOS is the bottleneck for dusty and cloudy scenes.  Options:
-vectorise harder, use a lower-order two-stream for the diffuse field, or move
-the whole solver to the GPU.  This is what would make an interactive viewer
-possible.
+For cold dusty scenes, Mie tables and moments dominate; warm/repeat optical
+work is largely cached (M11).  Vectorised kernels or validated lookup tables
+target that startup cost.  Deep-twilight MC has a different bottleneck: rare
+light-carrying paths and high variance.  Better estimators, wavelength reuse
+or GPU transport should be judged on time to a stable estimate.  A faster SOS
+alone would not remove either bottleneck; profile each intended workload
+before selecting its optimisation.
 
 ### E. Engineering
 
@@ -280,9 +526,10 @@ For the original question — *what colour is the sky, and why?* — the project
 close.  What remains is not more phenomena but **tighter error bars**:
 
 * a measured clear-sky spectral radiance set to replace the CIE fit at the limb;
-* an altitude-dependent twilight with the right *sign* (the chord fix resolved
-  the absolute level, but the model is still brighter at 2.4 km where the data
-  are darker; `at_altitude` needs auditing first);
+* a controlled altitude-response comparison that separates site conditions,
+  observable definition, transport approximations and sampling error (the
+  domain truncation and raised-ground occlusion are fixed; the physical
+  interpretation remains open);
 * polarisation, which is the one large piece of physics still missing.
 
 Everything else on this page is either a different project (3D clouds) or a

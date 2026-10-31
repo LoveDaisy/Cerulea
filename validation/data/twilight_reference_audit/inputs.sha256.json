@@ -1,0 +1,7 @@
+{
+  "validation/data/unified_solar_source_audit/raw/unified-ground0.jsonl": "795f343727be3f11226bfe9b0b337edfffbc5d8f6ae3e645a9046fa92ce4064d",
+  "validation/data/unified_solar_source_audit/raw/all-sources-ground2p4.jsonl": "ef3a0b1d874860ccef0fecfe280be7a67146d4cda9d1980360be59266e885417",
+  "validation/data/unified_solar_source_audit/raw/baselines-ground0.jsonl": "b73e5bb70bd72238fdf430e1c0f2d38fb0fa063e0fc5575065c9349a81d91d12",
+  "validation/data/twilight_reference_audit/references/fors-bess-v.txt": "a40dc33f9e5e0bb2c7cf926a231a0967850c62bd32382b0c6a7b326ea2c41b49",
+  "validation/data/twilight_reference_audit/references/alpha_lyr_stis_011.fits": "60aebf5c193223f69061cd176d6309730c3210051fffad0dd6ad44475199ceaa"
+}

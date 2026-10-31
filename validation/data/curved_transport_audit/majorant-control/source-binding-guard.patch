@@ -1,0 +1,15 @@
+--- a/tools/unified_solar_transport.py
++++ b/tools/unified_solar_transport.py
+@@ -61,6 +61,12 @@
+         self.table = table
+         if not np.array_equal(atmo.wl, table.wl):
+             raise ValueError("The explicit solar source and medium must share their wavelength grid")
++        if table.atmo is not atmo:
++            raise ValueError("Solar table must be loaded or built for this construction medium")
++        if hasattr(table, "definition"):
++            from tools.point_solar_table import _signature
++            if table.definition != _signature(atmo):
++                raise ValueError("Solar table medium changed after its construction")
+         self._medium_identity = getattr(atmo, "_medium", None)
+         self._scene_identity = getattr(atmo, "_scene", None)
+         self.n_radial = n_radial

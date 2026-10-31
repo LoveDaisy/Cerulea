@@ -1,5 +1,7 @@
 # The colour of the sky, from first principles
 
+> Twilight update (2026-11-01): engine benchmarks in this report precede the AOD550 slicing correction; later audits also establish distinct source/transport and observation contracts. See [STATUS.md](STATUS.md), [CURVED_TRANSPORT_AUDIT.md](CURVED_TRANSPORT_AUDIT.md) and [TWILIGHT_REFERENCE_AUDIT.md](TWILIGHT_REFERENCE_AUDIT.md) for current conclusions. Other historical measurements retain their original context.
+
 *This is the main write-up of the project.  Numbers quoted here are produced by
 the scripts in `experiments/` and `validation/`; the figures live in
 `figures/`.*
@@ -185,8 +187,10 @@ Against Patat et al. (2006):
 
 The engine brings the single-scattering deficits of ~60× and ~130× at −9° and
 −12° down to 0.54× and 0.37× of Patat; at −6° it is 1.09×.  The residual now
-grows with solar depression (1.09 → 0.54 → 0.37) and is the same
-low-atmosphere multiple scattering that the plane-parallel solver misses.  The
+grows with solar depression (1.09 → 0.54 → 0.37).  This does not establish
+its cause: the engine retains straight-line higher-order transport, and
+deep-twilight MC statistics are heavy-tailed.  See the
+[altitude audit](TWILIGHT_ALTITUDE_AUDIT.md).  The
 old 1.39/1.45 "excess" was the one-branch chord (M10).
 
 ## 4. What the model says
@@ -327,8 +331,9 @@ sea level — lets the model be compared like-for-like for the first time
 deterministic model, i.e. **0.69×** Koomen (0.646) and 0.86× Patat (0.516);
 the spherical engine gives **0.55 cd m⁻²** (0.85× Koomen, 1.07× Patat; the
 medium-quality benchmark gives 0.563, 0.87× / 1.09×).  The residual is
-15–30 %, inside the 1950s absolute calibration (±0.2–0.4 mag) and the
-plane-parallel multiple-scattering approximation.
+15–30 % in those historical runs. The primary photometry does not supply
+an absolute error budget that assigns this residual to calibration or to
+missing scattering; the later source audit supersedes that attribution.
 
 The story changed with the M10 chord fix.  The old 2.20× (and the 1.14×
 geometric number before it) were artifacts of a solar path that returned only
@@ -339,19 +344,21 @@ refraction happened to cancel part of that error, which is why the old
 "1.14×" looked like a site effect.  See `docs/ROADMAP.md` M10 and the sixth
 addendum of `validation/ADDENDUM.md`.
 
-The altitude dependence is the remaining twilight puzzle, and it is still
-wrong-signed: under the consistent (truncated) `at_altitude` construction the
-model is 1.21× *brighter* at 2.4 km (deterministic; 1.01× engine) while the
-data are 0.80× *darker*.  The old `at_altitude` — a double-scaled,
-ground-inconsistent construction — was replaced in the architecture refactor
-(Step 3c); no construction degree of freedom is left, and the missing
-low-atmosphere multiple scattering remains the physical candidate.
+The altitude audit found another construction defect after Step 3c: solar
+occultation still used sea level, allowing rays through the raised ground.
+Aligning the opaque radius changes the -6° deterministic ratio from 1.208
+to **1.027** (0.444279 → 0.456350 cd m⁻²), with sea-level results unchanged.
+The remaining station comparison is not a controlled altitude experiment:
+the often-quoted 0.80 mixes Koomen photopic and Patat V-band measurements.
+Independent full-spectrum MC, component decomposition and the original-paper
+audit are recorded in [TWILIGHT_ALTITUDE_AUDIT.md](TWILIGHT_ALTITUDE_AUDIT.md).
+The residual cannot yet be assigned to a missing physical component.
 
 ### 4.10 Altitude
 
 From 3 km the zenith gets darker and deeper blue (less air above), the horizon
 is depressed, and the whole sky gains contrast.  The twilight altitude
-dependence is an exception and is still wrong-signed in the model (see §4.9);
+dependence is sensitive to the diffuse-field approximation (see §4.9);
 the daytime altitude behaviour is not affected by the twilight chord fix.
 `at_altitude` itself now truncates the model at the site, so the daytime
 altitude figures (experiments/05) reflect one consistent ground.

@@ -89,7 +89,7 @@ skycolor/
 tools/build_data.py   rebuilds the packaged data tables from data_raw/
 experiments/          scripts that produce the figures (01..10)
 validation/           six independent checks against published references
-tests/                210 tests
+tests/                regression and mechanism tests
 docs/                 architecture, method notes, the write-up, the roadmap
 ```
 
@@ -98,8 +98,11 @@ docs/                 architecture, method notes, the write-up, the roadmap
 `docs/STATUS.md` is the one-page summary; `docs/ROADMAP.md` has the milestones
 and the open questions.  Short version: the daytime sky is validated to a few
 per cent, twilight timing and shape are right, and the **−6° twilight level**
-is now within ~15–30 % after the solar-chord fix (M10).  The deep twilight is
-low by ~1.8× at −9°, and the **altitude response** has the wrong sign.
+is now within ~15–30 % after the solar-chord fix (M10).  A recorded
+medium-budget deep-twilight run is low by ~1.8× at −9°.  The **altitude
+comparison** remains open: a second ground-shadow defect has been fixed, and
+observed station differences are not controlled changes of altitude alone.
+See `docs/TWILIGHT_ALTITUDE_AUDIT.md` for the experiment and its limits.
 
 ## How good is it?
 
@@ -115,11 +118,14 @@ low by ~1.8× at −9°, and the **altitude response** has the wrong sign.
   Patat et al. (2006)
 * Multiple scattering vs an independent Monte Carlo: **31 % of single
   scattering at the zenith, both codes agree to 1 %**
-* Known failures, documented rather than hidden: the limb (≈2× too bright,
-  plane-parallel diffuse transport), the solar aureole (32-moment truncation
-  without delta-fit), and the twilight **altitude response** (the model is a
-  a few per cent brighter at 2.4 km where the data are 0.80× darker, under
-  the consistent (truncated) `at_altitude` construction).
+* Known limits: the limb (≈2× brighter than the CIE fit, with the suitability
+  of that reference still open), the solar aureole (32-moment truncation
+  without delta-fit), and the twilight **altitude comparison**.  Correcting
+  solar rays that crossed the raised ground changes the deterministic
+  2.4 km/sea-level ratio at −6° from the historical 1.208× to **1.027×**.
+  Updated engine estimates and the effects of site/observable differences
+  are reported in `docs/TWILIGHT_ALTITUDE_AUDIT.md`; the remaining difference
+  has not been identified as a missing physical component.
 
 ## Data provenance
 

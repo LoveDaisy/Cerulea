@@ -1,0 +1,19 @@
+{
+  "historical-majorant-equivalence-audit.md": "7650894bcc25f85f76a5c57c0cd56bd79b473971b98d0b58cc6a2b198f2bfe8d",
+  "historical-majorant-equivalence-probe.json": "1de996c029aaab0fa22cff9dc2bf8e407e7267ca8f81c203b285a2cbfc4d548b",
+  "historical-majorant-equivalence-probe.py": "42558af1021c3d850b650d44fc86ab898ef4e014ef37c3bb6c36708cfb6919f3",
+  "runtime-source-provenance.json": "01674ed3c63620409feb5e7dacd07b4ac40e191d1b7bd3634169096de12a5cec",
+  "snapshots/aerosol_596aaba.py": "90ccc6997592cd6b300518cfc8f59803349a3f06a7640d4db9f4f193bda54a71",
+  "snapshots/continuous_curved_mc_runtime.py": "27558a178876fd2a4ec65d4eb148654f4c087d7d613b8509ab30f6385e3843a2",
+  "snapshots/mc_596aaba.py": "30db2a561fd3428074774bb6096148f21dc40de139d8199335761db3676a6f03",
+  "snapshots/unified_solar_transport_7ed71a62.py": "6408f854df11bd1632c4c26a568902127275bfe17ed474fc43dbae8e8be757ad",
+  "snapshots/unified_solar_transport_after_guard.py": "6ed1b03c3c49ad748540064d90ce8306b8855f08d2409ba9a1cc51e1a654dea2",
+  "snapshots/unified_solar_transport_before_guard.py": "5d25bf55d731054acbb9589ebc9904dc2eef7f4a21e18c17da1fa5fd77d39e69",
+  "source-binding-guard.patch": "fd0eeb7f5a4790169225e7c2e5d6da208d52e9239bf97de71923410a3f59c7d2",
+  "../majorant-control-summary.json": "d62f3310a3cc4786c29ba4f4c3cc6ba36e8d1380a9c2cde6cadcec4236cec449",
+  "../raw/global-straight-high-stat.jsonl": "696ae28ec290314eda061d24f80fa1a20363a0e00579b08ec384151e759ca1d9",
+  "../raw/native-new-seeds-ground2p4.jsonl": "4735ccfed6c629a95ebe5bce6b80e9fe72efba36e8cf5887aebaf35823b750d0",
+  "../../unified_solar_source_audit/raw/all-sources-ground2p4.jsonl": "ef3a0b1d874860ccef0fecfe280be7a67146d4cda9d1980360be59266e885417",
+  "../../unified_solar_source_audit/raw/baselines-ground0.jsonl": "b73e5bb70bd72238fdf430e1c0f2d38fb0fa063e0fc5575065c9349a81d91d12",
+  "../../unified_solar_source_audit/raw/unified-ground0.jsonl": "795f343727be3f11226bfe9b0b337edfffbc5d8f6ae3e645a9046fa92ce4064d"
+}

@@ -1,0 +1,36 @@
+/Users/zhangjiajie/Codes/sky-color-wt-twilight-audit/skycolor/rt/twilight.py:528: RuntimeWarning: twilight: no scattering path was detected at 1 anchor wavelength(s) (380..380 nm); the returned multiple scattering is zero there.  Increase grid['n_photons'] or the quality preset.
+  ms, ms_err, info = multiple_scattered(
+================================================================================================
+SKY-COLOUR VALIDATION SUMMARY
+================================================================================================
+check    status  what                                                 key numbers
+------------------------------------------------------------------------------------------------
+check1   PASS    Rayleigh optical depth vs Bodhaine et al. (1999)     tau_R(550) = 0.09676 vs 0.09707 (-0.31 %); worst deviation over 300-700 nm is 1.03 % at 300 nm.
+check2   FAIL    Clear-sky direct and diffuse illuminance             DNI: 94.8/101.9/109.5 klx at h=30/48.19/60 vs 91.2/97.1/103.6; DHI: 9.8/11.6 klx vs CIE 6.9/7.9.
+check3   FAIL    CIE 110-1994 clear-sky luminance distribution        h=45deg: sun-side horizon/zenith 8.83 vs CIE 3.65 (+142%); anti-solar 3.38 vs 2.00; RMS 10.6% (theta<=60deg), 74.3% (horizon band).
+check4   PASS    Sky chromaticity vs measured spectra                 horizon xy: model (0.300,0.324) vs measured (0.291,0.313); RMS dxy=0.0184, du'v'=0.0105.
+check5   FAIL    Twilight zenith luminance (Patat et al. 2006)        zenith L: -6deg 0.364 vs 0.516; -9deg 0.00029 vs 0.017; -12deg 1e-05 vs 0.0015 cd/m2.
+check6   PASS    Twilight against Koomen et al. (1952)                model/Koomen: -6deg 0.69, -9deg 1.12, -12deg 0.59; model/Patat at -6deg 0.86.
+------------------------------------------------------------------------------------------------
+
+FAILED METRICS
+
+[check2] Clear-sky direct and diffuse illuminance
+  DHI illuminance, h=30deg (CIE 110, T=2.2): model=9.763 ref=6.923 klx dev=+41.0% tol=25.0
+  DHI illuminance, h=60deg (CIE 110, T=2.2): model=11.58 ref=7.939 klx dev=+45.9% tol=25.0
+
+[check3] CIE 110-1994 clear-sky luminance distribution
+  horizon sun-side / zenith, h=45deg: model=8.827 ref=3.652  dev=+141.7% tol=40.0
+  horizon anti-solar / zenith, h=45deg: model=3.376 ref=2.005  dev=+68.4% tol=25.0
+  RMS dev, 60-75deg, h=45deg: model=32.62 ref=0 % dev=+32.6 tol=25.0
+  RMS dev, 75-90deg horizon, h=45deg: model=74.28 ref=0 % dev=+74.3 tol=30.0
+  RMS dev, whole sky, h=45deg: model=35.28 ref=0 % dev=+35.3 tol=15.0
+  horizon sun-side / zenith, h=30deg: model=22.64 ref=8.35  dev=+171.2% tol=50.0
+  horizon sun-side / zenith, h=60deg: model=3.514 ref=1.597  dev=+120.0% tol=50.0
+
+[check5] Twilight zenith luminance (Patat et al. 2006)
+  zenith luminance, h=-9deg: model=2.934e-04 ref=0.01712 cd/m2 dev=-1.77 tol=0.5
+  zenith luminance, h=-12deg: model=1.142e-05 ref=0.00146 cd/m2 dev=-2.11 tol=0.5
+  zenith luminance, h=-18deg: model=1.196e-05 ref=1.807e-04 cd/m2 dev=-1.18 tol=0.5
+
+3 passed, 3 failed, 0 skipped

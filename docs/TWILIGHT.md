@@ -1,5 +1,7 @@
 # The deep twilight: a spherical Monte Carlo engine
 
+> Historical engine write-up: the introductory table predates M10, and later engine benchmarks predate the AOD550 slicing fix. Current state and experimental source/transport conclusions are in [STATUS.md](STATUS.md) and [CURVED_TRANSPORT_AUDIT.md](CURVED_TRANSPORT_AUDIT.md). Historical numerical agreement is not an established calibration error budget.
+
 `skycolor/rt/twilight.py` adds a **usable spherical multiple-scattering engine**
 for twilight, without replacing the deterministic model for daytime use.
 
@@ -221,9 +223,11 @@ The factor-2 tolerance is met at −6° and −9°, not at −12°.
 The single-scattering column shows why the engine is needed at all: 0.017× the
 reference at −9° and 0.008× at −12°, against 0.54 and 0.37 for the engine.
 
-The residual now changes sign with depth (1.09 → 0.54 → 0.37) and is
-consistent with the same low-atmosphere multiple scattering that the
-plane-parallel solver misses and that the engine only partially recovers.  The
+The recorded residual changes sign with depth (1.09 → 0.54 → 0.37), but a
+missing physical component has not been isolated.  The engine uses refracted
+first order plus straight-line higher orders, and the deep estimates are
+heavy-tailed.  The [altitude audit](TWILIGHT_ALTITUDE_AUDIT.md) also found a
+raised-ground occultation defect and a confounded observational target.  The
 old 1.39/1.45 "excess" was the one-branch chord (M10); the low-quality
 `check6` run gives 0.0124 ± 0.0043 at −9°, consistent with the medium value
 within 1σ.
@@ -235,7 +239,8 @@ Two caveats must be read with the table:
   no airglow, so the −18° row measures the absence of an emission component,
   not a scattering error;
 * the **−6°** comparison is now the best-constrained point: 1.09× Patat and
-  0.87× Koomen, inside the site/calibration spread.  The old "the engine
+  0.87× Koomen in that historical run; its residual is not an identified
+  site/calibration error budget.  The old "the engine
   overshoots at −6°" caveat was the chord bug.
 
 ### 2.3 Bias against a high-photon direct Monte Carlo
@@ -349,9 +354,9 @@ same `rt/single.sky_radiance` call the production model makes.
    effect.
 3. **The twilight level**: after the M10 chord fix the engine is 1.09× Patat
    (0.87× Koomen) at −6°, 0.54× at −9° and 0.37× at −12°.  The residual is now
-   a deficit that grows with depth, consistent with the low-atmosphere multiple
-   scattering that the plane-parallel solver misses; the −6° point is inside
-   the site/calibration spread.  The old "engine is 1.4–1.9× the Patat fit"
+   a deficit that grows with depth in that run, with an unresolved cause;
+   the −6° residual is not independently assigned to calibration or site
+   effects.  The old "engine is 1.4–1.9× the Patat fit"
    was the one-branch chord.
 4. **No airglow.**  Below about −15° the real sky is dominated by the natural
    night sky, which the model does not contain; the −18° comparison is
@@ -359,8 +364,10 @@ same `rt/single.sky_radiance` call the production model makes.
 5. **The ground.** The Monte Carlo includes the Lambertian ground reflection of
    the direct beam and the diffuse field.  Patanal's ground albedo is not 0.1
    everywhere; the ground term is a few per cent of the twilight zenith.
-6. **No aerosol `HorizontalField`, no refraction, no polarisation**, in common
-   with the rest of the package.
+6. **Higher orders have no aerosol `HorizontalField`, no refraction, and no
+   polarisation.** First order does use the requested solar refraction.  The
+   engine is a hybrid of these approximations, not an all-order refracted
+   solution; see [the audit](TWILIGHT_ALTITUDE_AUDIT.md).
 
 ---
 

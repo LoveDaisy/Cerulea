@@ -1,0 +1,6 @@
+{"stage": "table_and_single", "mode": "unified", "elevation": 2.4, "single_photopic": 0.295623922904489, "table_build_seconds": 132.6864283749601, "seconds": 1.2240690409671515}
+{"mode": "unified", "elevation": 2.4, "seed": 313, "photopic_integrals": {"total": 0.46991543791176094, "single": 0.2863792766200395, "multiple": 0.18353616129172146, "split_total": 0.47916008419621037}, "seconds": 116.41670741699636}
+{"mode": "unified", "elevation": 2.4, "seed": 314, "photopic_integrals": {"total": 0.549846825040696, "single": 0.3280434874593283, "multiple": 0.22180333758136775, "split_total": 0.5174272604858567}, "seconds": 116.17190612503327}
+{"mode": "unified", "elevation": 2.4, "seed": 315, "photopic_integrals": {"total": 0.4786912381508846, "single": 0.2891099821472807, "multiple": 0.18958125600360404, "split_total": 0.485205178908093}, "seconds": 115.367698749993}
+{"mode": "unified", "elevation": 2.4, "seed": 316, "photopic_integrals": {"total": 0.4003085274367497, "single": 0.25399115417454016, "multiple": 0.14631737326220956, "split_total": 0.44194129616669864}, "seconds": 114.38427045801654}
+{"mode": "unified", "elevation": 2.4, "seed": 317, "photopic_integrals": {"total": 0.4416138491863329, "single": 0.30965716218820327, "multiple": 0.13195668699812965, "split_total": 0.4275806099026187}, "seconds": 114.78417520795483}

@@ -1,0 +1,114 @@
+{
+  "height_km": 100.0,
+  "apparent_elevation_deg": -9.48538509285,
+  "dop853_true_elevation_deg": -9.869439304834236,
+  "dop853_slopes": [
+    {
+      "halfwidth_app_deg": 0.01,
+      "true_minus": -9.88250066945796,
+      "true_plus": -9.853469253595636,
+      "dtrue_dapp": 1.451570793116197
+    },
+    {
+      "halfwidth_app_deg": 0.001,
+      "true_minus": -9.870767450143306,
+      "true_plus": -9.868090116738482,
+      "dtrue_dapp": 1.3386667024120058
+    },
+    {
+      "halfwidth_app_deg": 0.0001,
+      "true_minus": -9.869572969968061,
+      "true_plus": -9.86930542850025,
+      "dtrue_dapp": 1.3377073390596905
+    },
+    {
+      "halfwidth_app_deg": 1e-05,
+      "true_minus": -9.869452681464184,
+      "true_plus": -9.869425925769077,
+      "dtrue_dapp": 1.3377847553286415
+    }
+  ],
+  "ray_tube": {
+    "height_km": 100.0,
+    "true_elevation_deg": -9.869439304834236,
+    "apparent_elevation_deg": -9.485385092646496,
+    "closure_true_elevation_deg": -9.869439304382986,
+    "centre_return_error_m": 6.356760126789441e-05,
+    "n_point": 1.000000000099056,
+    "n_inf": 1.0,
+    "angular_formula_gain": 0.7478658568278983,
+    "area_tube_results": [
+      {
+        "offset_m": 20.0,
+        "local_over_far_area": 1.3372878196530946,
+        "beam_gain_from_energy": 0.7477821792016394
+      }
+    ],
+    "max_relative_gain_difference": 0.00011188854992505437
+  },
+  "radial_forward": -9.869439304762434,
+  "radial_slope": 1.3377123952551528,
+  "seconds": 5.015070000081323,
+  "ray_tube_refined": {
+    "height_km": 100.0,
+    "true_elevation_deg": -9.869439304834236,
+    "apparent_elevation_deg": -9.485385092636223,
+    "closure_true_elevation_deg": -9.869439304884377,
+    "centre_return_error_m": 1.1481384365618e-06,
+    "n_point": 1.000000000099056,
+    "n_inf": 1.0,
+    "angular_formula_gain": 0.7478658572967777,
+    "area_tube_results": [
+      {
+        "offset_m": 0.5,
+        "local_over_far_area": 1.3361984508820335,
+        "beam_gain_from_energy": 0.7483918270821923
+      },
+      {
+        "offset_m": 1.0,
+        "local_over_far_area": 1.336181670369919,
+        "beam_gain_from_energy": 0.7484012258027399
+      },
+      {
+        "offset_m": 2.0,
+        "local_over_far_area": 1.3361980791300423,
+        "beam_gain_from_energy": 0.7483920352969444
+      },
+      {
+        "offset_m": 5.0,
+        "local_over_far_area": 1.3362521699841818,
+        "beam_gain_from_energy": 0.7483617407422715
+      },
+      {
+        "offset_m": 10.0,
+        "local_over_far_area": 1.336459890682767,
+        "beam_gain_from_energy": 0.7482454258235335
+      },
+      {
+        "offset_m": 20.0,
+        "local_over_far_area": 1.33728702343875,
+        "beam_gain_from_energy": 0.7477826244275986
+      }
+    ],
+    "max_relative_gain_difference": 0.0007158616759126435
+  },
+  "point_gain_from_tiny_radial_derivative": 0.7483998118662645,
+  "historical_unsegmented_commit": "596aaba",
+  "historical_unsegmented": [
+    {
+      "n_quad": 8,
+      "forward": -9.869431866755145,
+      "dtrue_dapp": 1.3055930956795692
+    },
+    {
+      "n_quad": 16,
+      "forward": -9.869439789521959,
+      "dtrue_dapp": 1.3660024257511336
+    },
+    {
+      "n_quad": 32,
+      "forward": -9.869439293365696,
+      "dtrue_dapp": 1.3315203088559713
+    }
+  ]
+}

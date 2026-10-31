@@ -102,7 +102,7 @@ def test_medium_arrays_are_read_only():
 
 
 # ---------------------------------------------------------------------------
-# at_altitude: consistent truncation semantics (plan Step 3c, HANDOFF §2.3)
+# at_altitude: consistent truncation semantics (docs/ARCHITECTURE.md)
 # ---------------------------------------------------------------------------
 def test_at_altitude_truncates_at_the_site():
     a = Atmosphere.standard(WL_COARSE)

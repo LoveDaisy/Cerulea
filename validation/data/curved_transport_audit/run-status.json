@@ -1,0 +1,30 @@
+{
+  "initial_high_site_attempt": {
+    "exit_code": 139,
+    "completed_seeds": [
+      310,
+      311,
+      312
+    ],
+    "next_seed": 313,
+    "python_traceback": false,
+    "native_cause": "unknown; no matching crash report or core found"
+  },
+  "continuation": {
+    "faulthandler_enabled": true,
+    "completed_seeds": [
+      313,
+      314,
+      315,
+      316,
+      317
+    ],
+    "duplicate_seeds": false
+  },
+  "final_test": {
+    "passed": 316,
+    "seconds": 328.79,
+    "log": "logs/pytest-final.log"
+  },
+  "note": "Exit status was observed directly through the process tool; stdout/stderr were redirected to the preserved log. Successful continuation is not a diagnosis of the initial native exit."
+}

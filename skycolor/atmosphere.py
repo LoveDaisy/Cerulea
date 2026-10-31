@@ -253,17 +253,13 @@ class Atmosphere:
         ``surface_pressure`` keeps its meaning as the scaling of the whole
         US76 profile rather than "the pressure at the ground".
 
-        This replaces the old construction, which both double-scaled the
-        pressure (``p(z0) * p(z0)/P0``) and left the multiple-scattering
-        ground at sea level.  It does **not** fix the physical altitude
-        response: under the consistent construction the zenith luminance
-        ratio (2.4 km / sea level) at -6 deg is ~1.21 deterministic /
-        ~1.01 engine while the data say ~0.80 -- still wrong-signed, a
-        known gap of the low-altitude multiple scattering (see
-        ``validation/SECOND_DATASET.md``).  Open item: the refraction
-        shadow-threshold table is still built for rays grazing *sea
-        level*, which matters for horizon/low-altitude viewing, not for
-        zenith twilight.
+        This replaces the old double pressure scaling and inconsistent
+        bottom boundary.  Solar occultation also uses this same opaque
+        bottom radius, including the refracted grazing-ray thresholds.
+        Truncation raises a globally spherical surface; it does not model
+        a local mountain above surrounding lowland.  Cross-site brightness
+        ratios are not controlled predictions of this operation (see
+        ``docs/TWILIGHT_ALTITUDE_AUDIT.md``).
 
         ``elevation_km=0`` returns an equivalent atmosphere (a fresh copy,
         as the method always has).  The derived atmosphere owns fresh

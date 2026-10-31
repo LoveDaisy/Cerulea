@@ -177,8 +177,8 @@ def boundary_theta(profile: _Profile, r0: float, r_earth: float = R_EARTH) -> fl
 class RefractionTables:
     """Apparent/true conversion and shadow thresholds for one atmosphere.
 
-    The tables depend only on the *air-density profile*: the observer's
-    altitude and the wavelength grid play no role.  They therefore cache
+    The tables depend on the air-density profile and opaque bottom radius:
+    the observer's altitude and wavelength grid play no role.  They cache
     against the density-definition identity token of the atmosphere's
     :class:`~skycolor.medium.Medium` (see :func:`get_tables`).
     """
@@ -186,6 +186,7 @@ class RefractionTables:
     def __init__(self, atmo, n_elev: int = 61, alt_km=None):
         profile = RefractiveProfile(atmo)
         self.profile = profile
+        self.r_ground = float(atmo.r_bounds[0])
         self._n_elev = n_elev
         self._elev_table = None
 
@@ -193,12 +194,15 @@ class RefractionTables:
         if alt_km is None:
             alt_km = np.array([0.0, 0.5, 1, 2, 3, 5, 7, 10, 13, 16, 20, 25,
                                30, 38, 47, 56, 70, 90, 120])
+            ground_km = float(atmo.z_bounds[0])
+            if ground_km > 0.0:
+                alt_km = np.concatenate(([ground_km], alt_km[alt_km > ground_km]))
         self.alt_km = np.asarray(alt_km, dtype=float)
         sh_true, sh_app = [], []
         for h in self.alt_km:
             r0 = R_EARTH + h * 1e3
-            th = boundary_theta(profile, r0)
-            _, _, _, bend = _trace(profile, r0, th - 3e-5, R_EARTH,
+            th = boundary_theta(profile, r0, self.r_ground)
+            _, _, _, bend = _trace(profile, r0, th - 3e-5, self.r_ground,
                                    R_EARTH + 1.2e6, 2000.0, 400000,
                                    stop_on_ground=False)
             sh_app.append(th)
@@ -211,8 +215,8 @@ class RefractionTables:
         elev = np.radians(np.linspace(0.05, 90.0, self._n_elev))
         true = []
         for e in elev:
-            _, _, _, bend = _trace(self.profile, R_EARTH * (1 + 1e-9),
-                                   np.pi / 2 - e, R_EARTH, R_EARTH + 1.2e6,
+            _, _, _, bend = _trace(self.profile, self.r_ground * (1 + 1e-9),
+                                   np.pi / 2 - e, self.r_ground, R_EARTH + 1.2e6,
                                    2000.0, 400000)
             true.append(e - bend)
         self._elev_table = (np.degrees(np.array(true)), np.degrees(elev))
@@ -254,13 +258,13 @@ class RefractionTables:
     def refraction_extension(self, z_km):
         """Degrees of extra solar depression that still illuminate a point at z."""
         z = np.asarray(z_km, dtype=float)
-        geometric = 90.0 + np.degrees(np.arccos(R_EARTH / (R_EARTH + z * 1e3)))
+        geometric = 90.0 + self.horizon_dip(z)
         return self.shadow_zenith_true(z) - geometric
 
     def horizon_dip(self, z_km):
         """Dip of the visible horizon [deg]."""
-        z = np.maximum(np.asarray(z_km, dtype=float), 0.0)
-        return np.degrees(np.arccos(R_EARTH / (R_EARTH + z * 1e3)))
+        r = R_EARTH + np.asarray(z_km, dtype=float) * 1e3
+        return np.degrees(np.arccos(np.minimum(self.r_ground / r, 1.0)))
 
 
 _CACHE: "weakref.WeakKeyDictionary[object, RefractionTables]" = weakref.WeakKeyDictionary()
@@ -272,9 +276,10 @@ def get_tables(atmo) -> RefractionTables:
     Cache identity is the ``refraction_token`` of the atmosphere's
     :class:`~skycolor.medium.Medium` -- its *construction* identity (any
     redefinition through the facade, aerosol layers included, replaces the
-    medium and rotates the token), never a value proxy.  The tables only
-    read the air-density profile, so a redefinition that leaves it untouched
-    costs one rebuild but is never wrong.  Consequences, both deliberate:
+    medium and rotates the token), never a value proxy.  The tables read the
+    air-density profile and opaque bottom radius; redefining either rotates
+    the token.  A redefinition leaving both untouched costs one rebuild but
+    is never wrong.  Consequences, both deliberate:
 
     * two media built from different custom profiles but the same
       ``surface_pressure``/``elevation_km`` never share tables (the old

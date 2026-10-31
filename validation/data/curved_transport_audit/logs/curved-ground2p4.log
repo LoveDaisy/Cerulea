@@ -1,0 +1,4 @@
+{"stage": "table_and_single", "mode": "unified", "elevation": 2.4, "single_photopic": 0.295623922904489, "table_build_seconds": 132.6864283749601, "seconds": 1.2494430840015411}
+{"mode": "unified", "elevation": 2.4, "seed": 310, "photopic_integrals": {"total": 0.4470061120676922, "single": 0.30989771964220403, "multiple": 0.1371083924254883, "split_total": 0.43273231532997736}, "seconds": 122.13193491694983}
+{"mode": "unified", "elevation": 2.4, "seed": 311, "photopic_integrals": {"total": 0.4664657498560905, "single": 0.2673557563976542, "multiple": 0.19910999345843627, "split_total": 0.4947339163629252}, "seconds": 121.74682291701902}
+{"mode": "unified", "elevation": 2.4, "seed": 312, "photopic_integrals": {"total": 0.43462057067513155, "single": 0.2703762763158503, "multiple": 0.1642442943592812, "split_total": 0.45986821726377014}, "seconds": 115.76022016594652}

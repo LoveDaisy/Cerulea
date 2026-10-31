@@ -1,0 +1,6 @@
+{
+  "default_tracked_inputs_reproduce_after_chdir": true,
+  "relocated_tracked_archives_reproduce_identical_summary": true,
+  "git_history_and_scratchpad_not_read": true,
+  "new_MC_paths": 0
+}

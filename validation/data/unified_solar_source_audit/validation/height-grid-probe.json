@@ -1,0 +1,53 @@
+{
+  "rows": [
+    {
+      "height_spacing_km": 2.0,
+      "heights_range": [
+        34,
+        50
+      ],
+      "margins_true_deg": [
+        0.2,
+        0.5,
+        1.0,
+        2.0
+      ],
+      "max_app_offset_error_deg": 9.497392459301146e-05,
+      "max_inverse_derivative_relative_error": 6.79674887253956e-05,
+      "max_critical_angle_error_deg": 4.038510898141112e-05
+    },
+    {
+      "height_spacing_km": 1.0,
+      "heights_range": [
+        34,
+        50
+      ],
+      "margins_true_deg": [
+        0.2,
+        0.5,
+        1.0,
+        2.0
+      ],
+      "max_app_offset_error_deg": 2.4548818190472943e-05,
+      "max_inverse_derivative_relative_error": 1.734395931607402e-05,
+      "max_critical_angle_error_deg": 1.0383839295080577e-05
+    },
+    {
+      "height_spacing_km": 0.5,
+      "heights_range": [
+        34,
+        50
+      ],
+      "margins_true_deg": [
+        0.2,
+        0.5,
+        1.0,
+        2.0
+      ],
+      "max_app_offset_error_deg": 6.240246213984335e-06,
+      "max_inverse_derivative_relative_error": 4.38329230778578e-06,
+      "max_critical_angle_error_deg": 2.6331749092278756e-06
+    }
+  ],
+  "caveat": "Height errors isolated at exact critical margin; actual table must also propagate critical-angle interpolation error. Linear interpolation in sqrt(height) preserves derivative blend identity."
+}

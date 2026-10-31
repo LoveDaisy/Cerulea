@@ -71,8 +71,10 @@ uv run python experiments/01_day_cycle.py
 
 - `atmosphere.py`：`Atmosphere` 是 facade：物理介质在 frozen `Medium`（`skycolor/medium.py`），
   观察场景在 frozen `Scene`（`skycolor/scene.py`）。`at_altitude(z0)` 已改为一致截断
-  （`z_bounds` 自 z0 起、地面=z0、不重标定任何柱量，Step 3c）——single/SOS/MC 首次对
-  “地面在哪”同源；高度响应仍反号属已知物理缺口，不是构造问题。
+  （`z_bounds` 自 z0 起、地面=z0、不重标定任何柱量，Step 3c）。后续审计发现太阳遮挡
+  仍按海平面，已改为 single/SOS/MC/cloud 均用 `r_bounds[0]`；−6° 天顶确定性高低站比
+  由历史 1.208× 变为 1.027×。旧引擎 1.01× 也属修复前记录，当前结果及参考条件见
+  `docs/TWILIGHT_ALTITUDE_AUDIT.md`；剩余差异的物理根因尚未确定。
 - `geometry.py` / `refraction.py`：太阳弦长是暮光的关键。M10 修复后，太阳在局部水平
   以下时走“远侧 perigee→space + 近侧 perigee→point”（`up + 2*down`）。不要重做。
 - `rt/single.py`：一次散射从观察者半径 `r0` 开始积分；折射开启时用
@@ -85,6 +87,8 @@ uv run python experiments/01_day_cycle.py
   默认 256，覆盖 81 波长工作网格；预设气溶胶通过 `shared()` 跨 `Atmosphere` 复用，
   因此 warm / 重复调用的 Mie 预处理接近零。冷启动仍需向量化/LUT（后续任务）。
   共享实例是**只读契约**，不要 mutate 气溶胶属性。
+  AOD550 的参考截面固定为实际550 nm状态；查询网格和 `Atmosphere._restrict`
+  不得重新归一介质。单波长旧归一错误已修复，见 `docs/AEROSOL_GRID_AUDIT.md`。
 - `validation/`：对照公开文献的独立检查。`results.json` 是回归护栏，物理数字变化要
   有独立证据并重跑对应 check。
 
@@ -97,8 +101,9 @@ uv run python experiments/01_day_cycle.py
   的 `up + 2*down`）。
 - 不要用关闭折射来“修”暮光；`refraction=False` 只用于复现旧报告数字。
 - 不要为了跑得快把 `n_moments` 默认降到 16 而不检查 aureole / dust。
-- 不要把“高度响应反号”当作待修的构造问题：`at_altitude` 已改一致截断
-  （确定性 1.21×/引擎 1.01×，数据 0.80×，仍反号），残差是低层多次散射缺口。
+- 不要恢复 `at_altitude` 的双重缩放或用海平面半径判断高站太阳遮挡；域截断与不透明
+  地面遮挡必须同源于 `r_bounds[0]`。不要把历史 1.21×/1.01× 当当前结果，或把跨文献
+  0.80× 当受控海拔目标；残差不能直接归因为低层多次散射不足。
 - 不要在没有独立证据时改动 `validation/results.json` 或弦长修复的物理数字。
 
 ### DO
@@ -110,14 +115,20 @@ uv run python experiments/01_day_cycle.py
 ## 关键文件
 
 - `docs/STATUS.md` — 一页现状（先读这个）
-- `docs/ROADMAP.md` — M1–M10 与 open questions
+- `docs/ROADMAP.md` — 已完成里程碑、验证依据与 open questions
 - `docs/REPORT.md` — 完整报告；`docs/结论.zh.md` — 中文摘要
 - `docs/TWILIGHT.md` — 深暮光引擎与引擎基准
 - `validation/SECOND_DATASET.md` — Koomen 第二数据集与高度响应
 - `skycolor/atmosphere.py`、`skycolor/geometry.py`、`skycolor/refraction.py`
 - `skycolor/rt/single.py`、`skycolor/rt/multiple.py`、`skycolor/rt/twilight.py`
 - `validation/check5_twilight.py`、`validation/check6_second_dataset.py`
-- `scratchpad/HANDOFF_2026-10-30_twilight-perf.md` — 当前交接文档（本地，不进 git）
+- `docs/TWILIGHT_ALTITUDE_AUDIT.md` — 高站太阳遮挡修复、海拔响应实验与参考条件
+- `docs/SOLAR_SOURCE_AUDIT.md` — 太阳衰减配对消融、逆表误差与光束角域定幅；实验结果尚未替换默认模型
+- `docs/UNIFIED_SOLAR_SOURCE_AUDIT.md` — 连续柱量、二维日面与能流独立检验；SS/MC源项闭合
+- `docs/AEROSOL_GRID_AUDIT.md` — AOD550网格一致性修复及golden/物理校验归因
+- `docs/TWILIGHT_REFERENCE_AUDIT.md` — 原始观测定义、合成通带与可裁定边界
+- `docs/CURVED_TRANSPORT_AUDIT.md` — 连续漫射折射、独立闭合、完整探索结论与剩余边界
+- `scratchpad/` — 本地实验/任务记录与临时 session 交接；旧交接已退休，长期成果维护在 tracked 文档
 
 ## 代码风格
 

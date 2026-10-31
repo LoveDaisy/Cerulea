@@ -1,0 +1,500 @@
+{
+  "clear_direction": {
+    "changed": false,
+    "sha_before": "4492c7bad0afd820b5e099127b80e8f7b6f59682a010a8bb2987af86822606ff",
+    "sha_candidate": "4492c7bad0afd820b5e099127b80e8f7b6f59682a010a8bb2987af86822606ff",
+    "fields": {
+      "radiance": {
+        "equal": true,
+        "shape": [
+          1,
+          81
+        ],
+        "changed_values": 0,
+        "max_abs": 0.0,
+        "max_relative": 0.0,
+        "old_min": 0.004824962039461951,
+        "old_max": 0.043176447274986436,
+        "new_min": 0.004824962039461951,
+        "new_max": 0.043176447274986436
+      },
+      "wl": {
+        "equal": true,
+        "shape": [
+          81
+        ],
+        "changed_values": 0,
+        "max_abs": 0.0,
+        "max_relative": 0.0,
+        "old_min": 380.0,
+        "old_max": 780.0,
+        "new_min": 380.0,
+        "new_max": 780.0
+      },
+      "scenario": {
+        "equal": true,
+        "shape": []
+      }
+    }
+  },
+  "sos": {
+    "changed": false,
+    "sha_before": "f91c8da91d14745f65d744f99b6c34b0afccaaee304289738b30f5e7d47d581a",
+    "sha_candidate": "f91c8da91d14745f65d744f99b6c34b0afccaaee304289738b30f5e7d47d581a",
+    "fields": {
+      "radiance": {
+        "equal": true,
+        "shape": [
+          3,
+          81
+        ],
+        "changed_values": 0,
+        "max_abs": 0.0,
+        "max_relative": 0.0,
+        "old_min": 0.00046391806090403123,
+        "old_max": 0.06504178383078026,
+        "new_min": 0.00046391806090403123,
+        "new_max": 0.06504178383078026
+      },
+      "radiance_single": {
+        "equal": true,
+        "shape": [
+          3,
+          81
+        ],
+        "changed_values": 0,
+        "max_abs": 0.0,
+        "max_relative": 0.0,
+        "old_min": 0.0035170034182634164,
+        "old_max": 0.08842581236628307,
+        "new_min": 0.0035170034182634164,
+        "new_max": 0.08842581236628307
+      },
+      "flux_up_toa": {
+        "equal": true,
+        "shape": [
+          81
+        ],
+        "changed_values": 0,
+        "max_abs": 0.0,
+        "max_relative": 0.0,
+        "old_min": 0.0676932326872889,
+        "old_max": 0.2610761687068488,
+        "new_min": 0.0676932326872889,
+        "new_max": 0.2610761687068488
+      },
+      "flux_down_boa": {
+        "equal": true,
+        "shape": [
+          81
+        ],
+        "changed_values": 0,
+        "max_abs": 0.0,
+        "max_relative": 0.0,
+        "old_min": 0.03786877132295434,
+        "old_max": 0.24347721137822614,
+        "new_min": 0.03786877132295434,
+        "new_max": 0.24347721137822614
+      },
+      "flux_up_boa": {
+        "equal": true,
+        "shape": [
+          81
+        ],
+        "changed_values": 0,
+        "max_abs": 0.0,
+        "max_relative": 0.0,
+        "old_min": 0.030783189992902058,
+        "old_max": 0.07187050154953543,
+        "new_min": 0.030783189992902058,
+        "new_max": 0.07187050154953543
+      },
+      "direct_down_boa": {
+        "equal": true,
+        "shape": [
+          81
+        ],
+        "changed_values": 0,
+        "max_abs": 0.0,
+        "max_relative": 0.0,
+        "old_min": 0.14340141968695885,
+        "old_max": 0.536657918639882,
+        "new_min": 0.14340141968695885,
+        "new_max": 0.536657918639882
+      },
+      "incident_flux": {
+        "equal": true,
+        "shape": [
+          81
+        ],
+        "changed_values": 0,
+        "max_abs": 0.0,
+        "max_relative": 0.0,
+        "old_min": 0.4565122463323036,
+        "old_max": 0.8790459844206548,
+        "new_min": 0.4565122463323036,
+        "new_max": 0.8790459844206548
+      },
+      "orders": {
+        "equal": true,
+        "shape": [],
+        "changed_values": 0,
+        "max_abs": 0.0,
+        "max_relative": 0.0,
+        "old_min": 10.0,
+        "old_max": 10.0,
+        "new_min": 10.0,
+        "new_max": 10.0
+      },
+      "converged": {
+        "equal": true,
+        "shape": []
+      },
+      "wl": {
+        "equal": true,
+        "shape": [
+          81
+        ],
+        "changed_values": 0,
+        "max_abs": 0.0,
+        "max_relative": 0.0,
+        "old_min": 380.0,
+        "old_max": 780.0,
+        "new_min": 380.0,
+        "new_max": 780.0
+      },
+      "scenario": {
+        "equal": true,
+        "shape": []
+      }
+    }
+  },
+  "dome": {
+    "changed": false,
+    "sha_before": "d3bf8072335cedd1b2cef445e9fc026ca8e5878e84dd992c9eed838961e5e659",
+    "sha_candidate": "d3bf8072335cedd1b2cef445e9fc026ca8e5878e84dd992c9eed838961e5e659",
+    "fields": {
+      "zenith": {
+        "equal": true,
+        "shape": [
+          4
+        ],
+        "changed_values": 0,
+        "max_abs": 0.0,
+        "max_relative": 0.0,
+        "old_min": 0.0,
+        "old_max": 90.0,
+        "new_min": 0.0,
+        "new_max": 90.0
+      },
+      "azimuth_rel": {
+        "equal": true,
+        "shape": [
+          5
+        ],
+        "changed_values": 0,
+        "max_abs": 0.0,
+        "max_relative": 0.0,
+        "old_min": 0.0,
+        "old_max": 180.0,
+        "new_min": 0.0,
+        "new_max": 180.0
+      },
+      "radiance": {
+        "equal": true,
+        "shape": [
+          4,
+          5,
+          7
+        ],
+        "changed_values": 0,
+        "max_abs": 0.0,
+        "max_relative": 0.0,
+        "old_min": 0.0046520165042424405,
+        "old_max": 0.6120089569492253,
+        "new_min": 0.0046520165042424405,
+        "new_max": 0.6120089569492253
+      },
+      "wl": {
+        "equal": true,
+        "shape": [
+          7
+        ],
+        "changed_values": 0,
+        "max_abs": 0.0,
+        "max_relative": 0.0,
+        "old_min": 400.0,
+        "old_max": 700.0,
+        "new_min": 400.0,
+        "new_max": 700.0
+      },
+      "scenario": {
+        "equal": true,
+        "shape": []
+      }
+    }
+  },
+  "cloud": {
+    "changed": false,
+    "sha_before": "c4a551550768eb78078a8ad346147d631e18beda970e32dd19a487579c9b9aa1",
+    "sha_candidate": "c4a551550768eb78078a8ad346147d631e18beda970e32dd19a487579c9b9aa1",
+    "fields": {
+      "radiance": {
+        "equal": true,
+        "shape": [
+          1,
+          7
+        ],
+        "changed_values": 0,
+        "max_abs": 0.0,
+        "max_relative": 0.0,
+        "old_min": 0.011392818299293566,
+        "old_max": 0.025239347394851303,
+        "new_min": 0.011392818299293566,
+        "new_max": 0.025239347394851303
+      },
+      "clear": {
+        "equal": true,
+        "shape": [
+          1,
+          7
+        ],
+        "changed_values": 0,
+        "max_abs": 0.0,
+        "max_relative": 0.0,
+        "old_min": 1.9630820361975425e-15,
+        "old_max": 2.74304385155791e-14,
+        "new_min": 1.9630820361975425e-15,
+        "new_max": 2.74304385155791e-14
+      },
+      "cloud": {
+        "equal": true,
+        "shape": [
+          1,
+          7
+        ],
+        "changed_values": 0,
+        "max_abs": 0.0,
+        "max_relative": 0.0,
+        "old_min": 0.011392818299266135,
+        "old_max": 0.02523934739484341,
+        "new_min": 0.011392818299266135,
+        "new_max": 0.02523934739484341
+      },
+      "transmittance": {
+        "equal": true,
+        "shape": [
+          1,
+          7
+        ],
+        "changed_values": 0,
+        "max_abs": 0.0,
+        "max_relative": 0.0,
+        "old_min": 4.002630191309591e-13,
+        "old_max": 6.633912936628235e-13,
+        "new_min": 4.002630191309591e-13,
+        "new_max": 6.633912936628235e-13
+      },
+      "wl": {
+        "equal": true,
+        "shape": [
+          7
+        ],
+        "changed_values": 0,
+        "max_abs": 0.0,
+        "max_relative": 0.0,
+        "old_min": 400.0,
+        "old_max": 700.0,
+        "new_min": 400.0,
+        "new_max": 700.0
+      },
+      "scenario": {
+        "equal": true,
+        "shape": []
+      }
+    }
+  },
+  "twilight": {
+    "changed": true,
+    "sha_before": "a976e3fa09c0a9b137e7aef6f75f9f2d79b3e88a4a047963594534b6f3e5037f",
+    "sha_candidate": "de215fabb079a760b902df40c0e40b7f36bc0489f1d250fb8ccc94053a734f36",
+    "fields": {
+      "radiance": {
+        "equal": false,
+        "shape": [
+          3,
+          7
+        ],
+        "changed_values": 18,
+        "max_abs": 4.76966654393852e-05,
+        "max_relative": 37.88942050481041,
+        "old_min": 6.499814426401614e-07,
+        "old_max": 5.128080989483223e-05,
+        "new_min": 9.893118021720045e-07,
+        "new_max": 2.527740164315654e-05
+      },
+      "stderr": {
+        "equal": false,
+        "shape": [
+          3,
+          7
+        ],
+        "changed_values": 18,
+        "max_abs": 5.371115405191794e-06,
+        "max_relative": 6.693057303561099e+197,
+        "old_min": 0.0,
+        "old_max": 5.371115405191794e-06,
+        "new_min": 0.0,
+        "new_max": 4.529836360235636e-06
+      },
+      "wl": {
+        "equal": true,
+        "shape": [
+          7
+        ],
+        "changed_values": 0,
+        "max_abs": 0.0,
+        "max_relative": 0.0,
+        "old_min": 400.0,
+        "old_max": 700.0,
+        "new_min": 400.0,
+        "new_max": 700.0
+      },
+      "scenario": {
+        "equal": true,
+        "shape": []
+      }
+    }
+  },
+  "mc": {
+    "changed": false,
+    "sha_before": "2a96a9fb504656ddabb8fd7c61a427e1c71f21f0c26b291dcbad4bb4a18bc244",
+    "sha_candidate": "2a96a9fb504656ddabb8fd7c61a427e1c71f21f0c26b291dcbad4bb4a18bc244",
+    "fields": {
+      "total": {
+        "equal": true,
+        "shape": [
+          2,
+          7
+        ],
+        "changed_values": 0,
+        "max_abs": 0.0,
+        "max_relative": 0.0,
+        "old_min": 0.004075796550378135,
+        "old_max": 0.04604055620021887,
+        "new_min": 0.004075796550378135,
+        "new_max": 0.04604055620021887
+      },
+      "single": {
+        "equal": true,
+        "shape": [
+          2,
+          7
+        ],
+        "changed_values": 0,
+        "max_abs": 0.0,
+        "max_relative": 0.0,
+        "old_min": 0.0032704302858902815,
+        "old_max": 0.028963585724857965,
+        "new_min": 0.0032704302858902815,
+        "new_max": 0.028963585724857965
+      },
+      "multiple": {
+        "equal": true,
+        "shape": [
+          2,
+          7
+        ],
+        "changed_values": 0,
+        "max_abs": 0.0,
+        "max_relative": 0.0,
+        "old_min": 0.0008053662644879057,
+        "old_max": 0.017076970475361053,
+        "new_min": 0.0008053662644879057,
+        "new_max": 0.017076970475361053
+      },
+      "total_err": {
+        "equal": true,
+        "shape": [
+          2,
+          7
+        ],
+        "changed_values": 0,
+        "max_abs": 0.0,
+        "max_relative": 0.0,
+        "old_min": 3.38303369199263e-05,
+        "old_max": 0.00013215385840537763,
+        "new_min": 3.38303369199263e-05,
+        "new_max": 0.00013215385840537763
+      },
+      "wl": {
+        "equal": true,
+        "shape": [
+          7
+        ],
+        "changed_values": 0,
+        "max_abs": 0.0,
+        "max_relative": 0.0,
+        "old_min": 400.0,
+        "old_max": 700.0,
+        "new_min": 400.0,
+        "new_max": 700.0
+      },
+      "scenario": {
+        "equal": true,
+        "shape": []
+      }
+    }
+  },
+  "altitude": {
+    "changed": false,
+    "sha_before": "58b58fa59ea1b82327999c8a4707ede782f6641bc454c51e54ca97506b5d43d8",
+    "sha_candidate": "58b58fa59ea1b82327999c8a4707ede782f6641bc454c51e54ca97506b5d43d8",
+    "fields": {
+      "radiance": {
+        "equal": true,
+        "shape": [
+          1,
+          7
+        ],
+        "changed_values": 0,
+        "max_abs": 0.0,
+        "max_relative": 0.0,
+        "old_min": 0.003557162451564974,
+        "old_max": 0.01941292287166068,
+        "new_min": 0.003557162451564974,
+        "new_max": 0.01941292287166068
+      },
+      "wl": {
+        "equal": true,
+        "shape": [
+          7
+        ],
+        "changed_values": 0,
+        "max_abs": 0.0,
+        "max_relative": 0.0,
+        "old_min": 400.0,
+        "old_max": 700.0,
+        "new_min": 400.0,
+        "new_max": 700.0
+      },
+      "z_bounds": {
+        "equal": true,
+        "shape": [
+          56
+        ],
+        "changed_values": 0,
+        "max_abs": 0.0,
+        "max_relative": 0.0,
+        "old_min": 2.4,
+        "old_max": 200.0,
+        "new_min": 2.4,
+        "new_max": 200.0
+      },
+      "scenario": {
+        "equal": true,
+        "shape": []
+      }
+    }
+  }
+}

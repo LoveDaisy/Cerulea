@@ -1,0 +1,53 @@
+{
+  "transport": "continuous",
+  "max_step_m": 2000.0,
+  "seed": 310,
+  "height_km": 0.0,
+  "disk_points": [
+    16,
+    64
+  ],
+  "path_fingerprint": "ba45671f7683f52825eb129852ddabc0eec48fdfc20eb830cfaadd5867e95b86",
+  "checks": {
+    "positions_calls_points_flight_stats_and_source_hashes_identical": true
+  },
+  "fields": {
+    "single": {
+      "disk16": 0.2746790212486144,
+      "disk64": 0.27479928536841847,
+      "difference": 0.00012026411980409213,
+      "fractional_change": 0.0004378351111686829,
+      "seed_standard_error": null
+    },
+    "multiple": {
+      "disk16": 0.23543792652474416,
+      "disk64": 0.23547775289787715,
+      "difference": 3.9826373132989534e-05,
+      "fractional_change": 0.00016915869809452921,
+      "seed_standard_error": null
+    },
+    "total": {
+      "disk16": 0.5101169477733586,
+      "disk64": 0.5102770382662956,
+      "difference": 0.00016009049293697064,
+      "fractional_change": 0.0003138309629502345,
+      "seed_standard_error": null
+    },
+    "split_total": {
+      "disk16": 0.512369611109736,
+      "disk64": 0.5124017724964164,
+      "difference": 3.216138668038493e-05,
+      "fractional_change": 6.276989498021912e-05,
+      "seed_standard_error": null
+    }
+  },
+  "deterministic_single": {
+    "16": 0.27693168458499184,
+    "64": 0.2769240195985393
+  },
+  "inputs": {
+    "disk16-curved-ground0.jsonl": "ec9bdc11b2c1a96b8442d237b7a524b59cca8d7eeb58bc4a252f42f2a5e7e1cd",
+    "disk64-curved-ground0.jsonl": "5d5e786938da4ddc9a93f70ab50d2e0151679aa8848245f49992cfc6a8623ac8"
+  },
+  "limitation": "One sampled curved-path realization; no independent-seed uncertainty estimate and no bound on unvisited rare source vertices"
+}

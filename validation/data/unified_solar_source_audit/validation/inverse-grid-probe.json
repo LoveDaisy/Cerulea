@@ -1,0 +1,125 @@
+{
+  "rows": [
+    {
+      "height": 30.0,
+      "apparent_step_deg": 0.1,
+      "n_knots": 3,
+      "max_app_error_deg": 5.162887627641055e-06,
+      "max_relative_derivative_error": 0.0005326530570179955,
+      "interior_relative_derivative_error": null
+    },
+    {
+      "height": 30.0,
+      "apparent_step_deg": 0.05,
+      "n_knots": 6,
+      "max_app_error_deg": 6.815089008682662e-07,
+      "max_relative_derivative_error": 0.00016867270090958897,
+      "interior_relative_derivative_error": 0.00016867270090958897
+    },
+    {
+      "height": 30.0,
+      "apparent_step_deg": 0.025,
+      "n_knots": 12,
+      "max_app_error_deg": 8.83275559360186e-08,
+      "max_relative_derivative_error": 4.5796645264273295e-05,
+      "interior_relative_derivative_error": 4.5796645264273295e-05
+    },
+    {
+      "height": 38.0,
+      "apparent_step_deg": 0.2,
+      "n_knots": 5,
+      "max_app_error_deg": 0.011709259776527148,
+      "max_relative_derivative_error": 0.09025449332945124,
+      "interior_relative_derivative_error": 0.009000803311150163
+    },
+    {
+      "height": 38.0,
+      "apparent_step_deg": 0.1,
+      "n_knots": 9,
+      "max_app_error_deg": 0.004208987615289317,
+      "max_relative_derivative_error": 0.03909299562926738,
+      "interior_relative_derivative_error": 0.03909299562926738
+    },
+    {
+      "height": 38.0,
+      "apparent_step_deg": 0.05,
+      "n_knots": 17,
+      "max_app_error_deg": 0.0007931052807057526,
+      "max_relative_derivative_error": 0.032191621628933076,
+      "interior_relative_derivative_error": 0.032191621628933076
+    },
+    {
+      "height": 38.0,
+      "apparent_step_deg": 0.025,
+      "n_knots": 33,
+      "max_app_error_deg": 0.0003193691809544319,
+      "max_relative_derivative_error": 0.01962123297492324,
+      "interior_relative_derivative_error": 0.01962123297492324
+    },
+    {
+      "height": 42.0,
+      "apparent_step_deg": 0.2,
+      "n_knots": 5,
+      "max_app_error_deg": 0.006523528414772883,
+      "max_relative_derivative_error": 0.1986070638460251,
+      "interior_relative_derivative_error": 0.1986070638460251
+    },
+    {
+      "height": 42.0,
+      "apparent_step_deg": 0.1,
+      "n_knots": 9,
+      "max_app_error_deg": 0.0028368655120649677,
+      "max_relative_derivative_error": 0.1144419077924721,
+      "interior_relative_derivative_error": 0.1144419077924721
+    },
+    {
+      "height": 42.0,
+      "apparent_step_deg": 0.05,
+      "n_knots": 17,
+      "max_app_error_deg": 0.0032818353231727215,
+      "max_relative_derivative_error": 0.03374009842557535,
+      "interior_relative_derivative_error": 0.03374009842557535
+    },
+    {
+      "height": 42.0,
+      "apparent_step_deg": 0.025,
+      "n_knots": 33,
+      "max_app_error_deg": 0.00020056540458224248,
+      "max_relative_derivative_error": 0.01569355237727088,
+      "interior_relative_derivative_error": 0.01569355237727088
+    },
+    {
+      "height": 47.0,
+      "apparent_step_deg": 0.2,
+      "n_knots": 5,
+      "max_app_error_deg": 0.0005078794572686007,
+      "max_relative_derivative_error": 0.006102726701612715,
+      "interior_relative_derivative_error": 0.0036070370705090227
+    },
+    {
+      "height": 47.0,
+      "apparent_step_deg": 0.1,
+      "n_knots": 9,
+      "max_app_error_deg": 0.00016159844824681358,
+      "max_relative_derivative_error": 0.004353182183329696,
+      "interior_relative_derivative_error": 0.004353182183329696
+    },
+    {
+      "height": 47.0,
+      "apparent_step_deg": 0.05,
+      "n_knots": 17,
+      "max_app_error_deg": 0.00010437235448801374,
+      "max_relative_derivative_error": 0.0010782189761002758,
+      "interior_relative_derivative_error": 0.0010782189761002758
+    },
+    {
+      "height": 47.0,
+      "apparent_step_deg": 0.025,
+      "n_knots": 33,
+      "max_app_error_deg": 1.2935012357218056e-05,
+      "max_relative_derivative_error": 0.0007123502111410218,
+      "interior_relative_derivative_error": 0.0007123502111410218
+    }
+  ],
+  "seconds": 0.15470008307602257
+}

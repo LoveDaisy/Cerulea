@@ -78,6 +78,7 @@ CAPABILITIES = {
     "scattering": "orders >= 2, plane-parallel discrete ordinates (delta-M)",
     "domain": "ground fixed at z_bounds[0]; atmosphere.elevation_km is not read",
     "horizontal_field": "not applied",
+    "refraction": "shadow threshold only; direct-beam optical depth is geometric",
 }
 
 __all__ = ["SOSResult", "solve", "multiple_scattering"]
@@ -182,7 +183,7 @@ def _sun_transmittance_boundaries(atmo, sun_zenith_deg: float) -> np.ndarray:
         crit = get_tables(atmo).shadow_zenith_true(z_b)
         lit = c > np.cos(np.radians(crit))
     else:
-        lit = is_sunlit(p, c)
+        lit = is_sunlit(p, c, r_earth=rb[0])
     return np.where(lit[:, None], np.exp(-tau), 0.0)
 
 

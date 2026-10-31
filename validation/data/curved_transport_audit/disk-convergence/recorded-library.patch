@@ -1,0 +1,30 @@
+diff --git a/skycolor/aerosol.py b/skycolor/aerosol.py
+index 978480b..446a0cc 100644
+--- a/skycolor/aerosol.py
++++ b/skycolor/aerosol.py
+@@ -165,7 +165,6 @@ class AngstromAerosol(Aerosol):
+     def relative_coefficients(self, wl_nm):
+         wl = np.atleast_1d(np.asarray(wl_nm, dtype=float))
+         ext = (wl / 550.0) ** (-self.alpha)
+-        ext = ext / np.interp(550.0, wl, ext) if wl.min() <= 550 <= wl.max() else ext
+         s = np.clip(self.ssa + self.ssa_slope * (wl - 550.0), 0.0, 1.0)
+         return ext, ext * s
+ 
+@@ -496,14 +495,9 @@ class MieAerosol(Aerosol):
+         cs = np.array([s.cs for s in states])
+         if ce.size == 0:
+             return ce, cs
+-        if wl.size == 1:
+-            scale = ce[0] if ce[0] > 0.0 else 1.0
+-        elif wl.min() <= 550.0 <= wl.max():
+-            order = np.argsort(wl)
+-            scale = float(np.interp(550.0, wl[order], ce[order]))
+-        else:
+-            # normalise at the wavelength closest to 550 nm
+-            scale = float(ce[np.argmin(np.abs(wl - 550.0))])
++        # AOD550 fixes the reference cross section of the material, including
++        # monochromatic MC queries and grids that do not contain 550 nm.
++        scale = self._state(550.0).ce
+         scale = scale if scale > 0.0 else 1.0
+         return ce / scale, cs / scale
+ 

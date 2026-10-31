@@ -1,0 +1,13 @@
+{
+  "baseline_library_commit": "2d0294cecf7a0ee7b9cb258bf74f40986a0d64da",
+  "library_changed": false,
+  "files": {
+    "tools/audit_solar_source.py": "904bf70633822b6d2a5f9b3cb80fc13b6a099f480b91e623b40c14ca135424c6",
+    "tools/audit_single_solar_source.py": "f43fbf98b2e8bc261d4f1018d5f4d7447c75c97e7ecc5e0870663c6f20fd0f18",
+    "tools/radial_solar_mapping.py": "39152251f47b1216860928ca601c7576ab10b958421030206f41a7a0ae4b3600",
+    "tools/probe_solar_refraction.py": "3cdd1a2b5176b3f2757adfe3c12343dff7176583e953f2139e69305b246a65ce",
+    "tools/summarize_solar_source.py": "0bbb4fc29f77ffe36c70adc6cd317bd47d3bc81b9db2fe83430618e811414678"
+  },
+  "note": "The commit and per-file hashes identify the final archived numerical tools and dependency graph; run-level tool_sha256 covers only its entry script. Production library is unchanged from the baseline.",
+  "experimental_tools_commit": "af235a7838c68af91797aa559aaedb5623c20432"
+}
