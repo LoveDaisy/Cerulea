@@ -111,7 +111,12 @@ class RadialSolarMapping:
             [h0, htop],
         ]))
         levels = levels[(levels >= h0) & (levels <= htop)]
-        self._edges = R_EARTH + levels * 1e3
+        # Curvature derivatives are piecewise polynomials. Integrating across
+        # spline knots can leave tiny angle errors which become large noise
+        # when differentiated for the beam Jacobian near a turning point.
+        knots = self.r[(self.r >= self.r_ground) &
+                       (self.r <= min(self.r_top, R_EARTH + 200e3))]
+        self._edges = np.unique(np.r_[R_EARTH + levels * 1e3, knots])
         self._gx, self._gw = np.polynomial.legendre.leggauss(self.n_quad)
 
     def refractive_index(self, height_km):
