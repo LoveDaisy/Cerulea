@@ -1,7 +1,9 @@
 # Architecture and interfaces
 
 This document is the contract between the modules.  If you change an interface,
-update this file in the same commit.
+update this file in the same commit.  It describes the architecture after the
+`task-architecture-refactor` split (frozen `Medium` / `Scene`, species column
+algebra in `optics`, `SkyResult`, `radiance_field` display seam).
 
 ## Conventions
 
@@ -12,24 +14,120 @@ update this file in the same commit.
 * Angles are degrees on the outside, radians on the inside.
 * Azimuths are measured clockwise from **north**; zenith angle 0 is up.
 
-## Data flow
+## Module boundaries
 
 ```
 spectra/*            solar irradiance, CMF, cross sections (tabulated)
     |
-atmosphere.Atmosphere   1-D spherical shells: T, p, n_air, n_O3, n_NO2, aerosol
-    |                   -> layer_properties(), phase_moments(), r_bounds
+medium.Medium        FROZEN physical medium: composition, profiles, z_bounds,
+    |                cross sections; layer_properties / phase_moments /
+    |                delta_m_* / restrict.  Pure function of its definitions.
+scene.Scene          FROZEN observing scenario: observer elevation, spectral
+    |                ground albedo, refraction flag.
     |
-rt.single.sky_radiance  exact first-order scattering in spherical geometry
+atmosphere.Atmosphere   facade = Medium + Scene; every public name of the
+    |                pre-split class still resolves (read-only properties for
+    |                medium state, setter-backed properties for the scenario).
     |
-rt.multiple.*           higher orders (diffuse field)
+optics.py            shared species listing + column algebra: the species
+    |                order (air, ozone, NO2, one entry per aerosol layer),
+    |                shell_species_weights / species_extinction_weights,
+    |                shell_species_columns / tau_from_columns.  All RT
+    |                backends consume this; none imports another's privates.
     |
-rt.solver.total_radiance    L_1 + L_ms
+rt.single            exact first-order scattering, spherical geometry
+rt.multiple          orders >= 2, plane-parallel discrete ordinates (SOS)
+rt.twilight + rt.mc  deep-twilight spherical engine (split estimator: exact
+    |                first order + Monte Carlo higher orders)
+rt.cloud             delta-Eddington cloud deck composed on the clear solver
     |
-color.render_rgb        XYZ -> adapted -> tone mapped sRGB
+rt.solver.solve      explicit backend dispatch -> SkyResult (method, options,
+    |                stderr, components, diagnostics); sky_radiance_total is
+    |                the legacy ndarray wrapper of the "clear" branch
     |
-render.py               cameras, panoramas, fisheye, PNG
+color / render       spectral field -> XYZ -> adapted -> tone-mapped sRGB;
+                     sky_dome/render_scene accept a ``radiance_field`` closure
+                     so ANY spectral field (cloudy, experimental) uses the
+                     same display path
 ```
+
+### What is shared vs deliberately independent
+
+Shared across backends (one authoritative implementation each):
+geometry helpers (`geometry.py`), the species listing and column algebra
+(`optics.py`), the medium definition (`medium.py`), refraction tables
+(`refraction.py`, cached per density-definition identity).
+
+Deliberately independent: the Monte Carlo's *transport, sampling and
+estimator* (`rt/mc.py`) are written from scratch on purpose so the
+MC-vs-deterministic cross-check stays meaningful.  **Known blind spot**: the
+shared parts (geometry, species definitions, column algebra) are common
+failure modes that the cross-check cannot cover — their independent evidence
+lives in `validation/` against external references, not in the comparison.
+The two Mie kernels (`mie.py` single-particle analytic moments vs
+`cloud.py` batched numerical moments) are separate regimes on purpose and
+anchor each other for small size parameters
+(`tests/test_extension_scenarios.py`).
+
+### Backing approximations (CAPABILITIES)
+
+Each backend declares its standing approximations as a module-level
+`CAPABILITIES` dict; `rt.solver.solve` warns on the one degenerate request
+combination (twilight + non-uniform `HorizontalField`, which reaches the
+first-order term only) and stays silent on the default paths.
+
+| Backend | Standing approximations |
+|---|---|
+| `rt.single` | single scattering, exact spherical quadrature; horizontal field applied per scattering point |
+| `rt.multiple` | plane-parallel diffuse field; ground fixed at `z_bounds[0]` (`elevation_km` not read); horizontal field not applied |
+| `rt.twilight` | MC assumes a horizontally uniform atmosphere; MC transport has no refraction; horizontal field in the first-order term only |
+| `rt.cloud` | homogeneous plane-parallel deck (delta-Eddington); inherits the clear solver's geometry |
+
+### delta-M quantities vs raw physics (E4)
+
+`phase_moments(n)` returns the *raw* Legendre moments of the layer-averaged
+phase function (`p(cos t) = Σ (2l+1) β_l P_l`, ∫p dΩ = 4π).  `delta_m_moments`
+returns the Wiscombe-scaled moments with the forward fraction
+`f = β_n` (`β*_l = (β_l − f)/(1 − f)`), and `delta_m_properties` additionally
+rescales `τ* = τ(1 − ωf)`, `ω* = ω(1 − f)/(1 − ωf)`.  The relation to raw
+physics: a truncated discrete-ordinates code that used the raw moments would
+silently drop the forward peak (~37 % of the scattered energy for dust and
+cloud droplets); the delta-M set is the representation the SOS solver
+consumes, and `delta_m_f` records exactly what was scaled away.
+
+## Scenario semantics
+
+`at_altitude(z0)` **truncates** the model at the site: `z_bounds` starts at
+z0, the ground (and every backend's bottom boundary) sits there, and nothing
+is renormalised — single scattering (integrating from the observer), SOS and
+MC agree on where the ground is.  `elevation_km=0` is a no-op.  The
+balloon scenario (observer raised, sea-level domain kept) is the plain
+constructor with `elevation_km=z0`; the two are distinct constructions
+(`tests/test_extension_scenarios.py`).  Under the consistent construction
+the twilight altitude response at −6° is 1.21× deterministic / 1.01× engine
+vs 0.80× in the data — wrong-signed, a known multiple-scattering gap.
+
+**Open item**: the refraction shadow-threshold table is built for rays
+grazing *sea level*; aligning it with a raised site matters for horizon /
+low-altitude viewing, not for zenith twilight, and is deliberately not mixed
+into the truncation change.
+
+## Caching and identity
+
+* `Medium` / `Scene` are frozen value objects; redefinition replaces them
+  wholesale (facade setters), never patches.  Two separately constructed
+  media never share caches.
+* Species-column caches per backend key on (wavelength, shell) values —
+  per-instance, value-semantics keys.
+* `MieAerosol` / `CloudLayer` are frozen; `shared()` returns read-only
+  *by structure* (assignment raises `FrozenInstanceError`); redefinition is
+  `replace()`, returning a fresh unshared object with rebuilt caches
+  (`CloudLayer.replace` explicitly drops the carried-over optics cache).
+* Refraction tables cache on the medium's `refraction_token`: inherited by
+  `restrict()` (a wavelength subset never changes densities), fresh per
+  construction ("per-construction, don't share" — one ~2.3 s table build per
+  genuinely distinct medium), stored in a `WeakKeyDictionary` so entries
+  die with their medium (batch runs do not accumulate tables).
 
 ## Key interfaces
 
@@ -37,62 +135,66 @@ render.py               cameras, panoramas, fisheye, PNG
 
 ```python
 Atmosphere(wl_nm, ozone_du=300, no2_column=0, aerosols=[...],
-           ground_albedo=0.1, elevation_km=0)
+           ground_albedo=0.1, surface_pressure=P0, z_bounds_km=None,
+           elevation_km=0, refraction=True,
+           ozone_profile=None, no2_profile=None, air_profile=None)
 ```
 
-Attributes: `wl`, `z_bounds` (km, n+1), `z_mid` (km, n), `r_bounds` (m, n+1),
-`aerosols` (list of `AerosolLayer`), `elevation_km`.
-
-Methods:
-* `n_air(z)`, `n_o3(z)`, `n_no2(z)` — vectorised, `z` in km.
-* `layer_properties()` → dict of arrays `(n_layer, n_wl)`:
-  `beta_ray`, `beta_as`, `beta_ae`, `beta_o3`, `beta_no2`, `beta_ext`, `beta_sca`.
-* `phase_moments(n)` → `(n_layer, n, n_wl)` Legendre coefficients of the
-  layer-averaged phase function, normalised as
-  `p(cos t) = Σ_l (2l+1) β_l P_l(cos t)`, `∫p dΩ = 4π`.
-* `_sigma_ray`, `_sigma_o3`, `_sigma_no2` — cached spectral cross sections.
-
-### `skycolor.rt.single.sky_radiance`
-
-```python
-sky_radiance(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
-             sun_azimuth_deg=0.0, n_gauss=3, chunk=512)
-    -> ndarray (n_view, n_wl)
-```
-
-Exact single scattering; handles sun zenith angles beyond 90° (twilight).
-
-### `skycolor.rt.multiple` (to be implemented)
-
-```python
-multiple_scattering(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
-                    sun_azimuth_deg=0.0, **options) -> ndarray (n_view, n_wl)
-```
-
-Returns the radiance from scattering orders ≥ 2.  It must:
-
-* be zero when the atmosphere is empty;
-* be smooth in the viewing direction (it is a diffuse field);
-* reproduce the known magnitude: for a clear mid-latitude atmosphere at
-  550 nm and the sun at 60° zenith, the multiple-scattering contribution to the
-  zenith radiance is of order 10–20 % of the single-scattering value, and it
-  grows towards the horizon and towards twilight.
+* `ozone_profile` / `no2_profile`: vertical *shape* callables, column-
+  normalised to `ozone_du` / `no2_column` exactly like the built-in tables
+  — the extension point for custom gas profiles.
+* `air_profile`: complete `n_air(z)` callable replacing the US76 pressure /
+  temperature construction.
+* Frozen medium state surfaces as read-only properties (`wl`, `z_bounds`,
+  `_sigma_*`, ...); the scenario (`elevation_km`, `ground_albedo`,
+  `refraction`) and `aerosols` are setter-backed.
+* `at_altitude(z0)`: truncation semantics above.
 
 ### `skycolor.rt.solver`
 
 ```python
-sky_radiance_total(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
-                   sun_azimuth_deg=0.0, multiple=True, **kw)
-    -> ndarray (n_view, n_wl)
+solve(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
+      sun_azimuth_deg=0.0, *, method="clear"|"twilight"|"cloud",
+      cloud_layer=None, single=True, multiple=True,
+      quality="medium", seed=0, grid=None) -> SkyResult
+
+sky_radiance_total(...)  # legacy ndarray entry, wraps the "clear" branch
 ```
 
-### `skycolor.color.render_rgb`
+`SkyResult` = `radiance (n_view, n_wl)`, `wl`, `method`, `options`,
+`stderr` (twilight MC 1σ only), `components` (cloud decomposition),
+`diagnostics` (SOS `orders`/`converged`, twilight `undetected_wl` + grid,
+...).  Statistical, convergence and physical-approximation information stay
+separate; there is no single "confidence" number.
+
+### `skycolor.render`
 
 ```python
-render_rgb(radiance, wl_nm, exposure=None, tonemap="aces",
-           adaptation="bradford", white_xy=(0.3127, 0.3290),
-           reference_percentile=99.0, preserve_chromaticity=True) -> (..., 3)
+sky_dome(atmo, sun_zenith_deg, ..., radiance_field=None)
+render_scene(..., radiance_field=None, ground_direct_transmittance=None)
+ground_radiance(..., direct_transmittance=None)
 ```
+
+`radiance_field(zen_flat, az_rel_flat) -> (n_view, n_wl)`: the display layer
+consumes any spectral field without knowing the medium; bind medium and
+solar geometry in the caller's closure.  With a field given, `atmo` is used
+only for `wl` metadata (and the ground).
+
+## Entry-point migration map
+
+| Old | Now |
+|---|---|
+| `rt.solver.sky_radiance_total` | kept (compat); structured access via `rt.solver.solve` |
+| `rt.twilight.twilight_radiance` (2-tuple) | kept; `return_info=True` adds the MC info dict |
+| `rt.cloud.sky_radiance_with_cloud` | kept; structured via `solve(method="cloud")` |
+| `experiments/profile_variants.py` subclasses | thin constructors over `ozone_profile=` / `air_profile=` |
+| `install_twilight_profile_support` | removed — `_restrict` is the engine's native path |
+| `cloud._Distribution` | `cloud.SizeDistribution` (alias kept) |
+| `refraction._Profile` / `_trace` in data pipeline | `refractive_profile` / `trace_ray(..., profile=...)` |
+| mutating a shared aerosol | `aerosol.replace(**kw)` (shared instances are frozen) |
+| `at_altitude` (double-scaled rescaling) | truncation at the site (Step 3c) |
+| `experiments/clouds.py` display helpers | `render.sky_dome` / `render_scene` with `radiance_field` |
+| CLI `--elevation` | unchanged semantics (site altitude); values follow the truncation fix |
 
 ## Validation targets
 
@@ -104,15 +206,3 @@ render_rgb(radiance, wl_nm, exposure=None, tonemap="aces",
 | Diffuse / global horizontal, clear sky | 0.10–0.20 | standard radiation data |
 | Zenith chromaticity, clear sky | x≈0.25–0.28, y≈0.28–0.32 | measured spectra |
 | Twilight (sun −6°) zenith luminance | ~1–10 cd m⁻² | measured |
-
-## Working agreement for parallel agents
-
-* Work **only** inside your own worktree; never edit the main checkout.
-* New code goes in **new files** wherever possible; touch shared files only if
-  the task explicitly requires it, and keep the diff minimal.
-* Every module gets a `tests/test_*.py` with at least one numerical check
-  against an independent reference.
-* Commit early and often with descriptive messages; do not merge or rebase.
-* Use `/Users/zhangjiajie/Codes/Sky Color Simulation/.venv/bin/python` and set
-  `PYTHONPATH` to your worktree (or just run from the worktree root, which
-  works because every script starts with `sys.path.insert(0, ".")`).

@@ -19,7 +19,22 @@ argument; this is the state.*
 | Colour | CIE 1931 → Bradford → ACES, tone-mapping options |
 | Cameras | panorama, fisheye, perspective; ground; sun disk |
 
-210 tests.  Environment pinned by `uv.lock` (Python 3.12, numpy 2.5, scipy 1.18).
+252 tests.  Environment pinned by `uv.lock` (Python 3.12, numpy 2.5, scipy 1.18).
+
+## Architecture (post-refactor)
+
+The physical medium is a frozen `Medium` (`skycolor/medium.py`), the observing
+scenario a frozen `Scene` (`skycolor/scene.py`); `Atmosphere` is the facade.
+Species listing and column algebra are single-sourced in `skycolor/optics.py`
+(no backend imports another's privates; the MC's transport/sampling/estimator
+stay deliberately independent).  Custom gas profiles are injected callables
+(`ozone_profile=` / `air_profile=`); `at_altitude` truncates the model at the
+site.  `rt.solver.solve` dispatches explicitly to clear / twilight / cloud and
+returns a traceable `SkyResult`; `render` consumes any spectral field through
+a `radiance_field` closure (one display path for clear and cloudy skies).
+`MieAerosol` / `CloudLayer` are frozen (shared instances read-only by
+structure); refraction tables cache on the medium's density-definition
+identity.  Contracts: `docs/ARCHITECTURE.md`.
 
 ## How well it is validated
 

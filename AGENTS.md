@@ -17,7 +17,7 @@ uv sync        # 从 uv.lock 重建 .venv；不要 pip install 进环境
 ### 测试
 
 ```bash
-uv run pytest -q                      # 全量 210 tests，约 3.5 min
+uv run pytest -q                      # 全量 252 tests，约 5 min
 uv run python -m validation.run_all   # 六项物理校验，10+ min
 ```
 
