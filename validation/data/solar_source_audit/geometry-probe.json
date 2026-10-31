@@ -1,0 +1,862 @@
+{
+  "head": "2d0294cecf7a0ee7b9cb258bf74f40986a0d64da",
+  "wavelength_nm": 550.0,
+  "ray_step_m": 2000.0,
+  "rows": [
+    {
+      "ground_km": 0.0,
+      "height_km": 20.0,
+      "true_zenith_deg": 96.0,
+      "packaged": {
+        "apparent_elevation_deg": -5.2030633,
+        "invariant_m": 6364793.371485602,
+        "lit": false,
+        "tau550": null,
+        "transmittance550": 0.0,
+        "rk_hit_ground": true,
+        "rk_true_zenith_deg": 95.43537189021798,
+        "direction_error_deg": null,
+        "rk_at_same_apparent": {
+          "blocked": true,
+          "perigee_km": -0.07888903995417058
+        }
+      },
+      "rk_root": null,
+      "edge_true_minus_target_deg": -0.5693088125610383
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 30.0,
+      "true_zenith_deg": 96.0,
+      "packaged": {
+        "apparent_elevation_deg": -5.28525507,
+        "invariant_m": 6373811.796130103,
+        "lit": true,
+        "tau550": 10.756925046902868,
+        "transmittance550": 2.129741089414155e-05,
+        "rk_hit_ground": false,
+        "rk_true_zenith_deg": 96.26598450430083,
+        "direction_error_deg": 0.26598450430083176,
+        "rk_at_same_apparent": {
+          "blocked": false,
+          "perigee_km": 1.2421097819861024,
+          "species_columns": [
+            1.4203885679361384e+31,
+            1.9354115432485853e+24,
+            0.0,
+            3.8731654516793466
+          ],
+          "tau550": 10.927147727800481,
+          "transmittance550": 1.7963875598622393e-05
+        }
+      },
+      "rk_root": {
+        "apparent_elevation_deg": -5.15365751252952,
+        "rk": {
+          "blocked": false,
+          "perigee_km": 2.8080300611127167,
+          "species_columns": [
+            1.1793883216810575e+31,
+            1.989762204548029e+24,
+            0.0,
+            1.3501416171184497
+          ],
+          "tau550": 7.3362422322596395,
+          "transmittance550": 0.00065149409036134
+        }
+      },
+      "edge_true_minus_target_deg": 0.4834059428110852
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 36.0,
+      "true_zenith_deg": 96.0,
+      "packaged": {
+        "apparent_elevation_deg": -5.3928091065234405,
+        "invariant_m": 6378651.3131335005,
+        "lit": true,
+        "tau550": 4.145871143355308,
+        "transmittance550": 0.015829640057340024,
+        "rk_hit_ground": false,
+        "rk_true_zenith_deg": 95.96591332980867,
+        "direction_error_deg": -0.034086670191328494,
+        "rk_at_same_apparent": {
+          "blocked": false,
+          "perigee_km": 6.776089935249649,
+          "species_columns": [
+            7.159766059171334e+30,
+            2.310797305844136e+24,
+            0.0,
+            0.09385470431256084
+          ],
+          "tau550": 4.099528847736892,
+          "transmittance550": 0.016580485495009626
+        }
+      },
+      "rk_root": {
+        "apparent_elevation_deg": -5.4129599027439355,
+        "rk": {
+          "blocked": false,
+          "perigee_km": 6.540397448007018,
+          "species_columns": [
+            7.386039937047011e+30,
+            2.2981601594235813e+24,
+            0.0,
+            0.1099474818907127
+          ],
+          "tau550": 4.213345456708014,
+          "transmittance550": 0.014796783443845562
+        }
+      },
+      "edge_true_minus_target_deg": 1.0253927151978306
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 38.0,
+      "true_zenith_deg": 96.0,
+      "packaged": {
+        "apparent_elevation_deg": -5.428660452031254,
+        "invariant_m": 6380261.640872499,
+        "lit": true,
+        "tau550": 3.377131415419753,
+        "transmittance550": 0.034145262956756454,
+        "rk_hit_ground": false,
+        "rk_true_zenith_deg": 95.90626520166398,
+        "direction_error_deg": -0.0937347983360155,
+        "rk_at_same_apparent": {
+          "blocked": false,
+          "perigee_km": 8.549082191768102,
+          "species_columns": [
+            5.630726716697136e+30,
+            2.446179115580432e+24,
+            0.0,
+            0.0285678961767865
+          ],
+          "tau550": 3.3907215084051847,
+          "transmittance550": 0.0336843645776887
+        }
+      },
+      "rk_root": {
+        "apparent_elevation_deg": -5.487342769121213,
+        "rk": {
+          "blocked": false,
+          "perigee_km": 7.864973340282217,
+          "species_columns": [
+            6.187650660500546e+30,
+            2.4019207693875413e+24,
+            0.0,
+            0.04520006727726325
+          ],
+          "tau550": 3.643446485407981,
+          "transmittance550": 0.026162021382423795
+        }
+      },
+      "edge_true_minus_target_deg": 1.1952027008856287
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 40.0,
+      "true_zenith_deg": 96.0,
+      "packaged": {
+        "apparent_elevation_deg": -5.492867598648997,
+        "invariant_m": 6381567.046704678,
+        "lit": true,
+        "tau550": 3.135359275075515,
+        "transmittance550": 0.043484128259067875,
+        "rk_hit_ground": false,
+        "rk_true_zenith_deg": 95.90642770906507,
+        "direction_error_deg": -0.09357229093492947,
+        "rk_at_same_apparent": {
+          "blocked": false,
+          "perigee_km": 9.966985585110262,
+          "species_columns": [
+            4.600931067006472e+30,
+            2.5771121610148793e+24,
+            0.0,
+            0.011046218541830714
+          ],
+          "tau550": 2.95319121270885,
+          "transmittance550": 0.05217294503991973
+        }
+      },
+      "rk_root": {
+        "apparent_elevation_deg": -5.55511684323352,
+        "rk": {
+          "blocked": false,
+          "perigee_km": 9.240701565593481,
+          "species_columns": [
+            5.109734112379036e+30,
+            2.516236111271335e+24,
+            0.0,
+            0.01796828085118517
+          ],
+          "tau550": 3.1689176317412073,
+          "transmittance550": 0.04204908587750012
+        }
+      },
+      "edge_true_minus_target_deg": 1.360327788912747
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 47.0,
+      "true_zenith_deg": 96.0,
+      "packaged": {
+        "apparent_elevation_deg": -5.717592611811097,
+        "invariant_m": 6386072.692311751,
+        "lit": true,
+        "tau550": 2.0322613802451994,
+        "transmittance550": 0.13103885715694424,
+        "rk_hit_ground": false,
+        "rk_true_zenith_deg": 95.9288580787883,
+        "direction_error_deg": -0.07114192121170504,
+        "rk_at_same_apparent": {
+          "blocked": false,
+          "perigee_km": 14.782269751920365,
+          "species_columns": [
+            2.1402351164816082e+30,
+            3.1516094499186687e+24,
+            0.0,
+            0.0004389344070674433
+          ],
+          "tau550": 2.027143921526958,
+          "transmittance550": 0.13171116187754345
+        }
+      },
+      "rk_root": {
+        "apparent_elevation_deg": -5.7677034867361385,
+        "rk": {
+          "blocked": false,
+          "perigee_km": 14.192270409204998,
+          "species_columns": [
+            2.3537985819670963e+30,
+            3.089588675663074e+24,
+            0.0,
+            0.0006518504031963581
+          ],
+          "tau550": 2.1027097521869536,
+          "transmittance550": 0.12212505085679749
+        }
+      },
+      "edge_true_minus_target_deg": 1.9061970060987354
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 50.0,
+      "true_zenith_deg": 96.0,
+      "packaged": {
+        "apparent_elevation_deg": -5.7858639159144785,
+        "invariant_m": 6388290.347210212,
+        "lit": true,
+        "tau550": 1.7399528098045085,
+        "transmittance550": 0.17552868365445226,
+        "rk_hit_ground": false,
+        "rk_true_zenith_deg": 95.93197494358141,
+        "direction_error_deg": -0.06802505641859113,
+        "rk_at_same_apparent": {
+          "blocked": false,
+          "perigee_km": 17.088377653301695,
+          "species_columns": [
+            1.4782001560404414e+30,
+            3.235941829926486e+24,
+            0.0,
+            9.371400840385655e-05
+          ],
+          "tau550": 1.7568368853171883,
+          "transmittance550": 0.17258992304587048
+        }
+      },
+      "rk_root": {
+        "apparent_elevation_deg": -5.838689353130988,
+        "rk": {
+          "blocked": false,
+          "perigee_km": 16.46810649388004,
+          "species_columns": [
+            1.6328106877102851e+30,
+            3.2354052528115866e+24,
+            0.0,
+            0.00014192477656742737
+          ],
+          "tau550": 1.8263878600494654,
+          "transmittance550": 0.1609940517955436
+        }
+      },
+      "edge_true_minus_target_deg": 2.1268922487556043
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 70.0,
+      "true_zenith_deg": 99.0,
+      "packaged": {
+        "apparent_elevation_deg": -8.40396933,
+        "invariant_m": 6371838.003686188,
+        "lit": false,
+        "tau550": null,
+        "transmittance550": 0.0,
+        "rk_hit_ground": true,
+        "rk_true_zenith_deg": 98.80177875225611,
+        "direction_error_deg": null,
+        "rk_at_same_apparent": {
+          "blocked": true,
+          "perigee_km": -0.029256473703309895
+        }
+      },
+      "rk_root": {
+        "apparent_elevation_deg": -8.180308191931118,
+        "rk": {
+          "blocked": false,
+          "perigee_km": 3.1722402115743606,
+          "species_columns": [
+            1.1309789127102886e+31,
+            2.2330989162436256e+24,
+            0.0,
+            1.0567971490692665
+          ],
+          "tau550": 6.906719076580053,
+          "transmittance550": 0.001001036739445272
+        }
+      },
+      "edge_true_minus_target_deg": 0.4468107541373558
+    },
+    {
+      "ground_km": 0.0,
+      "height_km": 90.0,
+      "true_zenith_deg": 99.0,
+      "packaged": {
+        "apparent_elevation_deg": -8.97074411,
+        "invariant_m": 6381969.627531175,
+        "lit": true,
+        "tau550": 2.829926190166254,
+        "transmittance550": 0.05901720955911784,
+        "rk_hit_ground": false,
+        "rk_true_zenith_deg": 99.36825280218252,
+        "direction_error_deg": 0.3682528021825249,
+        "rk_at_same_apparent": {
+          "blocked": false,
+          "perigee_km": 10.401137669252233,
+          "species_columns": [
+            4.320692402788863e+30,
+            2.66908423416017e+24,
+            0.0,
+            0.008261785744912173
+          ],
+          "tau550": 2.855096671881791,
+          "transmittance550": 0.05755025736028819
+        }
+      },
+      "rk_root": {
+        "apparent_elevation_deg": -8.767338596162503,
+        "rk": {
+          "blocked": false,
+          "perigee_km": 14.186970614626073,
+          "species_columns": [
+            2.3579418609650866e+30,
+            3.104982842051836e+24,
+            0.0,
+            0.0006541725280982085
+          ],
+          "tau550": 2.1097673009467166,
+          "transmittance550": 0.12126618167609553
+        }
+      },
+      "edge_true_minus_target_deg": 1.579247829338898
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 20.0,
+      "true_zenith_deg": 96.0,
+      "packaged": {
+        "apparent_elevation_deg": -5.2030633,
+        "invariant_m": 6364793.371485602,
+        "lit": false,
+        "tau550": null,
+        "transmittance550": 0.0,
+        "rk_hit_ground": true,
+        "rk_true_zenith_deg": 95.37066334752906,
+        "direction_error_deg": null,
+        "rk_at_same_apparent": {
+          "blocked": true,
+          "perigee_km": 2.3515254288213328
+        }
+      },
+      "rk_root": null,
+      "edge_true_minus_target_deg": -1.036114503264309
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 30.0,
+      "true_zenith_deg": 96.0,
+      "packaged": {
+        "apparent_elevation_deg": -5.28525507,
+        "invariant_m": 6373811.796130103,
+        "lit": false,
+        "tau550": null,
+        "transmittance550": 0.0,
+        "rk_hit_ground": true,
+        "rk_true_zenith_deg": 95.5982838851196,
+        "direction_error_deg": null,
+        "rk_at_same_apparent": {
+          "blocked": true,
+          "perigee_km": 2.3660434009935707
+        }
+      },
+      "rk_root": {
+        "apparent_elevation_deg": -5.153657512528383,
+        "rk": {
+          "blocked": false,
+          "perigee_km": 2.8080300611285494,
+          "species_columns": [
+            1.179388321678978e+31,
+            1.9897622045485084e+24,
+            0.0,
+            1.3501416171053788
+          ],
+          "tau550": 7.336242232237358,
+          "transmittance550": 0.0006514940903758565
+        }
+      },
+      "edge_true_minus_target_deg": 0.06721575744599435
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 36.0,
+      "true_zenith_deg": 96.0,
+      "packaged": {
+        "apparent_elevation_deg": -5.3928091065234405,
+        "invariant_m": 6378651.3131335005,
+        "lit": true,
+        "tau550": 4.145871143355308,
+        "transmittance550": 0.015829640057340024,
+        "rk_hit_ground": false,
+        "rk_true_zenith_deg": 95.96591332980867,
+        "direction_error_deg": -0.034086670191328494,
+        "rk_at_same_apparent": {
+          "blocked": false,
+          "perigee_km": 6.776089935249649,
+          "species_columns": [
+            7.159766059171334e+30,
+            2.310797305844136e+24,
+            0.0,
+            0.09385470431256084
+          ],
+          "tau550": 4.099528847736892,
+          "transmittance550": 0.016580485495009626
+        }
+      },
+      "rk_root": {
+        "apparent_elevation_deg": -5.41295990194665,
+        "rk": {
+          "blocked": false,
+          "perigee_km": 6.54039745737426,
+          "species_columns": [
+            7.386039927959082e+30,
+            2.2981601599199973e+24,
+            0.0,
+            0.10994748120051905
+          ],
+          "tau550": 4.213345452089146,
+          "transmittance550": 0.014796783512189951
+        }
+      },
+      "edge_true_minus_target_deg": 0.6279291037901028
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 38.0,
+      "true_zenith_deg": 96.0,
+      "packaged": {
+        "apparent_elevation_deg": -5.428660452031254,
+        "invariant_m": 6380261.640872499,
+        "lit": true,
+        "tau550": 3.377131415419753,
+        "transmittance550": 0.034145262956756454,
+        "rk_hit_ground": false,
+        "rk_true_zenith_deg": 95.90626520166398,
+        "direction_error_deg": -0.0937347983360155,
+        "rk_at_same_apparent": {
+          "blocked": false,
+          "perigee_km": 8.549082191768102,
+          "species_columns": [
+            5.630726716697136e+30,
+            2.446179115580432e+24,
+            0.0,
+            0.0285678961767865
+          ],
+          "tau550": 3.3907215084051847,
+          "transmittance550": 0.0336843645776887
+        }
+      },
+      "rk_root": {
+        "apparent_elevation_deg": -5.4873427693231775,
+        "rk": {
+          "blocked": false,
+          "perigee_km": 7.864973337900825,
+          "species_columns": [
+            6.187650662507785e+30,
+            2.4019207692398436e+24,
+            0.0,
+            0.045200067349385496
+          ],
+          "tau550": 3.643446486335,
+          "transmittance550": 0.026162021358171108
+        }
+      },
+      "edge_true_minus_target_deg": 0.8028923595625834
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 40.0,
+      "true_zenith_deg": 96.0,
+      "packaged": {
+        "apparent_elevation_deg": -5.492867598648997,
+        "invariant_m": 6381567.046704678,
+        "lit": true,
+        "tau550": 3.135359275075515,
+        "transmittance550": 0.043484128259067875,
+        "rk_hit_ground": false,
+        "rk_true_zenith_deg": 95.90642770906507,
+        "direction_error_deg": -0.09357229093492947,
+        "rk_at_same_apparent": {
+          "blocked": false,
+          "perigee_km": 9.966985585110262,
+          "species_columns": [
+            4.600931067006472e+30,
+            2.5771121610148793e+24,
+            0.0,
+            0.011046218541830714
+          ],
+          "tau550": 2.95319121270885,
+          "transmittance550": 0.05217294503991973
+        }
+      },
+      "rk_root": {
+        "apparent_elevation_deg": -5.555116843412961,
+        "rk": {
+          "blocked": false,
+          "perigee_km": 9.240701563473792,
+          "species_columns": [
+            5.109734113918588e+30,
+            2.516236111108831e+24,
+            0.0,
+            0.017968280876654658
+          ],
+          "tau550": 3.1689176324057953,
+          "transmittance550": 0.04204908584955481
+        }
+      },
+      "edge_true_minus_target_deg": 0.9727508777952427
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 47.0,
+      "true_zenith_deg": 96.0,
+      "packaged": {
+        "apparent_elevation_deg": -5.717592611811097,
+        "invariant_m": 6386072.692311751,
+        "lit": true,
+        "tau550": 2.0322613802451994,
+        "transmittance550": 0.13103885715694424,
+        "rk_hit_ground": false,
+        "rk_true_zenith_deg": 95.9288580787883,
+        "direction_error_deg": -0.07114192121170504,
+        "rk_at_same_apparent": {
+          "blocked": false,
+          "perigee_km": 14.782269751920365,
+          "species_columns": [
+            2.1402351164816082e+30,
+            3.1516094499186687e+24,
+            0.0,
+            0.0004389344070674433
+          ],
+          "tau550": 2.027143921526958,
+          "transmittance550": 0.13171116187754345
+        }
+      },
+      "rk_root": {
+        "apparent_elevation_deg": -5.767703486736465,
+        "rk": {
+          "blocked": false,
+          "perigee_km": 14.192270409203134,
+          "species_columns": [
+            2.3537985819682036e+30,
+            3.089588675662885e+24,
+            0.0,
+            0.0006518504031974777
+          ],
+          "tau550": 2.10270975218739,
+          "transmittance550": 0.12212505085674419
+        }
+      },
+      "edge_true_minus_target_deg": 1.5325803206105015
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 50.0,
+      "true_zenith_deg": 96.0,
+      "packaged": {
+        "apparent_elevation_deg": -5.7858639159144785,
+        "invariant_m": 6388290.347210212,
+        "lit": true,
+        "tau550": 1.7399528098045085,
+        "transmittance550": 0.17552868365445226,
+        "rk_hit_ground": false,
+        "rk_true_zenith_deg": 95.93197494358141,
+        "direction_error_deg": -0.06802505641859113,
+        "rk_at_same_apparent": {
+          "blocked": false,
+          "perigee_km": 17.088377653301695,
+          "species_columns": [
+            1.4782001560404414e+30,
+            3.235941829926486e+24,
+            0.0,
+            9.371400840385655e-05
+          ],
+          "tau550": 1.7568368853171883,
+          "transmittance550": 0.17258992304587048
+        }
+      },
+      "rk_root": {
+        "apparent_elevation_deg": -5.838689352915964,
+        "rk": {
+          "blocked": false,
+          "perigee_km": 16.468106496423484,
+          "species_columns": [
+            1.63281068704397e+30,
+            3.235405252864526e+24,
+            0.0,
+            0.00014192477632575352
+          ],
+          "tau550": 1.8263878597667533,
+          "transmittance550": 0.16099405184105856
+        }
+      },
+      "edge_true_minus_target_deg": 1.758286766632169
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 70.0,
+      "true_zenith_deg": 99.0,
+      "packaged": {
+        "apparent_elevation_deg": -8.40396933,
+        "invariant_m": 6371838.003686188,
+        "lit": false,
+        "tau550": null,
+        "transmittance550": 0.0,
+        "rk_hit_ground": true,
+        "rk_true_zenith_deg": 98.65755614953638,
+        "direction_error_deg": null,
+        "rk_at_same_apparent": {
+          "blocked": true,
+          "perigee_km": 2.377185330015607
+        }
+      },
+      "rk_root": {
+        "apparent_elevation_deg": -8.180308192864175,
+        "rk": {
+          "blocked": false,
+          "perigee_km": 3.1722401943523435,
+          "species_columns": [
+            1.1309789150735698e+31,
+            2.2330989155322575e+24,
+            0.0,
+            1.0567971613103881
+          ],
+          "tau550": 6.906719099232848,
+          "transmittance550": 0.001001036716768992
+        }
+      },
+      "edge_true_minus_target_deg": 0.10252726322364548
+    },
+    {
+      "ground_km": 2.4,
+      "height_km": 90.0,
+      "true_zenith_deg": 99.0,
+      "packaged": {
+        "apparent_elevation_deg": -8.97074411,
+        "invariant_m": 6381969.627531175,
+        "lit": true,
+        "tau550": 2.829926190166254,
+        "transmittance550": 0.05901720955911784,
+        "rk_hit_ground": false,
+        "rk_true_zenith_deg": 99.36825280218252,
+        "direction_error_deg": 0.3682528021825249,
+        "rk_at_same_apparent": {
+          "blocked": false,
+          "perigee_km": 10.401137669252233,
+          "species_columns": [
+            4.320692402788863e+30,
+            2.66908423416017e+24,
+            0.0,
+            0.008261785744912173
+          ],
+          "tau550": 2.855096671881791,
+          "transmittance550": 0.05755025736028819
+        }
+      },
+      "rk_root": {
+        "apparent_elevation_deg": -8.767338596203743,
+        "rk": {
+          "blocked": false,
+          "perigee_km": 14.186970613872633,
+          "species_columns": [
+            2.357941861251236e+30,
+            3.104982841964679e+24,
+            0.0,
+            0.000654172528428289
+          ],
+          "tau550": 2.1097673010466433,
+          "transmittance550": 0.1212661816639778
+        }
+      },
+      "edge_true_minus_target_deg": 1.250360544596401
+    }
+  ],
+  "original_nodes": [
+    {
+      "height_km": 30.0,
+      "apparent_elevation_deg": -4.0,
+      "raw_true_elevation_deg": -4.23259757,
+      "rk_true_elevation_deg": -4.232651629549068,
+      "delta_deg": -5.405954906745336e-05,
+      "builder_true_elevation_deg": -4.232597572317735,
+      "builder_delta_deg": -2.3177344488090057e-09
+    },
+    {
+      "height_km": 38.0,
+      "apparent_elevation_deg": -5.0,
+      "raw_true_elevation_deg": -5.26988715,
+      "rk_true_elevation_deg": -5.2699300685520285,
+      "delta_deg": -4.291855202875894e-05,
+      "builder_true_elevation_deg": -5.269894155079916,
+      "builder_delta_deg": -7.0050799161336386e-06
+    },
+    {
+      "height_km": 47.0,
+      "apparent_elevation_deg": -5.0,
+      "raw_true_elevation_deg": -5.06134837,
+      "rk_true_elevation_deg": -5.061397324314214,
+      "delta_deg": -4.89543142139226e-05,
+      "builder_true_elevation_deg": -5.061351792435246,
+      "builder_delta_deg": -3.4224352454259588e-06
+    },
+    {
+      "height_km": 47.0,
+      "apparent_elevation_deg": -6.0,
+      "raw_true_elevation_deg": -6.3694048,
+      "rk_true_elevation_deg": -6.369446266138652,
+      "delta_deg": -4.146613865252391e-05,
+      "builder_true_elevation_deg": -6.369403772904049,
+      "builder_delta_deg": 1.0270959505120913e-06
+    },
+    {
+      "height_km": 70.0,
+      "apparent_elevation_deg": -7.0,
+      "raw_true_elevation_deg": -7.06782748,
+      "rk_true_elevation_deg": -7.067920368950766,
+      "delta_deg": -9.288895076586812e-05,
+      "builder_true_elevation_deg": -7.067827484391755,
+      "builder_delta_deg": -4.3917545156091364e-09
+    }
+  ],
+  "angular_gain_probes": [
+    {
+      "height_km": 38.0,
+      "true_zenith_deg": 96.0,
+      "root_apparent_elevation_deg": -5.487342769121213,
+      "packaged_dapp_dtrue": 0.5871153370759608,
+      "rk_derivatives": [
+        {
+          "step_m": 2000.0,
+          "halfwidth_app_deg": 0.01,
+          "dapp_dtrue": 0.6161828355594057,
+          "point_beam_gain": 0.6167390889382861
+        },
+        {
+          "step_m": 2000.0,
+          "halfwidth_app_deg": 0.005,
+          "dapp_dtrue": 0.6161791408516971,
+          "point_beam_gain": 0.6167353908952142
+        },
+        {
+          "step_m": 1000.0,
+          "halfwidth_app_deg": 0.01,
+          "dapp_dtrue": 0.6161811598495192,
+          "point_beam_gain": 0.616737411715668
+        },
+        {
+          "step_m": 1000.0,
+          "halfwidth_app_deg": 0.005,
+          "dapp_dtrue": 0.6161848531472816,
+          "point_beam_gain": 0.6167411083475208
+        }
+      ],
+      "caveat": "Point angular Jacobian only; no finite disk or horizon truncation"
+    },
+    {
+      "height_km": 40.0,
+      "true_zenith_deg": 96.0,
+      "root_apparent_elevation_deg": -5.55511684323352,
+      "packaged_dapp_dtrue": 0.6265325981639869,
+      "rk_derivatives": [
+        {
+          "step_m": 2000.0,
+          "halfwidth_app_deg": 0.01,
+          "dapp_dtrue": 0.6508857110875943,
+          "point_beam_gain": 0.6513984114504376
+        },
+        {
+          "step_m": 2000.0,
+          "halfwidth_app_deg": 0.005,
+          "dapp_dtrue": 0.6508589080155992,
+          "point_beam_gain": 0.6513715872657578
+        },
+        {
+          "step_m": 1000.0,
+          "halfwidth_app_deg": 0.01,
+          "dapp_dtrue": 0.6508864437187972,
+          "point_beam_gain": 0.6513991446587315
+        },
+        {
+          "step_m": 1000.0,
+          "halfwidth_app_deg": 0.005,
+          "dapp_dtrue": 0.6508614371791251,
+          "point_beam_gain": 0.651374118421497
+        }
+      ],
+      "caveat": "Point angular Jacobian only; no finite disk or horizon truncation"
+    },
+    {
+      "height_km": 47.0,
+      "true_zenith_deg": 96.0,
+      "root_apparent_elevation_deg": -5.7677034867361385,
+      "packaged_dapp_dtrue": 0.7644930119719895,
+      "rk_derivatives": [
+        {
+          "step_m": 2000.0,
+          "halfwidth_app_deg": 0.01,
+          "dapp_dtrue": 0.6928078733950438,
+          "point_beam_gain": 0.693097852793178
+        },
+        {
+          "step_m": 2000.0,
+          "halfwidth_app_deg": 0.005,
+          "dapp_dtrue": 0.6928236954140014,
+          "point_beam_gain": 0.6931136814345481
+        },
+        {
+          "step_m": 1000.0,
+          "halfwidth_app_deg": 0.01,
+          "dapp_dtrue": 0.6928081264887521,
+          "point_beam_gain": 0.6930981059928204
+        },
+        {
+          "step_m": 1000.0,
+          "halfwidth_app_deg": 0.005,
+          "dapp_dtrue": 0.6928225664829559,
+          "point_beam_gain": 0.693112552030981
+        }
+      ],
+      "caveat": "Point angular Jacobian only; no finite disk or horizon truncation"
+    }
+  ],
+  "seconds": 27.234756249934435
+}

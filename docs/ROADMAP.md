@@ -256,6 +256,30 @@ controlled experiments and limits of the conclusion.
 
 ---
 
+### M14 — isolate solar-source approximations (2026-11-01)
+
+Paired, full-spectrum direct MC holds every diffuse path fixed while changing
+only solar attenuation/shadow to the current single-scattering prescription.
+Higher orders increase 29.0% at sea level and 25.5% at 2.4 km; the hybrid
+altitude ratio changes 0.9568±0.0071 → 0.9292±0.0072 (empirical standard errors).
+All 16 mode pairs have identical next-event position fingerprints, and their
+geometric baselines reproduce M13's spectra bit-for-bit.
+
+Independent RK shooting and a separate radial-curvature integral then show
+that this source prescription itself needs refinement: sparse inverse-table
+angles can miss by 0.1–0.3°, and the refracted solar disk's angular amplitude
+is not represented by transmittance alone.  At −6°, the controlled sea-level
+first order changes from 0.3684 to 0.3506 with refined angles, then 0.2719
+with a point-beam angular Jacobian; a vertical finite-disk approximation gives
+0.2772 cd m⁻².  These are source ablations, not a new all-order sky prediction.
+
+*Outcome:* validate one angular/energy-consistent solar source before
+calibrating absolute levels or investing in a new diffuse solver.  Production
+defaults and prior physical validation remain unchanged in this phase.
+Tools, raw data, assumptions and independent checks are in
+[SOLAR_SOURCE_AUDIT.md](SOLAR_SOURCE_AUDIT.md).
+*Experiment commit:* `af235a7`.
+
 ## Open questions that matter now
 
 These are not roadmap items, they are the things we do not currently

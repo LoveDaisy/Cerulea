@@ -83,6 +83,15 @@ first-order term only) and stays silent on the default paths.
 | `rt.twilight` | MC assumes a horizontally uniform atmosphere; MC transport has no refraction; horizontal field in the first-order term only |
 | `rt.cloud` | homogeneous plane-parallel deck (delta-Eddington); inherits the clear solver's geometry |
 
+### Solar-source approximations
+
+The solar-source audit additionally records two limitations of the current
+refraction prescription: the packaged inverse angle table is sparse, and the
+source amplitude does not include the refracted solar disk's angular
+Jacobian.  Independent reference tools quantify these without changing the
+library defaults; see [SOLAR_SOURCE_AUDIT.md](SOLAR_SOURCE_AUDIT.md).  Agreement
+between two backends using the same source prescription cannot validate it.
+
 ### delta-M quantities vs raw physics (E4)
 
 `phase_moments(n)` returns the *raw* Legendre moments of the layer-averaged

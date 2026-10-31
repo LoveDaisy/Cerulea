@@ -98,6 +98,14 @@ covering its density profile and opaque bottom radius.  Contracts:
 
 ## Where to look
 
+**Solar-source follow-up (M14):** controlled experiments find a 29% change
+in sea-level MC higher orders from solar attenuation/shadow alone.  Independent
+angle mapping and beam-angular-amplitude checks also change the first-order
+source substantially.  These experimental variants retain straight diffuse
+paths and do not replace production defaults; the absolute-level residual
+cannot yet be assigned to missing multiple scattering.  See
+[SOLAR_SOURCE_AUDIT.md](SOLAR_SOURCE_AUDIT.md).
+
 `README.md` — what it is and how to run it.
 `docs/REPORT.md` — the physics and the results, with the figures.
 `docs/ROADMAP.md` — completed milestones, open questions, future directions.

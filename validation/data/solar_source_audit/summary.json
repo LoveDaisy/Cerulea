@@ -1,0 +1,152 @@
+{
+  "standard_scene": "clear, -6 deg zenith, 380-780 nm / 5 nm, ground 0/2.4 km",
+  "uncertainty": "Across 8 independent seeds; statistical error only",
+  "heights": {
+    "0": {
+      "means": {
+        "geometric": {
+          "single": 0.22960075358906365,
+          "multiple": 0.1953175477135698,
+          "split_total": 0.5614330086570337,
+          "total": 0.4249183013026335
+        },
+        "attenuation": {
+          "single": 0.3716883738648181,
+          "multiple": 0.2519136564993671,
+          "split_total": 0.618029117442831,
+          "total": 0.6236020303641852
+        }
+      },
+      "standard_errors": {
+        "geometric": {
+          "single": 0.0020937614558806605,
+          "multiple": 0.003749265483630372,
+          "split_total": 0.0037492654836303757,
+          "total": 0.0037862697185065152
+        },
+        "attenuation": {
+          "single": 0.0021284031384890645,
+          "multiple": 0.004035596469154469,
+          "split_total": 0.004035596469154483,
+          "total": 0.004505069112873422
+        }
+      },
+      "multiple_ratio": {
+        "value": 1.2897645882222248,
+        "se": 0.004745026738011976
+      },
+      "multiple_paired_difference": 0.056596108785797274,
+      "multiple_difference_se": 0.0005016390553956092,
+      "all_paths_identical": true
+    },
+    "2.4": {
+      "means": {
+        "geometric": {
+          "single": 0.24559694828513043,
+          "multiple": 0.1453723374858899,
+          "split_total": 0.537202331736758,
+          "total": 0.3909692857710204
+        },
+        "attenuation": {
+          "single": 0.39646530550249337,
+          "multiple": 0.18246195585004776,
+          "split_total": 0.5742919501009158,
+          "total": 0.5789272613525411
+        }
+      },
+      "standard_errors": {
+        "geometric": {
+          "single": 0.0014837353549281612,
+          "multiple": 0.002881631919249581,
+          "split_total": 0.0028816319192495597,
+          "total": 0.0027082991420905836
+        },
+        "attenuation": {
+          "single": 0.00198448918140256,
+          "multiple": 0.0033784740142830095,
+          "split_total": 0.0033784740142830142,
+          "total": 0.0032754996806827227
+        }
+      },
+      "multiple_ratio": {
+        "value": 1.2551353235807867,
+        "se": 0.0028833217849847438
+      },
+      "multiple_paired_difference": 0.03708961836415786,
+      "multiple_difference_se": 0.0005844330094008795,
+      "all_paths_identical": true
+    }
+  },
+  "altitude_ratios": {
+    "geometric": {
+      "value": 0.9568413745778214,
+      "se": 0.0071346500877381685
+    },
+    "attenuation": {
+      "value": 0.9292312188738244,
+      "se": 0.007243375437740906
+    }
+  },
+  "altitude_ratio_change": {
+    "value": -0.02761015570399694,
+    "se": 0.0004852561043710195
+  },
+  "single_refined": [
+    {
+      "mode": "packaged",
+      "elevation": 0,
+      "photopic": 0.36840321496118766,
+      "n_gauss": 24,
+      "n_quad": 16
+    },
+    {
+      "mode": "radial_attenuation",
+      "elevation": 0,
+      "photopic": 0.3506291067442366,
+      "n_gauss": 24,
+      "n_quad": 16
+    },
+    {
+      "mode": "radial_beam",
+      "elevation": 0,
+      "photopic": 0.2719219849142473,
+      "n_gauss": 24,
+      "n_quad": 16
+    },
+    {
+      "mode": "vertical_disk_17",
+      "elevation": 0,
+      "photopic": 0.2772304392017276,
+      "n_gauss": 24,
+      "n_quad": 16
+    },
+    {
+      "mode": "packaged",
+      "elevation": 2.4,
+      "photopic": 0.3936221641850766,
+      "n_gauss": 24,
+      "n_quad": 16
+    },
+    {
+      "mode": "radial_attenuation",
+      "elevation": 2.4,
+      "photopic": 0.373825093499269,
+      "n_gauss": 24,
+      "n_quad": 16
+    },
+    {
+      "mode": "radial_beam",
+      "elevation": 2.4,
+      "photopic": 0.2903853254786378,
+      "n_gauss": 24,
+      "n_quad": 16
+    },
+    {
+      "mode": "vertical_disk_17",
+      "elevation": 2.4,
+      "photopic": 0.2960547730214293,
+      "n_gauss": 24,
+      "n_quad": 16
+    }
+  ]
+}

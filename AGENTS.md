@@ -121,6 +121,7 @@ uv run python experiments/01_day_cycle.py
 - `skycolor/rt/single.py`、`skycolor/rt/multiple.py`、`skycolor/rt/twilight.py`
 - `validation/check5_twilight.py`、`validation/check6_second_dataset.py`
 - `docs/TWILIGHT_ALTITUDE_AUDIT.md` — 高站太阳遮挡修复、海拔响应实验与参考条件
+- `docs/SOLAR_SOURCE_AUDIT.md` — 太阳衰减配对消融、逆表误差与光束角域定幅；实验结果尚未替换默认模型
 - `scratchpad/` — 本地实验/任务记录与临时 session 交接；旧交接已退休，长期成果维护在 tracked 文档
 
 ## 代码风格

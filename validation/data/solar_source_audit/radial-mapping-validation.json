@@ -1,0 +1,191 @@
+{
+  "constant_n": [
+    {
+      "n": 1.0,
+      "forward_max_error_deg": 0.0,
+      "gain": [
+        0.999999999999666,
+        0.999999999999666
+      ],
+      "blocked_is_nan": true
+    },
+    {
+      "n": 1.000278,
+      "forward_max_error_deg": 0.0,
+      "gain": [
+        0.999999999999666,
+        0.999999999999666
+      ],
+      "blocked_is_nan": true
+    }
+  ],
+  "quadrature": [
+    {
+      "n_quad": 4,
+      "height_km": 38.0,
+      "true_target": -6.0,
+      "root_app_deg": -5.487340667620441,
+      "slope": 1.6228826559205878,
+      "gain": 0.6167437557261409
+    },
+    {
+      "n_quad": 4,
+      "height_km": 40.0,
+      "true_target": -6.0,
+      "root_app_deg": -5.555113993354218,
+      "slope": 1.5364245478561855,
+      "gain": 0.651374454206799
+    },
+    {
+      "n_quad": 4,
+      "height_km": 47.0,
+      "true_target": -6.0,
+      "root_app_deg": -5.767703406845006,
+      "slope": 1.4433615960736113,
+      "gain": 0.6931170675404775
+    },
+    {
+      "n_quad": 8,
+      "height_km": 38.0,
+      "true_target": -6.0,
+      "root_app_deg": -5.487342147425756,
+      "slope": 1.6228887983795737,
+      "gain": 0.6167414198873526
+    },
+    {
+      "n_quad": 8,
+      "height_km": 40.0,
+      "true_target": -6.0,
+      "root_app_deg": -5.555116179502504,
+      "slope": 1.5364439084604165,
+      "gain": 0.6513662438732599
+    },
+    {
+      "n_quad": 8,
+      "height_km": 47.0,
+      "true_target": -6.0,
+      "root_app_deg": -5.76770346592297,
+      "slope": 1.4433615484454876,
+      "gain": 0.693117090339806
+    },
+    {
+      "n_quad": 16,
+      "height_km": 38.0,
+      "true_target": -6.0,
+      "root_app_deg": -5.487342763684029,
+      "slope": 1.6228899381336426,
+      "gain": 0.6167409861131867
+    },
+    {
+      "n_quad": 16,
+      "height_km": 40.0,
+      "true_target": -6.0,
+      "root_app_deg": -5.555116810943933,
+      "slope": 1.536443322444292,
+      "gain": 0.6513664916132234
+    },
+    {
+      "n_quad": 16,
+      "height_km": 47.0,
+      "true_target": -6.0,
+      "root_app_deg": -5.7677034818516,
+      "slope": 1.4433615180546866,
+      "gain": 0.6931171049143168
+    },
+    {
+      "n_quad": 32,
+      "height_km": 38.0,
+      "true_target": -6.0,
+      "root_app_deg": -5.487342733815773,
+      "slope": 1.622890162167323,
+      "gain": 0.6167409010053703
+    },
+    {
+      "n_quad": 32,
+      "height_km": 40.0,
+      "true_target": -6.0,
+      "root_app_deg": -5.555116820280827,
+      "slope": 1.5364440936989077,
+      "gain": 0.651366164634015
+    },
+    {
+      "n_quad": 32,
+      "height_km": 47.0,
+      "true_target": -6.0,
+      "root_app_deg": -5.7677034815741175,
+      "slope": 1.443361510186758,
+      "gain": 0.6931171086929173
+    }
+  ],
+  "benchmarks": [
+    {
+      "n_quad": 4,
+      "n_rays": 1000,
+      "seconds": 0.09927858307491988,
+      "n_valid": 1000
+    },
+    {
+      "n_quad": 8,
+      "n_rays": 1000,
+      "seconds": 0.16918862506281585,
+      "n_valid": 1000
+    },
+    {
+      "n_quad": 16,
+      "n_rays": 1000,
+      "seconds": 0.2994874579599127,
+      "n_valid": 1000
+    },
+    {
+      "n_quad": 32,
+      "n_rays": 1000,
+      "seconds": 0.5070772499311715,
+      "n_valid": 1000
+    }
+  ],
+  "independent_rk_comparison": [
+    {
+      "height_km": 38.0,
+      "apparent_deg": -5.487342769121213,
+      "radial_true": -6.000000008826444,
+      "true_minus_target_deg": -8.826443576026577e-09,
+      "radial_gain": 0.6167409809128126,
+      "rk_gain_mean": 0.6167382499741723,
+      "rk_gain_range": [
+        0.6167353908952142,
+        0.6167411083475208
+      ],
+      "gain_minus_rk_mean": 2.730938640338465e-06
+    },
+    {
+      "height_km": 40.0,
+      "apparent_deg": -5.55511684323352,
+      "radial_true": -6.000000049616871,
+      "true_minus_target_deg": -4.961687061211251e-08,
+      "radial_gain": 0.6513664856443934,
+      "rk_gain_mean": 0.651385815449106,
+      "rk_gain_range": [
+        0.6513715872657578,
+        0.6513991446587315
+      ],
+      "gain_minus_rk_mean": -1.932980471264223e-05
+    },
+    {
+      "height_km": 47.0,
+      "apparent_deg": -5.7677034867361385,
+      "radial_true": -6.000000007057148,
+      "true_minus_target_deg": -7.0571477550629425e-09,
+      "radial_gain": 0.6931171012567792,
+      "rk_gain_mean": 0.6931055480628819,
+      "rk_gain_range": [
+        0.693097852793178,
+        0.6931136814345481
+      ],
+      "gain_minus_rk_mean": 1.1553193897229086e-05
+    }
+  ],
+  "ground_edges_checked_km": [
+    0.0,
+    2.4
+  ]
+}
