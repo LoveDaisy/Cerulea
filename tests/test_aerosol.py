@@ -476,3 +476,19 @@ def test_mie_aerosol_is_frozen():
     assert b is not a
     with pytest.raises(TypeError):
         a.replace(nope=1)
+
+
+def test_replace_is_field_level_preset_knobs_need_construction():
+    """``replace`` maps dataclass fields only; the hygroscopic preset knobs
+    (``rh``) are constructor keywords, not fields -- varying them means
+    constructing a new (shared) instance.  This pins the real contract the
+    replace docstring describes."""
+    from skycolor.aerosol import RuralAerosol, shared
+
+    rural = shared(RuralAerosol, rh=0.6)
+    with pytest.raises(TypeError, match="unknown field"):
+        rural.replace(rh=0.9)
+    # field-level replace works and leaves the shared instance untouched
+    variant = rural.replace(n_radii=48)
+    assert variant.n_radii == 48
+    assert shared(RuralAerosol, rh=0.6).n_radii == rural.n_radii

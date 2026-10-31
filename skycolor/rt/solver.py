@@ -65,12 +65,24 @@ def solve(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
         Include the first-order / higher-order terms.
     quality, seed, grid : twilight options (ignored by other methods).
 
+    Raises
+    ------
+    ValueError
+        Unknown method; ``method="cloud"`` without ``cloud_layer``; both
+        ``single`` and ``multiple`` false (nothing would be computed).  For
+        ``method="cloud"`` ``single`` is not supported (the deck composition
+        always includes the clear single scattering) and is not recorded in
+        ``options``.
+
     Returns
     -------
     SkyResult
         ``radiance`` is bit-identical to the corresponding legacy entry
         point called with the same arguments.
     """
+    if not single and not multiple:
+        raise ValueError("solve() with single=False and multiple=False "
+                         "computes nothing; enable at least one term")
     options: dict = dict(sun_zenith_deg=float(sun_zenith_deg),
                          sun_azimuth_deg=float(sun_azimuth_deg),
                          single=bool(single), multiple=bool(multiple))
@@ -110,6 +122,7 @@ def solve(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
     elif method == "cloud":
         if cloud_layer is None:
             raise ValueError("method='cloud' requires cloud_layer")
+        options.pop("single")   # the deck composition always includes it
         options.update(n_gauss=int(n_gauss), chunk=int(chunk),
                        cloud=cloud_layer.describe())
         total, components = _sky_radiance_with_cloud(

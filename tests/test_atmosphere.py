@@ -58,8 +58,12 @@ def test_phase_moments_normalised():
 # ---------------------------------------------------------------------------
 #: every name the pre-Medium ``Atmosphere`` exposed, captured at the
 #: pre-refactor baseline so the facade cannot silently drop one
+#: ``_prepare_ozone``/``_prepare_no2``/``_o3_scale``/``_no2_scale`` were
+#: captured in the pre-refactor surface and removed with the transitional
+#: subclass protocol (review round 1, Major 1): their only consumers were
+#: the retired Atmosphere subclasses.
 FACADE_METHODS = frozenset({
-    "_prepare_no2", "_prepare_ozone", "_restrict", "aerosol_coefficients",
+    "_restrict", "aerosol_coefficients",
     "at_altitude", "delta_m_moments", "delta_m_properties", "layer_properties",
     "n_air", "n_no2", "n_o3", "no2_coefficient", "ozone_coefficient",
     "phase_moments", "pressure", "r_bounds", "rayleigh_coefficient",
@@ -69,7 +73,6 @@ FACADE_ATTRIBUTES = frozenset({
     "wl", "ozone_du", "no2_column", "aerosols", "surface_pressure",
     "elevation_km", "refraction", "z_bounds", "z_mid", "ground_albedo",
     "_sigma_ray", "_sigma_o3", "_sigma_no2", "_ray_phase",
-    "_o3_scale", "_no2_scale",
 })
 
 
@@ -90,9 +93,12 @@ def test_medium_arrays_are_read_only():
         at._sigma_ray = at._sigma_ray
     with pytest.raises(AttributeError):
         at.wl = at.wl
-    # the aerosols setter remains the sanctioned redefinition path
+    # the aerosols setter remains the sanctioned redefinition path; the
+    # getter returns an immutable tuple (appending raises loudly)
     at.aerosols = []
-    assert at.aerosols == []
+    assert at.aerosols == ()
+    with pytest.raises(AttributeError):
+        at.aerosols.append(1)
 
 
 # ---------------------------------------------------------------------------
@@ -141,3 +147,22 @@ def test_elevation_truncates_aerosol_column():
     # the layer-midpoint quadrature on the 1 km first layer is ~1.7 % coarse
     # for this profile; the point is "no second rescale", not exactness
     assert tau == pytest.approx(aod * remaining, rel=3e-2)
+
+
+def test_at_altitude_rejects_out_of_domain_sites():
+    """z0 at/above the model top (or below 0) would produce an empty layer
+    stack; fail at the construction, not in a distant solver."""
+    a = Atmosphere.standard(WL_COARSE)
+    for bad in (200.0, 500.0, -1.0):
+        with pytest.raises(ValueError, match="outside the model domain"):
+            a.at_altitude(bad)
+
+
+def test_at_altitude_layers_are_fresh_copies():
+    """The derived atmosphere owns fresh AerosolLayer copies: mutating a
+    derived layer must not leak into the source scene (issue F6)."""
+    a = Atmosphere.standard(WL_COARSE)
+    b = a.at_altitude(2.4)
+    b.aerosols[0].aod550 = 0.99          # AerosolLayer stays a mutable record
+    assert a.aerosols[0].aod550 == pytest.approx(0.05)   # source unaffected
+    assert b.aerosols[0].aod550 == pytest.approx(0.99)

@@ -229,14 +229,6 @@ class Atmosphere:
         self._scene = Scene(observer_elevation_km=float(elevation_km),
                             ground_albedo=albedo, refraction=bool(refraction))
 
-        # Transitional subclass protocol (removed in Step 3b): subclasses may
-        # override these to install custom profile scales.  The base density
-        # queries read the Medium, so an override of _prepare_* must come with
-        # an override of the corresponding n_* method (as OzoneShapeAtmosphere
-        # in experiments/profile_variants.py does).
-        self._prepare_ozone()
-        self._prepare_no2()
-
     # -- construction helpers ------------------------------------------------
     @classmethod
     def standard(cls, wl_nm, **kw) -> "Atmosphere":
@@ -276,15 +268,24 @@ class Atmosphere:
         zenith twilight.
 
         ``elevation_km=0`` returns an equivalent atmosphere (a fresh copy,
-        as the method always has).
+        as the method always has).  The derived atmosphere owns fresh
+        ``AerosolLayer`` copies, so mutating one scene's layer never leaks
+        into the source scene.
         """
         z0 = float(elevation_km)
+        if not 0.0 <= z0 < float(self.z_bounds[-1]):
+            raise ValueError(
+                f"elevation_km={z0} outside the model domain "
+                f"[0, {float(self.z_bounds[-1])} km)")
         zb = (np.concatenate(([z0], self.z_bounds[self.z_bounds > z0]))
               if z0 > 0 else self.z_bounds)
         medium = self._medium
+        layers = [AerosolLayer(lay.aerosol, aod550=lay.aod550,
+                               profile=lay.profile, horizontal=lay.horizontal)
+                  for lay in self.aerosols]
         return Atmosphere(
             self.wl, ozone_du=self.ozone_du, no2_column=self.no2_column,
-            aerosols=list(self.aerosols), ground_albedo=self.ground_albedo,
+            aerosols=layers, ground_albedo=self.ground_albedo,
             surface_pressure=self.surface_pressure, z_bounds_km=zb,
             elevation_km=z0, refraction=self.refraction,
             ozone_profile=medium.ozone_profile,
@@ -335,8 +336,16 @@ class Atmosphere:
         return self._medium.surface_pressure
 
     @property
-    def aerosols(self) -> list:
-        return list(self._medium.aerosols)
+    def aerosols(self) -> tuple:
+        """The aerosol layers of the medium, as a read-only tuple.
+
+        Element mutation would pierce into the frozen medium
+        (``atmo.aerosols[0].aod550 = ...``), so the collection itself is
+        returned immutable: appending raises ``AttributeError`` loudly
+        instead of silently writing into a discarded copy.  Redefine the
+        layer list through the setter (wholesale replacement).
+        """
+        return self._medium.aerosols
 
     @aerosols.setter
     def aerosols(self, layers) -> None:
@@ -396,14 +405,8 @@ class Atmosphere:
         return self._medium.temperature(z_km)
 
     def n_air(self, z_km):
-        """Dry-air number density [m^-3], with a thermospheric tail.
-
-        Dispatches through ``self.pressure``/``self.temperature`` so a
-        subclass override of either reaches the density (transitional
-        protocol; Step 3b replaces it with injected profile callables).
-        """
-        return self._medium.n_air(z_km, pressure=self.pressure,
-                                  temperature=self.temperature)
+        """Dry-air number density [m^-3], with a thermospheric tail."""
+        return self._medium.n_air(z_km)
 
     def n_o3(self, z_km):
         return self._medium.n_o3(z_km)
@@ -414,13 +417,13 @@ class Atmosphere:
     # -- optical properties --------------------------------------------------
     def rayleigh_coefficient(self, z_km, wl_nm=None) -> np.ndarray:
         """Rayleigh scattering coefficient [m^-1]."""
-        return self._medium.rayleigh_coefficient(z_km, wl_nm, n_air=self.n_air)
+        return self._medium.rayleigh_coefficient(z_km, wl_nm)
 
     def ozone_coefficient(self, z_km, wl_nm=None) -> np.ndarray:
-        return self._medium.ozone_coefficient(z_km, wl_nm, n_o3=self.n_o3)
+        return self._medium.ozone_coefficient(z_km, wl_nm)
 
     def no2_coefficient(self, z_km, wl_nm=None) -> np.ndarray:
-        return self._medium.no2_coefficient(z_km, wl_nm, n_no2=self.n_no2)
+        return self._medium.no2_coefficient(z_km, wl_nm)
 
     def aerosol_coefficients(self, z_km) -> tuple[np.ndarray, np.ndarray]:
         """Aerosol extinction and scattering coefficients [m^-1].
@@ -436,8 +439,7 @@ class Atmosphere:
         ``beta_as`` (aerosol scattering), ``beta_o3``, ``beta_no2``,
         ``beta_ext`` (total), ``beta_sca`` (total), all shape ``(n_layer, n_wl)``.
         """
-        return self._medium.layer_properties(z_low, z_high, n_air=self.n_air,
-                                             n_o3=self.n_o3, n_no2=self.n_no2)
+        return self._medium.layer_properties(z_low, z_high)
 
     def phase_moments(self, n_moments: int = 32) -> np.ndarray:
         """Legendre moments of the layer-averaged phase function.
@@ -449,8 +451,7 @@ class Atmosphere:
         forward peak that lives beyond the truncation is silently discarded --
         which for dust and cloud droplets is 37 % of the scattered energy.
         """
-        return self._medium.phase_moments(n_moments, n_air=self.n_air,
-                                          n_o3=self.n_o3, n_no2=self.n_no2)
+        return self._medium.phase_moments(n_moments)
 
     def delta_m_moments(self, n_moments: int = 32):
         """delta-M-scaled moments and the forward fraction.
@@ -469,13 +470,11 @@ class Atmosphere:
         Use :meth:`delta_m_properties` to get the rescaled optical properties
         consistently with these moments.
         """
-        return self._medium.delta_m_moments(n_moments, n_air=self.n_air,
-                                            n_o3=self.n_o3, n_no2=self.n_no2)
+        return self._medium.delta_m_moments(n_moments)
 
     def delta_m_properties(self, n_moments: int = 32) -> dict:
         """Layer optical properties rescaled by delta-M, plus the moments."""
-        return self._medium.delta_m_properties(n_moments, n_air=self.n_air,
-                                               n_o3=self.n_o3, n_no2=self.n_no2)
+        return self._medium.delta_m_properties(n_moments)
 
     def _restrict(self, index):
         """A copy of this atmosphere restricted to the wavelengths ``index``.

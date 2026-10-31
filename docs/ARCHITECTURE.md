@@ -116,7 +116,11 @@ into the truncation change.
 
 * `Medium` / `Scene` are frozen value objects; redefinition replaces them
   wholesale (facade setters), never patches.  Two separately constructed
-  media never share caches.
+  media never share caches.  "Frozen" guarantees the *binding*, not the
+  content: the numpy arrays and nested objects held by a frozen object are
+  still technically mutable in place — treat everything reachable from a
+  frozen object as read-only (a51: the mutation surface is not fenced; the
+  contract is documented here rather than enforced).
 * Species-column caches per backend key on (wavelength, shell) values —
   per-instance, value-semantics keys.
 * `MieAerosol` / `CloudLayer` are frozen; `shared()` returns read-only
@@ -147,7 +151,8 @@ Atmosphere(wl_nm, ozone_du=300, no2_column=0, aerosols=[...],
   temperature construction.
 * Frozen medium state surfaces as read-only properties (`wl`, `z_bounds`,
   `_sigma_*`, ...); the scenario (`elevation_km`, `ground_albedo`,
-  `refraction`) and `aerosols` are setter-backed.
+  `refraction`) is setter-backed, and `aerosols` returns an immutable
+  tuple (redefine through the setter).
 * `at_altitude(z0)`: truncation semantics above.
 
 ### `skycolor.rt.solver`

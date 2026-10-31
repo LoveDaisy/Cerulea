@@ -90,10 +90,8 @@ N_MOMENTS = 64
 
 
 class SizeDistribution:
-    """Log-normal droplet size distribution (public name; ``_Distribution``
-    is kept as a compatibility alias)."""
-
-    """Log-normal droplet size distribution on a Gauss-Legendre grid in ln r."""
+    """Log-normal droplet size distribution on a Gauss-Legendre grid in ln r
+    (public name; ``_Distribution`` is kept as a compatibility alias)."""
 
     def __init__(self, r_eff_um: float, sigma_g: float, n_radii: int):
         if r_eff_um <= 0:

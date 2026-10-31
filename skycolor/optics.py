@@ -16,9 +16,9 @@ stay bit-exact (equivalence criterion A of the task plan).
 
 The ``atmo`` argument is duck-typed: anything exposing ``n_air``/``n_o3``/
 ``n_no2``, ``aerosols`` (with ``aod550``/``profile``/``aerosol``) and the
-``_sigma_*`` cross-section arrays works.  The species protocol that will
-replace the ``_sigma_*`` reads is Step 3a's ``Medium``; until then this
-module is the one place that reads those attributes.
+``_sigma_*`` cross-section arrays works -- the frozen ``Medium`` is the
+canonical such object, and this module is the one place that reads those
+attributes.
 """
 from __future__ import annotations
 

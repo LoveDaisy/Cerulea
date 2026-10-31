@@ -30,12 +30,9 @@ def sky_dome(atmo, sun_zenith_deg: float, n_zenith: int = 46, n_azimuth: int = 9
     zen = np.linspace(min_zenith_deg, 90.0, n_zenith)
     az = np.linspace(0.0, 180.0, n_azimuth)
     Z, A = np.meshgrid(zen, az, indexing="ij")
-    if radiance_field is not None:
-        rad = np.asarray(radiance_field(Z.ravel(), A.ravel()), dtype=float)
-        rad = rad.reshape(Z.shape + (rad.shape[-1],))
-    else:
-        rad = sky_radiance_grid(atmo, sun_zenith_deg, Z, A, n_gauss=n_gauss,
-                                chunk=chunk, multiple=multiple)
+    rad = sky_radiance_grid(atmo, sun_zenith_deg, Z, A, n_gauss=n_gauss,
+                            chunk=chunk, multiple=multiple,
+                            radiance_field=radiance_field)
     return dict(zenith=zen, azimuth_rel=az, radiance=rad, wl=atmo.wl,
                 sun_zenith_deg=sun_zenith_deg)
 

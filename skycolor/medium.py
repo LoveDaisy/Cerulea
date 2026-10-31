@@ -10,23 +10,17 @@ mutable state, which is what makes frozen media safe to share and to cache
 against (the aliasing hazards the task plan's F6 describes cannot arise).
 
 What is deliberately *not* here: the observing scenario (observer height,
-ground albedo, refraction) -- those stay on the
-:class:`skycolor.atmosphere.Atmosphere` facade until the plan's Step 3b
-moves them into ``Scene``.
-
-The processing methods accept optional density-callable overrides
-(``n_air=`` / ``n_o3=`` / ``n_no2=``).  They exist so the transitional
-subclass protocol (custom profiles via inheritance, scheduled for removal
-in Step 3b) keeps working through the facade: the facade passes its own
-dispatching methods in, so an overridden ``pressure``/``n_o3`` still
-reaches the layer processing.  Direct Medium consumers get the medium's
-own profiles.
+ground albedo, refraction) -- that lives in :class:`skycolor.scene.Scene`,
+and :class:`skycolor.atmosphere.Atmosphere` is the facade pairing the two.
+Custom profiles enter as data at construction (``ozone_profile`` /
+``no2_profile`` / ``air_profile`` callables); every processing method reads
+the medium's own profiles.
 """
 from __future__ import annotations
 
 import copy
 from dataclasses import dataclass
-from typing import Callable, Sequence
+from typing import Sequence
 
 import numpy as np
 
@@ -167,10 +161,6 @@ def _column_of_shape(shape: Callable[[np.ndarray], np.ndarray]) -> float:
                               _PROFILE_COLUMN_GRID * 1e3))
 
 
-#: density-callable injection type of the transitional subclass protocol
-DensityFn = Callable[[np.ndarray], np.ndarray]
-
-
 # ---------------------------------------------------------------------------
 # The medium
 # ---------------------------------------------------------------------------
@@ -266,19 +256,13 @@ class Medium:
     def temperature(self, z_km):
         return us76_temperature(np.asarray(z_km, dtype=float))
 
-    def n_air(self, z_km, *, pressure: DensityFn | None = None,
-              temperature: DensityFn | None = None) -> np.ndarray:
-        """Dry-air number density [m^-3], with a thermospheric tail.
-
-        ``pressure``/``temperature`` inject alternative profiles; they exist
-        only so the facade can forward subclass overrides (transitional
-        protocol, removed in Step 3b).
-        """
+    def n_air(self, z_km) -> np.ndarray:
+        """Dry-air number density [m^-3], with a thermospheric tail."""
         if self.air_profile is not None:
             return np.asarray(self.air_profile(np.asarray(z_km, dtype=float)),
                               dtype=float)
-        pressure = self.pressure if pressure is None else pressure
-        temperature = self.temperature if temperature is None else temperature
+        pressure = self.pressure
+        temperature = self.temperature
         z = np.asarray(z_km, dtype=float)
         n = pressure(z) / (1.380649e-23 * temperature(z))
         n0 = pressure(np.array(THERMOSPHERE_START_KM)) / (
@@ -299,22 +283,19 @@ class Medium:
         return _log_interp(_NO2_PROFILE, z_km) * 1e6 * self._no2_scale
 
     # -- optical properties ---------------------------------------------------
-    def rayleigh_coefficient(self, z_km, wl_nm=None, *,
-                             n_air: DensityFn | None = None) -> np.ndarray:
+    def rayleigh_coefficient(self, z_km, wl_nm=None) -> np.ndarray:
         """Rayleigh scattering coefficient [m^-1]."""
-        n = (self.n_air if n_air is None else n_air)(z_km)
+        n = self.n_air(z_km)
         s = self._sigma_ray if wl_nm is None else spectra.rayleigh_cross_section(np.asarray(wl_nm))
         return np.multiply.outer(np.atleast_1d(n), s)
 
-    def ozone_coefficient(self, z_km, wl_nm=None, *,
-                          n_o3: DensityFn | None = None) -> np.ndarray:
-        n = (self.n_o3 if n_o3 is None else n_o3)(z_km)
+    def ozone_coefficient(self, z_km, wl_nm=None) -> np.ndarray:
+        n = self.n_o3(z_km)
         s = self._sigma_o3 if wl_nm is None else spectra.ozone_cross_section(np.asarray(wl_nm))
         return np.multiply.outer(np.atleast_1d(n), s)
 
-    def no2_coefficient(self, z_km, wl_nm=None, *,
-                        n_no2: DensityFn | None = None) -> np.ndarray:
-        n = (self.n_no2 if n_no2 is None else n_no2)(z_km)
+    def no2_coefficient(self, z_km, wl_nm=None) -> np.ndarray:
+        n = self.n_no2(z_km)
         s = self._sigma_no2 if wl_nm is None else spectra.no2_cross_section(np.asarray(wl_nm))
         return np.multiply.outer(np.atleast_1d(n), s)
 
@@ -334,10 +315,7 @@ class Medium:
         return ext, sca
 
     # -- layer processing -----------------------------------------------------
-    def layer_properties(self, z_low=None, z_high=None, *,
-                         n_air: DensityFn | None = None,
-                         n_o3: DensityFn | None = None,
-                         n_no2: DensityFn | None = None) -> dict:
+    def layer_properties(self, z_low=None, z_high=None) -> dict:
         """Optical properties evaluated at the layer mid-points.
 
         Returns a dict with ``beta_ray``, ``beta_ae`` (aerosol extinction),
@@ -345,9 +323,9 @@ class Medium:
         ``beta_ext`` (total), ``beta_sca`` (total), all shape ``(n_layer, n_wl)``.
         """
         z = self.z_mid if z_low is None else 0.5 * (z_low + z_high)
-        beta_ray = self.rayleigh_coefficient(z, n_air=n_air)
-        beta_o3 = self.ozone_coefficient(z, n_o3=n_o3)
-        beta_no2 = self.no2_coefficient(z, n_no2=n_no2)
+        beta_ray = self.rayleigh_coefficient(z)
+        beta_o3 = self.ozone_coefficient(z)
+        beta_no2 = self.no2_coefficient(z)
         beta_ae, beta_as = self.aerosol_coefficients(z)
         beta_sca = beta_ray + beta_as
         beta_ext = beta_ray + beta_ae + beta_o3 + beta_no2
@@ -357,10 +335,7 @@ class Medium:
             beta_ext=beta_ext, beta_sca=beta_sca,
         )
 
-    def phase_moments(self, n_moments: int = 32, *,
-                      n_air: DensityFn | None = None,
-                      n_o3: DensityFn | None = None,
-                      n_no2: DensityFn | None = None) -> np.ndarray:
+    def phase_moments(self, n_moments: int = 32) -> np.ndarray:
         """Legendre moments of the layer-averaged phase function.
 
         Shape ``(n_layer, n_moments, n_wl)``; ``p(cos t) = sum_l (2l+1) b_l P_l``.
@@ -370,7 +345,7 @@ class Medium:
         forward peak that lives beyond the truncation is silently discarded --
         which for dust and cloud droplets is 37 % of the scattered energy.
         """
-        props = self.layer_properties(n_air=n_air, n_o3=n_o3, n_no2=n_no2)
+        props = self.layer_properties()
         nz, nwl = props["beta_ray"].shape
         out = np.zeros((nz, n_moments, nwl))
         beta_sca = np.maximum(props["beta_sca"], 1e-300)
@@ -387,10 +362,7 @@ class Medium:
                 out[:, l, :] += mom[l][None, :] * bs / beta_sca
         return out
 
-    def delta_m_moments(self, n_moments: int = 32, *,
-                        n_air: DensityFn | None = None,
-                        n_o3: DensityFn | None = None,
-                        n_no2: DensityFn | None = None):
+    def delta_m_moments(self, n_moments: int = 32):
         """delta-M-scaled moments and the forward fraction.
 
         Returns ``(moments, f)`` with ``moments`` of shape
@@ -407,19 +379,16 @@ class Medium:
         Use :meth:`delta_m_properties` to get the rescaled optical properties
         consistently with these moments.
         """
-        raw = self.phase_moments(n_moments + 1, n_air=n_air, n_o3=n_o3, n_no2=n_no2)
+        raw = self.phase_moments(n_moments + 1)
         f = np.clip(raw[:, n_moments, :], 0.0, 0.999)
         beta = (raw[:, :n_moments, :] - f[:, None, :]) / (1.0 - f[:, None, :])
         beta[:, 0, :] = 1.0
         return beta, f
 
-    def delta_m_properties(self, n_moments: int = 32, *,
-                           n_air: DensityFn | None = None,
-                           n_o3: DensityFn | None = None,
-                           n_no2: DensityFn | None = None) -> dict:
+    def delta_m_properties(self, n_moments: int = 32) -> dict:
         """Layer optical properties rescaled by delta-M, plus the moments."""
-        props = self.layer_properties(n_air=n_air, n_o3=n_o3, n_no2=n_no2)
-        beta, f = self.delta_m_moments(n_moments, n_air=n_air, n_o3=n_o3, n_no2=n_no2)
+        props = self.layer_properties()
+        beta, f = self.delta_m_moments(n_moments)
         beta_ext = np.maximum(props["beta_ext"], 0.0)
         beta_sca = np.maximum(props["beta_sca"], 0.0)
         omega = np.where(beta_ext > 1e-300, beta_sca / np.maximum(beta_ext, 1e-300), 0.0)

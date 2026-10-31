@@ -170,3 +170,21 @@ def test_ground_radiance_direct_transmittance_override(atmo7):
     assert np.all(E_zero <= E_base)
     assert np.all(dark0 <= base)
     assert np.any(dark0 < base)
+
+
+def test_solve_rejects_empty_request_and_records_cloud_options(atmo7, stratus):
+    """single=False + multiple=False computes nothing -> ValueError; the
+    cloud branch does not record ``single`` in options (the deck composition
+    always includes the clear single scattering)."""
+    with pytest.raises(ValueError, match="computes nothing"):
+        solve(atmo7, 60.0, 30.0, 90.0, single=False, multiple=False)
+    with pytest.raises(ValueError, match="computes nothing"):
+        solve(atmo7, 96.0, 30.0, 90.0, method="twilight", quality="low",
+              grid=TINY, seed=0, single=False, multiple=False)
+    res = solve(atmo7, 75.0, 45.0, 135.0, method="cloud", cloud_layer=stratus,
+                single=False)   # not supported on the cloud path...
+    assert "single" not in res.options          # ...and honestly not recorded
+    # while the clear branch does record it
+    res_ss = solve(atmo7, 60.0, 30.0, 90.0, single=True, multiple=False)
+    assert res_ss.options["single"] is True
+    assert res_ss.diagnostics == {}          # no SOS ran, no orders claimed
