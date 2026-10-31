@@ -66,7 +66,12 @@ from scipy.special import assoc_legendre_p_all
 from .. import spectra
 from ..constants import R_EARTH
 from ..geometry import is_sunlit, path_lengths_sun
-from .single import _tau_from_columns, species_columns
+from ..optics import (
+    shell_species_columns,
+    shell_species_weights,
+    species_extinction_weights,
+    tau_from_columns,
+)
 
 __all__ = ["SOSResult", "solve", "multiple_scattering"]
 
@@ -152,8 +157,8 @@ def _sun_transmittance_boundaries(atmo, sun_zenith_deg: float) -> np.ndarray:
     For the point of the vertical column at radius ``r`` the solar ray has
     impact parameter ``p = r sin(sza)`` and direction cosine
     ``cos(sza)``.  The optical depth is integrated along the true spherical
-    ray with the helpers of :mod:`skycolor.rt.single`, and rays that
-    intersect the Earth are masked to zero transmittance.
+    ray with the shared column algebra of :mod:`skycolor.optics`, and rays
+    that intersect the Earth are masked to zero transmittance.
     """
     rb = atmo.r_bounds
     sza = np.radians(float(sun_zenith_deg))
@@ -161,8 +166,8 @@ def _sun_transmittance_boundaries(atmo, sun_zenith_deg: float) -> np.ndarray:
     p = rb * np.sin(sza)
     c = np.full_like(rb, mu0)
     lengths = path_lengths_sun(p, c, rb, rb)  # (n_shell, n_boundary)
-    cols = species_columns(atmo, lengths, rb)
-    tau = _tau_from_columns(atmo, cols)
+    cols = shell_species_columns(lengths, shell_species_weights(atmo, rb))
+    tau = tau_from_columns(cols, species_extinction_weights(atmo))
     if getattr(atmo, "refraction", False):
         from ..refraction import get_tables
 

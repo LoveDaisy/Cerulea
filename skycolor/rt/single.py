@@ -25,6 +25,12 @@ import numpy as np
 from .. import spectra
 from ..constants import R_EARTH
 from ..geometry import is_sunlit, path_lengths_sun, path_lengths_sun_array
+from ..optics import (
+    shell_species_columns,
+    shell_species_weights,
+    species_extinction_weights,
+    tau_from_columns,
+)
 
 
 def _quadrature_points(ub: np.ndarray, n_gauss: int):
@@ -62,13 +68,10 @@ def _local_optics_h(atmo, z_km, h_km, wl_mask=None):
 
 
 def _tau_from_columns(atmo, cols: np.ndarray) -> np.ndarray:
-    tau = (cols[:, 0:1] * atmo._sigma_ray[None, :]
-           + cols[:, 1:2] * atmo._sigma_o3[None, :]
-           + cols[:, 2:3] * atmo._sigma_no2[None, :])
-    for j, lay in enumerate(atmo.aerosols):
-        rel_ext, _ = lay.aerosol.relative_coefficients(atmo.wl)
-        tau = tau + cols[:, 3 + j:4 + j] * rel_ext[None, :]
-    return tau
+    """Optical depth of species column amounts; thin wrapper over the shared
+    column algebra in :mod:`skycolor.optics` (the single source of the
+    species listing and its summation order)."""
+    return tau_from_columns(cols, species_extinction_weights(atmo))
 
 
 def species_columns(atmo, lengths: np.ndarray, r_bounds: np.ndarray) -> np.ndarray:
@@ -76,16 +79,10 @@ def species_columns(atmo, lengths: np.ndarray, r_bounds: np.ndarray) -> np.ndarr
 
     ``lengths`` has shape ``(n_shell, n_points)``.  Returns ``(n_points,
     3 + n_aerosol_layers)``: air, ozone, NO2 (molecules m^-2) followed by one
-    column per aerosol layer (550 nm extinction optical depth).
+    column per aerosol layer (550 nm extinction optical depth).  Thin
+    wrapper over the shared algebra in :mod:`skycolor.optics`.
     """
-    r_mid = np.sqrt(r_bounds[:-1] * r_bounds[1:])
-    z_mid = (r_mid - R_EARTH) / 1e3
-    cols = [lengths.T @ atmo.n_air(z_mid),
-            lengths.T @ atmo.n_o3(z_mid),
-            lengths.T @ atmo.n_no2(z_mid)]
-    for lay in atmo.aerosols:
-        cols.append(lengths.T @ (lay.aod550 * lay.profile(z_mid) / 1000.0))
-    return np.stack(cols, axis=1)
+    return shell_species_columns(lengths, shell_species_weights(atmo, r_bounds))
 
 
 def direct_sun_transmittance(atmo, sun_zenith_deg: float) -> np.ndarray:
