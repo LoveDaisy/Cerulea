@@ -59,9 +59,9 @@ def test_phase_moments_normalised():
 #: every name the pre-Medium ``Atmosphere`` exposed, captured at the
 #: pre-refactor baseline so the facade cannot silently drop one
 #: ``_prepare_ozone``/``_prepare_no2``/``_o3_scale``/``_no2_scale`` were
-#: captured in the pre-refactor surface and removed with the transitional
-#: subclass protocol (review round 1, Major 1): their only consumers were
-#: the retired Atmosphere subclasses.
+#: captured in the pre-refactor surface; they are *removed* now (they served
+#: only the retired inheritance protocol and were dead state on the facade),
+#: which test_removed_transitional_protocol_enforces below pins mechanically.
 FACADE_METHODS = frozenset({
     "_restrict", "aerosol_coefficients",
     "at_altitude", "delta_m_moments", "delta_m_properties", "layer_properties",
@@ -166,3 +166,25 @@ def test_at_altitude_layers_are_fresh_copies():
     b.aerosols[0].aod550 = 0.99          # AerosolLayer stays a mutable record
     assert a.aerosols[0].aod550 == pytest.approx(0.05)   # source unaffected
     assert b.aerosols[0].aod550 == pytest.approx(0.99)
+
+
+def test_removed_transitional_protocol_enforces():
+    """Mechanical gate against a third round of "the record says deleted but
+    the code is still there" (code review rounds 1-2, Major 1): the retired
+    transitional protocol must have no remnants in skycolor/ -- no
+    _prepare_* methods on the facade, no transitional-tense docstrings, and
+    no facade-level _o3_scale/_no2_scale (the authoritative scales live on
+    the Medium and are consumed by its n_o3/n_no2)."""
+    import pathlib
+
+    assert not hasattr(Atmosphere, "_prepare_ozone")
+    assert not hasattr(Atmosphere, "_prepare_no2")
+    at = Atmosphere(np.array([400.0, 550.0]), ozone_du=300.0, aerosols=[])
+    assert not hasattr(at, "_o3_scale")
+    assert not hasattr(at, "_no2_scale")
+    banned = ("transitional", "_prepare_ozone", "_prepare_no2")
+    root = pathlib.Path(__file__).resolve().parents[1] / "skycolor"
+    for path in root.rglob("*.py"):
+        text = path.read_text().lower()
+        for token in banned:
+            assert token not in text, f"{path.name} contains {token!r}"

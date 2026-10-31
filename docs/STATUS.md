@@ -19,7 +19,9 @@ argument; this is the state.*
 | Colour | CIE 1931 → Bradford → ACES, tone-mapping options |
 | Cameras | panorama, fisheye, perspective; ground; sun disk |
 
-252 tests.  Environment pinned by `uv.lock` (Python 3.12, numpy 2.5, scipy 1.18).
+Test suite: `uv run pytest -q` (see that command's output for the current
+count; docs do not track absolute numbers).  Environment pinned by `uv.lock`
+(Python 3.12, numpy 2.5, scipy 1.18).
 
 ## Architecture (post-refactor)
 

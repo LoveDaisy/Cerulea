@@ -400,13 +400,18 @@ class MieAerosol(Aerosol):
         object.__setattr__(self, "_max_tables", 512)
 
     def replace(self, **kw) -> "MieAerosol":
-        """A copy of this aerosol with the given parameters redefined.
+        """A copy of this aerosol with the given *dataclass fields* redefined.
 
-        Implemented with ``copy.copy`` + field writes rather than
-        ``dataclasses.replace`` so it also works for the preset subclasses
-        whose ``__init__`` takes different keywords.  The derived nodes and
-        the per-wavelength caches are rebuilt for the new definition; the
-        old object (and any shared instance of it) is untouched.
+        Field-level only: ``kw`` keys must be dataclass fields of the
+        instance's class.  The preset subclasses (``RuralAerosol``,
+        ``HazeAerosol``, ...) take different constructor keywords (``rh``,
+        ...) that are **not** fields -- to vary a preset knob, construct a
+        new instance (``HazeAerosol(rh=0.9)`` / :func:`shared`) rather than
+        calling ``replace``.  Note the ``name`` field is not re-derived:
+        renamed definitions should also pass ``name=`` explicitly.  The
+        derived nodes and the per-wavelength caches are rebuilt for the new
+        definition; the old object (and any shared instance of it) is
+        untouched.
         """
         field_names = {f.name for f in dataclasses_fields(type(self))}
         unknown = set(kw) - field_names

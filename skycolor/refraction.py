@@ -270,8 +270,11 @@ def get_tables(atmo) -> RefractionTables:
     """Cached :class:`RefractionTables` for the density profile of ``atmo``.
 
     Cache identity is the ``refraction_token`` of the atmosphere's
-    :class:`~skycolor.medium.Medium` -- the identity of its *density
-    definition*, not a proxy.  Consequences, both deliberate:
+    :class:`~skycolor.medium.Medium` -- its *construction* identity (any
+    redefinition through the facade, aerosol layers included, replaces the
+    medium and rotates the token), never a value proxy.  The tables only
+    read the air-density profile, so a redefinition that leaves it untouched
+    costs one rebuild but is never wrong.  Consequences, both deliberate:
 
     * two media built from different custom profiles but the same
       ``surface_pressure``/``elevation_km`` never share tables (the old

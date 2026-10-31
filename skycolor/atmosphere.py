@@ -2,12 +2,10 @@
 
 The physical medium -- composition, profiles, discretisation and the
 layer-averaged optical processing -- lives in :class:`skycolor.medium.Medium`,
-a frozen value object.  :class:`Atmosphere` is the long-standing public
-entry point: it attaches the *scenario* (observer height, ground albedo,
-refraction) to a medium and forwards every medium query, so the rest of
-the library keeps its ``atmo`` interface unchanged.  (Step 3b of the
-architecture refactor moves the scenario fields into a dedicated
-``Scene``; this facade is the transitional shape.)
+a frozen value object, and the observing scenario in
+:class:`skycolor.scene.Scene`.  :class:`Atmosphere` is the long-standing
+public entry point: it pairs the two frozen parts and forwards every query,
+so the rest of the library keeps its ``atmo`` interface unchanged.
 
 The model atmosphere is a set of concentric spherical shells.  Within each
 shell the composition is described by continuous profiles so that the
@@ -292,20 +290,6 @@ class Atmosphere:
             no2_profile=medium.no2_profile,
             air_profile=medium.air_profile,
         )
-
-    def _prepare_ozone(self) -> None:
-        # Transitional protocol: the authoritative scale lives in the Medium;
-        # this facade copy exists only so subclass overrides (which set it and
-        # override n_o3 themselves) keep working until Step 3b.
-        from .constants import DU
-        from .medium import _column_normalisation, _O3_PROFILE
-
-        self._o3_scale = self.ozone_du * DU / _column_normalisation(_O3_PROFILE)
-    def _prepare_no2(self) -> None:
-        from .medium import _column_normalisation, _NO2_PROFILE
-
-        col = _column_normalisation(_NO2_PROFILE)
-        self._no2_scale = (self.no2_column / col) if col > 0 else 0.0
 
     # -- medium delegation -----------------------------------------------------
     #   scalar/array attributes of the medium are exposed as read-only

@@ -131,7 +131,11 @@ into the truncation change.
   `restrict()` (a wavelength subset never changes densities), fresh per
   construction ("per-construction, don't share" — one ~2.3 s table build per
   genuinely distinct medium), stored in a `WeakKeyDictionary` so entries
-  die with their medium (batch runs do not accumulate tables).
+  die with their medium (batch runs do not accumulate tables).  The token
+  is the medium's construction identity: redefining *any* medium field
+  through the facade (aerosols included) rotates it and triggers one
+  rebuild, even when the air-density profile the tables actually read is
+  untouched — never wrong, occasionally one rebuild more than necessary.
 
 ## Key interfaces
 

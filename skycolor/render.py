@@ -172,7 +172,11 @@ def render_scene(atmo, sun_elevation_deg: float, sun_azimuth_deg: float = 0.0,
     ``radiance_field`` / ``ground_direct_transmittance`` have the same
     meaning as in :func:`sky_dome` / :func:`ground_radiance`: they let a
     cloudy or otherwise non-default spectral field flow through the same
-    display path instead of a duplicated one.
+    display path instead of a duplicated one.  The pair is coupled: a
+    non-default ``radiance_field`` usually needs a matching
+    ``ground_direct_transmittance`` (a cloudy sky also attenuates the
+    direct beam that lights the ground) — leaving the ground default pairs
+    a custom sky with a clear-sky beam.
     """
     sun_zen = 90.0 - sun_elevation_deg
     dome = sky_dome(atmo, sun_zen, n_zenith=n_zenith, n_azimuth=n_azimuth,
