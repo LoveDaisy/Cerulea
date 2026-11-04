@@ -486,8 +486,8 @@ def test_candidate_and_sensitivity_sections(tmp_path):
     (data / "raw" / "sensitivity" / "singles-refinement.json").write_text(
         json.dumps(dict(schema="s/1", items={"ss_gauss16": "d"},
                         by_sun={"-9.0": dict(
-                            baseline=[1e-8] * 81,
-                            ss_gauss16=[1e-8 * (1 + 1e-6)] * 81)})))
+                            baseline=[1e-8] * 3,
+                            ss_gauss16=[1e-8 * (1 + 1e-6)] * 3)})))
 
     wl = np.arange(380.0, 781.0, 5.0)
     cand = _candidate_stats(data, proto, wl, [14, 34, 54], {})
@@ -516,6 +516,25 @@ def test_candidate_and_sensitivity_sections(tmp_path):
     entry = sens["by_sun"]["-9.0"]["mc"]["disk4x16"]["550.0"]
     assert entry["paired_delta_mean"] == 0.0 and entry["fingerprints_same"]
     assert sens["singles"]["-9.0"]["ss_gauss16"]["max_abs_relative_drift"] > 0.0
+    # missing singles evidence must be refused, not silently skipped
+    (data / "raw" / "sensitivity" / "singles-refinement.json").unlink()
+    with pytest.raises(ValueError, match="singles-refinement.json missing"):
+        _sensitivity_stats(data, proto, wl, [14, 34, 54])
+    # a missing protocol-required experiment item must be refused too
+    (data / "raw" / "sensitivity" / "singles-refinement.json").write_text(
+        json.dumps(dict(schema="s/1", items={"ss_gauss16": "d"},
+                        by_sun={"-9.0": dict(
+                            baseline=[1e-8] * 3,
+                            ss_gauss16=[1e-8] * 3)})))
+    rows = [json.loads(l) for l in
+            (data / "raw" / "sensitivity" / "s0mc" / "attempt-00.jsonl").read_text().splitlines()]
+    keep = [r for r in rows if r["seed"] != 110001 or True]
+    for r in keep:
+        r["items"].pop("disk4x16", None)
+    (data / "raw" / "sensitivity" / "s0mc" / "attempt-00.jsonl").write_text(
+        "\n".join(json.dumps(r) for r in keep) + "\n")
+    with pytest.raises(ValueError, match="missing required items"):
+        _sensitivity_stats(data, proto, wl, [14, 34, 54])
     assert sens["not_run_here"] == ["curved"]
 
 
@@ -598,9 +617,23 @@ def test_check_batch_contract_rejects_tampered_record():
                                   photons_per_wavelength=400, mode="disk",
                                   table_sha256="t"),
                              stage="direct", batch_id="b")
-    # implementation identity: a record whose code hash differs from the
-    # batch meta keeps its own (uniform) per-record identity as the
-    # authority and the difference is reported as a note
+    # two-level identity: a PHYSICS-anchor change between meta and records
+    # is rejected outright
+    physics_meta = dict(meta, code_sha256=dict.fromkeys(
+        ("skycolor/rt/mc.py", "tools/point_solar_table.py",
+         "tools/unified_solar_transport.py", "tools/twilight_second_order.py"),
+        "good-physics"))
+    physics_tampered = [dict(good[0], code_sha256=dict.fromkeys(
+        ("skycolor/rt/mc.py", "tools/point_solar_table.py",
+         "tools/unified_solar_transport.py", "tools/twilight_second_order.py"),
+        "evil-physics"))]
+    with pytest.raises(ValueError, match="PHYSICS implementation identity"):
+        check_batch_contract(physics_tampered, physics_meta,
+                             dict(sun_elevation_deg=-9.0,
+                                  photons_per_wavelength=400,
+                                  mode="disk", table_sha256="t"),
+                             stage="direct", batch_id="b")
+    # an orchestration-only difference is an auditable note
     meta_code = dict(meta, code_sha256={"x.py": "1"})
     code_tampered = [dict(good[0], code_sha256={"x.py": "evil"})]
     notes = check_batch_contract(code_tampered, meta_code,
@@ -608,18 +641,35 @@ def test_check_batch_contract_rejects_tampered_record():
                                       photons_per_wavelength=400,
                                       mode="disk", table_sha256="t"),
                                  stage="direct", batch_id="b")
-    assert any("predates the records" in n for n in notes)
-    # ... and a batch whose records span two implementations is refused
+    assert any("non-physics implementation" in n for n in notes)
+    # ... and a batch whose records span two orchestration versions is
+    # also only noted (physics anchors uniform), while mixed PHYSICS is
+    # refused within the batch
     mixed = [dict(good[0], protocol_sha256=KNOWN_SHA,
                   code_sha256={"x.py": "1"}),
              dict(good[0], seed=2, protocol_sha256=KNOWN_SHA,
                   code_sha256={"x.py": "2"})]
     meta_known = dict(meta_code, protocol_sha256=KNOWN_SHA)
-    with pytest.raises(ValueError, match="distinct.*implementation"):
-        check_batch_contract(mixed, meta_known,
+    notes = check_batch_contract(mixed, meta_known,
+                                 dict(sun_elevation_deg=-9.0,
+                                      photons_per_wavelength=400,
+                                      mode="disk", table_sha256="t"),
+                                 stage="direct", batch_id="b")
+    assert any("non-physics implementation" in n for n in notes)
+    mixed_phys = [dict(good[0], protocol_sha256=KNOWN_SHA,
+                       code_sha256=dict.fromkeys(
+                           ("skycolor/rt/mc.py",), "a")),
+                  dict(good[0], seed=2, protocol_sha256=KNOWN_SHA,
+                       code_sha256=dict.fromkeys(
+                           ("skycolor/rt/mc.py",), "b"))]
+    meta_phys_known = dict(meta, protocol_sha256=KNOWN_SHA,
+                           code_sha256=dict.fromkeys(
+                               ("skycolor/rt/mc.py",), "a"))
+    with pytest.raises(ValueError, match="multiple physics implementations"):
+        check_batch_contract(mixed_phys, meta_phys_known,
                              dict(sun_elevation_deg=-9.0,
-                                  photons_per_wavelength=400, mode="disk",
-                                  table_sha256="t"),
+                                  photons_per_wavelength=400,
+                                  mode="disk", table_sha256="t"),
                              stage="direct", batch_id="b")
     # a known historical generation is accepted with an auditable note
     drifted = check_batch_contract(good, meta,

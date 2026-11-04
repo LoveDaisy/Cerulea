@@ -168,8 +168,35 @@ def load_protocol(path: Path) -> dict:
 
 
 def build_scenario(protocol: dict):
-    """The frozen benchmark atmosphere, with contract assertions."""
+    """The frozen benchmark atmosphere, with contract assertions.
+
+    The implementation realizes exactly ONE physical scenario; a protocol
+    that declares anything else (different AOD, ozone, site heights, view
+    geometry, sun azimuth or order cap) is refused BEFORE any computation
+    instead of executing a different experiment under the same protocol
+    hash.
+    """
     scenario = protocol["scenario"]
+    transport = scenario.get("transport", {})
+    requirements = [
+        ("preset", scenario.get("preset"), "clear"),
+        ("aod550", float(scenario.get("aod550", -1)), 0.05),
+        ("ozone_du", float(scenario.get("ozone_du", -1)), 300.0),
+        ("ground_albedo", float(scenario.get("ground_albedo", -1)), 0.1),
+        ("elevation_km", float(scenario.get("elevation_km", -1)), 0.0),
+        ("ground_km", float(scenario.get("ground_km", -1)), 0.0),
+        ("view_zenith_deg", float(scenario.get("view_zenith_deg", -1)), 0.0),
+        ("view_azimuth_deg", float(scenario.get("view_azimuth_deg", -1)), 0.0),
+        ("sun_azimuth_deg", float(scenario.get("sun_azimuth_deg", -1)), 0.0),
+        ("max_scatter", int(transport.get("max_scatter", -1)), 50),
+    ]
+    for name, declared, implemented in requirements:
+        if declared != implemented:
+            raise ValueError(
+                f"scenario contract violated: protocol declares {name}="
+                f"{declared!r} but this tool implements {implemented!r}; "
+                "a different physical scenario requires a different "
+                "implementation, not a different protocol file")
     atmo = presets.clear(WL_COARSE)
     checks = [
         ("wavelength grid", np.array_equal(atmo.wl, WL_COARSE)),
@@ -181,8 +208,6 @@ def build_scenario(protocol: dict):
     for name, ok in checks:
         if not ok:
             raise ValueError(f"scenario contract violated: {name}")
-    if float(scenario["sun_azimuth_deg"]) != 0.0:
-        raise ValueError("the reference fixes sun azimuth 0")
     return atmo
 
 
@@ -546,9 +571,14 @@ def run_formal_stage(protocol, atmo, table, stage, data_dir, state, *,
     budgets = direct["budgets_photons"]
     repeats = int(direct["repeats"])
     suns = protocol["scenario"]["sun_elevations_deg"]
-    singles = deterministic_singles(protocol, atmo, table)
-    spent, budget_left = stage_budget(data_dir, stage, protocol, max_stage_hours)
+    # the stage clock starts BEFORE any setup so the cap truly bounds the
+    # whole wall-clock including table load and deterministic singles; the
+    # budget is checked before that work, too
     started = time.perf_counter()
+    spent, budget_left = stage_budget(data_dir, stage, protocol, max_stage_hours)
+    singles = None
+    if budget_left > 0.0:
+        singles = deterministic_singles(protocol, atmo, table)
     billed = started  # seconds of this invocation already noted into state
     computed = 0
     stopped = None
@@ -572,7 +602,7 @@ def run_formal_stage(protocol, atmo, table, stage, data_dir, state, *,
         save_state(data_dir, state, stage=stage)
 
     billed_records = 0
-    bill(0)  # setup (table load, deterministic singles) counts against the cap
+    bill(0)  # stage clock includes setup; singles run only within budget
 
     for sun_index, sun_elev in enumerate(suns):
         budget_indices = [len(budgets) - 1] if stage == "source-pairs" \
@@ -591,6 +621,9 @@ def run_formal_stage(protocol, atmo, table, stage, data_dir, state, *,
                                      budget_index, budgets[budget_index], mode)
             batch = Batch(data_dir / "raw" / stage, batch_id, seeds, meta_base)
             missing = [s for s in seeds if s not in batch.done]
+            if missing and singles is None:
+                stopped = "budget-exhausted"
+                break
             if not missing:
                 batch.close("complete")
                 continue
@@ -1018,7 +1051,27 @@ def stage_sensitivity(protocol, atmo, table, data_dir, state, *, protocol_path,
         if stopped:
             break
     bill(computed)
-    # deterministic single-scattering refinements (no MC, no seeds)
+    # deterministic single-scattering refinements (no MC, no seeds) --
+    # inside the billed window and skipped when the budget is gone
+    single_ref = {}
+    if budget_left > 0.0 and table3 is not None:
+        single_ref = _sensitivity_singles(protocol, atmo3, table3, suns)
+    out = data_dir / "raw" / "sensitivity" / "singles-refinement.json"
+    out.write_text(json.dumps(dict(
+        schema="deep-twilight-reference/sensitivity-singles/1",
+        protocol_sha256=sha256_file(protocol_path),
+        items={k: d for k, d in SENSITIVITY_SINGLE_ITEMS}, by_sun=single_ref),
+        indent=1) + "\n")
+    bill(computed)  # final bill includes the deterministic refinements
+    print(json.dumps(dict(
+        stage_status="complete" if not stopped else f"incomplete-{stopped}",
+        stage="sensitivity", computed=computed,
+        stage_seconds_here=time.perf_counter() - started,
+        cumulative_seconds=spent_total(data_dir, "sensitivity"))), flush=True)
+    return computed
+
+
+def _sensitivity_singles(protocol, atmo3, table3, suns):
     single_ref = {}
     for sun_elev in suns:
         base, _ = single_zenith(atmo3, FiniteSolarSource(atmo3, table3),
@@ -1033,18 +1086,7 @@ def stage_sensitivity(protocol, atmo, table, data_dir, state, *, protocol_path,
             baseline=base.tolist(), ss_gauss16=g16.tolist(),
             ss_segment_km_0_25=fine.tolist(),
             ss_density_step_0_0125=step.tolist())
-    out = data_dir / "raw" / "sensitivity" / "singles-refinement.json"
-    out.write_text(json.dumps(dict(
-        schema="deep-twilight-reference/sensitivity-singles/1",
-        protocol_sha256=sha256_file(protocol_path),
-        items={k: d for k, d in SENSITIVITY_SINGLE_ITEMS}, by_sun=single_ref),
-        indent=1) + "\n")
-    print(json.dumps(dict(
-        stage_status="complete" if not stopped else f"incomplete-{stopped}",
-        stage="sensitivity", computed=computed,
-        stage_seconds_here=time.perf_counter() - started,
-        cumulative_seconds=spent_total(data_dir, "sensitivity"))), flush=True)
-    return computed
+    return single_ref
 
 
 def table3_hash(protocol: dict, data_dir: Path) -> str:

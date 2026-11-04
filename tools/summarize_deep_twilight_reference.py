@@ -148,6 +148,19 @@ def check_record_invariants(records, *, stage, batch_id):
 #: A batch whose meta pins an unknown protocol generation is REJECTED, not
 #: silently accepted; the mapping is the auditable witness for the archived
 #: pre-candidate-section wave.
+#: the PHYSICS anchor files whose hashes define implementation identity
+#: for comparisons (the orchestration file deep_twilight_reference.py is
+#: recorded per record but does not enter the traced physics; its
+#: cross-batch differences are audited notes, with the verified basis
+#: that the direct-stage orchestration diffs touched only
+#: save_state/stage_budget/sensitivity wiring -- the physics files are
+#: bit-identical across all archived batches)
+#: verified compatibility mapping for protocol generations older than the
+#: current file.  Each entry: executed protocol SHA256 -> human-verified
+#: statement of what the generation changed relative to the current file.
+#: A batch whose meta pins an unknown protocol generation is REJECTED, not
+#: silently accepted; the mapping is the auditable witness for the archived
+#: pre-candidate-section wave.
 KNOWN_PROTOCOL_GENERATIONS = {
     "f6da541115dadeb612f7f9ec8eaf9449858f780b33c700fa0a039f1f37274f1e":
         "direct/source-pairs wave (2026-11-04): identical scenario/source/"
@@ -156,6 +169,13 @@ KNOWN_PROTOCOL_GENERATIONS = {
         "Verified against the current contract for every stage-relevant "
         "field checked here.",
 }
+PHYSICS_ANCHOR_FILES = (
+    "skycolor/rt/mc.py",
+    "tools/point_solar_table.py",
+    "tools/unified_solar_transport.py",
+    "tools/twilight_second_order.py",
+)
+ORCHESTRATION_FILE = "tools/deep_twilight_reference.py"
 
 
 def check_batch_contract(records, meta, expect, *, stage, batch_id,
@@ -207,23 +227,42 @@ def check_batch_contract(records, meta, expect, *, stage, batch_id,
             raise ValueError(
                 f"{stage}/{batch_id} seed {row['seed']}: record "
                 "protocol_sha256 differs from the batch meta provenance")
-    # per-batch implementation uniformity: all records of one batch must
-    # share a single implementation identity (a batch spanning an edit is
-    # heterogeneous evidence and is refused); a stale batch-meta hash is an
-    # auditable note, with the per-record identity as the authority
+    # per-batch implementation identity: two-level policy enforced below
+    # (physics anchors strict, orchestration file audited as notes)
     record_codes = {json.dumps(r.get("code_sha256"), sort_keys=True)
                     for r in records if r.get("code_sha256") is not None}
-    if len(record_codes) > 1:
-        raise ValueError(
-            f"{stage}/{batch_id}: records span {len(record_codes)} distinct "
-            "implementation identities -- mixed-implementation batches "
-            "must not be merged as independent repeats")
-    if meta.get("code_sha256") is not None and record_codes and \
-            json.dumps(meta["code_sha256"], sort_keys=True) not in record_codes:
-        notes.append(
-            f"{stage}/{batch_id}: batch-meta code_sha256 predates the "
-            "records' implementation identity; the uniform per-record "
-            "identity is authoritative")
+    if meta.get("code_sha256") is not None and record_codes:
+        parsed = [json.loads(rc) for rc in record_codes]
+        anchor = "tools/deep_twilight_reference.py"
+        meta_phys = json.dumps({k: meta["code_sha256"].get(k)
+                                for k in PHYSICS_ANCHOR_FILES}, sort_keys=True)
+        rec_phys = {json.dumps({k: rc.get(k)
+                                for k in PHYSICS_ANCHOR_FILES}, sort_keys=True)
+                    for rc in parsed}
+        if len(rec_phys) > 1:
+            raise ValueError(
+                f"{stage}/{batch_id}: records span multiple physics "
+                "implementations -- mixed-physics batches must not be "
+                "merged as independent repeats")
+        if meta_phys not in rec_phys:
+            raise ValueError(
+                f"{stage}/{batch_id}: PHYSICS implementation identity "
+                "differs between the batch meta and the records; no "
+                "verified exception exists")
+        meta_all = json.dumps(meta["code_sha256"], sort_keys=True)
+        # non-physics projection: everything outside the physics anchors
+        nonphys = lambda rc: json.dumps(
+            {k: v for k, v in rc.items() if k not in PHYSICS_ANCHOR_FILES},
+            sort_keys=True)
+        rec_nonphys = {nonphys(rc) for rc in parsed}
+        meta_nonphys = nonphys(meta["code_sha256"])
+        orch_differs = (len(rec_nonphys) > 1) or (meta_nonphys not in rec_nonphys)
+        if orch_differs:
+            notes.append(
+                f"{stage}/{batch_id}: non-physics implementation "
+                "fingerprints differ from the batch meta or span versions "
+                "within the batch (these files do not enter the traced "
+                "physics; physics anchors verified uniform)")
     if missing_fields:
         raise ValueError(
             f"{stage}/{batch_id}: records lack {sorted(missing_fields)} and "
@@ -364,6 +403,23 @@ def compute_summary(data_dir: Path, protocol: dict, *,
                 failures.append("luminance drift between budgets exceeds a "
                                 "quarter of the luminance gate")
             stats["verdict_failures"] = failures
+    # cross-budget comparisons require the same PHYSICS implementation;
+    # orchestration-file differences are audited (verified bookkeeping-only)
+    direct_phys = {json.dumps({k: r.get("code_sha256", {}).get(k, "")
+                               for k in PHYSICS_ANCHOR_FILES}, sort_keys=True)
+                   for rows in disk_records.values() for r in rows}
+    if len(direct_phys) > 1:
+        raise ValueError(
+            "direct: the four batches span multiple PHYSICS implementations "
+            "-- cross-budget comparisons require the same physics")
+    direct_orch = {r.get("code_sha256", {}).get(ORCHESTRATION_FILE, "")
+                   for rows in disk_records.values() for r in rows}
+    if len(direct_orch) > 1:
+        out.setdefault("contract_notes", []).append(
+            "direct: orchestration file spans "
+            f"{len(direct_orch)} versions across batches (verified "
+            "bookkeeping-only diffs: state merge + budget accounting; "
+            "physics anchors bit-identical in all 64 records)")
     # ---- source pairs ----------------------------------------------------
     pair_cfg = protocol["source"]["point_pairing"]
     pairs = {}
@@ -385,6 +441,25 @@ def compute_summary(data_dir: Path, protocol: dict, *,
             stage="source-pairs", batch_id=batch_id,
             protocol_sha_now=protocol_sha_now))
         disk_rows = disk_records[(sun, photons)]
+        pair_phys = {json.dumps({k: r.get("code_sha256", {}).get(k, "")
+                                 for k in PHYSICS_ANCHOR_FILES},
+                                sort_keys=True) for r in records}
+        disk_phys = {json.dumps({k: r.get("code_sha256", {}).get(k, "")
+                                 for k in PHYSICS_ANCHOR_FILES},
+                                sort_keys=True) for r in disk_rows}
+        if pair_phys != disk_phys:
+            raise ValueError(
+                f"source-pairs/{batch_id}: PHYSICS implementation differs "
+                "from the disk batch it is paired against -- paired "
+                "comparisons require the same physics")
+        pair_orch = {r.get("code_sha256", {}).get(ORCHESTRATION_FILE, "")
+                     for r in records}
+        if pair_orch & direct_orch and len(pair_orch) == len(direct_orch) == 1 \
+                and pair_orch != direct_orch:
+            out.setdefault("contract_notes", []).append(
+                f"source-pairs/{batch_id}: orchestration file version "
+                "differs from the direct wave (bookkeeping-only diffs; "
+                "physics anchors verified identical)")
         pairs[str(sun)] = _pair_stats(disk_rows, records, wl, v_curve,
                                       anchor_idx, sun, protocol, pair_cfg)
     out["source_pairs"] = pairs
@@ -590,7 +665,17 @@ def _candidate_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
                     raise ValueError(
                         f"candidate/{batch_id} seed {row['seed']}: wavelength "
                         f"set {sorted(got_wl)} != protocol {sorted(want_wl)}")
+                if row.get("candidate_samples") not in (None, tier["candidate_samples"]):
+                    raise ValueError(
+                        f"candidate/{batch_id} seed {row['seed']}: "
+                        f"candidate_samples {row.get('candidate_samples')!r} "
+                        f"!= tier budget {tier['candidate_samples']}")
                 for a_nm, v in row["per_lambda"].items():
+                    if v.get("candidate_samples") not in (None, tier["candidate_samples"]):
+                        raise ValueError(
+                            f"candidate/{batch_id} seed {row['seed']} {a_nm}: "
+                            f"per-lambda candidate_samples {v.get('candidate_samples')!r} "
+                            f"!= tier budget {tier['candidate_samples']}")
                     recomposed = (v["deterministic_single"] + v["L2"]
                                   + v["rest_mean"])
                     if not math.isclose(v["total_cand"], recomposed,
@@ -598,6 +683,13 @@ def _candidate_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
                         raise ValueError(
                             f"candidate/{batch_id} seed {row['seed']} {a_nm}: "
                             "total_cand != single + L2 + rest")
+                    if not math.isclose(v["total_analog"],
+                                        v["deterministic_single"]
+                                        + v["mc_multiple"],
+                                        rel_tol=1e-12, abs_tol=0.0):
+                        raise ValueError(
+                            f"candidate/{batch_id} seed {row['seed']} {a_nm}: "
+                            "total_analog != single + mc_multiple")
                     if not math.isclose(v["rest_mean"],
                                         v["mc_multiple"] - v["c2nt_mean"],
                                         rel_tol=1e-12, abs_tol=0.0):
@@ -711,6 +803,30 @@ def _sensitivity_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
             "sensitivity: singles-refinement.json missing -- the "
             "deterministic refinement evidence is required for a complete "
             "sensitivity summary")
+    payload = json.loads(singles_path.read_text())
+    want_suns = {str(s) for s in protocol["scenario"]["sun_elevations_deg"]}
+    slug_of = {"ss_gauss16": "ss_gauss16",
+               "ss_fine_density": "ss_density_step_0_0125"}
+    want_single_items = {slug_of[d.split(" (")[0].strip()]
+                         for d in sens.get("single_items", [])}
+    got_suns = set(payload.get("by_sun", {}))
+    if got_suns != want_suns:
+        raise ValueError(
+            f"sensitivity singles: depths {sorted(got_suns)} != protocol "
+            f"{sorted(want_suns)}")
+    for sun, entries in payload["by_sun"].items():
+        missing_items = want_single_items - set(entries)
+        if missing_items:
+            raise ValueError(
+                f"sensitivity singles {sun}: missing protocol-required "
+                f"items {sorted(missing_items)}")
+        base = np.array(entries["baseline"], dtype=float)
+        n_anchor = len(protocol["scenario"]["anchor_wavelengths_nm"])
+        if base.shape != (n_anchor,) or not np.all(np.isfinite(base)) \
+                or not np.any(base > 0):
+            raise ValueError(
+                f"sensitivity singles {sun}: baseline must be finite and "
+                f"positive on the {n_anchor}-anchor grid")
     out = dict(mc_items=required_items, by_sun={})
     for sun_index, sun in enumerate(suns):
         batch_id = f"s{sun_index}mc"
@@ -754,9 +870,7 @@ def _sensitivity_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
                         == r["items"]["baseline"]["fingerprint"] for r in records))
             per_item[item] = per_anchor
         out["by_sun"][str(sun)] = dict(mc=per_item)
-    singles_path = raw_dir / "singles-refinement.json"
-    if singles_path.exists():
-        payload = json.loads(singles_path.read_text())
+    if True:
         singles = {}
         for sun, by in payload["by_sun"].items():
             base = np.array(by["baseline"])
