@@ -2,8 +2,8 @@
 
 2026-10-31；起点 `a15555b`（M12 已合并），修复提交 `c45a03b`。
 本报告取代临时 HANDOFF 对剩余问题的判断。
-里程碑见 [ROADMAP](ROADMAP.md)，当前状态见 [STATUS](STATUS.md)；原始实验记录随代码提交在
-[`validation/data/twilight_altitude_audit/`](../validation/data/twilight_altitude_audit/README.md)。
+里程碑见 [ROADMAP](../ROADMAP.md)，当前状态见 [STATUS](../STATUS.md)；原始实验记录随代码提交在
+[`validation/data/twilight_altitude_audit/`](../../validation/data/twilight_altitude_audit/README.md)。
 
 ## 结论
 
@@ -57,7 +57,7 @@ blocked = norm(x_min) < r_ground
 修正涉及 single、MC、SOS 的太阳遮挡，折射 grazing 阈值表，以及云层的直接照明和影高。
 所有入口使用同一个 `r_bounds[0]`。**没有修改 `up + 2*down` 或任何 M10 弦长积分。**
 
-新增 [14 项测试](../tests/test_raised_ground.py) 用射线/球体相交、常折射率的解析切线、
+新增 [14 项测试](../../tests/test_raised_ground.py) 用射线/球体相交、常折射率的解析切线、
 阴影内薄散射层及气球/高原的差别独立裁定边界。原基线隔离导入时 **10 failed / 4 passed**；
 修正后 **14 passed**。这条缺陷成立与否不依赖任何观测亮度目标。
 
@@ -113,7 +113,7 @@ SOS 的高阶减量较小，净结果仍增亮约 2.7%。光路/源项的额外�
 每 anchor 4 million 路径、6×8 个方向；4 组的经验 t 区间约 0.899–1.011，单独还不能
 裁定小幅变暗。此复查没有证明深暮光的插值偏差小，也没有沿用单次引擎误差条作真值。
 
-![确定性分量与直接 MC 对比](../figures/14_twilight_altitude_audit.png)
+![确定性分量与直接 MC 对比](../../figures/14_twilight_altitude_audit.png)
 
 ## 5. 仍然存在的传输近似
 
@@ -183,6 +183,8 @@ uv run python -m tools.summarize_twilight_altitude
 
 ## 后续阶段
 
-2026-11-01 已完成下一轮太阳源消融：高阶源项的衰减/遮挡敏感性、太阳逆表误差与光束角度
-定幅均有独立证据。结果见 [SOLAR_SOURCE_AUDIT.md](SOLAR_SOURCE_AUDIT.md)。本报告的
-数值仍表示M13默认处方；后续实验没有追溯改写它们，也未将不完整太阳源直接作为生产修复。
+2026-11-01 已完成后续太阳源消融、统一源、AOD550 修复、连续漫射传播与观测边界审计。
+顺序与报告分工见[文档目录](README.md#audit-sequence-m13m18)，最终结论见
+[CURVED_TRANSPORT_AUDIT.md](CURVED_TRANSPORT_AUDIT.md)。本报告数值仍表示 M13 处方；
+后续实验未追溯改写它们，统一源与曲线传播也尚未替换生产默认。本文旧引擎 anchor
+结果早于 AOD550 修复；完整 81 波长的直接 MC 光学不受该修复影响。

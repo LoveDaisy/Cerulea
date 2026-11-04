@@ -3,6 +3,10 @@
 2026-11-01；第三阶段，承接[太阳源审计](SOLAR_SOURCE_AUDIT.md)。
 基线 `596aaba`，实验实现的具体版本另由原始记录中的 `source_hashes` 固定。
 
+> 阶段定位：报告末尾提出的 straight/连续曲线比较已在
+> [CURVED_TRANSPORT_AUDIT.md](CURVED_TRANSPORT_AUDIT.md)中完成本轮有界实验。
+> 本文只承载源项与直线漫射证据；生产单源化、稳定统计和匹配观测仍是后续候选。
+
 **本阶段建立了一个能通过独立方向、柱量、能流和一次项统计检验的实验太阳源。**
 在太阳真实高度 −6°、clear、天顶这一受控场景中，统一源的
 “确定性一次项 + MC 高阶项”给出海平面 **0.493233±0.003081 cd m⁻²**、
@@ -120,7 +124,7 @@ Unified 的总量相对旧混合组合下降约 12.5%/15.4%，相对完整几何
 这些点估计同时包含太阳源及确定性一次积分处方变化，不能将全部差额归给单独一个 G 因子。
 高度比仍在 0.93 附近，绝对源修正不会自动解决真实跨站点大气、地形和观测差异。
 
-![统一太阳源配对结果](../validation/data/unified_solar_source_audit/summary.png)
+![统一太阳源配对结果](../../validation/data/unified_solar_source_audit/summary.png)
 
 ## 4. 一次项闭合的证据与限制
 
@@ -146,7 +150,7 @@ NPZ holdout、SS/view/disk 积分误差与直线漫射近似均不包含在统�
 ## 5. 归档、复跑与后续边界
 
 永久原始光谱、源表、输入 SHA256、独立探针和统计在
-[`validation/data/unified_solar_source_audit/`](../validation/data/unified_solar_source_audit/README.md)。
+[`validation/data/unified_solar_source_audit/`](../../validation/data/unified_solar_source_audit/README.md)。
 它们不依赖 scratchpad 或本机绝对路径。重新核对输入并生成汇总/科研图：
 
 ```bash

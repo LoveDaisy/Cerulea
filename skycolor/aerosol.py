@@ -31,7 +31,7 @@ Three families are provided:
   :class:`MieAerosol` with documented provenance and documented Angstrom
   exponent, SSA and asymmetry at 550 nm.
 
-The analytic moments and the phase table are described in ``docs/AEROSOL.md``.
+The analytic moments and the phase table are described in ``docs/physics/AEROSOL.md``.
 The short version is that the phase function is a polynomial in
 ``mu = cos(theta)``, so its Legendre moments can be obtained *exactly* from the
 Mie coefficients with the Gaunt/Wigner 3-j expansion implemented in
@@ -1010,7 +1010,7 @@ class DesertDustAerosol(MieAerosol):
     follow OPAC's mineral-dust model (Hess et al. 1998); the imaginary part is
     an illustrative iron-oxide model with a visible minimum and a near-IR rise,
     which reproduces the *anomalous, non-monotonic* extinction of dust in the
-    visible (see ``docs/AEROSOL.md``).  Dust is only weakly hygroscopic here
+    visible (see ``docs/physics/AEROSOL.md``).  Dust is only weakly hygroscopic here
     (``gamma = 0.05``).
 
     At 550 nm this model gives ``alpha(440/660) = -0.04``, ``SSA = 0.876``

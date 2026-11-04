@@ -27,7 +27,7 @@ Method
   mid-point.  (An alternative normalisation by the actual transmittance
   difference between layer boundaries would close the column energy budget
   exactly, but it over-weights grazing twilight rays by a large factor, so it
-  is deliberately not used.  See ``docs/MULTIPLE_SCATTERING.md``.)
+  is deliberately not used.  See ``docs/physics/MULTIPLE_SCATTERING.md``.)
 * The recursion is
   ``L^(1) = transfer(source = J_direct)``,
   ``L^(n) = transfer(source = scattering(L^(n-1)))`` with a Lambertian

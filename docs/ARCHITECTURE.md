@@ -89,7 +89,10 @@ The solar-source audit additionally records two limitations of the current
 refraction prescription: the packaged inverse angle table is sparse, and the
 source amplitude does not include the refracted solar disk's angular
 Jacobian.  Independent reference tools quantify these without changing the
-library defaults; see [SOLAR_SOURCE_AUDIT.md](SOLAR_SOURCE_AUDIT.md).  Agreement
+library defaults; see [SOLAR_SOURCE_AUDIT.md](twilight/SOLAR_SOURCE_AUDIT.md). The later
+[unified-source](twilight/UNIFIED_SOLAR_SOURCE_AUDIT.md) and
+[continuous-transport](twilight/CURVED_TRANSPORT_AUDIT.md) references have separate
+independent checks and remain experimental. Agreement
 between two backends using the same source prescription cannot validate it.
 
 ### delta-M quantities vs raw physics (E4)
@@ -128,7 +131,7 @@ deterministic 2.4 km/sea-level ratio changes from the historical 1.208× to
 1.027×.  The historical low-budget engine 1.01× also predates the fix;
 multi-seed results and the distinction between domain truncation and an
 observed station comparison are in
-[TWILIGHT_ALTITUDE_AUDIT.md](TWILIGHT_ALTITUDE_AUDIT.md).  These ratios do not
+[TWILIGHT_ALTITUDE_AUDIT.md](twilight/TWILIGHT_ALTITUDE_AUDIT.md).  These ratios do not
 establish a missing low-altitude multiple-scattering component.
 
 ## Caching and identity

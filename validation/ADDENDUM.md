@@ -1,5 +1,10 @@
 # Addendum — the numbers after multiple scattering was integrated
 
+> Chronological evidence, not a current status page. Each addendum retains its
+> baseline; later fixes supersede earlier interpretations. Current six-check
+> results are in [results.json](results.json), limits in [STATUS.md](../docs/STATUS.md).
+> The post-M10 changes are indexed in the seventh addendum below.
+
 The main report (`REPORT.md`) was written while `skycolor.rt.multiple` was still
 a stub, so every number in it is **single scattering only**.  Multiple
 scattering has since been merged.  The harness now defaults to the full model;
@@ -107,7 +112,7 @@ same value, and it is a model-atmosphere/site mismatch (sea-level standard
 atmosphere versus the 2400 m Paranal site).  The check-5 harness still uses
 the deterministic model, so it still reports a failure at −9° and below; that
 is a deliberate choice to keep the harness comparing like with like, and the
-engine's numbers are in `docs/TWILIGHT.md` §2.2.
+engine's numbers are in `docs/twilight/TWILIGHT.md` §2.2.
 
 ## The aerosol library
 
@@ -137,7 +142,7 @@ Carlo: albedo within 0.1–0.7 % for a conservative `g = 0` layer and within 1 %
 for `g = 0.85` at τ ≥ 5; `R + T + direct = 1` to 1e-12; the overcast
 horizon/zenith ratio is exactly 1/3; τ → 0 reduces bit-for-bit to the clear
 sky.  The brief's "albedo 0.7 at τ = 10" holds only for `g = 0.6`; for real
-droplets (`g = 0.859`) it needs τ = 30 (`docs/CLOUD.md`).
+droplets (`g = 0.859`) it needs τ = 30 (`docs/physics/CLOUD.md`).
 
 ---
 
@@ -188,7 +193,12 @@ performance item.
 
 ---
 
-# Fourth addendum — the twilight excess was a site effect
+# Fourth addendum — historical site-effect interpretation (superseded)
+
+> The causal interpretation in this addendum was rejected by M10 and M13–M18.
+> It cannot establish an altitude-only response, exclude profile effects in the
+> corrected model, or identify missing low-level scattering. The numerical
+> record and original interpretation below are preserved as history.
 
 ## A second dataset
 
@@ -238,7 +248,7 @@ produces too little of it.  This is now a milestone-level item in
 
 ## Vertical structure is excluded
 
-`docs/PROFILES.md` sweeps the ozone profile, the temperature above 20 km, the
+`docs/twilight/PROFILES.md` sweeps the ozone profile, the temperature above 20 km, the
 ground albedo and the phase-function truncation.  None of them can supply the
 factor 0.66 that the old comparison asked for; the only lever that reaches it
 is a −26 K stratopause, which no observed climatology supports.  A useful
@@ -276,7 +286,8 @@ excluded yet:
    at −6° has a transmittance of only ~0.03, so the answer is sensitive to
    how that chord is integrated);
 2. the multiple-scattering level in a shadowed troposphere;
-3. the absolute calibration of 1950s photometry (±0.2–0.4 mag is plausible).
+3. the absolute calibration of 1950s photometry (historically speculated as
+   ±0.2–0.4 mag; this was not a measured error budget and is not established).
 
 The geometric-shadow numbers remain reachable with `refraction=False`, which
 is why they are kept in the tables above.
@@ -287,6 +298,10 @@ is why they are kept in the tables above.
 ---
 
 # Sixth addendum — the solar chord was one branch short
+
+> The chord mechanism and independent checks stand. Engine values here predate
+> the AOD550 slicing fix; the closing solar-axis and altitude interpretations
+> were revised by the later audits.
 
 The −6° "2.20× too bright" was not a physical excess.  For a scattering point
 whose sun is below the local horizontal, the ray to the sun crosses its
@@ -315,13 +330,33 @@ The engine column is `quality="low"`; the medium benchmark gives 0.563 at
 The old geometric 1.14× was a partial cancellation: the chord bug made
 twilight ~2.5× too bright, the absence of refraction ~1.5× too dark, and the
 two errors left the geometric model accidentally close to Koomen.  The
-refraction convention is no longer degenerate: H1 (true axis) gives 0.69×
-Koomen at −6°, H2 (apparent axis) 0.29×, so the references almost certainly
-use the true solar altitude.
+two model axis readings separate: H1 (true axis) gives 0.69×
+Koomen at −6°, H2 (apparent axis) 0.29×. This sensitivity does not establish
+which convention the instruments used; the original claim that the references
+“almost certainly” use true altitude is withdrawn by M17.
 
-What this does *not* fix is the altitude response.  The model is a few per cent
-brighter at 2.4 km where the data are 0.80× darker; `at_altitude` also scales
-the US1976 profile by `p(z0)/P0`, making the density at the site 0.746× too
-low.  That is the next audit.  The lesson: the Monte Carlo and the engine share
-`path_lengths_sun`, so their 1 % agreement could not catch this; the
-independent check has to be a line integral or a ray trace.
+The then-current altitude construction also double-scaled density. M12 later
+fixed truncation; M13 fixed solar occlusion at the raised bottom. The old 0.80
+cross-study ratio is not a controlled altitude target. The lasting lesson:
+the Monte Carlo and engine share `path_lengths_sun`, so their 1% agreement
+could not catch the chord bug; independent line integration or ray tracing
+was required.
+
+---
+
+# Seventh addendum — post-M10 production fixes and experimental audits
+
+M11–M18 and their evidence are recorded in [ROADMAP.md](../docs/ROADMAP.md).
+Two subsequent physical fixes are in production: raised-ground solar occlusion
+([altitude audit](../docs/twilight/TWILIGHT_ALTITUDE_AUDIT.md)) and invariant AOD550 under
+wavelength slicing ([grid audit](../docs/twilight/AEROSOL_GRID_AUDIT.md)). The latter
+changed the engine's anchor optics; older engine benchmarks above keep their
+original meaning and cannot be used as present predictions.
+
+The latest committed physical-check pattern remains 3 PASS / 3 FAIL; a passing
+regression suite does not change that verdict. Unified solar illumination and
+continuous diffuse refraction are separately checked experimental references,
+not production defaults. [CURVED_TRANSPORT_AUDIT.md](../docs/twilight/CURVED_TRANSPORT_AUDIT.md)
+contains the bounded final conclusion and raw-evidence links;
+[TWILIGHT_REFERENCE_AUDIT.md](../docs/twilight/TWILIGHT_REFERENCE_AUDIT.md) explains why
+station residuals and solar-axis conventions remain unassigned.

@@ -11,7 +11,7 @@
 ## 原文事实
 
 以下页码均为正式刊物；arXiv排版页码不同。来源及下载hash在
-[`source_provenance.json`](../validation/data/twilight_reference_audit/source_provenance.json)。
+[`source_provenance.json`](../../validation/data/twilight_reference_audit/source_provenance.json)。
 
 ### Patat et al. 2006
 
@@ -70,7 +70,7 @@ zodiacal bias，另列若补偿该贡献应施加的.18mag修正。这不是纯a
 若示例夜底在线性V信号中扣除，−12° V等效目标约.00121442。
 **这不是同期实测背景扣除，也不是推荐修改validation目标。** 它只说明−12°总观测与纯散射
 的语义差异可能显著；在−6°，该历史夜底太小，不能解释20–30%差额。
-计算值保存在[`reference-calculations.json`](../validation/data/twilight_reference_audit/reference-calculations.json)。
+计算值保存在[`reference-calculations.json`](../../validation/data/twilight_reference_audit/reference-calculations.json)。
 
 ### 站点差不等于受控高度实验
 
@@ -158,9 +158,9 @@ MS的CIE(x,y)约(.20724,.19776)/(.20279,.19043)，比SS的
 
 ## 可复现产物
 
-[`validation/data/twilight_reference_audit/`](../validation/data/twilight_reference_audit/)
+[`validation/data/twilight_reference_audit/`](../../validation/data/twilight_reference_audit)
 包含原始滤镜、288KB的固定CALSPEC谱、URL/SHA、参考算术、逐seed/配对JSON和汇总CSV。
-默认输入来自[`unified_solar_source_audit/raw/`](../validation/data/unified_solar_source_audit/raw/)，
+默认输入来自[`unified_solar_source_audit/raw/`](../../validation/data/unified_solar_source_audit/raw)，
 不依赖scratchpad；脚本通过`__file__`定位仓库，输出来源使用仓库相对路径。
 
 ```bash

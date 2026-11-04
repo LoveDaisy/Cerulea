@@ -37,6 +37,14 @@ uv run python experiments/01_day_cycle.py
 
 项目没有 linter / formatter 配置；沿用现有风格（见文末“代码风格”）。
 
+## 开发与合并惯例
+
+- 代码、文档、配置改动均先基于当前 `main` 建独立主题分支，在分支内修改、验证并提交。
+- 合并前用 `git diff main...HEAD` 核对范围，再在主题分支执行 `git rebase main`；
+  回主仓以 `git merge --no-ff <branch>` 合入，保留明确的任务边界。
+- 合并后核对树内容与工作区状态；独立任务并行时用隔离 worktree。
+- 具体操作、按改动类型选择测试及物理校验判读见 `docs/DEVELOPMENT.md`。
+
 ## 架构与设计
 
 ```text
@@ -61,7 +69,9 @@ uv run python experiments/01_day_cycle.py
 ├── validation/          # check1..6 + common.py + 各轮 addendum
 ├── experiments/         # 生成 figures/ 的脚本（01..12）
 ├── tests/               # 测试套件
-├── docs/                # STATUS / ROADMAP / REPORT / 专题文档 / 中文摘要
+├── docs/                # 项目入口：STATUS / ROADMAP / ARCHITECTURE / DEVELOPMENT / SUMMARY.zh
+│   ├── physics/         # 通用散射、气溶胶、折射与云方法
+│   └── twilight/        # 暮光引擎、审计链与历史廓线实验
 ├── tools/               # build_data.py、twilight_benchmark.py
 ├── figures/             # 提交在仓库里的结果图
 └── scratchpad/          # 本地任务管理（gitignore，不进 git）
@@ -74,7 +84,7 @@ uv run python experiments/01_day_cycle.py
   （`z_bounds` 自 z0 起、地面=z0、不重标定任何柱量，Step 3c）。后续审计发现太阳遮挡
   仍按海平面，已改为 single/SOS/MC/cloud 均用 `r_bounds[0]`；−6° 天顶确定性高低站比
   由历史 1.208× 变为 1.027×。旧引擎 1.01× 也属修复前记录，当前结果及参考条件见
-  `docs/TWILIGHT_ALTITUDE_AUDIT.md`；剩余差异的物理根因尚未确定。
+  `docs/twilight/TWILIGHT_ALTITUDE_AUDIT.md`；剩余差异的物理根因尚未确定。
 - `geometry.py` / `refraction.py`：太阳弦长是暮光的关键。M10 修复后，太阳在局部水平
   以下时走“远侧 perigee→space + 近侧 perigee→point”（`up + 2*down`）。不要重做。
 - `rt/single.py`：一次散射从观察者半径 `r0` 开始积分；折射开启时用
@@ -88,7 +98,7 @@ uv run python experiments/01_day_cycle.py
   因此 warm / 重复调用的 Mie 预处理接近零。冷启动仍需向量化/LUT（后续任务）。
   共享实例是**只读契约**，不要 mutate 气溶胶属性。
   AOD550 的参考截面固定为实际550 nm状态；查询网格和 `Atmosphere._restrict`
-  不得重新归一介质。单波长旧归一错误已修复，见 `docs/AEROSOL_GRID_AUDIT.md`。
+  不得重新归一介质。单波长旧归一错误已修复，见 `docs/twilight/AEROSOL_GRID_AUDIT.md`。
 - `validation/`：对照公开文献的独立检查。`results.json` 是回归护栏，物理数字变化要
   有独立证据并重跑对应 check。
 
@@ -114,20 +124,17 @@ uv run python experiments/01_day_cycle.py
 
 ## 关键文件
 
-- `docs/STATUS.md` — 一页现状（先读这个）
+- `docs/STATUS.md` — 当前行为与验证边界（先读这个）
+- `docs/README.md` — 文档分工、当前入口、暮光审计顺序与历史报告定位
 - `docs/ROADMAP.md` — 已完成里程碑、验证依据与 open questions
-- `docs/REPORT.md` — 完整报告；`docs/结论.zh.md` — 中文摘要
-- `docs/TWILIGHT.md` — 深暮光引擎与引擎基准
+- `docs/DEVELOPMENT.md` — 分支、提交/合并惯例和开发/测试流程
+- `docs/REPORT.md` — 完整报告；`docs/SUMMARY.zh.md` — 中文摘要
+- `docs/twilight/TWILIGHT.md` — 深暮光引擎与引擎基准
 - `validation/SECOND_DATASET.md` — Koomen 第二数据集与高度响应
 - `skycolor/atmosphere.py`、`skycolor/geometry.py`、`skycolor/refraction.py`
 - `skycolor/rt/single.py`、`skycolor/rt/multiple.py`、`skycolor/rt/twilight.py`
 - `validation/check5_twilight.py`、`validation/check6_second_dataset.py`
-- `docs/TWILIGHT_ALTITUDE_AUDIT.md` — 高站太阳遮挡修复、海拔响应实验与参考条件
-- `docs/SOLAR_SOURCE_AUDIT.md` — 太阳衰减配对消融、逆表误差与光束角域定幅；实验结果尚未替换默认模型
-- `docs/UNIFIED_SOLAR_SOURCE_AUDIT.md` — 连续柱量、二维日面与能流独立检验；SS/MC源项闭合
-- `docs/AEROSOL_GRID_AUDIT.md` — AOD550网格一致性修复及golden/物理校验归因
-- `docs/TWILIGHT_REFERENCE_AUDIT.md` — 原始观测定义、合成通带与可裁定边界
-- `docs/CURVED_TRANSPORT_AUDIT.md` — 连续漫射折射、独立闭合、完整探索结论与剩余边界
+- 暮光审计 M13–M18：专题与证据入口统一见 `docs/twilight/README.md`，实验后端尚未替换生产默认。
 - `scratchpad/` — 本地实验/任务记录与临时 session 交接；旧交接已退休，长期成果维护在 tracked 文档
 
 ## 代码风格

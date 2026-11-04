@@ -26,7 +26,7 @@ from skycolor.rt.cloud import (delta_eddington, illuminate_cloud,
 from skycolor.rt.single import direct_sun_transmittance
 
 #: Monte-Carlo reference albedos (conservative layer, mu0 = 1, black ground).
-#: 2e5-4e5 photons, 1 sigma <= 0.001; see docs/CLOUD.md.
+#: 2e5-4e5 photons, 1 sigma <= 0.001; see docs/physics/CLOUD.md.
 MC_G0 = np.array([0.3406, 0.5165, 0.7372, 0.8523, 0.9206])
 MC_G085 = np.array([0.0424, 0.0913, 0.2372, 0.4224, 0.6176])
 MC_TAU = np.array([1.0, 2.0, 5.0, 10.0, 20.0])

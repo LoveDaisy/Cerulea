@@ -63,7 +63,7 @@ Estimator design
 4. **Error estimate.**  ``stderr`` combines the Monte Carlo standard error of
    the coarse grid with the linear smoother weights and the wavelength
    interpolation weights.  It is a statistical error only; the systematic
-   errors are listed in ``docs/TWILIGHT.md``.
+   errors are listed in ``docs/twilight/TWILIGHT.md``.
 
 Quality presets
 ---------------
@@ -122,7 +122,7 @@ _MIN_NEIGHBOURS = 6
 
 #: relative systematic floor of the angular smoother, added in quadrature to
 #: the statistical error (measured against a converged coarse grid, see
-#: ``docs/TWILIGHT.md``)
+#: ``docs/twilight/TWILIGHT.md``)
 MS_BIAS = 0.03
 
 
@@ -425,7 +425,7 @@ def multiple_scattered(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
         # cubic) on purpose: the weights are then a genuine partition of unity
         # and the error propagation below is exact, while the curvature of the
         # multiple-scattering spectrum over one anchor spacing is small (see
-        # docs/TWILIGHT.md).
+        # docs/twilight/TWILIGHT.md).
         wmat = np.zeros((wl.size, n_anchor))
         for j, lam in enumerate(wl):
             k = int(np.searchsorted(wl_a, lam))

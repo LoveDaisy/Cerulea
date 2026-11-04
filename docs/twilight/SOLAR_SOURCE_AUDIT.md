@@ -4,6 +4,11 @@
 这是[海拔遮挡审计](TWILIGHT_ALTITUDE_AUDIT.md)之后的第二阶段。
 本轮保留库的默认计算，新增可复跑实验工具和独立参考积分器。
 
+> 阶段定位：下文“下一步”的统一源已由
+> [阶段三](UNIFIED_SOLAR_SOURCE_AUDIT.md)完成实验验证，连续漫射传播见
+> [阶段四](CURVED_TRANSPORT_AUDIT.md)。本报告保留阶段二消融与当时的未决边界，
+> 不把局部实验效果当完整新模型；生产默认尚未替换。
+
 ## 结论
 
 **已证实的太阳方向误差与源项敏感性已经足够大，应先于高阶求解器的大改或观测校准处理。**
@@ -129,7 +134,7 @@ limb darkening。低分辨率（12/8点Gauss）5/9日面节点结果为海平面
 高站0.295800/0.295877；提高至24/16点Gauss与17日面节点为上表结果。该联合精化显示
 数值差别远小于24.7%的处方效应，但不是有限日面模型误差已被消除的证明。
 
-![MC与一次太阳源消融](../figures/15_solar_source_audit.png)
+![MC与一次太阳源消融](../../figures/15_solar_source_audit.png)
 
 ## 5. 已解决的命题、仍未签发的结论
 
@@ -148,7 +153,7 @@ limb darkening。低分辨率（12/8点Gauss）5/9日面节点结果为海平面
 ## 6. 数据、复跑与验证
 
 原始光谱、配对路径指纹、几何与积分精化探针、统计汇总见
-[`validation/data/solar_source_audit/`](../validation/data/solar_source_audit/README.md)。
+[`validation/data/solar_source_audit/`](../../validation/data/solar_source_audit/README.md)。
 局部过程记录在`scratchpad/explore-twilight-altitude/phase-02-solar-refraction/`，阶段一成果
 单独记入`phase-01-ground-shadow/SUMMARY.md`；永久数值与本报告不依赖这些本地文件。
 

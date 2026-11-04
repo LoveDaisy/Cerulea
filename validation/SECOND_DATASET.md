@@ -1,20 +1,21 @@
 # A second twilight dataset: Koomen et al. (1952)
 
-> Historical production comparisons below predate the AOD550 anchor-optics correction. Current source/transport experiments and primary-reference contracts are in [CURVED_TRANSPORT_AUDIT.md](../docs/CURVED_TRANSPORT_AUDIT.md) and [TWILIGHT_REFERENCE_AUDIT.md](../docs/TWILIGHT_REFERENCE_AUDIT.md).
+> Historical production comparisons below predate the AOD550 anchor-optics correction. Current source/transport experiments and primary-reference contracts are in [CURVED_TRANSPORT_AUDIT.md](../docs/twilight/CURVED_TRANSPORT_AUDIT.md) and [TWILIGHT_REFERENCE_AUDIT.md](../docs/twilight/TWILIGHT_REFERENCE_AUDIT.md).
 
-*The second dataset asked for by open question #2 of `docs/ROADMAP.md`.*
+This document owns the Koomen transcription and the historical production
+comparisons. The deterministic −6° sea-level result remains **0.69×** Koomen
+(0.444279 vs 0.645835 cd m⁻²), or **0.86×** Patat. Older engine ratios below
+predate the AOD550 correction and are labelled as historical.
 
-**Short answer.** The −6° level is no longer a factor-of-two problem.  After
-the M10 chord fix the sea-level model is **0.69×** Koomen et al. (1952)
-(0.44 vs 0.646 cd m⁻²) and **0.86×** Patat et al. (2006); the spherical
-engine gives **0.85×** Koomen and **1.07×** Patat.  The old 1.14× (geometric)
-and 2.20× (refracted) numbers were artifacts of a solar path that returned
-only one perigee → space traversal, dropping the near-side perigee → point
-segment of every grazing twilight ray.  The remaining difference is not causally identified; the paper does not
-provide the absolute error budget needed to assign it to calibration.
+Current check6 deep points are recorded in [results.json](results.json):
+−9° 0.0181585 and −12° 0.000763295 cd m⁻², or **1.12× / 0.59×** Koomen.
+These are one low-budget seed, not converged predictions. Their change from
+older runs is documented in [AEROSOL_GRID_AUDIT.md](../docs/twilight/AEROSOL_GRID_AUDIT.md).
+The remaining station difference is not causally identified; the paper does
+not supply an absolute error budget that assigns it to calibration.
 
 The altitude interpretation was revised by the subsequent
-[audit](../docs/TWILIGHT_ALTITUDE_AUDIT.md): Step 3c fixed truncation, but
+[audit](../docs/twilight/TWILIGHT_ALTITUDE_AUDIT.md): Step 3c fixed truncation, but
 solar visibility still let rays cross the raised opaque ground.  Correcting
 that changes the deterministic -6° high/low ratio **1.208 → 1.027**;
 full-spectrum direct MC gives dimming instead.  The cross-study ratio 0.80
@@ -32,7 +33,8 @@ with FORS1 on the VLT at **ESO-Paranal, altitude 2400 m**.  The model
 atmosphere is a **sea-level** standard atmosphere (1013 hPa, 300 DU O₃,
 AOD₅₅₀ = 0.05 in `presets.clear`).  The comparison therefore mixes a model
 error with a site difference.  A second measurement at a *different altitude*
-is the only way to separate them.
+adds an independent constraint, but cannot by itself separate altitude from
+other station differences.
 
 ## 2. The datasets
 
@@ -121,13 +123,14 @@ effect being tested.  They are therefore reported but not used for the verdict.
   `check5`, so the two references share one zero point.
 
 Both datasets are in `validation/data/twilight_koomen1952.csv` and
-`validation/data/twilight_nawar2020.csv`; `validation/check6_second_dataset.py`
-reproduces the deterministic and `quality="low"` engine numbers below.  The
-medium-quality engine values come from `tools/twilight_benchmark.py`.
+`validation/data/twilight_nawar2020.csv`. The historical comparisons used
+`validation/check6_second_dataset.py` for deterministic/low-quality values
+and `tools/twilight_benchmark.py` for medium-quality values. Current reruns use
+the corrected AOD550 optics and do not reproduce the old engine samples verbatim.
 
 ## 4. Comparison
 
-### 4.1 The headline table
+### 4.1 Historical headline table (post-M10, pre-AOD550 correction)
 
 Zenith luminance [cd m⁻²].  Model: sea level, 300 DU O₃; *clear* =
 AOD₅₅₀ 0.05, *pristine* = Rayleigh + O₃ only.  Deterministic
@@ -149,7 +152,7 @@ AOD₅₅₀ 0.05, *pristine* = Rayleigh + O₃ only.  Deterministic
 the −15° row is used for the verdict.
 Brackets are the 1σ range propagated from the engine's own statistical error.
 
-**At −6° the model is 0.69× Koomen (deterministic) or 0.85× (spherical
+**In those runs, the −6° model is 0.69× Koomen (deterministic) or 0.85× (spherical
 engine, low budget; 0.87× at medium), and 0.86× Patat (deterministic) or
 1.07× (engine; 1.09× at medium).**  The old 1.14× and 2.20× were the
 one-branch chord (M10); the residual in those runs is not independently assigned to calibration
@@ -181,15 +184,16 @@ A common photometric zero point cancels within a same-band ratio.  A
 photopic-to-Johnson-V conversion need not cancel when spectra differ.
 No numerical correction for that difference is inferred here.
 
-### 4.3 The deep twilight
+### 4.3 Historical deep-twilight benchmarks
 
 At −9° the medium-quality benchmark gives 9.31 × 10⁻³ ± 1.91 × 10⁻³ against
 Koomen's 0.01615 (0.58 ×, 1σ 0.46–0.70) and Patat's 0.01712 (0.54 ×, 1σ
 0.43–0.66).  The low-quality `check6` run gives 0.0124 ± 0.0043 (0.77 ×),
 consistent within 1σ.  At −12° the medium run gives 5.46 × 10⁻⁴ ± 3.16 × 10⁻⁴,
 0.42 × Koomen (1σ 0.18–0.67) and 0.37 × Patat; the 58 % error makes this
-non-conclusive.  **The chord fix removed the old 1.4–1.6 × excess and revealed
-a deficit that grows with depth; at −9° it is ~2σ.**
+non-conclusive. The chord fix removed the old 1.4–1.6× excess in this
+benchmark. A growing deficit in one heavy-tailed, pre-AOD550 run is not a
+converged prediction or evidence of a particular missing component.
 
 ### 4.4 The two points that do not fit
 
@@ -256,14 +260,14 @@ cross-site change in atmospheric profiles are different interventions.
 Nor is the engine fully refracted: its higher orders and solar next-event
 estimates remain geometric.  The full evidence, raw runs, uncertainty
 calculation and remaining hypotheses are in
-[the audit](../docs/TWILIGHT_ALTITUDE_AUDIT.md).
+[the audit](../docs/twilight/TWILIGHT_ALTITUDE_AUDIT.md).
 
 ## 6. Verdict
 
-- M10's two-branch chord correction stands.  Sea-level -6° ratios remain
-  0.69 to Koomen (deterministic), about 0.85–0.87 with the engine, and
-  0.86 / about 1.07–1.09 to Patat.  These alone do not isolate the absolute
-  calibration or site contribution to the residual.
+- M10's two-branch chord correction stands. Sea-level −6° deterministic
+  ratios remain 0.69 to Koomen and 0.86 to Patat. Engine ratios 0.85–0.87
+  and 1.07–1.09 refer to pre-AOD550 runs. None isolates calibration or site
+  contributions to the residual.
 - The raised-ground solar-occultation defect is fixed independently of any
   observational fit.  The old 1.208 altitude ratio is superseded by 1.027;
   independent spherical direct MC shows dimming in this standard scene.
@@ -275,12 +279,16 @@ calculation and remaining hypotheses are in
 - `check5` is single-scattering only; use the full solver/engine results when
   discussing absolute twilight levels.
 
-## 7. What would settle the rest
+## 7. Work completed since these comparisons and remaining scope
 
-- Match a **specific station**, its pressure, aerosol/profile information and
-  photometric response, rather than applying an empirical altitude factor.
-- Quantify photopic versus Johnson-V synthetic photometry from the same spectra.
-- Isolate refracted solar illumination from diffuse-path bending in the MC
-  before attributing residuals to a missing scattering mechanism.
-- For deeper twilight, use independent seeds and direct angular/spectral
-  samples to distinguish sampling variance from interpolation bias.
+Unified-source and continuous-diffuse experiments now isolate illumination from
+flight curvature; their source/first-order/MC checks and limits are in
+[CURVED_TRANSPORT_AUDIT.md](../docs/twilight/CURVED_TRANSPORT_AUDIT.md). They have not
+replaced production defaults. A limited same-spectrum V-filter calculation is
+also complete, but is not the full original instrument response; see
+[TWILIGHT_REFERENCE_AUDIT.md](../docs/twilight/TWILIGHT_REFERENCE_AUDIT.md).
+
+Matched station/solar-axis metadata, full instrument response and stable
+rare-path uncertainty remain needed. Proposed next scopes are maintained in
+[ROADMAP.md](../docs/ROADMAP.md#next-work-justified-by-this-exploration), rather
+than restated here as a separate task list.

@@ -27,7 +27,7 @@ pk = np.array(sorted(patat))
 pv = np.array([patat[k] for k in pk])
 
 # The engine points below are the post-M10 medium-quality benchmark
-# (8 anchors x 1.2e7 photons), from docs/TWILIGHT.md section 2.2.  The JSON
+# (8 anchors x 1.2e7 photons), from docs/twilight/TWILIGHT.md section 2.2.  The JSON
 # written by the --quick preview run is 20x cheaper and its engine values carry
 # 40-70 % statistical error, so they are not used for the figure.
 ENG = {  # solar elevation [deg]: (luminance, sigma)

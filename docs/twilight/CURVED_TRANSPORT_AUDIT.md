@@ -71,7 +71,7 @@ ground=observer=0 或2.4km，同一大气截断。主比较均用2×8日面节�
 **本预算未确定曲率修正的符号，更未证明其解释了20–30%的观测残差。**
 不能把点估计的几百分点说成已收敛的普适修正；高度比的区间也没有锁定升降方向。
 
-![连续折射传播受控比较](../validation/data/curved_transport_audit/summary.png)
+![连续折射传播受控比较](../../validation/data/curved_transport_audit/summary.png)
 
 原200–207种子的 coarse-majorant 高站结果.459769±.003474，与新global控制相差约
 2.25 combined-SE，故追加新种子310–317的 native100k 控制，而非直接宣称都是噪声。
@@ -124,7 +124,7 @@ faulthandler续跑313–317，全部成功且无重复seed。成功续跑不是�
 ## 复跑
 
 永久证据、日志、数值反例和来源见
-[`validation/data/curved_transport_audit/`](../validation/data/curved_transport_audit/README.md)。
+[`validation/data/curved_transport_audit/`](../../validation/data/curved_transport_audit/README.md)。
 统计/图不依赖scratchpad，不重跑MC：
 
 ```bash

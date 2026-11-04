@@ -1,21 +1,26 @@
 # Validation report — is the model right?
 
-**Branch:** `feat/validation` · **Model under test:** `skycolor/` as committed
-on this branch (single-scattering core; multiple scattering is still a stub).
-**Environment:** Python 3.11, numpy 2.4.6, scipy 1.17.1, matplotlib 3.11.2.
+This is the **original single-scattering baseline**, recorded on
+`feat/validation` with Python 3.11 / numpy 2.4.6 / scipy 1.17.1. Multiple
+scattering was still a stub. The five-check table and interpretation below
+retain that historical context; they are not the current harness output.
 
-Run everything with:
+The latest committed six-check [results.json](results.json) has **3 PASS /
+3 FAIL**; [STATUS.md](../docs/STATUS.md) explains the present limits.
+[ADDENDUM.md](ADDENDUM.md) records subsequent changes, and
+[the documentation guide](../docs/README.md) maps the later independent audits.
+Reference sources are documented in [SOURCES.md](data/SOURCES.md).
+
+From the repository root, run the **current** checks with:
 
 ```bash
-cd "/Users/zhangjiajie/Codes/skycolor-wt/validation"
-"/Users/zhangjiajie/Codes/Sky Color Simulation/.venv/bin/python" validation/run_all.py
+uv run python -m validation.run_all
 ```
 
-`run_all.py` prints the table below, writes `validation/results.json`, and
-exits non-zero only if a check that actually ran fails its tolerance.
-Reference sources are documented in `validation/data/SOURCES.md`.
+This writes `validation/results.json` and figures; it is a new calculation,
+not a replay of the historical tables below.
 
-## Summary
+## Historical summary
 
 | # | Check | Reference | Verdict |
 |---|---|---|---|
@@ -355,14 +360,15 @@ twilight scene deeper than about −6°, until multiple scattering is
 implemented.  The failures are consistent, understood, and all point at the
 same missing physics rather than at independent bugs.
 
-## Reproducing
+## Running current checks
+
+From the repository root:
 
 ```bash
-cd "/Users/zhangjiajie/Codes/skycolor-wt/validation"
-PY="/Users/zhangjiajie/Codes/Sky Color Simulation/.venv/bin/python"
-"$PY" validation/run_all.py          # all checks, table, results.json
-"$PY" validation/check3_cie_luminance.py   # one check at a time
+uv run python -m validation.run_all
+uv run python -m validation.check3_cie_luminance
 ```
 
 `run_all.py` exits 0 if every check that ran passed (skipped checks do not
-fail the run), 1 if any check failed.
+fail the run), 1 if any check failed. Exact reproduction of the tables in
+this historical report requires its original model and environment.

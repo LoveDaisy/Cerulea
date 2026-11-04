@@ -22,7 +22,7 @@ What is *not* modelled
 No three-dimensional structure, no cloud streets, no cumulus, no entrainment,
 no ice-crystal habit (cirrus uses an equivalent-sphere approximation), no
 vertical variation of droplet size inside the deck and no horizontal variation
-of optical depth.  See ``docs/CLOUD.md`` for the full list and for what those
+of optical depth.  See ``docs/physics/CLOUD.md`` for the full list and for what those
 omissions cost.
 
 Units
@@ -79,7 +79,7 @@ RHO_ICE = 917.0
 #: typical of stratocumulus and altostratus (Miles, Verlinde & Clothiaux 2000).
 SIGMA_G = {"water": 1.35, "ice": 1.45}
 
-#: Numerical defaults.  See ``docs/CLOUD.md`` for the convergence study that
+#: Numerical defaults.  See ``docs/physics/CLOUD.md`` for the convergence study that
 #: fixes these numbers: ``n_radii`` controls the size integral, ``n_f``/``n_b``
 #: the forward-peak and full-sphere angular quadrature.
 N_RADII = 128

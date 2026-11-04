@@ -26,7 +26,8 @@ Two numerical details matter:
   `ds = 4000 m` down to `ds = 500 m`.
 * the shadow threshold is found from **Bouguer's invariant**,
   `n r sin(theta) = const`, which gives the grazing angle in closed form,
-  `sin(theta) = n(R) R / (n(r0) r0)` (taking the obtuse root, because the ray
+  `sin(theta) = n(R_b) R_b / (n(r0) r0)`, where `R_b = r_bounds[0]` is
+  the opaque model bottom (taking the obtuse root, because the ray
   points down toward the horizon).  No bisection, no noise.
 
 ## Validation
@@ -86,7 +87,7 @@ Bending the paths raises the terminator by 0.5–1.0 degrees and makes twilight
 brighter.  With the corrected two-branch chord (see below) the model gives,
 for the `clear` preset at sea level:
 
-| solar elevation | geometric | full refraction | Koomen 1952 | Patat 2006 |
+| solar elevation | geometric | refracted solar-path model | Koomen 1952 | Patat 2006 |
 |---|---|---|---|---|
 | −3° | 16.0 (0.75 K) | 20.1 (0.93 K) | 21.5 | 40.1 † |
 | −6° | 0.295 (0.46 K) | 0.444 (0.69 K) | 0.646 | 0.516 |
@@ -113,8 +114,9 @@ there:
 | H2: reference axis is *apparent*, refraction on | — | 0.36× |
 | geometric model (refraction off, true axis) | 0.40× | 0.57× |
 
-(ratios to Patat).  H1 is the better reading; H2 is much too dark.  The old
-"the two readings are degenerate" result was computed with the one-branch
-chord.  The references almost certainly tabulate the true (ephemeris) solar
-altitude.  Refraction stays on by default; `refraction=False` reproduces the
-geometric numbers above.
+These are historical model sensitivities (ratios to Patat), not evidence of
+which convention the observations used. The primary papers do not explicitly
+settle true/apparent altitude or disk centre/limb, and better agreement cannot
+establish that contract. Current experiments assume true solar-centre altitude
+without fitting an axis shift. See [TWILIGHT_REFERENCE_AUDIT.md](../twilight/TWILIGHT_REFERENCE_AUDIT.md).
+Refraction stays on by default; `refraction=False` reproduces geometric controls.

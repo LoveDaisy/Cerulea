@@ -50,7 +50,7 @@ plus the near branch (perigee -> point).  The one-branch version returned
 The altitude response is diagnostic only: cross-site measurements do not
 isolate a pure height intervention.  Aligning solar occultation with the
 raised ground changed the deterministic -6 deg ratio from 1.208 to 1.027;
-see docs/TWILIGHT_ALTITUDE_AUDIT.md for independent MC and reference audits.
+see docs/twilight/TWILIGHT_ALTITUDE_AUDIT.md for independent MC and reference audits.
 
 Runtime is a few minutes, almost all of it in the two engine points.
 
@@ -342,7 +342,7 @@ def main():
     print("  pair gives 1.28x.  These are cross-site comparisons, not a controlled")
     print("  intervention on altitude alone.  at_altitude raises a global opaque")
     print("  sphere, including the solar shadow, with no column renormalisation.")
-    print("  See docs/TWILIGHT_ALTITUDE_AUDIT.md for the residual and its limits.")
+    print("  See docs/twilight/TWILIGHT_ALTITUDE_AUDIT.md for the residual and its limits.")
     print()
     print(f"  verdict: {result.verdict}")
     print()
@@ -354,7 +354,7 @@ def main():
     print(f"  the model is {d6k:.2f}x Koomen (deterministic) or {e6k:.2f}x (engine),")
     print(f"  and {d6p:.2f}x / {e6p:.2f}x Patat.  The old 1.14x / 2.20x were the one-branch")
     print("  chord.  Remaining residuals do not independently identify calibration,")
-    print("  site conditions or missing scattering; see docs/TWILIGHT_REFERENCE_AUDIT.md.")
+    print("  site conditions or missing scattering; see docs/twilight/TWILIGHT_REFERENCE_AUDIT.md.")
     print("  The old 1.208x altitude ratio included solar rays crossing the raised")
     print("  opaque ground.  That defect is fixed; the current deterministic ratio")
     print("  is printed above.  A cross-study ratio of 0.80 is not a calibration target.")

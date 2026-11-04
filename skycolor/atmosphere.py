@@ -259,7 +259,7 @@ class Atmosphere:
         Truncation raises a globally spherical surface; it does not model
         a local mountain above surrounding lowland.  Cross-site brightness
         ratios are not controlled predictions of this operation (see
-        ``docs/TWILIGHT_ALTITUDE_AUDIT.md``).
+        ``docs/twilight/TWILIGHT_ALTITUDE_AUDIT.md``).
 
         ``elevation_km=0`` returns an equivalent atmosphere (a fresh copy,
         as the method always has).  The derived atmosphere owns fresh

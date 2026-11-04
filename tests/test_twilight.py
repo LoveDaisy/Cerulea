@@ -3,7 +3,7 @@
 The Monte Carlo is deliberately run with a very small photon budget here (pass
 ``grid=dict(...)``): the suite must stay fast.  The quantitative validation
 against Patat et al. and against high-photon references lives in
-``tools/twilight_benchmark.py`` and is reported in ``docs/TWILIGHT.md``.
+``tools/twilight_benchmark.py`` and is reported in ``docs/twilight/TWILIGHT.md``.
 """
 from __future__ import annotations
 

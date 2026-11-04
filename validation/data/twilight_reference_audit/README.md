@@ -1,6 +1,6 @@
 # Twilight reference and filter-only bandpass audit
 
-Companion interpretation: [`docs/TWILIGHT_REFERENCE_AUDIT.md`](../../../docs/TWILIGHT_REFERENCE_AUDIT.md).
+Companion interpretation: [`docs/TWILIGHT_REFERENCE_AUDIT.md`](../../../docs/twilight/TWILIGHT_REFERENCE_AUDIT.md).
 The audit does not change validation targets or identify an altitude causal effect.
 The −12° night-floor calculation is a historical-mean illustration, not a matched
 measurement or an instruction to subtract that value from the observations.

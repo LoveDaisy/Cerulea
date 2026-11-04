@@ -79,7 +79,7 @@ PATAT = {-3.0: 40.09, -6.0: 0.516, -9.0: 0.0171, -12.0: 0.00146}
 #: the elevations the sweep is run at.  -3 and -6 are the two reference
 #: points quoted in the roadmap; -4 and -8 bracket -6 and are reported for
 #: shape, but the deterministic model is not trustworthy at -8 (it is 2.8x
-#: too dark there; see docs/TWILIGHT.md, section 2.1).
+#: too dark there; see docs/twilight/TWILIGHT.md, section 2.1).
 ELEVATIONS = (-3.0, -4.0, -6.0, -8.0)
 
 ALBEDO = 0.1
@@ -385,7 +385,7 @@ def main(run_engine: bool = False):
     payload = dict(
         experiment="12_profile_sensitivity",
         description="Vertical-structure sensitivity of the twilight zenith "
-                    "luminance; see docs/PROFILES.md.",
+                    "luminance; see docs/twilight/PROFILES.md.",
         atmosphere=dict(ozone_du=OZONE_DU, aerosols=[], ground_albedo=ALBEDO,
                         surface_pressure_Pa=101325.0, elevation_km=0.0),
         wavelengths_nm=[float(WL[0]), float(WL[-1]), float(WL[1] - WL[0])],

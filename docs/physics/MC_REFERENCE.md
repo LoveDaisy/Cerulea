@@ -97,7 +97,8 @@ Rays are straight lines in three dimensions (no refraction) through
 concentric spherical shells.  The free flight uses **delta tracking**:
 
 * the atmosphere is divided into a few coarse layers (boundaries at
-  0, 1, 4, 12, 40, 120 km by default);
+  offsets 1, 4, 12, 40 and 120 km above the model bottom, clipped to the
+  domain and bracketed by its bottom and top);
 * inside a layer a majorant `b_max` bounds the extinction;
 * a step of length `-ln(ξ)/b_max` is taken.  If it crosses a layer boundary
   the photon moves to the boundary and continues with the new majorant; if
@@ -105,7 +106,7 @@ concentric spherical shells.  The free flight uses **delta tracking**:
   (otherwise it is a null collision and the photon continues).
 
 The extinction used by the sampler is tabulated on a fine height grid
-(700 quadratically spaced points, ~0.4 m spacing at the ground) and
+(701 quadratically spaced points plus model/sampling boundaries) and
 log-linearly interpolated.  Log-linear interpolation cannot overshoot between
 two grid points, so the maximum of the tabulated field inside a layer is a
 true majorant of the field actually being sampled.  The sampler is therefore
@@ -142,10 +143,14 @@ spectral weighting.
 Each wavelength gets an independent random stream derived from the user seed
 with `numpy.random.SeedSequence(...).spawn(n_wl)`, so
 
-* results are reproducible for a given seed,
-* a single wavelength computed alone gives exactly the same number as in a
-  multi-wavelength call,
+* results are reproducible for a fixed seed and ordered query grid,
+* child streams are assigned by wavelength **index**; slicing/reordering a grid
+  can assign a different stream to the same physical wavelength,
 * the different wavelengths are statistically independent.
+
+The medium optics do remain invariant under wavelength restriction; this is a
+physical contract, distinct from equality of individual MC samples. See
+[AEROSOL_GRID_AUDIT.md](../twilight/AEROSOL_GRID_AUDIT.md).
 
 ---
 

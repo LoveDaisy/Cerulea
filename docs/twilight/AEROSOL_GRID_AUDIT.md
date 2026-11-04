@@ -31,7 +31,7 @@ golden 是回归检查；正确性的依据是上述介质不变量与解析归�
 401点网格超过256容量时可能重算已逐出的550状态，数值仍确定。
 
 原始前后数组、红绿日志、fixture 字段差及 SHA 存于
-[`validation/data/aerosol_grid_audit/`](../validation/data/aerosol_grid_audit/)。
+[`validation/data/aerosol_grid_audit/`](../../validation/data/aerosol_grid_audit)。
 该目录的 `probe.py after` 可在仓库根目录用 `uv run python` 复跑；`before` 模式
 只用于旧源码基线，勿覆盖保留的历史数组。
 

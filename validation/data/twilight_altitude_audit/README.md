@@ -1,6 +1,6 @@
 # Twilight altitude audit records
 
-Report: [TWILIGHT_ALTITUDE_AUDIT.md](../../../docs/TWILIGHT_ALTITUDE_AUDIT.md).
+Report: [TWILIGHT_ALTITUDE_AUDIT.md](../../../docs/twilight/TWILIGHT_ALTITUDE_AUDIT.md).
 Baseline commit: `a15555b`. All runs are zenith, true solar elevation -6°,
 clear aerosol AOD550 0.05, ozone 300 DU, Lambertian albedo 0.1, unless named
 geometric. Radiance arrays are W m⁻² sr⁻¹ nm⁻¹; photopic integrals are cd m⁻²

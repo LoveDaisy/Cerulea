@@ -42,7 +42,7 @@ LIBRARY_NAMES = [
 ]
 
 #: Values documented in the docstrings of ``skycolor.aerosol`` and in
-#: ``docs/AEROSOL.md``.  ``alpha`` is ``-ln(tau(440)/tau(660))/ln(440/660)``,
+#: ``docs/physics/AEROSOL.md``.  ``alpha`` is ``-ln(tau(440)/tau(660))/ln(440/660)``,
 #: ``tau_ratio`` is ``tau(450)/tau(650)``, ``f32`` is ``beta_32`` (the first
 #: omitted moment when the SOS solver keeps 32 moments, l = 0..31).
 DOCUMENTED = {
@@ -362,7 +362,7 @@ def test_library_registry_aliases():
 
 def test_documented_values_are_consistent_with_docstrings():
     """A cheap guard: the numbers in ``DOCUMENTED`` are the ones quoted in the
-    module docstrings (kept in sync manually; see docs/AEROSOL.md)."""
+    module docstrings (kept in sync manually; see docs/physics/AEROSOL.md)."""
     import skycolor.aerosol as mod
 
     for cls, name in [
