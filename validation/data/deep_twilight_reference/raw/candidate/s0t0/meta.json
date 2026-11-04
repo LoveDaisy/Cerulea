@@ -33,9 +33,16 @@
  "attempts": [
   {
    "index": 0,
+   "status": "superseded-cost-bookkeeping",
+   "seeds": [],
+   "path": "attempt-00.jsonl",
+   "note": "values exact (same seeds/physics) but cost fields wrong: the 3-wavelength rest MC ran once per anchor (3x cost) and per-anchor mc_seconds misstated the repeat cost unit; CODE_FILES lacked twilight_second_order.py. Superseded by attempt-01 (one MC per repeat, corrected bookkeeping)."
+  },
+  {
+   "index": 1,
    "status": "complete",
    "seeds": [],
-   "path": "attempt-00.jsonl"
+   "path": "attempt-01.jsonl"
   }
  ],
  "expected_seeds": [
@@ -55,5 +62,27 @@
   80013,
   80014,
   80015
- ]
+ ],
+ "recontracts": [
+  {
+   "changed": [
+    "protocol_sha256",
+    "candidate_samples",
+    "rest_photons"
+   ],
+   "stored": {
+    "protocol_sha256": "23b46bd6784b91181c34cd5ff05656ce86f9aeecfa2bbe29c0728f1b432c87a1",
+    "candidate_samples": 100000,
+    "rest_photons": null
+   },
+   "incoming": {
+    "protocol_sha256": "23b46bd6784b91181c34cd5ff05656ce86f9aeecfa2bbe29c0728f1b432c87a1",
+    "candidate_samples": 100000,
+    "rest_photons": 400000
+   },
+   "at": "2026-11-04T21:20:00+08:00",
+   "reason": "protocol file evolved (candidate/sensitivity sections added); contract fields made explicit in review round 1"
+  }
+ ],
+ "rest_photons": 400000
 }

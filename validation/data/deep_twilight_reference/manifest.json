@@ -1,6 +1,6 @@
 {
  "schema": "deep-twilight-reference/manifest/1",
- "generated": "2026-11-04T19:03:25+0800",
+ "generated": "2026-11-04T19:45:03+0800",
  "files": {
   "README.md": "e42170fc87e544963cd71f9e555a2e730531932770ba06800688d43f1d13c91b",
   "probe/README.md": "93ed32f692d0e7509cf0397da6e46b20f1af4a2284322171b93718208bda8d07",
@@ -28,13 +28,17 @@
   "probe/verified-probe-summary.json": "709cfc20ed32631fdd4a024e885843eb4cb65b40d7910158e435e5e16573da44",
   "protocol.json": "23b46bd6784b91181c34cd5ff05656ce86f9aeecfa2bbe29c0728f1b432c87a1",
   "raw/candidate/s0t0/attempt-00.jsonl": "c16aa5d2bec8b6bbc4c610499fd29a5b31288ab460e9019bb0e7a691d42d145c",
-  "raw/candidate/s0t0/meta.json": "29c44c873c371c9b482144f6265ea8f2905887a0a3cebe960375728a1ee6e512",
+  "raw/candidate/s0t0/attempt-01.jsonl": "71bc162ed278c5888e0a2e43f7f01bd742b8d596e55ba9d468b053af7b5d41c5",
+  "raw/candidate/s0t0/meta.json": "9cecce67726899acc68e59952efe5e46001c722d8fe3cb4837ccfab2e7ef8290",
   "raw/candidate/s0t1/attempt-00.jsonl": "96dc062224b6ccdc97fb768f2921b526a9b235c91b2a80896ce591fb2b732e6d",
-  "raw/candidate/s0t1/meta.json": "65b875bd06c8ab88ed9c9e7c6752eea564e954e432e2bc317b3f49864400cc7a",
+  "raw/candidate/s0t1/attempt-01.jsonl": "1a2c8e29222b24c6630fd385cea4c18f5ab449419e5333030823ccb9e4673792",
+  "raw/candidate/s0t1/meta.json": "2d9b65712a57334da8ff813d5b0a14ae09342eef28f9f04dd0f4e1dd88984462",
   "raw/candidate/s1t0/attempt-00.jsonl": "78e36d3b386b2b58099b26a47e5918079979e4eb54c0b622149cd479a81529cb",
-  "raw/candidate/s1t0/meta.json": "2f307f6790783d488b155763ed14b8b065567cec6850f14bb156e62d0acef064",
+  "raw/candidate/s1t0/attempt-01.jsonl": "2d1d8b07f9361cb4e3eb85465970ab1cab40e9a88a2c882f61ee468fe54bd94b",
+  "raw/candidate/s1t0/meta.json": "5d7bc889900d0bdde4cb5eb9ba673a87246c32ad23412a89db1c288eae95d706",
   "raw/candidate/s1t1/attempt-00.jsonl": "ef62423882147e811f3414e8ed839e6181ae10bd572a578f6313a98716d7d0e3",
-  "raw/candidate/s1t1/meta.json": "467bb24097be1c5ce59be6a4b9090dd7ecb02591b686dc2ab5ccbca736c99e0d",
+  "raw/candidate/s1t1/attempt-01.jsonl": "7df262f7a24479c6b38538f35ce9d6410ebe58fa5d52290f5096eedc9b70134d",
+  "raw/candidate/s1t1/meta.json": "8b9e81754c395ab455651d08b7c99640521499d22b29bfbcb7be5ef581572e7d",
   "raw/direct/s0b0/attempt-00.jsonl": "6a0f956dcd22b55bd1ff1569285d7e25149623798c09a55bcc1e361ea260d7f0",
   "raw/direct/s0b0/meta.json": "bde0a0aacb6d25988f696266fd6e682e0851cde8557151dc26ebe0a55296a000",
   "raw/direct/s0b1/attempt-00.jsonl": "cdd33e5345366dae9ad8db0e430589d32b14f065bdc8e43f0d8374453df34da4",
@@ -55,7 +59,7 @@
   "raw/source-pairs/s1b1-point/attempt-00.jsonl": "fa60d708c02daf9ca9fe5d7864dda46d6d52a77e237541302f5984431763b8b3",
   "raw/source-pairs/s1b1-point/meta.json": "3e595659d07c8afee95042af777a4346dbe5e2a4366415b1e90840af9a51877d",
   "regression-run-all.log": "70e663fe60257ffa6899949127c681ed3b2d74b93c7d3c3d6fc4a6427c48f3b7",
-  "state.json": "0707e2949eb4195691e9c2bd0ce807fbd17b6941d1ea48e3f1b2fae95996f1b1",
+  "state.json": "b3f2a8ea85926af68c713972b0a4657cd43e28058d7d58a4161fc791b2a6a7d1",
   "table-heldout.json": "66fdb9c9e128dfd3c6e2369916b10d10bf95e4b432abe28c5e6c5562d686c8d9",
   "table-heldout.log": "ab48e2f7bacf786a9f8d768976be38a2f8470f23c7788f5c3741135d0a548e52"
  }

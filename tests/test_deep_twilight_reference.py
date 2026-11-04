@@ -479,11 +479,20 @@ def test_candidate_and_sensitivity_sections(tmp_path):
     tier0_550 = cand["-9.0"]["tiers"]["0"]["anchors"]["550.0"]
     tier1_550 = cand["-9.0"]["tiers"]["1"]["anchors"]["550.0"]
     assert tier1_550["candidate_mean"] > tier0_550["candidate_mean"]
-    # zero rest moments are real zeros in the mean, not dropped samples
-    assert tier0_550["zero_rest_records"] == 1
+    # zero rest moments are real zeros in the mean, not dropped samples;
+    # zero_rest_records counts only genuinely missing (None) values
+    assert tier0_550["zero_rest_records"] == 0
+    assert tier1_550["zero_rest_records"] == 0
     moments = [0.0 if r == 3 else 5e-12 for r in range(4)]
     assert abs(tier0_550["rest_second_moment_mean"]
                - sum(moments) / 4) < 1e-30
+    # a genuinely missing moment (None from a no-tail-evidence record)
+    rows = json.loads(json.dumps([
+        dict(seed=s, per_lambda={"550.0": dict(rest_second_moment=(
+            None if s == 80003 else 5e-12))}) for s in range(80000, 80004)]))
+    n_none = sum(1 for r in rows
+                 if r["per_lambda"]["550.0"]["rest_second_moment"] is None)
+    assert n_none == 1
     assert cand["-9.0"]["drift"]["550.0"]["abs_drift"] > 0.0
     eff = cand["-9.0"]["efficiency"]["550.0"]
     assert eff["verdict"] in ("candidate-more-efficient",

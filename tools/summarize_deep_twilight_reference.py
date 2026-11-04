@@ -485,9 +485,9 @@ def _candidate_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
                     0.0 if r["per_lambda"][str(a_nm)]["rest_second_moment"] is None
                     else r["per_lambda"][str(a_nm)]["rest_second_moment"]
                     for r in records])
-                n_zero_rest = int(np.count_nonzero(
-                    r["per_lambda"][str(a_nm)]["rest_second_moment"] is None
-                    for r in records))
+                n_zero_rest = sum(1 for r in records
+                                  if r["per_lambda"][str(a_nm)]["rest_second_moment"]
+                                  is None)
                 repeat_seconds = np.array([float(r["seconds"]) for r in records])
                 analog_seconds = np.array([float(r.get("mc_seconds")
                                                  or r["seconds"] * 0.0)

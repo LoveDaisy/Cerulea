@@ -9,8 +9,8 @@
    ]
   },
   "candidate": {
-   "cumulative_seconds": 1303.54373024893,
-   "records": 64,
+   "cumulative_seconds": 2016.07982699899,
+   "records": 128,
    "stages": [
     "candidate"
    ]
