@@ -463,14 +463,15 @@ def run_formal_stage(protocol, atmo, table, stage, data_dir, state, *,
     repeats = int(direct["repeats"])
     suns = protocol["scenario"]["sun_elevations_deg"]
     singles = deterministic_singles(protocol, atmo, table)
-    spent, _cap = stage_budget(state, stage, protocol, max_stage_hours)
+    spent, budget_left = stage_budget(state, stage, protocol, max_stage_hours)
     started = time.perf_counter()
     billed = started  # seconds of this invocation already noted into state
     computed = 0
     stopped = None
 
     def remaining():
-        return _cap - (spent + (time.perf_counter() - started))
+        # budget_left already excludes prior invocations' cumulative cost
+        return budget_left - (time.perf_counter() - started)
 
     def bill(records_done):
         nonlocal billed, billed_records
@@ -644,7 +645,7 @@ def stage_candidate(protocol, atmo, table, data_dir, state, *, protocol_path,
         singles3[sun_elev] = value
         print(json.dumps(dict(candidate_single=sun_elev,
                               seconds=time.perf_counter() - started)), flush=True)
-    spent, _cap = stage_budget(state, "candidate", protocol, max_stage_hours)
+    spent, budget_left = stage_budget(state, "candidate", protocol, max_stage_hours)
     started = time.perf_counter()
     billed = started
     billed_records = 0
@@ -652,7 +653,8 @@ def stage_candidate(protocol, atmo, table, data_dir, state, *, protocol_path,
     stopped = None
 
     def remaining():
-        return _cap - (spent + (time.perf_counter() - started))
+        # budget_left already excludes prior invocations' cumulative cost
+        return budget_left - (time.perf_counter() - started)
 
     def bill(records_done):
         nonlocal billed, billed_records
@@ -806,7 +808,7 @@ def stage_sensitivity(protocol, atmo, table, data_dir, state, *, protocol_path,
     repeats = int(sens.get("repeats", 16))
     photons = int(sens.get("photons_per_wavelength", 100_000))
     suns = protocol["scenario"]["sun_elevations_deg"]
-    spent, _cap = stage_budget(state, "sensitivity", protocol, max_stage_hours)
+    spent, budget_left = stage_budget(state, "sensitivity", protocol, max_stage_hours)
     started = time.perf_counter()
     billed = started
     billed_records = 0
@@ -814,7 +816,8 @@ def stage_sensitivity(protocol, atmo, table, data_dir, state, *, protocol_path,
     stopped = None
 
     def remaining():
-        return _cap - (spent + (time.perf_counter() - started))
+        # budget_left already excludes prior invocations' cumulative cost
+        return budget_left - (time.perf_counter() - started)
 
     def bill(records_done):
         nonlocal billed, billed_records
