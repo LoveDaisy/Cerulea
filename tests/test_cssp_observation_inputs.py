@@ -47,7 +47,6 @@ from tools.cssp_observation_inputs import (  # noqa: E402
     parse_edt_label,
     parse_full_csv_rows,
     publish_pipeline,
-    published_correction_factor_pi,
     quality_of_column,
     read_jpl_elevation,
     read_json,
@@ -741,28 +740,34 @@ def test_signed_sensitivity_rates_and_forward_operator_domain():
     # result equals the response-domain reference and differs from a naive
     # physical-domain median filter (the two operations do not commute -
     # exactly the inequality the r02 review probed numerically).
-    d = published_correction_factor_pi(PACKET)
-    assert d.shape == (561,)
-    # A constant physical sky does NOT publish to a constant spectrum: the
-    # published smoothing runs in the response domain, so D*median(c/D)
-    # carries a real (upstream-inherited) spectral distortion. The contract
-    # is the mapping itself, verified against its reference below.
-    flat = np.full(561, 2.5)
-    padded_flat = np.pad(flat / d, (4, 4), mode="constant", constant_values=np.nan)
-    assert publish_pipeline(flat, d) == pytest.approx(
-        d * np.asarray([np.nanmedian(padded_flat[k:k + 8]) for k in range(561)]),
-        nan_ok=True)
-    ramp = np.linspace(0.5, 5.0, 561)
-    padded_response = np.pad(ramp / d, (4, 4), mode="constant",
-                             constant_values=np.nan)
-    reference = d * np.asarray([np.nanmedian(padded_response[k:k + 8])
-                                for k in range(561)])
-    assert publish_pipeline(ramp, d) == pytest.approx(reference, nan_ok=True)
-    padded_physical = np.pad(ramp, (4, 4), mode="constant",
-                             constant_values=np.nan)
-    naive = np.asarray([np.nanmedian(padded_physical[k:k + 8])
-                        for k in range(561)])
-    assert not np.allclose(publish_pipeline(ramp, d), naive)
+    extract = load_calibration_extract(PACKET)
+    d_full = np.asarray(extract["correction_factor"], dtype=float) * np.pi
+    wls = extract["wls"]
+    assert wls.size == 951
+    # Interior windows reproduce the response-domain mapping exactly; edge
+    # windows touch the uncalibrated region (no public D outside 280-840),
+    # where the count-domain context of the published chain is not
+    # representable - publish_pipeline returns NaN there instead of
+    # fabricating edge values (r03 Major: the crop-first boundary difference
+    # at 280-283 / 838-840 nm made those channels unrepresentable).
+    rng = np.random.default_rng(7)
+    full = np.where(rng.random(951) < 0.2, np.nan, 1.0 + rng.random(951))
+    full[130] = 2.0                          # 280 nm finite
+    full[691] = 1.2                          # 840 nm finite
+    out = publish_pipeline(full, extract)
+    assert out.shape == (561,)
+    crop = (wls >= 280.0) & (wls <= 840.0)
+    wl_band = wls[crop]
+    edge = (wl_band <= 283.0) | (wl_band >= 838.0)
+    assert np.all(np.isnan(out[edge])), "edge channels must stay NaN"
+    # Reference with the same window rule (all-finite windows only; a window
+    # containing NaN context is not reproducible and maps to NaN).
+    padded = np.pad(full / d_full, (4, 4), mode="constant", constant_values=np.nan)
+    reference_full = np.asarray([
+        d_full[k] * np.median(padded[k:k + 8])
+        if np.isfinite(padded[k:k + 8]).all() else np.nan
+        for k in range(951)])
+    assert out == pytest.approx(reference_full[crop], nan_ok=True)
 
 
 def test_weather_source_urls_reconstruct_acquisition_requests():

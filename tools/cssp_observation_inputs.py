@@ -1062,6 +1062,23 @@ WEATHER_SUBSTITUTES = {
 }
 
 
+def verify_archive_identity(index: dict) -> None:
+    """Build attests the WHOLE raw-archive identity, not just member hits.
+
+    A re-tarred archive containing exactly the selected members would map,
+    extract and replay identically while being a different upstream object;
+    the measured identity of the cached archive must equal the pinned
+    whole-file identity before build may sign it into sources.json.
+    """
+    if index.get("archive_sha256") != RAW_ARCHIVE_FULL_SHA256 \
+            or index.get("total_bytes") != RAW_ARCHIVE_TOTAL_BYTES:
+        raise ValueError(
+            "raw archive identity mismatch: measured "
+            f"{index.get('archive_sha256', '?')[:12]}…/{index.get('total_bytes', '?')} B, "
+            f"expected {RAW_ARCHIVE_FULL_SHA256[:12]}…/{RAW_ARCHIVE_TOTAL_BYTES} B; "
+            "the cache archive is not the pinned upstream whole file")
+
+
 def check_cache_inputs(cache_dir: Path, substitutes: dict | None = None,
                        substitute_root: Path | None = None) -> None:
     """Preflight: build refuses to start without every required input.
@@ -1234,7 +1251,9 @@ def build_packet(cache_dir: Path, out: Path, force: bool) -> dict:
     inventory = build_session_inventory(labels, values)
     picks = choose_session_samples(labels, values, inventory, sun_tab)
     columns = sorted(c for cols in picks.values() for c in cols)
-    mapping = map_columns_to_members(labels, scan_raw_index(tar_path), columns)
+    archive_index = scan_raw_index(tar_path)
+    verify_archive_identity(archive_index)
+    mapping = map_columns_to_members(labels, archive_index, columns)
 
     (out / "raw/mat").mkdir(parents=True, exist_ok=True)
     (out / "ephemeris").mkdir(parents=True, exist_ok=True)
@@ -1497,18 +1516,22 @@ def operator_contract() -> dict:
                   "evidence": EVIDENCE_UNKNOWN,
                   "reason": "site horizon not characterised; H=1 is the idealisation"},
             "P_publish": {"text": "publishing steps that apply to already-calibrated "
-                                  "physical spectra (W m-2 nm-1 in and out): resampling "
-                                  "onto the 1 nm published grid, the published median "
-                                  "filter span 8 - which the upstream chain applies in "
-                                  "the detector-response domain, i.e. E -> D*median(E/D) "
-                                  "with D = correction_factor*pi from the vendored "
-                                  "extract (filtering and a wavelength-dependent "
-                                  "scaling do not commute; filtering E directly would "
-                                  "reshape spectra by up to a few percent) - and the "
-                                  "negative-value clamp. Implemented in "
-                                  "publish_pipeline(); a model spectrum in physical "
-                                  "units passes through these and only these steps "
-                                  "before band comparison",
+                                  "physical spectra (W m-2 nm-1): resampling onto the "
+                                  "FULL calibration grid (150-1100 nm), the published "
+                                  "median filter span 8 applied there in the "
+                                  "detector-response domain - E -> D*median(E/D), "
+                                  "D = correction_factor*pi from the vendored extract "
+                                  "(filtering and wavelength-dependent scaling do not "
+                                  "commute) - negative clamp, and only then the crop to "
+                                  "the published 280-840 band. The edge channels "
+                                  "(280-283, 838-840 nm) are not closable in physical "
+                                  "units: the upstream smoothing context there is "
+                                  "count-domain signal outside the calibrated band, for "
+                                  "which no public correction factor exists, so "
+                                  "publish_pipeline returns NaN for filter windows "
+                                  "touching the uncalibrated region and band "
+                                  "comparisons must use interior bands (all reference "
+                                  "bands are interior)",
                           "evidence": EVIDENCE_DERIVED},
             "C_capture": {"text": "the raw-count-to-physical calibration chain (dark "
                                   "subtraction by nearest integration-time node and "
@@ -2449,6 +2472,9 @@ def run_replay(packet: Path, write: bool = False) -> dict:
     it rewrites ``replay.json`` and its manifest entry and still reports any
     tolerance breach, which verify then enforces against the stored table.
     """
+    # The verdict comes from the single position-wise authority; this method
+    # only rebuilds the frozen-table detail (write path) and keeps summaries.
+    acceptance = evaluate_replay(packet)
     cal = load_calibration_extract(packet)
     records = read_json(packet / "records.json")["records"]
     spectra = load_packet_spectra(packet)
@@ -2469,10 +2495,6 @@ def run_replay(packet: Path, write: bool = False) -> dict:
     rel = [v["published_vs_replay"]["median_abs_relative_diff"]
            for v in per_record.values()
            if v["published_vs_replay"]["median_abs_relative_diff"] is not None]
-    breaches = [rid for rid, v in per_record.items()
-                if v["published_vs_replay"]["median_abs_relative_diff"] is None
-                or v["published_vs_replay"]["median_abs_relative_diff"]
-                >= REPLAY_MEDIAN_REL_TOLERANCE]
     summary = {
         "n_records": len(per_record),
         "median_abs_relative_diff_range": [float(np.min(rel)), float(np.median(rel)),
@@ -2480,8 +2502,8 @@ def run_replay(packet: Path, write: bool = False) -> dict:
         "tolerance": REPLAY_MEDIAN_REL_TOLERANCE,
         "tolerance_basis": "published CSV carries ~10 significant digits; the bound is "
                            "quantisation-derived and never fitted to replay output",
-        "tolerance_breaches": breaches,
-        "ok": not breaches,
+        "tolerance_breaches": [p.split(":")[0] for p in acceptance["problems"]],
+        "ok": acceptance["ok"],
         "note": "agreement documents reproduction of the upstream processing chain "
                 "(Preprocess.m + RawToAbsolute.m port); it is not an independent "
                 "absolute calibration and must not be quoted as one",
@@ -2501,24 +2523,22 @@ def run_replay(packet: Path, write: bool = False) -> dict:
         frozen_path = packet / "replay.json"
         if frozen_path.is_file():
             frozen = read_json(frozen_path)
-            if set(frozen["records"]) != set(per_record):
+            if set(frozen["records"]) != set(records_json_ids(records)):
                 summary["ok"] = False
                 summary.setdefault("problems", []).append(
                     "frozen replay.json record set differs from the packet records")
-            else:
-                mismatched = [
-                    rid for rid, v in per_record.items()
-                    if v["published_vs_replay"]["median_abs_relative_diff"]
-                    != frozen["records"][rid]["published_vs_replay"]["median_abs_relative_diff"]]
-                if mismatched:
-                    summary["ok"] = False
-                    summary.setdefault("problems", []).append(
-                        f"recomputed replay differs from frozen table: {mismatched[:5]}")
         else:
             summary["ok"] = False
             summary.setdefault("problems", []).append(
                 "packet has no frozen replay.json; run build or replay --write")
+    summary["problems"] = acceptance["problems"]
+    if acceptance["problems"]:
+        summary["ok"] = False
     return {"ok": summary["ok"], **summary}
+
+
+def records_json_ids(records: list[dict]) -> set:
+    return {r["record_id"] for r in records}
 
 
 # ---------------------------------------------------------------------------
@@ -2532,37 +2552,52 @@ def ideal_hemispheric_irradiance(radiance: float,
     return np.pi * radiance * np.cos(np.radians(horizon_depression_deg)) ** 2
 
 
-def publish_pipeline(spectrum: np.ndarray, correction_factor_pi: np.ndarray,
+def publish_pipeline(spectrum_full_grid: np.ndarray, extract: dict,
                      filter_span: int = REPLAY_FILTER_SPAN) -> np.ndarray:
-    """Model-facing publish steps (P_publish) on a physical 1 nm spectrum.
+    """Model-facing publish steps (P_publish), with honest edge handling.
 
-    Input and output are spectral irradiance in W m-2 nm-1 on the published
-    grid. The published smoothing runs in the DETECTOR-RESPONSE domain, not
-    directly on physical irradiance: the replayed upstream chain filters the
-    (dark-subtracted, per-us) counts first and multiplies the wavelength-
-    dependent correction factor and pi afterwards, i.e. published =
-    D * median(E / D) with D = correction_factor * pi. Median filtering does
-    not commute with a wavelength-dependent scaling, so applying a plain
-    median to E would silently reshape spectra by up to a few percent. D is
-    the vendored calibration extract's correction_factor * pi; the negative
-    clamp follows as upstream. Count-domain calibration itself (C_capture)
-    remains absent - see operator.json.
+    Input: spectral irradiance on the FULL calibration grid
+    (``extract["wls"]``, 150-1100 nm). Output: the published 280-840 crop,
+    W m-2 nm-1. Wherever the 8-point filter window lies entirely inside the
+    calibrated band, the chain is exactly the replayed upstream order -
+    resample onto the calibration grid (caller's step), smooth in the
+    detector-response domain (``E -> D*median(E/D)``, ``D =
+    correction_factor*pi``; median filtering and wavelength-dependent
+    scaling do not commute), clamp negatives, crop last.
+
+    The edge channels are NOT closable in physical units: the upstream
+    filter ran on dark-subtracted counts that extend below 280 and above
+    840 nm, and no public correction factor exists there to translate a
+    physical spectrum into that count-domain context. Windows touching the
+    uncalibrated region therefore produce NaN instead of a fabricated edge
+    value; band comparisons must use interior bands (all reference bands
+    are interior). Count-domain calibration itself (C_capture) remains
+    absent - see operator.json.
     """
-    spectrum = np.asarray(spectrum, dtype=float)
-    d = np.asarray(correction_factor_pi, dtype=float)
-    if d.shape != spectrum.shape:
-        raise ValueError("correction_factor_pi must match the spectrum grid")
+    spectrum = np.asarray(spectrum_full_grid, dtype=float)
+    d_full = np.asarray(extract["correction_factor"], dtype=float) * np.pi
+    if d_full.shape != spectrum.shape:
+        raise ValueError("spectrum must live on the full calibration grid "
+                         f"({d_full.size} channels)")
     with np.errstate(divide="ignore", invalid="ignore"):
-        response_domain = spectrum / d
+        response_domain = spectrum / d_full
     pad = filter_span // 2
     padded = np.pad(response_domain, pad, mode="constant", constant_values=np.nan)
     windows = np.lib.stride_tricks.sliding_window_view(padded, filter_span)
     import warnings
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", RuntimeWarning)
-        filtered = np.nanmedian(windows, axis=1)[:len(spectrum)]
-    published = d * filtered
-    return np.where(published < 0, 0.0, published)
+        filtered = np.nanmedian(windows, axis=1)[:spectrum.size]
+        # A window is only reproducible when every one of its response-domain
+        # samples is finite; nanmedian would otherwise silently fall back to
+        # the crop-first behaviour the upstream chain never performed.
+        fully_finite = np.isfinite(windows).all(axis=1)[:spectrum.size]
+    published_full = np.where(d_full * filtered < 0, 0.0, d_full * filtered)
+    published_full[~fully_finite] = np.nan
+    crop = (extract["wls"] >= REPLAY_CROP_NM[0]) & (extract["wls"] <= REPLAY_CROP_NM[1])
+    return published_full[crop]
+
+
 
 
 def exposure_weighted_mean(values: np.ndarray, sample_seconds: list[float],

@@ -24,7 +24,7 @@
       "reason": "site horizon not characterised; H=1 is the idealisation"
     },
     "P_publish": {
-      "text": "publishing steps that apply to already-calibrated physical spectra (W m-2 nm-1 in and out): resampling onto the 1 nm published grid, the published median filter span 8 - which the upstream chain applies in the detector-response domain, i.e. E -> D*median(E/D) with D = correction_factor*pi from the vendored extract (filtering and a wavelength-dependent scaling do not commute; filtering E directly would reshape spectra by up to a few percent) - and the negative-value clamp. Implemented in publish_pipeline(); a model spectrum in physical units passes through these and only these steps before band comparison",
+      "text": "publishing steps that apply to already-calibrated physical spectra (W m-2 nm-1): resampling onto the FULL calibration grid (150-1100 nm), the published median filter span 8 applied there in the detector-response domain - E -> D*median(E/D), D = correction_factor*pi from the vendored extract (filtering and wavelength-dependent scaling do not commute) - negative clamp, and only then the crop to the published 280-840 band. The edge channels (280-283, 838-840 nm) are not closable in physical units: the upstream smoothing context there is count-domain signal outside the calibrated band, for which no public correction factor exists, so publish_pipeline returns NaN for filter windows touching the uncalibrated region and band comparisons must use interior bands (all reference bands are interior)",
       "evidence": "derived-documented"
     },
     "C_capture": {
