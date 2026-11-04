@@ -148,19 +148,6 @@ def check_record_invariants(records, *, stage, batch_id):
 #: A batch whose meta pins an unknown protocol generation is REJECTED, not
 #: silently accepted; the mapping is the auditable witness for the archived
 #: pre-candidate-section wave.
-#: the PHYSICS anchor files whose hashes define implementation identity
-#: for comparisons (the orchestration file deep_twilight_reference.py is
-#: recorded per record but does not enter the traced physics; its
-#: cross-batch differences are audited notes, with the verified basis
-#: that the direct-stage orchestration diffs touched only
-#: save_state/stage_budget/sensitivity wiring -- the physics files are
-#: bit-identical across all archived batches)
-#: verified compatibility mapping for protocol generations older than the
-#: current file.  Each entry: executed protocol SHA256 -> human-verified
-#: statement of what the generation changed relative to the current file.
-#: A batch whose meta pins an unknown protocol generation is REJECTED, not
-#: silently accepted; the mapping is the auditable witness for the archived
-#: pre-candidate-section wave.
 KNOWN_PROTOCOL_GENERATIONS = {
     "f6da541115dadeb612f7f9ec8eaf9449858f780b33c700fa0a039f1f37274f1e":
         "direct/source-pairs wave (2026-11-04): identical scenario/source/"
@@ -169,6 +156,9 @@ KNOWN_PROTOCOL_GENERATIONS = {
         "Verified against the current contract for every stage-relevant "
         "field checked here.",
 }
+#: the PHYSICS anchor files whose hashes define the traced physics of
+#: every comparison.  A difference in any of these refuses the comparison
+#: unconditionally -- no compatibility entry may excuse it.
 PHYSICS_ANCHOR_FILES = (
     "skycolor/rt/mc.py",
     "tools/point_solar_table.py",
@@ -176,6 +166,113 @@ PHYSICS_ANCHOR_FILES = (
     "tools/twilight_second_order.py",
 )
 ORCHESTRATION_FILE = "tools/deep_twilight_reference.py"
+
+
+def execution_fingerprint(code_sha256) -> str:
+    """Canonical full execution identity: the complete per-file hash
+    projection of the executing implementation (every recorded file,
+    physics anchors and orchestration alike)."""
+    return json.dumps(code_sha256, sort_keys=True)
+
+
+def _physics_projection(fp: str) -> str:
+    return json.dumps({k: json.loads(fp).get(k)
+                       for k in PHYSICS_ANCHOR_FILES}, sort_keys=True)
+
+
+def _archived_fp(orch_sha256, *, candidate_sha256=None) -> str:
+    """Full fingerprint of one archived implementation generation.
+
+    The archived waves all share these physics-anchor hashes (verified
+    bit-identical across every batch in the data directory); only the
+    orchestration file (and, for the candidate wave, the candidate
+    estimator) varied.  Used solely to build the verified-compatibility
+    keys below, so the map binds the exact archived fingerprint pairs.
+    """
+    files = {
+        "skycolor/rt/mc.py":
+            "b8cab675585fe72fd74340e57cd24b66c2f757c221398cd83fa9a74a858143df",
+        "tools/deep_twilight_reference.py": orch_sha256,
+        "tools/point_solar_table.py":
+            "c189f8c043a2da0b234b57c36d3e1b5f5c6ed459a7c7a45e3b7048f4bf51d084",
+        "tools/unified_solar_transport.py":
+            "6ed1b03c3c49ad748540064d90ce8306b8855f08d2409ba9a1cc51e1a654dea2",
+    }
+    if candidate_sha256:
+        files["tools/twilight_second_order.py"] = candidate_sha256
+    return execution_fingerprint(files)
+
+
+# archived orchestration-file generations (extracted from the frozen
+# records, not invented): direct wave ran on two versions, source-pairs on
+# two, candidate on one, sensitivity on one -- plus the stale hash the
+# sensitivity batch meta pinned from before its run started.
+_ORCH_DIRECT_A = "0326e2ebe70d1e4abeea77c8c808229d243e28b5f0146b499283d75c0db04c62"
+_ORCH_DIRECT_B = "4be29c6c063dd6fbe361148a5476afab2dbb84e68d6c05aa6d6edf1a5277e856"
+_ORCH_CANDIDATE = "9690e774b8cf8cd1767993fd2e00987558995591ce2c86092969dccbddc05489"
+_ORCH_PAIRS_S0_SENS = "2b9d608f9623ec9d3292d25e1cd2a16fbe2781fcdf11089482fd578cb957a618"
+_ORCH_PAIRS_S1 = "722942e6802ecb114532c898302aa1fcc73fb61a4ddedb0e1c5a2c1933378ebe"
+_ORCH_SENS_META_STALE = "78a30731e803bb996dd51f009c526ed994eb569cf9b6a8b98dd165789645fca2"
+
+#: verified implementation-compatibility records.  Key: (comparison wave,
+#: fingerprint-low, fingerprint-high), the complete execution fingerprints
+#: sorted.  A fingerprint difference inside a wave is REFUSED unless this
+#: exact (wave, pair) binding exists -- a blanket "orchestration-only
+#: differences are fine" rule was removed: the archived bookkeeping-only
+#: audit covers these specific pairs, not any future unknown version.
+VERIFIED_IMPLEMENTATION_COMPAT = {
+    ("direct", _archived_fp(_ORCH_DIRECT_A), _archived_fp(_ORCH_DIRECT_B)):
+        "orchestration-only diff (state merge + stage-budget accounting) "
+        "within the direct wave; physics anchors bit-identical across all "
+        "archived records; verified during code-review round 4",
+    ("source-pairs",
+     _archived_fp(_ORCH_DIRECT_A), _archived_fp(_ORCH_PAIRS_S0_SENS)):
+        "orchestration-only diff between the direct wave and the "
+        "source-pairs run; physics anchors bit-identical; verified during "
+        "code-review round 4",
+    ("source-pairs",
+     _archived_fp(_ORCH_DIRECT_B), _archived_fp(_ORCH_PAIRS_S1)):
+        "orchestration-only diff between the direct wave and the "
+        "source-pairs run; physics anchors bit-identical; verified during "
+        "code-review round 4",
+    ("sensitivity",
+     _archived_fp(_ORCH_PAIRS_S0_SENS), _archived_fp(_ORCH_SENS_META_STALE)):
+        "batch meta pinned a stale orchestration hash from before the "
+        "sensitivity run started; the records carry the executed truth; "
+        "verified during code-review round 3",
+}
+
+
+def require_same_execution(wave: str, fp_a: str, fp_b: str, *,
+                           context: str) -> str | None:
+    """Single contract entry for implementation compatibility.
+
+    Two batches (or a batch meta and its records) may enter one
+    comparison only when their full execution fingerprints are equal, or
+    when VERIFIED_IMPLEMENTATION_COMPAT binds this exact (wave, pair).
+    A PHYSICS-anchor difference is refused unconditionally: those files
+    define the traced physics, and no audited exception covers them.
+    Returns the verified statement when a mapped exception applies
+    (the caller records it as an auditable note).
+    """
+    if fp_a == fp_b:
+        return None
+    if _physics_projection(fp_a) != _physics_projection(fp_b):
+        raise ValueError(
+            f"{context}: PHYSICS implementation differs across the "
+            f"{wave!r} comparison; no compatibility entry may excuse this "
+            "-- the batches are not comparable as independent repeats or "
+            "as a budget/estimator pair")
+    lo, hi = sorted((fp_a, fp_b))
+    statement = VERIFIED_IMPLEMENTATION_COMPAT.get((wave, lo, hi))
+    if statement is None:
+        raise ValueError(
+            f"{context}: execution fingerprints differ within the "
+            f"{wave!r} comparison and no verified compatibility entry "
+            f"binds this exact pair ({lo[:12]}... vs {hi[:12]}...) -- "
+            "comparison refused; extend VERIFIED_IMPLEMENTATION_COMPAT "
+            "only with a human-verified (wave, fingerprint-pair) binding")
+    return statement
 
 
 def check_batch_contract(records, meta, expect, *, stage, batch_id,
@@ -227,42 +324,27 @@ def check_batch_contract(records, meta, expect, *, stage, batch_id,
             raise ValueError(
                 f"{stage}/{batch_id} seed {row['seed']}: record "
                 "protocol_sha256 differs from the batch meta provenance")
-    # per-batch implementation identity: two-level policy enforced below
-    # (physics anchors strict, orchestration file audited as notes)
-    record_codes = {json.dumps(r.get("code_sha256"), sort_keys=True)
-                    for r in records if r.get("code_sha256") is not None}
-    if meta.get("code_sha256") is not None and record_codes:
-        parsed = [json.loads(rc) for rc in record_codes]
-        anchor = "tools/deep_twilight_reference.py"
-        meta_phys = json.dumps({k: meta["code_sha256"].get(k)
-                                for k in PHYSICS_ANCHOR_FILES}, sort_keys=True)
-        rec_phys = {json.dumps({k: rc.get(k)
-                                for k in PHYSICS_ANCHOR_FILES}, sort_keys=True)
-                    for rc in parsed}
-        if len(rec_phys) > 1:
+    # per-batch implementation identity through the single contract entry:
+    # records must not span implementations, and the batch meta must match
+    # the records unless a verified (wave, fingerprint-pair) entry binds
+    # the exact difference
+    record_fps = {execution_fingerprint(r["code_sha256"])
+                  for r in records if r.get("code_sha256") is not None}
+    if meta.get("code_sha256") is not None and record_fps:
+        if len(record_fps) > 1:
             raise ValueError(
-                f"{stage}/{batch_id}: records span multiple physics "
-                "implementations -- mixed-physics batches must not be "
-                "merged as independent repeats")
-        if meta_phys not in rec_phys:
-            raise ValueError(
-                f"{stage}/{batch_id}: PHYSICS implementation identity "
-                "differs between the batch meta and the records; no "
-                "verified exception exists")
-        meta_all = json.dumps(meta["code_sha256"], sort_keys=True)
-        # non-physics projection: everything outside the physics anchors
-        nonphys = lambda rc: json.dumps(
-            {k: v for k, v in rc.items() if k not in PHYSICS_ANCHOR_FILES},
-            sort_keys=True)
-        rec_nonphys = {nonphys(rc) for rc in parsed}
-        meta_nonphys = nonphys(meta["code_sha256"])
-        orch_differs = (len(rec_nonphys) > 1) or (meta_nonphys not in rec_nonphys)
-        if orch_differs:
+                f"{stage}/{batch_id}: records span multiple execution "
+                "implementations -- mixed-implementation batches must not "
+                "be merged as independent repeats")
+        meta_fp = execution_fingerprint(meta["code_sha256"])
+        rec_fp = next(iter(record_fps))
+        statement = require_same_execution(
+            stage, meta_fp, rec_fp,
+            context=f"{stage}/{batch_id} (batch meta vs records)")
+        if statement:
             notes.append(
-                f"{stage}/{batch_id}: non-physics implementation "
-                "fingerprints differ from the batch meta or span versions "
-                "within the batch (these files do not enter the traced "
-                "physics; physics anchors verified uniform)")
+                f"{stage}/{batch_id}: meta and records differ under a "
+                f"verified compatibility exception: {statement}")
     if missing_fields:
         raise ValueError(
             f"{stage}/{batch_id}: records lack {sorted(missing_fields)} and "
@@ -403,23 +485,20 @@ def compute_summary(data_dir: Path, protocol: dict, *,
                 failures.append("luminance drift between budgets exceeds a "
                                 "quarter of the luminance gate")
             stats["verdict_failures"] = failures
-    # cross-budget comparisons require the same PHYSICS implementation;
-    # orchestration-file differences are audited (verified bookkeeping-only)
-    direct_phys = {json.dumps({k: r.get("code_sha256", {}).get(k, "")
-                               for k in PHYSICS_ANCHOR_FILES}, sort_keys=True)
-                   for rows in disk_records.values() for r in rows}
-    if len(direct_phys) > 1:
-        raise ValueError(
-            "direct: the four batches span multiple PHYSICS implementations "
-            "-- cross-budget comparisons require the same physics")
-    direct_orch = {r.get("code_sha256", {}).get(ORCHESTRATION_FILE, "")
-                   for rows in disk_records.values() for r in rows}
-    if len(direct_orch) > 1:
+    # cross-budget comparisons run through the single contract entry: the
+    # four batches need one compatible execution identity (verified
+    # orchestration-only exceptions pass as auditable notes)
+    direct_fps = sorted({execution_fingerprint(r.get("code_sha256") or {})
+                         for rows in disk_records.values() for r in rows})
+    if len(direct_fps) > 1:
+        statements = [require_same_execution(
+            "direct", direct_fps[0], other,
+            context="direct wave (cross-budget comparison)")
+            for other in direct_fps[1:]]
+        unique = list(dict.fromkeys(s for s in statements if s))
         out.setdefault("contract_notes", []).append(
-            "direct: orchestration file spans "
-            f"{len(direct_orch)} versions across batches (verified "
-            "bookkeeping-only diffs: state merge + budget accounting; "
-            "physics anchors bit-identical in all 64 records)")
+            "direct wave spans multiple orchestration versions under "
+            f"verified exceptions: {'; '.join(unique)}")
     # ---- source pairs ----------------------------------------------------
     pair_cfg = protocol["source"]["point_pairing"]
     pairs = {}
@@ -441,25 +520,17 @@ def compute_summary(data_dir: Path, protocol: dict, *,
             stage="source-pairs", batch_id=batch_id,
             protocol_sha_now=protocol_sha_now))
         disk_rows = disk_records[(sun, photons)]
-        pair_phys = {json.dumps({k: r.get("code_sha256", {}).get(k, "")
-                                 for k in PHYSICS_ANCHOR_FILES},
-                                sort_keys=True) for r in records}
-        disk_phys = {json.dumps({k: r.get("code_sha256", {}).get(k, "")
-                                 for k in PHYSICS_ANCHOR_FILES},
-                                sort_keys=True) for r in disk_rows}
-        if pair_phys != disk_phys:
-            raise ValueError(
-                f"source-pairs/{batch_id}: PHYSICS implementation differs "
-                "from the disk batch it is paired against -- paired "
-                "comparisons require the same physics")
-        pair_orch = {r.get("code_sha256", {}).get(ORCHESTRATION_FILE, "")
-                     for r in records}
-        if pair_orch & direct_orch and len(pair_orch) == len(direct_orch) == 1 \
-                and pair_orch != direct_orch:
+        statement = require_same_execution(
+            "source-pairs",
+            execution_fingerprint(records[0].get("code_sha256") or {}),
+            execution_fingerprint(disk_rows[0].get("code_sha256") or {}),
+            context=f"source-pairs/{batch_id} vs the disk batch it is "
+                    "paired against")
+        if statement:
             out.setdefault("contract_notes", []).append(
                 f"source-pairs/{batch_id}: orchestration file version "
-                "differs from the direct wave (bookkeeping-only diffs; "
-                "physics anchors verified identical)")
+                f"differs from the direct wave under a verified "
+                f"exception: {statement}")
         pairs[str(sun)] = _pair_stats(disk_rows, records, wl, v_curve,
                                       anchor_idx, sun, protocol, pair_cfg)
     out["source_pairs"] = pairs
@@ -641,6 +712,7 @@ def _candidate_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
     out = {}
     for sun_index, sun in enumerate(suns):
         tiers = {}
+        tiers_meta = {}
         for tier_index, tier in enumerate(cand_cfg["tiers"]):
             batch_id = f"s{sun_index}t{tier_index}"
             seeds = [80000 + 10000 * sun_index + 1000 * tier_index + r
@@ -648,6 +720,7 @@ def _candidate_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
             records, meta = load_batch(raw_dir / batch_id, seeds,
                                        stage="candidate", batch_id=batch_id)
             records = sorted(records, key=lambda r: int(r["seed"]))
+            tiers_meta[str(tier_index)] = meta
             contract_notes.extend(check_batch_contract(
                 records, meta,
                 dict(sun_elevation_deg=sun,
@@ -744,6 +817,19 @@ def _candidate_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
                 anchors=per_anchor,
                 seconds=float(sum(r["seconds"] for r in records)))
         lo_tier, hi_tier = sorted(tiers, key=int)
+        # the two tiers enter one budget-drift comparison, so their
+        # execution identities must be compatible first (single contract
+        # entry; a physics-anchor difference is refused unconditionally --
+        # estimator changes must not be reported as budget drift)
+        tier_stmt = require_same_execution(
+            "candidate",
+            execution_fingerprint(tiers_meta[lo_tier].get("code_sha256") or {}),
+            execution_fingerprint(tiers_meta[hi_tier].get("code_sha256") or {}),
+            context=f"candidate {sun}: tier drift ({lo_tier} vs {hi_tier})")
+        if tier_stmt:
+            contract_notes.append(
+                f"candidate {sun}: tiers differ under a verified "
+                f"compatibility exception: {tier_stmt}")
         drift = {}
         for a_nm in anchors_nm:
             lo = tiers[lo_tier]["anchors"][str(a_nm)]
@@ -795,8 +881,14 @@ def _sensitivity_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
     raw_dir = data_dir / "raw" / "sensitivity"
     if contract_notes is None:
         contract_notes = []
-    # protocol entries are "key (description)"; the records carry the key
+    # protocol entries are "key (description)"; the records carry the key.
+    # The protocol-derived sets below are the SINGLE authority for both
+    # validation and summary generation -- the refinement file's own
+    # "items" metadata is checked against them, never consulted to decide
+    # what gets computed and reported.
     required_items = [i.split(" (")[0].strip() for i in sens.get("mc_items", [])]
+    proto_single_items = [d.split(" (")[0].strip()
+                          for d in sens.get("single_items", [])]
     singles_path = raw_dir / "singles-refinement.json"
     if not singles_path.exists():
         raise ValueError(
@@ -805,10 +897,14 @@ def _sensitivity_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
             "sensitivity summary")
     payload = json.loads(singles_path.read_text())
     want_suns = {str(s) for s in protocol["scenario"]["sun_elevations_deg"]}
-    slug_of = {"ss_gauss16": "ss_gauss16",
-               "ss_fine_density": "ss_density_step_0_0125"}
-    want_single_items = {slug_of[d.split(" (")[0].strip()]
-                         for d in sens.get("single_items", [])}
+    want_single_items = {_slug(d) for d in proto_single_items}
+    got_items = set(payload.get("items", {}))
+    if got_items != set(proto_single_items):
+        raise ValueError(
+            f"sensitivity singles: refinement-file items {sorted(got_items)} "
+            f"!= protocol single_items {sorted(proto_single_items)} -- the "
+            "payload metadata must match the protocol, not decide the "
+            "reported comparison set")
     got_suns = set(payload.get("by_sun", {}))
     if got_suns != want_suns:
         raise ValueError(
@@ -834,14 +930,17 @@ def _sensitivity_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
         records, meta = load_batch(raw_dir / batch_id, seeds,
                                    stage="sensitivity", batch_id=batch_id)
         sens_budget = int(sens.get("photons_per_wavelength", 100_000))
+        want_mc_items = set(required_items) | {"baseline"}
         for row in records:
-            got_items = set(row.get("items", {}))
-            lacking = [i for i in required_items if i not in got_items]
-            if lacking:
+            got_mc_items = set(row.get("items", {}))
+            if got_mc_items != want_mc_items:
                 raise ValueError(
-                    f"sensitivity/{batch_id} seed {row['seed']}: missing "
-                    f"required items {lacking} -- the sensitivity summary "
-                    "must cover every protocol-declared experiment")
+                    f"sensitivity/{batch_id} seed {row['seed']}: items "
+                    f"{sorted(got_mc_items)} != protocol set exactly "
+                    f"(missing {sorted(want_mc_items - got_mc_items)}, "
+                    f"unexpected {sorted(got_mc_items - want_mc_items)}) "
+                    "-- the sensitivity summary must cover every "
+                    "protocol-declared experiment and nothing else")
         contract_notes.extend(check_batch_contract(
             records, meta,
             dict(sun_elevation_deg=sun,
@@ -850,8 +949,9 @@ def _sensitivity_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
             stage="sensitivity", batch_id=batch_id,
             protocol_sha_now=protocol_sha_now))
         per_item = {}
-        items = [k for k in records[0]["items"] if k != "baseline"]
-        for item in items:
+        # "baseline" is part of the required record coverage but pairs
+        # against itself, so it produces no drift entry
+        for item in (i for i in required_items if i != "baseline"):
             per_anchor = {}
             for a_nm in anchors_nm:
                 base = np.array([r["items"]["baseline"]["per_lambda"][str(a_nm)]["total"]
@@ -870,20 +970,25 @@ def _sensitivity_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
                         == r["items"]["baseline"]["fingerprint"] for r in records))
             per_item[item] = per_anchor
         out["by_sun"][str(sun)] = dict(mc=per_item)
-    if True:
-        singles = {}
-        for sun, by in payload["by_sun"].items():
-            base = np.array(by["baseline"])
-            entries = {}
-            for item, _desc in payload["items"].items():
-                variant = np.array(by[_slug(item)])
-                entries[item] = dict(
-                    max_abs_relative_drift=float(
-                        np.max(np.abs(variant - base)
-                               / np.maximum(np.abs(base), 1e-300))),
-                    variant=variant.tolist())
-            singles[sun] = entries
-        out["singles"] = singles
+    singles = {}
+    for sun, by in payload["by_sun"].items():
+        base = np.array(by["baseline"])
+        entries = {}
+        for item in proto_single_items:
+            key = _slug(item)
+            if key not in by:
+                raise ValueError(
+                    f"sensitivity singles {sun}: protocol item {item!r} "
+                    f"has no refinement data under {key!r} -- the summary "
+                    "must report every protocol-required comparison")
+            variant = np.array(by[key])
+            entries[item] = dict(
+                max_abs_relative_drift=float(
+                    np.max(np.abs(variant - base)
+                           / np.maximum(np.abs(base), 1e-300))),
+                variant=variant.tolist())
+        singles[sun] = entries
+    out["singles"] = singles
     out["not_run_here"] = sens.get("not_run_here", [])
     return out
 

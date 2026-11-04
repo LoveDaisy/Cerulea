@@ -1,6 +1,6 @@
 {
  "schema": "deep-twilight-reference/summary/1",
- "generated": "2026-11-04T21:05:29+0800",
+ "generated": "2026-11-04T21:50:09+0800",
  "protocol_sha256": "23b46bd6784b91181c34cd5ff05656ce86f9aeecfa2bbe29c0728f1b432c87a1",
  "protocol_file": "protocol.json",
  "grid": [
@@ -1618,9 +1618,9 @@
   "candidate/s0t1: records lack ['mode']; values taken from the batch meta provenance and validated against the protocol",
   "candidate/s1t0: records lack ['mode']; values taken from the batch meta provenance and validated against the protocol",
   "candidate/s1t1: records lack ['mode']; values taken from the batch meta provenance and validated against the protocol",
-  "sensitivity/s0mc: non-physics implementation fingerprints differ from the batch meta or span versions within the batch (these files do not enter the traced physics; physics anchors verified uniform)",
+  "sensitivity/s0mc: meta and records differ under a verified compatibility exception: batch meta pinned a stale orchestration hash from before the sensitivity run started; the records carry the executed truth; verified during code-review round 3",
   "sensitivity/s0mc: records lack ['mode']; values taken from the batch meta provenance and validated against the protocol",
-  "sensitivity/s1mc: non-physics implementation fingerprints differ from the batch meta or span versions within the batch (these files do not enter the traced physics; physics anchors verified uniform)",
+  "sensitivity/s1mc: meta and records differ under a verified compatibility exception: batch meta pinned a stale orchestration hash from before the sensitivity run started; the records carry the executed truth; verified during code-review round 3",
   "sensitivity/s1mc: records lack ['mode']; values taken from the batch meta provenance and validated against the protocol"
  ],
  "source_pairs": {
