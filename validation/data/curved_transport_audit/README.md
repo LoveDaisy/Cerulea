@@ -1,7 +1,7 @@
 # Frozen continuous diffuse-transport audit
 
 The conclusion and its scope are in
-[`docs/CURVED_TRANSPORT_AUDIT.md`](../../../docs/CURVED_TRANSPORT_AUDIT.md).
+[`docs/CURVED_TRANSPORT_AUDIT.md`](../../../docs/twilight/CURVED_TRANSPORT_AUDIT.md).
 This directory is an experimental reference, not the production solver default.
 
 ## Main inputs and reduction
@@ -79,7 +79,7 @@ correct table for each medium.
 Runs started before and after committing the aerosol fix have different HEAD /
 dirty-diff metadata but the same actual physical library. The exact aerosol
 patch and before/after source hashes are in the
-[grid-invariance archive](../aerosol_grid_audit/); disk-convergence also retains
+[grid-invariance archive](../aerosol_grid_audit); disk-convergence also retains
 an independent dirty-to-committed-library check. This does not grant arbitrary
 hash changes an exemption: these concrete differences were read and checked.
 

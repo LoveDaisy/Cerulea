@@ -1,6 +1,6 @@
 # Solar-source audit evidence
 
-Report: [SOLAR_SOURCE_AUDIT.md](../../../docs/SOLAR_SOURCE_AUDIT.md).
+Report: [SOLAR_SOURCE_AUDIT.md](../../../docs/twilight/SOLAR_SOURCE_AUDIT.md).
 Baseline library: `2d0294c`. Experiments are standard clear air, AOD550 0.05,
 ozone 300 DU, albedo 0.1, solar elevation -6°, zenith viewing, and globally
 spherical opaque ground at 0/2.4 km. No production library or prior validation

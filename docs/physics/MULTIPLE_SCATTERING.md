@@ -8,7 +8,8 @@ approximations, and the validation numbers obtained on branch `feat/ms`.
 
 The solver is a **successive orders of scattering (SOS)** solver:
 
-* **Vertical grid.**  The 54 layers of `Atmosphere.z_bounds` (ground to 120 km).
+* **Vertical grid.** `Atmosphere.z_bounds` (default ground to 200 km;
+  site truncation starts at `z_bounds[0]`).
   Layer optical depths are `beta_ext * dz`; the extinction includes Rayleigh,
   aerosol, ozone and NO2.  The diffuse field is **plane-parallel**.
 * **Angular grid.**  Gauss-Legendre nodes in `mu = cos(zenith)` (default 32,
@@ -20,8 +21,10 @@ The solver is a **successive orders of scattering (SOS)** solver:
   p_m             = sum_{l>=m} (2l+1) beta_l (l-m)!/(l+m)! P_l^m(mu) P_l^m(mu')
   ```
 
-  The Legendre moments `beta_l` are the layer-averaged moments from
-  `Atmosphere.phase_moments`, so Rayleigh and Mie are treated consistently.
+  With default `delta_m=True`, optical depths, albedos and Legendre moments
+  use `Atmosphere.delta_m_properties(n_moments)`. With `delta_m=False`,
+  `Atmosphere.phase_moments` supplies the raw layer-averaged moments.
+  See [ARCHITECTURE.md](../ARCHITECTURE.md#delta-m-quantities-vs-raw-physics-e4).
   The azimuthal expansion is exact up to the mode/moment truncation; there is
   no `m = 0` approximation.  Twelve modes (default) are enough for the phase
   functions in this package (the result changes by < 0.1 % between 8 and 20
@@ -30,8 +33,9 @@ The solver is a **successive orders of scattering (SOS)** solver:
   radius `r` the solar ray has impact parameter `p = r sin(sza)` and direction
   cosine `mu_s = cos(sza)` (towards the sun).  Its transmittance is integrated
   along the true spherical ray with `geometry.path_lengths_sun` and
-  `rt.single.species_columns`, and rays whose perigee falls inside the Earth
-  are masked to zero.  This reproduces the twilight shadow boundary: at
+  shared `optics.shell_species_columns`. With refraction on, the shadow
+  threshold refracts but this beam optical depth remains geometric. Occlusion
+  uses the opaque model bottom, `r_bounds[0]`. In the geometric control, at
   `sza = 96 deg` only the atmosphere above about 35 km is lit.
 * **Beam source.**  The direct beam is a delta function in angle with radiance
   amplitude `F_sun * T(z)` (the physical beam radiance).  Its contribution to

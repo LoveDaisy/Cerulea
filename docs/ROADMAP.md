@@ -54,7 +54,7 @@ approximation, which was wrong by an order of magnitude inside 1° for dust.
 
 *Validated:* moments vs quadrature 2 × 10⁻⁸; `beta_1` = Bohren-Huffman `g`
 to 10⁻¹⁰.
-*Code:* `mie.py`, `aerosol.py`, `docs/AEROSOL.md`.
+*Code:* `mie.py`, `aerosol.py`, `docs/physics/AEROSOL.md`.
 
 ### M5 — the spherical twilight engine
 
@@ -65,7 +65,7 @@ Monte Carlo for orders ≥ 2) on a coarse angular grid closes the gap.
 *Validated:* −9° goes from 24× too dark to 1.39× of Patat et al. (2006); −12°
 from 1500× to 1.45×.  (M10 later moved these to 0.54× and 0.37×: the 1.39/1.45
 were the one-branch chord.)
-*Code:* `rt/twilight.py`, `docs/TWILIGHT.md`.
+*Code:* `rt/twilight.py`, `docs/twilight/TWILIGHT.md`.
 
 ### M6 — refraction, taken seriously (**now the default**)
 
@@ -78,7 +78,7 @@ a ray trace per photon.
 *Validated:* the per-shell formula against numerical path integration to 0.1 %
 (1661 km vs 1663 km for a horizontal ray); the apparent-elevation table against
 the ray tracer.
-*Code:* `refraction.py`, `data/refraction.csv`, `docs/REFRACTION.md`.
+*Code:* `refraction.py`, `data/refraction.csv`, `docs/physics/REFRACTION.md`.
 *Consequence:* twilight is 2–5× brighter.  The absolute level that this exposed
 was later traced to a two-branch chord bug (M10), not to refraction itself.
 
@@ -90,7 +90,7 @@ which part of the deck is still lit.
 
 *Validated:* albedo against an independent Monte Carlo within 0.1–0.7 %
 (`g = 0`) and 1 % (`g = 0.85`, τ ≥ 5); `R + T + direct = 1` to 10⁻¹².
-*Code:* `cloud.py`, `rt/cloud.py`, `docs/CLOUD.md`.
+*Code:* `cloud.py`, `rt/cloud.py`, `docs/physics/CLOUD.md`.
 
 ### M9 — delta-M
 
@@ -115,7 +115,7 @@ clarity, bandpass and calibration also differ.
 The durable result is the independent reference dataset and an unresolved
 altitude-response question, not closure of the twilight problem.
 See `validation/SECOND_DATASET.md` and
-[the altitude audit](TWILIGHT_ALTITUDE_AUDIT.md).
+[the altitude audit](twilight/TWILIGHT_ALTITUDE_AUDIT.md).
 
 ### M8 — the physics of red skies and blue suns
 
@@ -218,7 +218,7 @@ merge `a15555b`.  See [ARCHITECTURE.md](ARCHITECTURE.md) for current contracts.
 The temporary 2026-10-30 handoff has been consumed; M11/M12 supersede its
 instructions to implement caching or truncation.  The remaining physical
 questions and follow-up experiments live in
-[TWILIGHT_ALTITUDE_AUDIT.md](TWILIGHT_ALTITUDE_AUDIT.md).
+[TWILIGHT_ALTITUDE_AUDIT.md](twilight/TWILIGHT_ALTITUDE_AUDIT.md).
 
 ### M13 — raised-ground solar occlusion and altitude diagnostics (2026-10-31)
 
@@ -237,7 +237,7 @@ cd m⁻².  Their total changes from 0.536728 to 0.456350, so the high/low ratio
 falls from 1.208 to **1.027**.  This is a zenith-twilight effect: the former
 claim that raised-ground shadow alignment mattered only near the horizon was
 incorrect.  Multi-seed spherical-engine results and their photon budgets are
-reported separately in [the audit](TWILIGHT_ALTITUDE_AUDIT.md).
+reported separately in [the audit](twilight/TWILIGHT_ALTITUDE_AUDIT.md).
 
 The audit also distinguishes the experiment from the references.  The often
 quoted 0.80 is a Maryland/Paranal ratio spanning different studies and
@@ -277,7 +277,7 @@ with a point-beam angular Jacobian; a vertical finite-disk approximation gives
 calibrating absolute levels or investing in a new diffuse solver.  Production
 defaults and prior physical validation remain unchanged in this phase.
 Tools, raw data, assumptions and independent checks are in
-[SOLAR_SOURCE_AUDIT.md](SOLAR_SOURCE_AUDIT.md).
+[SOLAR_SOURCE_AUDIT.md](twilight/SOLAR_SOURCE_AUDIT.md).
 *Experiment commit:* `af235a7`.
 
 ### M15 — one finite solar source, independently checked (2026-11-01)
@@ -298,7 +298,7 @@ These are straight-diffuse-path reference experiments, not a new production
 default or an identified station-altitude law.
 
 *Code checkpoint:* `7ed71a6`; *evidence:* `2255b46` and
-[UNIFIED_SOLAR_SOURCE_AUDIT.md](UNIFIED_SOLAR_SOURCE_AUDIT.md).
+[UNIFIED_SOLAR_SOURCE_AUDIT.md](twilight/UNIFIED_SOLAR_SOURCE_AUDIT.md).
 
 ### M16 — wavelength slicing preserves AOD550 (2026-11-01)
 
@@ -315,7 +315,7 @@ after isolated attribution/update; the other six golden files are unchanged.
 Six physical checks remain 3 PASS / 3 FAIL; only check6's two low-budget deep points
 change.  The corrected definition, not better observational fit, justifies the
 update.  *Fix:* `5d6f793`; *evidence:* `73031e3` and
-[AEROSOL_GRID_AUDIT.md](AEROSOL_GRID_AUDIT.md).
+[AEROSOL_GRID_AUDIT.md](twilight/AEROSOL_GRID_AUDIT.md).
 
 ### M17 — establish what the twilight references measure (2026-11-01)
 
@@ -330,7 +330,7 @@ ESO V-filter/CALSPEC approximation changes unified −6° total luminance by onl
 −0.46%/−0.65%, height ratio by −0.19%.  It does not explain the remaining
 10–25% cross-scene residual, nor replace the missing complete instrument
 response.  No atmosphere, axis shift or zero point was fitted.  See
-[TWILIGHT_REFERENCE_AUDIT.md](TWILIGHT_REFERENCE_AUDIT.md).
+[TWILIGHT_REFERENCE_AUDIT.md](twilight/TWILIGHT_REFERENCE_AUDIT.md).
 
 ### M18 — continuous diffuse refraction and a bounded conclusion (2026-11-01)
 
@@ -341,7 +341,7 @@ integrals check directions, optical depth, first boundary and reduced-radiance
 transfer.  Source-table construction also now rejects wrong-medium bindings;
 the original experiment loader had already checked those contracts.
 
-At−6°, 81 wavelengths, eight seeds, curved SS+MS is
+At −6°, 81 wavelengths, eight seeds, curved SS+MS is
 0.489009±0.007777 / 0.467331±0.011337 cd m⁻², high/sea 0.955669±0.035776.
 Compared with matched-source global-straight controls, corrections are
 −0.63%±1.63% /+3.64%±2.67%; their conditional 95% intervals include zero.
@@ -353,7 +353,7 @@ The final full regression passes 316 tests; production physical checks remain
 3 PASS / 3 FAIL.  One native process exit 139 remains unexplained, with saved partial
 records and a successful faulthandler continuation; it is not concealed as a
 completed run.  The experimental backend has not replaced production defaults.
-See [CURVED_TRANSPORT_AUDIT.md](CURVED_TRANSPORT_AUDIT.md) and its frozen evidence.
+See [CURVED_TRANSPORT_AUDIT.md](twilight/CURVED_TRANSPORT_AUDIT.md) and its frozen evidence.
 
 ### Next work justified by this exploration
 
@@ -378,76 +378,27 @@ session handoffs are not a substitute for this record.
 
 ## Open questions that matter now
 
-These are not roadmap items, they are the things we do not currently
-understand.  Each is worth resolving before adding new physics.
-
-1. **The solar-altitude convention remains an observational contract to
-   establish.**  M10 changed the model's sensitivity to this choice.  The
-   historical calculations below are model sensitivities, not evidence that
-   identifies the convention used by either instrument (ratios to Koomen):
-
-   | reading | −3° | −6° |
-   |---|---|---|
-   | H1: reference axis is *true* altitude, refraction on | 0.93× | **0.69×** |
-   | H2: reference axis is *apparent* altitude, refraction on | — | 0.29× |
-   | geometric model (refraction off, true axis) | 0.75× | 0.46× |
-
-   The primary papers do not explicitly settle true/apparent altitude or
-   disk centre/limb.  A better fit cannot establish that contract.  Current
-   experiments explicitly assume true solar-centre elevation, keep refraction
-   on, and do not fit an axis shift.  This assumption needs metadata or an
-   independent observing convention before it becomes a verified fact.
-2. **The twilight level was a chord bug, not a site effect and not a physical
-   excess.**  A second, independent, *photopic* measurement — Koomen et al.
-   (1952), JOSA 42, 353, Maryland, 30 m — lets the model be compared like for
-   like at sea level.  With the two-branch chord (M10) the −6° zenith is
-   **0.69×** Koomen (deterministic) or **0.85×** (spherical engine), and
-   0.86× / 1.07× Patat.  The old 2.20× (and the 1.14× geometric before it)
-   were artifacts: the missing near-side perigee→point segment made every
-   grazing ray too bright, and the geometric mode's missing refraction partly
-   cancelled it.  These are historical production-model values, not a
-   measurement of the remaining transport error.  Koomen does not supply an
-   absolute error budget that justifies assigning ±0.2–0.4 mag to its −6°
-   point.  Source consistency, bandpass and site conditions must be examined
-   before interpreting the residual.  See
-   `validation/SECOND_DATASET.md` and the sixth addendum of
-   `validation/ADDENDUM.md`.
-
-   **The altitude comparison remains unresolved, but its construction defect
-   is now demonstrated.**  M12 fixed domain truncation and double scaling;
-   M13 additionally made solar occlusion respect that raised ground.  The
-   deterministic high-site/sea-level ratio at −6° changes from the historical
-   1.208× to 1.027×.  The old low-budget engine ratio 1.01× also predates the
-   occlusion fix; updated multi-seed results are in
-   [the audit](TWILIGHT_ALTITUDE_AUDIT.md).  An observed station ratio is not a
-   controlled altitude-only target: the 0.80× Maryland/Paranal comparison mixes
-   studies and observables, while Koomen's same-instrument 0.37× comparison
-   also changes season and transparency.  Transport approximations, sampling
-   uncertainty and site conditions remain to be separated before attributing
-   the residual to missing low-altitude multiple scattering.
-
-3. **The limb.**  The model's horizon is ≈ 2× brighter than the CIE 110 fit.
-   The CIE formula is a daylighting standard, not a physical model, so this may
-   be a reference problem — but a measured clear-sky luminance scan would settle
-   it, and we do not have one.
-4. **The V band vs the photopic integral.**  Twilight spectra are strongly
-   coloured; Johnson-V equivalent luminance and a photopic integral are
-   different observables.  Their difference must be calculated from a stated
-   response curve, not assigned a generic percentage.  Patat's fit also
-   includes the night background; this is negligible at −6° but material in
-   deep twilight.  The original instrument's full response is still needed
-   for a definitive synthetic-photometry comparison.
-5. **Performance.**  The bottleneck is Mie pre-processing, not the
-   multiple-scattering solve: a cold dusty ``delta_m(32)`` costs ~40 s on
-   the reference machine (phase tables + analytic Legendre moments), while
-   the transfer itself takes seconds.  The per-wavelength state cache now
-   holds the whole 81-wavelength working grid (capacity 8 → 256) and the
-   preset aerosols are shared across atmospheres, so warm and repeat calls
-   are nearly free: warm single clear 1 dir 0.353 → 0.003 s, a second
-   ``delta_m_properties(32)`` 6.8 → 0.002 s, a second ``presets.dusty``
-   build ~41 s → < 1 ms (``tools/perf_bench.py``; all values bit-identical
-   to the pre-change code).  Cold starts still pay the full Mie build and
-   need vectorised kernels or a lookup table.
+1. **Production source consistency.** Backends still mix solar attenuation,
+   direction and shadow prescriptions. M14/M15 establish a checked experimental
+   contract; integrating it across production scenes remains work to scope.
+   [Source audit](twilight/SOLAR_SOURCE_AUDIT.md), [unified source](twilight/UNIFIED_SOLAR_SOURCE_AUDIT.md).
+2. **Absolute twilight brightness and altitude response.** Domain truncation,
+   raised-ground occlusion and AOD550 slicing are fixed. The remaining station
+   residual cannot be assigned to missing low-level scattering, calibration or
+   site pressure. Rare-path uncertainty and matched observing conditions still
+   need to be separated. [Final transport audit](twilight/CURVED_TRANSPORT_AUDIT.md).
+3. **Observation contracts.** True/apparent solar altitude, disk centre/limb,
+   instrument response and site conditions remain unverified. A better fit does
+   not determine the solar-axis convention. The limited V-filter synthesis in
+   M17 is complete; full-response synthesis and same-night background handling
+   are still open. [Reference audit](twilight/TWILIGHT_REFERENCE_AUDIT.md).
+4. **The limb and aureole.** CIE 110 horizon luminance differs by about a factor
+   of two; a measured clear-sky spectral/luminance scan is needed to distinguish
+   model and reference error. Mie/delta-M are present, but 32-moment aureole
+   resolution and delta-fit remain open.
+5. **Runtime to a reliable result.** M11 removed repeated optical work. Cold
+   Mie construction and rare-path MC variance are separate remaining costs;
+   profile them separately and judge changes by time to a stable estimate.
 
 ---
 
@@ -522,10 +473,11 @@ before selecting its optimisation.
 
 ## What "done" would look like
 
-For the original question — *what colour is the sky, and why?* — the project is
-close.  What remains is not more phenomena but **tighter error bars**:
+For the original question — *what colour is the sky, and why?* — the model
+reproduces many mechanisms. Quantitative closure still requires:
 
-* a measured clear-sky spectral radiance set to replace the CIE fit at the limb;
+* one checked production solar source and stable twilight uncertainty;
+* a measured clear-sky spectral radiance set to test the CIE fit at the limb;
 * a controlled altitude-response comparison that separates site conditions,
   observable definition, transport approximations and sampling error (the
   domain truncation and raised-ground occlusion are fixed; the physical

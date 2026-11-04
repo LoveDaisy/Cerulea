@@ -12,7 +12,7 @@ failing comparison pass.
 
 All scenarios are pinned at ``elevation_km=0`` so the structural criterion
 stays decoupled from the altitude-semantics change (plan Step 3c), which is
-verified separately (see ``docs/TWILIGHT_ALTITUDE_AUDIT.md``).
+verified separately (see ``docs/twilight/TWILIGHT_ALTITUDE_AUDIT.md``).
 """
 from __future__ import annotations
 

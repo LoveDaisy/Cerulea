@@ -12,7 +12,7 @@ The tests encode the four claims the cloud model makes:
 
 Reference albedos marked "MC" come from an independent plane-parallel Monte
 Carlo (200 000-400 000 photons, 1 sigma < 0.001) with the same phase function;
-they are quoted in ``docs/CLOUD.md``.
+they are quoted in ``docs/physics/CLOUD.md``.
 """
 from __future__ import annotations
 

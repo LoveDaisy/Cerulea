@@ -1,6 +1,6 @@
 # The deep twilight: a spherical Monte Carlo engine
 
-> Historical engine write-up: the introductory table predates M10, and later engine benchmarks predate the AOD550 slicing fix. Current state and experimental source/transport conclusions are in [STATUS.md](STATUS.md) and [CURVED_TRANSPORT_AUDIT.md](CURVED_TRANSPORT_AUDIT.md). Historical numerical agreement is not an established calibration error budget.
+> Historical engine write-up: the introductory table predates M10, and later engine benchmarks predate the AOD550 slicing fix. Current state and experimental source/transport conclusions are in [STATUS.md](../STATUS.md) and [CURVED_TRANSPORT_AUDIT.md](CURVED_TRANSPORT_AUDIT.md). Historical numerical agreement is not an established calibration error budget.
 
 `skycolor/rt/twilight.py` adds a **usable spherical multiple-scattering engine**
 for twilight, without replacing the deterministic model for daytime use.
@@ -151,12 +151,14 @@ The first-order term is deterministic and carries no statistical error.
 
 ---
 
-## 2. Validation
+## 2. Historical validation benchmarks (pre-AOD550 correction)
 
-All numbers below are reproducible with
-`uv run python tools/twilight_benchmark.py` (≈ 10 min; `--quick` ≈ 2 min for
-the noisier versions).  Atmosphere: `presets.clear` (AOD₅₅₀ = 0.05, 300 DU
-ozone, ground albedo 0.1), observer at sea level.
+The cases below were measured with `tools/twilight_benchmark.py` before the
+AOD550 correction. Running `uv run python tools/twilight_benchmark.py` today
+reruns those cases with current optics; it does not reproduce these historical
+engine values verbatim. Recorded runtime was about 10 min (`--quick` about
+2 min for noisier versions). Atmosphere: `presets.clear` (AOD₅₅₀ = 0.05,
+300 DU ozone, ground albedo 0.1), observer at sea level.
 
 ### 2.1 Agreement with the deterministic model where both are valid
 
@@ -332,7 +334,7 @@ NumPy timings.
 | wavelength interpolation (linear in log `L`) | < 1 % between anchors | anchor spacing vs curvature, §4.4 |
 | plane-parallel is *not* used for the diffuse field | — | the whole point |
 | ground reflection is Lambertian, no polarisation, no refraction | as the rest of the package | — |
-| `max_scatter = 50` | negligible above −12° | `docs/MC_REFERENCE.md` §5 |
+| `max_scatter = 50` | negligible above −12° | `docs/physics/MC_REFERENCE.md` §5 |
 
 The single-scattering term is **not** approximated by the engine: it is the
 same `rt/single.sky_radiance` call the production model makes.
@@ -345,11 +347,12 @@ same `rt/single.sky_radiance` call the production model makes.
    shadowed line of sight is dominated by rare paths that random-walk to the
    terminator ring.  At −12° the per-photon coefficient of variation is of
    order 10³.  Consequence: the *statistical* error quoted by the engine is
-   reliable only in the sense that it is derived from the observed scatter; the
+   an estimate derived from the observed scatter; the
    underlying distribution is far from Gaussian, and a single run can sit a
    factor of two from the converged value at low budgets.  **Do not interpret
-   the −12° numbers as better than a factor of ~1.5–2 without a `high`/`ultra`
-   run.**
+   the −12° numbers as converged from one quality setting.** Independent
+   seeds and budget-convergence checks are required; a `high`/`ultra` run alone
+   does not establish a bound.
 2. **The anti-solar horizon** (§2.3): ~10 % low at −9°, a smoother-resolution
    effect.
 3. **The twilight level**: after the M10 chord fix the engine is 1.09× Patat
@@ -371,7 +374,12 @@ same `rt/single.sky_radiance` call the production model makes.
 
 ---
 
-## 5. What I would do next
+## 5. Historical estimator and solver proposals
+
+These are unimplemented research hypotheses; the timing/precision expectations
+below are not measured deliverables. Current priorities and scope are maintained
+in [ROADMAP.md](../ROADMAP.md#next-work-justified-by-this-exploration), following the
+unified-source and continuous-transport audits.
 
 1. **Kill the variance at the source.** The correct fix is not more photons but
    a better estimator.  The dominant order is the *second* one, and it can be

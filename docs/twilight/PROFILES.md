@@ -1,12 +1,12 @@
 # Vertical structure and the twilight excess at −6°
 
-> **Superseded by the M10 chord fix.**  The "factor 0.66" this document tries
-> to explain was the one-branch solar chord, not a real excess.  After the fix
-> the model is 0.69× Koomen (deterministic) / 0.85× (spherical engine) at −6°,
-> so there is no 0.66 to fill.  The sensitivity results below are retained as a
-> record: they correctly show that vertical structure is not a lever, and the
-> statement "the −6° zenith is lit by 35–60 km and dimmed by the shadowed
-> troposphere" is still the right physical picture.
+> Historical pre-M10 sensitivity study. The old 1.5× excess was the
+> one-branch solar chord; it is not a physical discrepancy to fill. The sweeps
+> document sensitivities under that baseline, not an exclusion of profiles as
+> a cause of current station residuals. Current conclusions are in
+> [STATUS.md](../STATUS.md) and [TWILIGHT_REFERENCE_AUDIT.md](TWILIGHT_REFERENCE_AUDIT.md).
+
+## Historical interpretation and baseline
 
 **Verdict: no.**  No plausible change to the vertical structure of the
 atmosphere reduces the −6° zenith luminance by the factor **0.66** that would
@@ -86,7 +86,7 @@ size of the documented smoothing bias.  Take the engine's −6° value as
 
 The last row matters for everything that follows.  The deterministic model's
 plane-parallel multiple scattering is only 16 % of the total at −6° and is
-known to be ~30 % low there (`docs/TWILIGHT.md` §2.1); the spherical engine
+known to be ~30 % low there (`docs/twilight/TWILIGHT.md` §2.1); the spherical engine
 gives 0.985 cd m⁻² at −6° (×1.91 of Patat) with 33 % multiple scattering.  The
 sweep below uses the deterministic solver because that is the model the
 roadmap's 0.785 refers to and because it is fast (~0.3 s per case).  The one
@@ -230,9 +230,9 @@ signal is first order, driving the engine to the Patat level by temperature
 alone would need far more than −40 K.  The deterministic −26 K is a *lower bound*
 on what the engine would need, and the engine never gets there.
 
-**Engine, current (architecture refactor Step 3b).**  The rebuild fallback and
-the run-time patch are both retired: custom profiles are now injected as data
-(``Atmosphere(ozone_profile=..., air_profile=...)``) and the engine reads them
+**Post-refactor mechanism (Step 3b; the numerical spot check predates AOD550).**
+The rebuild fallback and the run-time patch are both retired: custom profiles are now injected as data
+(`Atmosphere(ozone_profile=..., air_profile=...)`) and the engine reads them
 through its native `_restrict` wavelength subsets — no patching, no hybrid
 term (`docs/ARCHITECTURE.md` migration map).  `experiments/12` runs the
 engine check patch-free: reference L(−6°) 0.554 vs ΔT = −20 K 0.458, the
@@ -342,7 +342,7 @@ candidate 2, and it needs the ratio, not a new atmospheric model.
 * The sweep uses the deterministic solver at −4° and −8°, where it is not
   reliable.  −4° is an extrapolation of the Patat fit (valid −5° to −15°) and
   −8° is 2.8× too dark because the plane-parallel multiple scattering has
-  collapsed (`docs/TWILIGHT.md` §2.1).  Only the −6° column is a like-for-like
+  collapsed (`docs/twilight/TWILIGHT.md` §2.1).  Only the −6° column is a like-for-like
   comparison; the other elevations are there to show the *shape* of each lever.
 * The −3° reference (40.09) is itself an extrapolation of the Patat fit.  The
   model's 3 % agreement there is therefore not evidence that the model is
@@ -352,10 +352,10 @@ candidate 2, and it needs the ratio, not a new atmospheric model.
   would need a comparable magnitude, not a smaller one, because the uniform
   offset is the most efficient way to change the density over the whole
   emitting layer.
-* The spherical-engine temperature check needs the run-time patch described in
-  §4.2(ii).  Without it the engine's multiple scattering is that of US 1976
-  whatever profile is passed in, so engine-based profile studies are invalid
-  until `skycolor/rt/twilight.py::_sub_atmosphere` is fixed upstream.
+* The historical engine check used the run-time patch described in §4.2(ii).
+  That protocol is retired: injected profiles now pass through native
+  `_restrict` without patching. The post-refactor spot check verifies profile
+  propagation, not current absolute brightness.
 * The ozone Gaussian variants are *not* realistic profiles (a σ = 9 km
   Gaussian puts 13.5 DU below 10 km and has no sharp tropopause).  They are
   there to bracket the shape, not to model a sounding.
@@ -368,10 +368,12 @@ uv run python experiments/12_profile_sensitivity.py            # ~45 s
 uv run python experiments/12_profile_sensitivity.py --engine   # + ~1.5 min
 ```
 
-The script prints the tables above, writes
+The current script reruns these sensitivity cases with current code; it does
+not reproduce the pre-M10 table values verbatim. It writes
 `experiments/out/12_profile_sensitivity.json` (all cases, all elevations,
 profile diagnostics, the contribution function and the ramp/grid checks), and
 regenerates `figures/12_profile_sensitivity.png`.  `--engine` adds the
-spherical-engine spot check of §4.2(ii) (patched, `quality="low"`, two runs).  The JSON is
+spherical-engine spot check of §4.2(ii) (native profile injection,
+`quality="low"`, two runs).  The JSON is
 under the repository's ignored `experiments/out/` directory, like every other
 experiment output; the figure and this document are the committed record.

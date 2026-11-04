@@ -15,6 +15,13 @@ importable, and the old ad-hoc names (`HinterlandAerosol`, `HazeAerosol`,
 `DustAerosol`, `SmokeAerosol`, `UrbanAerosol`, `MaritimeAerosol`) now delegate
 to the physical library.
 
+Current definition and lifecycle contracts: Mie relative coefficients are
+always normalized by the actual 550 nm extinction cross section, independently
+of the query grid ([AOD550 audit](../twilight/AEROSOL_GRID_AUDIT.md)). Mie definitions are
+frozen and changed via `replace`; preset instances share read-only caches
+([architecture](../ARCHITECTURE.md#caching-and-identity)). The library/property
+measurements below retain their stated humidity and wavelength conditions.
+
 ---
 
 ## 1. Mie theory

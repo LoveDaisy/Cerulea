@@ -1,6 +1,6 @@
 """Benchmark and validation numbers for the spherical twilight engine.
 
-This script produces every number quoted in ``docs/TWILIGHT.md``:
+This script produces every number quoted in ``docs/twilight/TWILIGHT.md``:
 
 1. the ratio to the deterministic model where both are valid (-3 to -6 deg),
 2. the comparison with Patat, Ugolnikov & Postylyakov (2006) at -3, -6, -9

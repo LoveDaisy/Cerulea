@@ -1,6 +1,6 @@
 # 阶段三：统一太阳源的冻结证据
 
-结论及数值边界见 [UNIFIED_SOLAR_SOURCE_AUDIT.md](../../../docs/UNIFIED_SOLAR_SOURCE_AUDIT.md)。
+结论及数值边界见 [UNIFIED_SOLAR_SOURCE_AUDIT.md](../../../docs/twilight/UNIFIED_SOLAR_SOURCE_AUDIT.md)。
 这是实验资料，不是生产 LUT 或 `validation/results.json` 的替代品。
 
 - `raw/`：48 条未经重写的 JSONL 光谱记录；3 source ×2 ground ×8 seeds。

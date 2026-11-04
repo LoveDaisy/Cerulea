@@ -6,13 +6,13 @@ transitive ones**, and `.python-version` pins the interpreter.
 
 ```bash
 uv sync                      # install from the lock file
-uv run pytest -q             # 210 tests
+uv run pytest -q             # current regression suite
 uv run python -m validation.run_all
 ```
 
-Nothing else is needed; `uv sync` recreates `.venv` byte-for-byte from the
-lock.  Do not `pip install` into the environment — if a package is missing, add
-it to `pyproject.toml` and run `uv lock`.
+`uv sync` installs the locked dependency versions for the selected interpreter
+and platform. Do not `pip install` into the environment — if a package is
+missing, add it to `pyproject.toml` and run `uv lock`.
 
 ## Updating
 
@@ -26,6 +26,12 @@ git add uv.lock pyproject.toml
 The validation suite is the guard rail: a dependency bump that changes
 `validation/results.json` materially is a red flag, not a merge.
 
-## Locked versions (at the time of writing)
+## Sources of environment and validation state
 
-Python 3.12.11, numpy 2.5.4, scipy 1.18.1, pillow, matplotlib 3.11.2, pytest 8.4.2.
+[.python-version](.python-version) pins the interpreter and [uv.lock](uv.lock)
+pins dependencies. Read these files for exact versions rather than maintaining
+a second list here. The latest committed physical-check snapshot is 3 PASS /
+3 FAIL; `validation.run_all` therefore currently exits non-zero for known
+physical deviations. See [STATUS.md](docs/STATUS.md) for their scope.
+
+Branch, review, test-selection and merge procedures: [DEVELOPMENT.md](docs/DEVELOPMENT.md).

@@ -87,45 +87,27 @@ skycolor/
   render.py       sky dome, cameras (panorama / fisheye / perspective), images
   presets.py      named scenarios
 tools/build_data.py   rebuilds the packaged data tables from data_raw/
-experiments/          scripts that produce the figures (01..10)
+experiments/          scripts that produce the figures (01..12 and named scripts)
 validation/           six independent checks against published references
 tests/                regression and mechanism tests
-docs/                 architecture, method notes, the write-up, the roadmap
+docs/                 project overview, architecture and development guide
+  physics/            general physical and numerical method notes
+  twilight/           twilight engine, audit sequence and historical sensitivities
 ```
 
 ## Where it stands
 
-`docs/STATUS.md` is the one-page summary; `docs/ROADMAP.md` has the milestones
-and the open questions.  Short version: the daytime sky is validated to a few
-per cent, twilight timing and shape are right, and the **−6° twilight level**
-is now within ~15–30 % after the solar-chord fix (M10).  A recorded
-medium-budget deep-twilight run is low by ~1.8× at −9°.  The **altitude
-comparison** remains open: a second ground-shadow defect has been fixed, and
-observed station differences are not controlled changes of altitude alone.
-See `docs/TWILIGHT_ALTITUDE_AUDIT.md` for the experiment and its limits.
+[STATUS.md](docs/STATUS.md) records current behavior and validation limits;
+[the documentation guide](docs/README.md) maps methods and historical evidence.
+The latest committed six-check snapshot is **3 PASS / 3 FAIL**. Rayleigh optical
+depth and direct illuminance agree closely with their references; diffuse
+illuminance and horizon luminance retain substantial deviations.
 
-## How good is it?
-
-`validation/REPORT.md` and `validation/ADDENDUM.md` have the details.  In short:
-
-* Rayleigh optical depth vs Bodhaine et al. (1999): **0.5 % RMS**
-* Direct normal illuminance vs ASTM G173 / Bird & Hulstrom: **+4 to +6 %**
-* CIE 110 relative luminance, upper sky: **10.6 % RMS** (multiple scattering;
-  dominated by the solar aureole)
-* Horizon chromaticity vs measured Berlin spectra: **Δxy = 0.018**
-* Twilight zenith luminance at −6°: **0.69× Koomen (1952)** deterministic,
-  **0.85×** spherical engine (low budget; 0.87× medium); 0.86× / 1.07×
-  Patat et al. (2006)
-* Multiple scattering vs an independent Monte Carlo: **31 % of single
-  scattering at the zenith, both codes agree to 1 %**
-* Known limits: the limb (≈2× brighter than the CIE fit, with the suitability
-  of that reference still open), the solar aureole (32-moment truncation
-  without delta-fit), and the twilight **altitude comparison**.  Correcting
-  solar rays that crossed the raised ground changes the deterministic
-  2.4 km/sea-level ratio at −6° from the historical 1.208× to **1.027×**.
-  Updated engine estimates and the effects of site/observable differences
-  are reported in `docs/TWILIGHT_ALTITUDE_AUDIT.md`; the remaining difference
-  has not been identified as a missing physical component.
+Recent work fixed raised-ground solar occlusion and AOD550 wavelength slicing.
+Twilight source/transport experiments now have independent closure checks, but
+have not replaced production defaults. Absolute twilight brightness, rare-path
+MC uncertainty and comparisons between observing sites remain unresolved.
+See [ROADMAP.md](docs/ROADMAP.md) for M11–M18 and proposed follow-up work.
 
 ## Data provenance
 

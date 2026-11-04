@@ -1,10 +1,10 @@
 # The colour of the sky, from first principles
 
-> Twilight update (2026-11-01): engine benchmarks in this report precede the AOD550 slicing correction; later audits also establish distinct source/transport and observation contracts. See [STATUS.md](STATUS.md), [CURVED_TRANSPORT_AUDIT.md](CURVED_TRANSPORT_AUDIT.md) and [TWILIGHT_REFERENCE_AUDIT.md](TWILIGHT_REFERENCE_AUDIT.md) for current conclusions. Other historical measurements retain their original context.
-
-*This is the main write-up of the project.  Numbers quoted here are produced by
-the scripts in `experiments/` and `validation/`; the figures live in
-`figures/`.*
+This report explains the physics and the recorded figures. Use
+[STATUS.md](STATUS.md) for the current validation snapshot and
+[the documentation guide](README.md) for method/audit ownership. Figure values
+retain their original experimental conditions; the engine benchmarks in §3.1
+predate the AOD550 anchor-optics correction.
 
 ## 1. The question
 
@@ -32,9 +32,10 @@ through an explicit, auditable chain.
 
 ### 2.1 Atmosphere
 
-A spherically stratified atmosphere between 0 and 120 km, with 54 layers.
-Temperature and pressure follow the US Standard Atmosphere 1976; the air
-number density follows from the ideal gas law.  Ozone uses a mid-latitude
+A spherically stratified atmosphere extends to 200 km on the default grid.
+Temperature and pressure follow the US Standard Atmosphere 1976, with a
+thermospheric tail above 120 km; the air number density follows from the
+profile definition.  Ozone uses a mid-latitude
 climatological profile normalised to a column in Dobson units (default
 300 DU).  NO₂ is available but off by default.  Aerosol is described by one or
 more layers, each carrying an optical depth at 550 nm, a normalised vertical
@@ -65,10 +66,10 @@ integrates
 L1(lambda) = (F0(lambda)/4pi) * integral beta_sca(s) p(Theta) T_sun(s) T_view(s) ds
 ```
 
-along the true straight ray through the spherical shells.  Both transmittances
-are computed on the true curved paths: `T_sun` is the transmittance from the
-scattering point to the sun along a ray that may graze or dip below the Earth's
-limb.  This single detail is what produces
+along a straight viewing ray through spherical shells. `T_view` attenuates
+that viewing segment. `T_sun` attenuates the solar path from the scattering
+point to space, including both branches when it crosses a perigee; that path
+can refract under the prescription in §2.4.  This single detail is what produces
 
 * the **twilight arch** (the geometric shadow boundary is a curve on the sky,
   not a straight line),
@@ -106,11 +107,13 @@ The integrated refraction is 33 arcminutes at the horizon and matches
 Saemundsson's fit to a few per cent above 5 degrees.  It is used for the solar
 position and for the dip of the horizon.
 
-It is **not** used for the shadow mask in the radiative transfer, and that is a
-deliberate, documented choice: raising the terminator while keeping straight
-rays admits surface-grazing rays whose optical depth should be computed along
-their *bent* path, and the result over-brightens twilight by 3–6×
-(see `docs/REFRACTION.md`).  Bending the paths is the next step.
+Refraction is on by default. First-order solar attenuation and visibility use
+refracted paths and the model's opaque bottom; viewing rays and phase angles
+remain geometric. SOS uses a refracted shadow threshold with geometric solar
+optical depth, while production MC higher orders remain geometric. The
+experimental unified source and continuous diffuse flights have independent
+checks but have not replaced these defaults. See [REFRACTION.md](physics/REFRACTION.md)
+and [ARCHITECTURE.md](ARCHITECTURE.md) for the production contract.
 
 ### 2.5 From spectrum to pixels
 
@@ -126,42 +129,19 @@ their *bent* path, and the result over-brightens twilight by 3–6×
 
 ## 3. Does it work?
 
-See `validation/REPORT.md` for the full table.  Headlines:
+The latest committed six-check snapshot is **3 PASS / 3 FAIL**, with failures
+in diffuse illuminance, CIE luminance distribution and single-scattering deep
+twilight. [STATUS.md](STATUS.md) summarises those checks and their limits;
+[validation/results.json](../validation/results.json) holds the metric values.
+The original single-scattering baseline is in
+[REPORT.md](../validation/REPORT.md); subsequent historical changes
+are in [ADDENDUM.md](../validation/ADDENDUM.md).
 
-| Test | Result |
-|---|---|
-| Rayleigh optical depth vs Bodhaine (1999), 300–700 nm | RMS 0.48 %, worst 1.0 % → **pass** |
-| Direct normal illuminance vs Bird & Hulstrom / ASTM G173 | +4 to +6 % → **pass** |
-| Diffuse horizontal illuminance vs CIE 110 (T = 2.2) | +38 %, but 9.5 klx = 86 W m⁻² is a normal measured clear-sky DHI → **reference is the weak link** |
-| CIE 110 clear-sky relative luminance, θ ≤ 60° | 3.8 % RMS single-scattering only; 14.5 % with multiple scattering (dominated by one point, the solar aureole) |
-| CIE 110 relative luminance, last 5° above the horizon | model ≈ 2× too bright → **known deviation** |
-| CIE 110 relative luminance at the sun's position | model too weak (the HG aureole has no forward peak) → **known deviation** |
-| Single scattering vs the analytic plane-parallel Rayleigh solution | 1.5–4 % → **pass** |
-| Single scattering vs Monte Carlo (thin atmosphere, 9 points) | within 1.7σ → **pass** |
-| Diffuse / direct ratio, pure Rayleigh atmosphere | 0.056 vs 0.061 analytic → **pass** |
-| SOS energy conservation (conservative atmosphere) | 2.3 × 10⁻⁴ → **pass** |
-| MC global energy conservation | 0.9985 → **pass** |
-| MS/SS at the zenith, sun at 60°, clear sky | 0.31 (SOS) vs 0.31 (MC) → **pass** |
-| Twilight zenith luminance at −6°, deterministic (sea level) | 0.44 vs Koomen 0.65 cd m⁻² (0.69×); engine 0.56 (0.87×) → **pass** |
-| Twilight zenith luminance at −9°, spherical engine (medium) | 9.31 × 10⁻³ vs Patat 0.0171 (0.54×, 1σ 0.43–0.66) → **pass** (factor 2) |
-| Twilight zenith luminance at −12°, spherical engine (medium) | 5.46 × 10⁻⁴ vs 0.00146 (0.37×, 1σ 0.16–0.59) → **not conclusive** (58 % error) |
-| Single scattering alone at −9° / −12° | ~60× / ~130× too dark → **known limitation**, the engine handles this range |
-| Horizon chromaticity vs measured Berlin spectra | Δxy = 0.018 (tolerance 0.02) → **marginal pass** |
-| Mie phase moments vs quadrature | 2e-8, `beta_1` = g to 1e-10 → **pass** |
-| Cloud albedo vs Monte Carlo | 0.1–0.7 % (`g=0`), ≤1 % (`g=0.85`, τ≥5) → **pass** |
-| Cloud `R + T + direct` | 1 to 1e-12 → **pass** |
-| Refraction at the horizon | 33′ (Sæmundsson 29′, classical 34′) → **pass** |
-
-`engine` in the twilight rows means the split estimator: the refracted
-deterministic first order plus geometric-ray Monte Carlo multiple scattering.
-The two halves are not fully consistent about refraction (the MC ignores it),
-which is a known limitation of the engine, not a chord issue.
-
-The two deviations are understood and documented rather than papered over:
-the last few degrees above the horizon are where the plane-parallel diffuse
-approximation and the aerosol vertical profile matter most, and the Henyey-
-Greenstein phase function cannot reproduce the sharp forward diffraction peak
-that makes the solar aureole.
+Independent numerical checks cover analytic Rayleigh first order, MC/SOS
+agreement, energy conservation, Mie moments and cloud albedo. Backends share
+some geometry and optical definitions, so agreement between them cannot
+validate those shared parts. Their independent audits are linked from
+[ARCHITECTURE.md](ARCHITECTURE.md).
 
 ### 3.1 The deep twilight needs a spherical solver
 
@@ -176,7 +156,8 @@ three-dimensional one can.
 engine with a split estimator (the first order is taken from the exact
 deterministic solver, only orders ≥ 2 from the Monte Carlo), a coarse angular
 grid with a spherical local-linear regression, and wavelength interpolation.
-Against Patat et al. (2006):
+**Historical post-M10, pre-AOD550 benchmark**, compared with Patat et al.
+(2006), in cd m⁻²:
 
 | solar elevation | deterministic | engine | Patat | engine / Patat |
 |---|---|---|---|---|
@@ -190,7 +171,7 @@ The engine brings the single-scattering deficits of ~60× and ~130× at −9° a
 grows with solar depression (1.09 → 0.54 → 0.37).  This does not establish
 its cause: the engine retains straight-line higher-order transport, and
 deep-twilight MC statistics are heavy-tailed.  See the
-[altitude audit](TWILIGHT_ALTITUDE_AUDIT.md).  The
+[altitude audit](twilight/TWILIGHT_ALTITUDE_AUDIT.md).  The
 old 1.39/1.45 "excess" was the one-branch chord (M10).
 
 ## 4. What the model says
@@ -226,15 +207,12 @@ Three separate mechanisms produce the twilight sky:
    black: light scattered in the still-sunlit upper atmosphere diffuses down
    into the shadow.
 
-The last of these is where the model stops working.  At −6° the zenith
-luminance is within 10 % of the empirical fit of Patat et al. (2006), but at
-−9° it is 20× too dark and at −12° it is essentially zero.  The reason is
-geometric rather than radiative: the zenith line of sight at −9° is entirely
-inside the Earth's shadow, and the light that actually reaches it has travelled
-several hundred kilometres *horizontally* from the sunlit twilight arch.  A
-horizontally homogeneous, plane-parallel multiple-scattering solver has no
-mechanism for that transport.  Reproducing deep twilight needs a spherical
-three-dimensional multiple-scattering model.
+A plane-parallel diffuse field cannot represent the long horizontal transport
+from the sunlit twilight arch into the shadowed zenith below about −8°.
+The spherical MC engine (§3.1) supplies that mechanism. Its heavy-tailed
+sampling uncertainty and mixed source/refraction prescriptions still limit
+absolute predictions; the later [transport audit](twilight/CURVED_TRANSPORT_AUDIT.md)
+does not identify a specific missing component from the station residual.
 
 ### 4.4 Air
 
@@ -325,34 +303,20 @@ range.
 
 ### 4.9 The twilight level: a chord bug, not a physical excess
 
-A second, independent, *photopic* twilight measurement — Koomen et al. (1952),
-sea level — lets the model be compared like-for-like for the first time
-(`validation/SECOND_DATASET.md`).  The −6° zenith is **0.44 cd m⁻²** in the
-deterministic model, i.e. **0.69×** Koomen (0.646) and 0.86× Patat (0.516);
-the spherical engine gives **0.55 cd m⁻²** (0.85× Koomen, 1.07× Patat; the
-medium-quality benchmark gives 0.563, 0.87× / 1.09×).  The residual is
-15–30 % in those historical runs. The primary photometry does not supply
-an absolute error budget that assigns this residual to calibration or to
-missing scattering; the later source audit supersedes that attribution.
+The old 2.20× twilight excess was a solar-column defect: a grazing twilight
+ray needs both the far-side perigee→space and near-side perigee→point paths.
+M10 restored the missing near-side segment (`up + 2*down`), checked against
+independent line integration and ray tracing. An apparently good geometric
+fit had partly cancelled the chord error against absent refraction.
 
-The story changed with the M10 chord fix.  The old 2.20× (and the 1.14×
-geometric number before it) were artifacts of a solar path that returned only
-one perigee → space traversal: for a twilight ray the light also traverses the
-near-side perigee → point segment, so every grazing ray was under-attenuated by
-half of its dense lower-atmosphere column.  The geometric mode's missing
-refraction happened to cancel part of that error, which is why the old
-"1.14×" looked like a site effect.  See `docs/ROADMAP.md` M10 and the sixth
-addendum of `validation/ADDENDUM.md`.
-
-The altitude audit found another construction defect after Step 3c: solar
-occultation still used sea level, allowing rays through the raised ground.
-Aligning the opaque radius changes the -6° deterministic ratio from 1.208
-to **1.027** (0.444279 → 0.456350 cd m⁻²), with sea-level results unchanged.
-The remaining station comparison is not a controlled altitude experiment:
-the often-quoted 0.80 mixes Koomen photopic and Patat V-band measurements.
-Independent full-spectrum MC, component decomposition and the original-paper
-audit are recorded in [TWILIGHT_ALTITUDE_AUDIT.md](TWILIGHT_ALTITUDE_AUDIT.md).
-The residual cannot yet be assigned to a missing physical component.
+Later audits fixed raised-ground solar occlusion and AOD550 slicing. They also
+built a unified finite-disk solar source and continuous diffuse refraction as
+experimental references. The remaining station comparison mixes site
+conditions, observables and uncertain solar-axis metadata; it has not been
+assigned to calibration or missing low-level multiple scattering.
+[ROADMAP.md](ROADMAP.md) records M10 and M13–M18; source spectra, independent
+checks and the bounded final conclusion are in
+[CURVED_TRANSPORT_AUDIT.md](twilight/CURVED_TRANSPORT_AUDIT.md).
 
 ### 4.10 Altitude
 
@@ -360,12 +324,13 @@ From 3 km the zenith gets darker and deeper blue (less air above), the horizon
 is depressed, and the whole sky gains contrast.  The twilight altitude
 dependence is sensitive to the diffuse-field approximation (see §4.9);
 the daytime altitude behaviour is not affected by the twilight chord fix.
-`at_altitude` itself now truncates the model at the site, so the daytime
-altitude figures (experiments/05) reflect one consistent ground.
+`at_altitude` now truncates the model at the site; rerunning `experiments/05`
+uses this consistent ground. Existing figures retain their recorded baseline.
 
 ## 5. Limitations
 
-* **No clouds.**  By construction.
+* **One homogeneous cloud deck.** No cumulus structure, silver linings or
+  ice-crystal halos; see [CLOUD.md](physics/CLOUD.md).
 * **No polarisation.**  The Rayleigh phase function is used in its scalar form;
   the polarised sky (and the neutral points, Babinet and Brewster) would need a
   Stokes-vector treatment.
@@ -380,12 +345,12 @@ altitude figures (experiments/05) reflect one consistent ground.
   cannot represent.  `skycolor/rt/twilight.py` fixes it with a spherical
   Monte Carlo (see §3.1) at the cost of running the diffuse field as a Monte
   Carlo rather than a deterministic solve.
-* **Refraction is only half-implemented.**  The solar position and the horizon
-  dip use traced rays, but the radiative-transfer shadow mask does not: bending
-  the terminator while keeping straight rays over-brightens twilight by 3–6×.
-  Doing it properly means integrating the sun-ray optical depth along the
-  refracted chord.
-* **Henyey-Greenstein aureole.**  The solar aureole is too smooth.
+* **Mixed refraction/source approximations.** First-order solar attenuation
+  and shadow can refract; production higher-order transport remains geometric.
+  The source contracts differ across backends; see [ARCHITECTURE.md](ARCHITECTURE.md).
+* **Under-resolved aureole.** Mie and delta-M are present, but the 32-moment
+  multiple-scattering expansion does not resolve the full forward peak;
+  delta-fit remains absent.
 * **Temperature-independent Chappuis band** (the JPL table has no temperature
   dependence in the visible).
 * **Lambertian ground.**
