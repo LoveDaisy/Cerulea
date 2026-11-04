@@ -51,6 +51,71 @@ corrupt partial line is marked invalid in ``meta.json`` and any recomputation
 goes to a fresh attempt; summaries must find exactly one valid complete
 attempt per batch (duplicated recomputation never counts as an extra seed).
 
+Threat model and acceptance boundary
+------------------------------------
+
+This tool is a single-project research reference instrument.  The deliverable
+is a reproducible deep-twilight reference with honest uncertainty labels --
+not a multi-tenant service.  The contracts below defend against well-meaning
+mistakes; the owner adjudication of 2026-11-05 (binding for future reviews)
+declares what they do *not* defend against.
+
+In scope -- honest-operator correctness (reject, or flag explicitly):
+
+* protocol/scene fields that disagree with this tool's single implementation
+  (preset, AOD, ozone, albedo, altitude, sightline, solar azimuth,
+  scatter-order cap) -- refused before any computation;
+* component-closure violations, checked per wavelength before statistics:
+  ``total = single + multiple`` (direct/sensitivity waves);
+  ``total_cand = single + L2 + rest``, ``rest = multiple - c2nt`` and
+  ``total_analog = single + multiple`` (candidate wave);
+* sample-count/budget mismatches: ``candidate_samples`` against the tier
+  budget (record and per-wavelength level); Monte Carlo per-record items
+  exactly equal to the protocol set; sensitivity items exactly equal to the
+  fixed supported full set -- the latter enforced by
+  :func:`require_supported_sensitivity_items` at CLI entry, before any
+  numeric work;
+* coverage gaps: singles evidence validated by the shared
+  ``validated_singles`` contract (depth set, item metadata, anchor-vector
+  shape/finiteness/positivity); a stage declared by the protocol but absent
+  from ``raw/`` refuses a full summary unless ``--allow-incomplete`` lists
+  it explicitly;
+* cross-batch implementation-identity inconsistency: records and meta must
+  pin ``code_sha256``; per-stage identity *content* is verified
+  (``verified_identity``); within-wave fingerprint equality is enforced by
+  ``require_same_execution`` -- physics-anchor differences are refused
+  unconditionally, and historical exceptions exist only as exact frozen
+  ``(wave, fingerprint-pair)`` bindings in ``VERIFIED_IMPLEMENTATION_COMPAT``;
+* protocol-generation mismatches: ``require_protocol_generation`` accepts
+  the current protocol or a known generation that binds its stage tuple and
+  a verified target-protocol hash; unknown or out-of-stage generations are
+  refused;
+* run-root identity conflicts: protocol identity is resolved through the
+  summarizer's single authority ``resolve_protocol_path``; the executor
+  requires byte-exact equality with that resolved identity before any
+  numeric work; conflicting ``protocol.json`` / ``protocol.snapshot.json``
+  files are refused at the resolution point and identity files are never
+  silently overwritten;
+* ledger violations: append-only attempts, corrupt tails invalidate the
+  attempt, exactly one valid complete attempt per batch, duplicated
+  recomputation never counts as an extra seed, and recovery never
+  overwrites finished evidence (zero-budget recovery with valid singles is
+  a byte-preserving reuse; missing evidence reports
+  ``incomplete-no-singles-evidence`` instead of a false ``complete``);
+* summaries are always recomputed from raw records; the manifest pins file
+  hashes; ``--verify-only`` refuses tampered, missing or duplicated
+  batches; an all-zero batch is reported as a detection limit, never as a
+  precision pass.
+
+Out of scope -- recorded as non-blocking notes, never blocking Majors:
+
+* malicious adversarial scenarios: shadowing identity files with crafted
+  substitutes, forging identities, or forensic probes of *where* a gate
+  fires (e.g. profiling the rejection order).  These are self-inflicted
+  attacks with no demonstrated cost in this project;
+* identity-layer hardening beyond what the current implementation
+  (commit ``76c9e03``) already provides.
+
 Run from the repository root::
 
     uv run python -m tools.deep_twilight_reference --protocol \\
