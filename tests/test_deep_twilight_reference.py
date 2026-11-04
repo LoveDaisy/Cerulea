@@ -387,6 +387,84 @@ def test_missing_batch_refuses(tmp_path):
         compute_summary(data, MINI_PROTOCOL)
 
 
+def test_candidate_and_sensitivity_sections(tmp_path):
+    """The Step-3/Step-4 analysis sections run on synthetic mini batches."""
+    from tools.deep_twilight_reference import Batch, SENSITIVITY_MC_ITEMS
+    from tools.summarize_deep_twilight_reference import _candidate_stats, \
+        _sensitivity_stats
+    data = _write_mini_dataset(tmp_path)
+    proto = json.loads((data / "protocol.json").read_text())
+    proto["candidate"] = {
+        "table": {"path": "probe/x.npz", "label": "x", "sha256": "x"},
+        "wavelengths_nm": [450.0, 550.0, 650.0], "repeats": 4,
+        "seed_rule": "test", "tiers": [
+            {"candidate_samples": 100, "rest_photons": 400},
+            {"candidate_samples": 200, "rest_photons": 800}]}
+    proto["sensitivity"] = {"repeats": 4, "photons_per_wavelength": 300,
+                            "mc_items": ["baseline", "disk4x16"],
+                            "not_run_here": ["curved"]}
+    (data / "protocol.json").write_text(json.dumps(proto))
+    rng = np.random.default_rng(0)
+    wl_anchor = {450.0: 14, 550.0: 34, 650.0: 54}
+    for sun_index in (0,):
+        for tier_index in (0, 1):
+            batch = Batch(data / "raw" / "candidate", f"s{sun_index}t{tier_index}",
+                          [80000 + 10000 * sun_index + 1000 * tier_index + r
+                           for r in range(4)], dict(stage="candidate"))
+            for r in range(4):
+                seed = 80000 + 10000 * sun_index + 1000 * tier_index + r
+                per_lambda = {}
+                for a, idx in wl_anchor.items():
+                    s2 = rng.uniform(0, 1e-18)
+                    per_lambda[str(a)] = dict(
+                        L2=1e-9 * (1 + tier_index), L2_second_moment=2e-18,
+                        L2_max_abs=1e-8, candidate_seconds=0.2,
+                        candidate_samples=100, c2nt_mean=5e-10, rest_mean=2e-10,
+                        rest_second_moment=s2, mc_multiple=7e-10, mc_seconds=0.1,
+                        deterministic_single=1e-8,
+                        total_cand=1e-8 + 1e-9 * (1 + tier_index) + 2e-10,
+                        total_analog=1.17e-8, max_fraction=0.004,
+                        top001_fraction=0.2, effective_contributors=50.0)
+                batch.record_seed(seed, dict(
+                    seed=seed, sun_elevation_deg=-9.0, tier_index=tier_index,
+                    candidate_samples=100, rest_photons=400,
+                    per_lambda=per_lambda, seconds=0.3, table_sha256="t",
+                    code_sha256={}, batch_id="x", attempt=0))
+            batch.close("complete")
+    batch = Batch(data / "raw" / "sensitivity", "s0mc",
+                  [110000 + r for r in range(4)], dict(stage="sensitivity"))
+    for r in range(4):
+        seed = 110000 + r
+        items = {}
+        for item in ("baseline", "disk4x16"):
+            items[item] = dict(
+                fingerprint="fp" if item == "baseline" else "fp",
+                per_lambda={str(a): dict(deterministic_single=1e-8,
+                                         multiple=5e-10, total=1.05e-8)
+                            for a in wl_anchor}, seconds=0.1)
+        batch.record_seed(seed, dict(seed=seed, sun_elevation_deg=-9.0,
+                                     photons_per_wavelength=300, items=items,
+                                     batch_id="s0mc", attempt=0,
+                                     code_sha256={}, table_sha256="t"))
+    batch.close("complete")
+    (data / "raw" / "sensitivity" / "singles-refinement.json").write_text(
+        json.dumps(dict(schema="s/1", items={"ss_gauss16": "d"},
+                        by_sun={"-9.0": dict(
+                            baseline=[1e-8] * 81,
+                            ss_gauss16=[1e-8 * (1 + 1e-6)] * 81)})))
+
+    wl = np.arange(380.0, 781.0, 5.0)
+    cand = _candidate_stats(data, proto, wl, [14, 34, 54], {})
+    assert cand["-9.0"]["tiers"]["1"]["anchors"]["550.0"]["total_mean"] \
+        > cand["-9.0"]["tiers"]["0"]["anchors"]["550.0"]["total_mean"]
+    assert cand["-9.0"]["drift"]["550.0"]["abs_drift"] > 0.0
+    sens = _sensitivity_stats(data, proto, wl, [14, 34, 54])
+    entry = sens["by_sun"]["-9.0"]["mc"]["disk4x16"]["550.0"]
+    assert entry["paired_delta_mean"] == 0.0 and entry["fingerprints_same"]
+    assert sens["singles"]["-9.0"]["ss_gauss16"]["max_abs_relative_drift"] > 0.0
+    assert sens["not_run_here"] == ["curved"]
+
+
 # ---------------------------------------------------------------------------
 # real end-to-end pieces (small, but with the actual physics and table)
 # ---------------------------------------------------------------------------
