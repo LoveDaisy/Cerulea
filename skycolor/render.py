@@ -137,25 +137,50 @@ def perspective_grid(width: int, height: int, hfov_deg: float = 90.0,
 # ---------------------------------------------------------------------------
 # high level renderer
 # ---------------------------------------------------------------------------
-def ground_radiance(atmo, dome, sun_zenith_deg, ground_albedo=None,
-                    direct_transmittance=None):
+def ground_radiance(atmo, dome, sun_zenith_deg, ground_albedo=None, *,
+                    direct_irradiance=None, direct_transmittance=None):
     """Spectral radiance of a Lambertian ground illuminated by sun + sky.
 
-    ``direct_transmittance`` overrides the clear-sky direct-beam
-    transmittance -- e.g. a cloud-deck attenuated beam, so the display of a
-    cloudy scene can keep its physically darkened ground without reaching
-    into the solver.
+    The default direct term is the unified source's horizontal direct
+    irradiance (finite disk, refracted, occultation-aware) at the observer's
+    ground.  ``direct_irradiance`` overrides it wholesale -- e.g. a cloud
+    deck's beam-attenuated irradiance, so the display of a cloudy scene keeps
+    its physically darkened ground without reaching into the solver.
+
+    ``direct_transmittance`` is the retired centre-beam override: it still
+    works for explicit old callers (multiplied by F*cos(z) exactly as before)
+    but is deprecated; passing it together with ``direct_irradiance`` is an
+    error, and nothing defaults to it.
     """
+    import warnings
+
     from .rt.single import direct_sun_transmittance
+    from .solar_source import SolarSource
     from .spectra import solar_irradiance
 
+    if direct_irradiance is not None and direct_transmittance is not None:
+        raise ValueError(
+            "pass either direct_irradiance or the deprecated "
+            "direct_transmittance, not both")
     albedo = (atmo.ground_albedo if ground_albedo is None
               else np.full(len(atmo.wl), ground_albedo))
     E_diff = hemispherical_irradiance(dome["radiance"], dome["zenith"], dome["azimuth_rel"])
-    T = (direct_sun_transmittance(atmo, sun_zenith_deg)
-         if direct_transmittance is None else np.asarray(direct_transmittance, dtype=float))
-    cosz = max(np.cos(np.radians(sun_zenith_deg)), 0.0)
-    E_dir = solar_irradiance(atmo.wl) * T * cosz
+    if direct_irradiance is not None:
+        E_dir = np.broadcast_to(np.asarray(direct_irradiance, dtype=float),
+                                (len(atmo.wl),)).copy()
+    elif direct_transmittance is not None:
+        warnings.warn(
+            "direct_transmittance is deprecated by the unified solar source; "
+            "pass direct_irradiance instead (it carries the disk geometry)",
+            DeprecationWarning, stacklevel=2)
+        T = np.asarray(direct_transmittance, dtype=float)
+        cosz = max(np.cos(np.radians(sun_zenith_deg)), 0.0)
+        E_dir = solar_irradiance(atmo.wl) * T * cosz
+    else:
+        source = SolarSource(atmo, float(sun_zenith_deg), 0.0)
+        x_ground = np.array([[0.0, 0.0, atmo.r_bounds[0] + (atmo.elevation_km - atmo.z_bounds[0]) * 1e3]])
+        E_dir = np.asarray(source.direct_irradiance(x_ground, np.array([0.0, 0.0, 1.0]))[0],
+                           dtype=float)
     return np.asarray(albedo) / np.pi * (E_dir + E_diff), E_dir + E_diff
 
 
@@ -166,17 +191,19 @@ def render_scene(atmo, sun_elevation_deg: float, sun_azimuth_deg: float = 0.0,
                  ground: bool = True, n_zenith: int = 50, n_azimuth: int = 91,
                  hfov_deg: float = 90.0, pitch_deg: float = 0.0, yaw_deg: float = 0.0,
                  white_xy=None, preserve_chromaticity: bool = True,
-                 radiance_field=None, ground_direct_transmittance=None):
+                 radiance_field=None, ground_direct_irradiance=None,
+                 ground_direct_transmittance=None):
     """Render a complete scene (sky + ground + sun disk) to an RGB image.
 
-    ``radiance_field`` / ``ground_direct_transmittance`` have the same
-    meaning as in :func:`sky_dome` / :func:`ground_radiance`: they let a
-    cloudy or otherwise non-default spectral field flow through the same
-    display path instead of a duplicated one.  The pair is coupled: a
-    non-default ``radiance_field`` usually needs a matching
-    ``ground_direct_transmittance`` (a cloudy sky also attenuates the
-    direct beam that lights the ground) — leaving the ground default pairs
-    a custom sky with a clear-sky beam.
+    ``radiance_field`` / ``ground_direct_irradiance`` have the same meaning
+    as in :func:`sky_dome` / :func:`ground_radiance`: they let a cloudy or
+    otherwise non-default spectral field flow through the same display path
+    instead of a duplicated one.  The pair is coupled: a non-default
+    ``radiance_field`` usually needs a matching ``ground_direct_irradiance``
+    (a cloudy sky also attenuates the direct beam that lights the ground) --
+    leaving the ground default pairs a custom sky with a clear-sky beam.
+    ``ground_direct_transmittance`` is the retired override; see
+    :func:`ground_radiance` for its deprecation semantics.
     """
     sun_zen = 90.0 - sun_elevation_deg
     dome = sky_dome(atmo, sun_zen, n_zenith=n_zenith, n_azimuth=n_azimuth,
@@ -198,6 +225,7 @@ def render_scene(atmo, sun_elevation_deg: float, sun_azimuth_deg: float = 0.0,
     rad = sample_dome(dome, 90.0 - np.clip(el, 0.0, 90.0), rel)
     if ground:
         Lg, _ = ground_radiance(atmo, dome, sun_zen,
+                                direct_irradiance=ground_direct_irradiance,
                                 direct_transmittance=ground_direct_transmittance)
         rad = np.where(above[..., None], rad, Lg[None, None, :])
 

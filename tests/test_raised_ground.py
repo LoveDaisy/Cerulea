@@ -194,8 +194,13 @@ def test_cloud_point_and_deck_share_the_raised_ground_shadow():
             tau=np.ones_like(wl), omega=np.full_like(wl, 0.9),
             g=np.full_like(wl, 0.5), f=np.full_like(wl, 0.25)),
     )
+    # the finite disk keeps the deck's upper limb lit at -6 deg (the
+    # refracted boundary at 36.5 km is -7.17 deg true): partial light is
+    # physical, and the whole-disk shadow needs a deeper sun
     high = cloud.illuminate_cloud(atmo, deck, 96.0)
-    assert high.geometry == "none"
+    assert high.geometry in ("base", "mixed")
+    high_deep = cloud.illuminate_cloud(atmo, deck, 98.5)
+    assert high_deep.geometry == "none"
     low = cloud.illuminate_cloud(_vacuum(ground_km=0.0), deck, 96.0)
     assert low.geometry == "base"
 

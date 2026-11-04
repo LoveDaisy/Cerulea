@@ -461,6 +461,11 @@ class SolarRayField:
                     lo, 90.0, xtol=2e-9)
         return out.reshape(height.shape)
 
+    def turning_radius(self, invariant):
+        """Public alias of the turning-point solver (radius where ``n(r) r`` equals
+        the invariant).  Requires a monotone ``n*r`` medium (constructor-checked)."""
+        return self._turning_radius(np.asarray(invariant, dtype=float))
+
     def beam_gain(self, height_km, apparent_elevation_deg):
         """Local point-source gain ``(n/n_inf)^2 dOmega_app/dOmega_true``.
 
@@ -1214,17 +1219,19 @@ class SolarSource:
             # vector is the true beam direction tilted from the radial by
             # (true -> apparent elevation).
             radial = x[sl] / np.linalg.norm(x[sl], axis=1)[:, None]
-            true_e = np.arcsin(np.clip(radial @ directions.T, -1, 1))
-            # apparent cosine toward the normal, composed from the radial and
-            # in-plane components of the normal:
+            sin_true = np.clip(radial @ directions.T, -1, 1)     # sin(true elev)
+            cos_true = np.sqrt(np.maximum(1.0 - sin_true ** 2, 1e-300))
+            # The apparent beam direction is  sin(app)*radial + cos(app)*e_h
+            # (app = apparent *elevation*, radians); resolve the unit normal
+            # against that basis:
             n_dot_radial = np.einsum("ij,j->i", radial, normal)[:, None]
-            n_dot_beam = normal @ directions.T  # (n, n_beam)
-            horizontal = (n_dot_beam - n_dot_radial * np.cos(true_e)) / np.sqrt(
-                np.maximum(1.0 - np.cos(true_e) ** 2, 1e-30))
-            app_dot_normal = (np.cos(np.radians(app)) * n_dot_radial
-                              + np.sin(np.radians(app)) * horizontal)
+            n_dot_beam = normal @ directions.T                   # (n, n_beam)
+            horizontal = (n_dot_beam - n_dot_radial * sin_true) / cos_true
+            app_dot_normal = (np.sin(app) * n_dot_radial
+                              + np.cos(app) * horizontal)
             if iw is None:
-                gain = gain[..., None]
+                gain = gain[..., None]     # gain is wavelength independent
+                app_dot_normal = app_dot_normal[..., None]
             weighted = transmission * gain * np.maximum(app_dot_normal, 0.0)
             if iw is None:
                 out[sl] = weighted.sum(axis=1) * f_inf[None, :]
