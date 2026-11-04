@@ -390,12 +390,12 @@ def stage_budget(state: dict, stage: str, protocol: dict, override_hours):
 
 
 def note_stage_seconds(data_dir: Path, state: dict, stage: str, seconds: float,
-                       records: int) -> None:
+                       records_delta: int) -> None:
     group = STAGE_CAP_GROUP[stage]
     entry = state["stages"].setdefault(
         group, {"cumulative_seconds": 0.0, "records": 0, "stages": []})
     entry["cumulative_seconds"] += float(seconds)
-    entry["records"] += int(records)
+    entry["records"] += int(records_delta)
     if stage not in entry["stages"]:
         entry["stages"].append(stage)
 
@@ -461,12 +461,15 @@ def run_formal_stage(protocol, atmo, table, stage, data_dir, state, *,
         return _cap - (spent + (time.perf_counter() - started))
 
     def bill(records_done):
-        nonlocal billed
+        nonlocal billed, billed_records
         now = time.perf_counter()
-        note_stage_seconds(data_dir, state, stage, now - billed, records_done)
+        note_stage_seconds(data_dir, state, stage, now - billed,
+                           records_done - billed_records)
         billed = now
+        billed_records = records_done
         save_state(data_dir, state)
 
+    billed_records = 0
     bill(0)  # setup (table load, deterministic singles) counts against the cap
 
     for sun_index, sun_elev in enumerate(suns):
