@@ -1198,7 +1198,7 @@ def test_fresh_run_root_direct_resume(tmp_path):
     # test_batch_contract_mismatch_refused)
     protocol["direct"]["budgets_photons"] = [400, 1600]
     (input_dir / "protocol.json").write_text(json.dumps(protocol))
-    with pytest.raises(SystemExit, match="protocol snapshot"):
+    with pytest.raises(SystemExit, match="protocol identity"):
         main(["--protocol", str(input_dir / "protocol.json"),
               "--stage", "direct", "--out", str(run_root),
               "--max-stage-hours", "0.01"])
@@ -1277,7 +1277,7 @@ def test_run_root_protocol_identity_refuses_cross_stage_switch(
                         lambda *a, **k: calls.append("build_scenario"))
     monkeypatch.setattr(dtr, "load_source_table",
                         lambda *a, **k: calls.append("load_source_table"))
-    with pytest.raises(SystemExit, match="protocol snapshot"):
+    with pytest.raises(SystemExit, match="protocol identity"):
         dtr.main(["--protocol", str(input_b / "protocol.json"),
                   "--stage", "sensitivity", "--out", str(run_root)])
     assert calls == [], "numeric work ran before the identity refusal"
@@ -1288,6 +1288,84 @@ def test_run_root_protocol_identity_refuses_cross_stage_switch(
                     "--stage", "direct", "--out", str(run_root),
                     "--max-stage-hours", "0.02"])
     assert rc2 == 0
+
+
+def test_run_root_identity_covers_default_and_inner_protocol_layouts(
+        tmp_path, monkeypatch):
+    """The identity gate must hold for EVERY supported layout, not only
+    run_root != input_root (generation-3 review round-3): the default
+    archive layout keeps protocol.json inside the run root, and a
+    protocol file placed inside a snapshot-only run root makes
+    run_root == input_root -- both previously admitted a second
+    contract that executed, reported complete, and left evidence the
+    run root's own frozen protocol refuses."""
+    import tools.deep_twilight_reference as dtr
+    full = json.loads(DEFAULT_PROTOCOL.read_text())
+
+    def tiny(proto, sens=False):
+        proto = json.loads(json.dumps(proto))
+        proto["direct"]["repeats"] = 1
+        proto["direct"]["budgets_photons"] = [400, 800]
+        if sens:
+            proto["sensitivity"]["repeats"] = 2
+            proto["sensitivity"]["photons_per_wavelength"] = 100
+        return proto
+
+    def watch_numeric():
+        calls = []
+        monkeypatch.setattr(dtr, "build_scenario",
+                            lambda *a, **k: calls.append("build_scenario"))
+        monkeypatch.setattr(dtr, "load_source_table",
+                            lambda *a, **k: calls.append("load"))
+        return calls
+
+    # layout 1: default archive layout -- protocol.json lives in the run
+    # root; an external protocol must not enter the established root via
+    # --out either
+    root1 = tmp_path / "run1"
+    root1.mkdir()
+    (root1 / "protocol.json").write_text(json.dumps(tiny(full)))
+    rc = dtr.main(["--protocol", str(root1 / "protocol.json"),
+                   "--stage", "direct", "--max-stage-hours", "0"])
+    assert rc == 0
+    frozen1 = (root1 / "protocol.json").read_bytes()
+    ext = tmp_path / "ext"
+    ext.mkdir()
+    (ext / "protocol-b.json").write_text(json.dumps(tiny(full, sens=True)))
+    calls = watch_numeric()
+    with pytest.raises(SystemExit, match="protocol identity"):
+        dtr.main(["--protocol", str(ext / "protocol-b.json"),
+                  "--stage", "sensitivity", "--out", str(root1)])
+    assert calls == []
+    assert (root1 / "protocol.json").read_bytes() == frozen1
+    assert not (root1 / "protocol.snapshot.json").exists()
+    monkeypatch.undo()
+    rc = dtr.main(["--protocol", str(root1 / "protocol.json"),
+                   "--stage", "direct", "--max-stage-hours", "0.02"])
+    assert rc == 0
+
+    # layout 2: snapshot-only run root, second protocol placed INSIDE it
+    # and used without --out (run_root == input_root)
+    root2 = tmp_path / "run2"
+    in_a = tmp_path / "in-a"
+    in_a.mkdir()
+    (in_a / "protocol.json").write_text(json.dumps(tiny(full)))
+    dtr.main(["--protocol", str(in_a / "protocol.json"),
+              "--stage", "direct", "--out", str(root2),
+              "--max-stage-hours", "0"])
+    frozen2 = (root2 / "protocol.snapshot.json").read_bytes()
+    (root2 / "protocol-b.json").write_text(json.dumps(tiny(full, sens=True)))
+    calls = watch_numeric()
+    with pytest.raises(SystemExit, match="protocol identity"):
+        dtr.main(["--protocol", str(root2 / "protocol-b.json"),
+                  "--stage", "sensitivity"])
+    assert calls == []
+    assert (root2 / "protocol.snapshot.json").read_bytes() == frozen2
+    monkeypatch.undo()
+    rc = dtr.main(["--protocol", str(in_a / "protocol.json"),
+                   "--stage", "direct", "--out", str(root2),
+                   "--max-stage-hours", "0.02"])
+    assert rc == 0
 
 
 def test_sensitivity_full_set_fresh_compute_passes_shared_contract(tmp_path):

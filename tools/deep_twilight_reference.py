@@ -1192,38 +1192,46 @@ def main(argv=None) -> int:
         require_supported_sensitivity_items(protocol)
     # the protocol directory is the READ-ONLY input root (frozen tables,
     # frozen protocol); --out is the writable run root and defaults to the
-    # input root for the default archive layout.  A fresh run root is
-    # created and receives a validated protocol snapshot so the summarizer
-    # can work offline against the run alone.
+    # input root for the default archive layout.
     input_root = args.protocol.resolve().parent
     run_root = args.out.resolve() if args.out is not None else input_root
     if args.stage in SCRATCH_STAGES:
         if args.out is None:
             parser.error(f"--stage {args.stage} requires --out (scratch only)")
-    elif run_root != input_root:
-        # One run root has exactly one protocol identity -- the snapshot's
-        # bytes -- shared by execution, evidence validation and offline
-        # summarization.  (generation-3 review round-2: a local section
-        # whitelist here let a run root accept a protocol whose
-        # not-yet-run stage had different budgets, so the stage ran and
-        # wrote evidence under the new protocol that the frozen
-        # snapshot's own summarizer must refuse -- complete on the
-        # execution side, unusable on the consumption side.)
-        snapshot = run_root / "protocol.snapshot.json"
-        if snapshot.exists():
-            if args.protocol.read_bytes() != snapshot.read_bytes():
+    else:
+        # One run root has exactly one protocol identity, shared by
+        # execution, evidence validation and offline summarization: the
+        # file resolve_protocol_path prefers (protocol.json first, then
+        # protocol.snapshot.json).  Byte-checked here BEFORE any numeric
+        # work for EVERY layout -- including protocol-inside-output-root
+        # and snapshot-only roots.  (generation-3 review round-3: the
+        # previous check only ran when run_root != input_root, so a
+        # second contract could enter an established run root through
+        # the default layout or through a protocol file placed inside
+        # the run root, execute, report complete, and leave evidence the
+        # run root's own frozen protocol must refuse.)
+        from tools.summarize_deep_twilight_reference import \
+            resolve_protocol_path
+        try:
+            identity = resolve_protocol_path(run_root)
+        except FileNotFoundError:
+            identity = None
+        if identity is not None:
+            if (args.protocol.resolve() != identity
+                    and args.protocol.read_bytes() != identity.read_bytes()):
                 raise SystemExit(
-                    "input protocol bytes differ from the run-root "
-                    "protocol snapshot; a run root never switches "
-                    "protocol identity -- use a fresh run root or "
-                    "consciously delete the snapshot")
-        else:
+                    f"input protocol bytes differ from the run root's "
+                    f"protocol identity file ({identity.name}); a run "
+                    "root never switches protocol identity -- use a "
+                    "fresh run root for a different protocol")
+        elif args.protocol.resolve() != run_root / "protocol.json":
             run_root.mkdir(parents=True, exist_ok=True)
             # verbatim byte copy: the snapshot must carry the SAME sha as
             # the executed protocol, or the summarizer's generation gate
             # would see a fabricated third generation
             import shutil
-            shutil.copyfile(args.protocol, snapshot)
+            shutil.copyfile(args.protocol,
+                            run_root / "protocol.snapshot.json")
 
     atmo = build_scenario(protocol)
     table = load_source_table(protocol, atmo)
