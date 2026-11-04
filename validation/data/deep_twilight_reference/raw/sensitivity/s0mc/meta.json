@@ -1,0 +1,65 @@
+{
+ "stage": "sensitivity",
+ "schema": "deep-twilight-reference/1",
+ "protocol_sha256": "23b46bd6784b91181c34cd5ff05656ce86f9aeecfa2bbe29c0728f1b432c87a1",
+ "code_sha256": {
+  "skycolor/rt/mc.py": "b8cab675585fe72fd74340e57cd24b66c2f757c221398cd83fa9a74a858143df",
+  "tools/point_solar_table.py": "c189f8c043a2da0b234b57c36d3e1b5f5c6ed459a7c7a45e3b7048f4bf51d084",
+  "tools/unified_solar_transport.py": "6ed1b03c3c49ad748540064d90ce8306b8855f08d2409ba9a1cc51e1a654dea2",
+  "tools/deep_twilight_reference.py": "78a30731e803bb996dd51f009c526ed994eb569cf9b6a8b98dd165789645fca2"
+ },
+ "table_sha256": "ed2376c9a6f5c8044b26b0e51bc36347057948ed710e3a3f87b514f4e4154be7",
+ "hardware": {
+  "platform": "macOS-14.7-arm64-arm-64bit",
+  "machine": "arm64",
+  "cpu_brand": "Apple M2 Max",
+  "cpu_count": 12,
+  "thread_env": {
+   "OMP_NUM_THREADS": null,
+   "OPENBLAS_NUM_THREADS": null,
+   "MKL_NUM_THREADS": null,
+   "NUMEXPR_NUM_THREADS": null
+  },
+  "python": "3.12.11",
+  "numpy": "2.5.4"
+ },
+ "sun_index": 0,
+ "budget_index": 0,
+ "photons_per_wavelength": 100000,
+ "mode": "disk",
+ "created": "2026-11-04T17:06:13+0800",
+ "batch_id": "s0mc",
+ "attempts": [
+  {
+   "index": 0,
+   "status": "superseded-defective-instrument",
+   "seeds": [],
+   "path": "attempt-00.jsonl",
+   "note": "run_mc called the production point-source MC without the finite-source clone; disk4x16 was vacuous and the baseline used the wrong source contract. Superseded by attempt-01 (clone-wrapped rerun)."
+  },
+  {
+   "index": 1,
+   "status": "complete",
+   "seeds": [],
+   "path": "attempt-01.jsonl"
+  }
+ ],
+ "expected_seeds": [
+  110000,
+  110001,
+  110002,
+  110003,
+  110004,
+  110005,
+  110006,
+  110007,
+  110008,
+  110009,
+  110010,
+  110011,
+  110012,
+  110013,
+  110014,
+  110015
+ ]
+}
