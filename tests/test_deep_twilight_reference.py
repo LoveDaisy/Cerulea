@@ -1204,6 +1204,103 @@ def test_fresh_run_root_direct_resume(tmp_path):
               "--max-stage-hours", "0.01"])
 
 
+def test_sensitivity_item_gate_refuses_before_any_compute(tmp_path, monkeypatch):
+    """Subset / unsupported-item sensitivity protocols must be refused at
+    the CLI entry BEFORE any numeric work -- zero calls into scenario
+    build or table loading (generation-3 review round-1: the stage-level
+    gate alone had already evaluated deterministic single_zenith twice
+    before raising, so 'no raw files' did not prove pre-compute refusal)."""
+    import tools.deep_twilight_reference as dtr
+    full = json.loads(DEFAULT_PROTOCOL.read_text())
+    calls = []
+    monkeypatch.setattr(dtr, "build_scenario",
+                        lambda *a, **k: calls.append("build_scenario"))
+    monkeypatch.setattr(dtr, "load_source_table",
+                        lambda *a, **k: calls.append("load_source_table"))
+    variants = {
+        "subset": ["baseline"],
+        "unsupported": list(full["sensitivity"]["mc_items"])
+        + ["curved_transport (not a supported item)"],
+    }
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    for name, mc_items in variants.items():
+        proto = json.loads(json.dumps(full))
+        proto["sensitivity"]["mc_items"] = mc_items
+        path = input_dir / f"protocol-{name}.json"
+        path.write_text(json.dumps(proto))
+        with pytest.raises(ValueError, match="fixed supported set"):
+            dtr.main(["--protocol", str(path), "--stage", "sensitivity",
+                      "--out", str(tmp_path / f"run-{name}")])
+        assert calls == [], f"{name}: numeric work ran before the refusal"
+        assert not (tmp_path / f"run-{name}" / "protocol.snapshot.json").exists()
+    # the same single-authority gate also guards direct stage calls
+    proto = json.loads(json.dumps(full))
+    proto["sensitivity"]["mc_items"] = ["baseline"]
+    with pytest.raises(ValueError, match="fixed supported set"):
+        dtr.require_supported_sensitivity_items(proto)
+
+
+def test_sensitivity_full_set_fresh_compute_passes_shared_contract(tmp_path):
+    """Positive control for the entry gate: a legal full-set protocol
+    actually recomputed in a fresh run root must produce records and
+    singles evidence that the shared validated_singles contract and the
+    summarizer accept (generation-3 review round-1)."""
+    import shutil
+    from tools.deep_twilight_reference import main as dtr_main, \
+        SENSITIVITY_MC_ITEMS
+    from tools.summarize_deep_twilight_reference import compute_summary
+    input_dir = tmp_path / "input"
+    (input_dir / "probe").mkdir(parents=True)
+    shutil.copyfile(DEFAULT_PROTOCOL.parent / "probe" / "point-source.npz",
+                    input_dir / "probe" / "point-source.npz")
+    proto = json.loads(DEFAULT_PROTOCOL.read_text())
+    proto["sensitivity"]["repeats"] = 1
+    proto["sensitivity"]["photons_per_wavelength"] = 100
+    path = input_dir / "protocol.json"
+    path.write_text(json.dumps(proto))
+    run_root = tmp_path / "run"
+    dtr_main(["--protocol", str(path), "--stage", "sensitivity",
+              "--out", str(run_root), "--max-stage-hours", "0.5"])
+    singles = json.loads(
+        (run_root / "raw" / "sensitivity"
+         / "singles-refinement.json").read_text())
+    assert set(singles["items"]) == {"ss_gauss16", "ss_fine_density"}
+    assert sorted(singles["by_sun"]) == ["-12.0", "-9.0"]
+    for sun_index in (0, 1):
+        rows = [json.loads(l) for l in (
+            run_root / "raw" / "sensitivity" / f"s{sun_index}mc"
+            / "attempt-00.jsonl").read_text().splitlines()]
+        assert len(rows) == 1
+        assert set(rows[0]["items"]) == {name for name, _ in SENSITIVITY_MC_ITEMS}
+        for item_payload in rows[0]["items"].values():
+            for lam in item_payload["per_lambda"].values():
+                assert lam["total"] == (lam["deterministic_single"]
+                                        + lam["multiple"])
+    # the sensitivity stats chain is the summarizer's acceptance path for
+    # this stage: it runs validated_singles (the shared evidence contract)
+    # on the fresh singles file, then the exact-set / closure / batch
+    # contract over the fresh records -- direct/source-pairs sections are
+    # unconditional in a whole-run summary, so the stage-level entry is
+    # the right positive control here
+    from tools.summarize_deep_twilight_reference import _sensitivity_stats, \
+        sha256_file
+    wl = np.arange(380.0, 781.0, 5.0)
+    anchor_idx = [int(np.argmin(np.abs(wl - a)))
+                  for a in proto["scenario"]["anchor_wavelengths_nm"]]
+    sens = _sensitivity_stats(
+        run_root, proto, wl, anchor_idx,
+        protocol_sha_now=sha256_file(run_root / "protocol.snapshot.json"))
+    assert sens["mc_items"] == [i.split(" (")[0]
+                                for i in proto["sensitivity"]["mc_items"]]
+    assert sorted(sens["by_sun"]) == ["-12.0", "-9.0"]
+    # "mc" holds the paired comparison items; baseline is the reference
+    # each of them is differenced against, not a key of its own
+    for sun in sens["by_sun"].values():
+        assert set(sun["mc"]) == ({name for name, _ in SENSITIVITY_MC_ITEMS}
+                                  - {"baseline"})
+
+
 def test_efficiency_metric_direction(tmp_path):
     """Variance x time: a slower estimator must never score better."""
     from tools.summarize_deep_twilight_reference import _candidate_stats

@@ -921,37 +921,20 @@ SENSITIVITY_SINGLE_ITEMS = (
 SENSITIVITY_SEED_BASE = 110000
 
 
-def stage_sensitivity(protocol, atmo, table, data_dir, state, *, protocol_path,
-                      input_root, max_stage_hours=None) -> int:
-    """Discretisation/refinement sensitivity (plan Step 4).
+def require_supported_sensitivity_items(protocol) -> None:
+    """Single authority for the sensitivity item-set contract.
 
-    Three anchor wavelengths, 16 seeds per depth at 100k photons, on the
-    frozen 3-wavelength planning table; every MC item is compared against
-    the same-seed baseline run, and the single-scattering refinements are
-    deterministic and compared directly.  Curved-diffuse transport is NOT
-    in this stage: the experiment backend exists but its inclusion is a
-    documented unknown, not a run under this budget.
+    The sensitivity wave is a fixed-full-set experiment: the protocol must
+    declare exactly the supported item sets.  Running a subset -- or
+    writing metadata for items the protocol never declared -- would
+    execute a different experiment than the protocol declares and produce
+    output the summarizer must refuse.  Callers must invoke this BEFORE
+    any numeric work: the CLI entry checks right after protocol parse so
+    an unsupported protocol never builds the atmosphere or loads a table,
+    and stage_sensitivity re-checks at its top so no direct call reaches
+    the table load or the deterministic singles either.
     """
-    from tools.twilight_second_order import estimate  # noqa: F401 (parity)
-
     sens = protocol.get("sensitivity", {})
-    anchors = [int(np.argmin(np.abs(WL_COARSE - a)))
-               for a in protocol["scenario"]["anchor_wavelengths_nm"]]
-    wl3 = WL_COARSE[anchors]
-    atmo3 = atmo._restrict(anchors)
-    table3 = candidate_table_load(protocol, input_root, atmo3)
-    singles3 = {}
-    for sun_elev in protocol["scenario"]["sun_elevations_deg"]:
-        singles3[sun_elev] = single_zenith(atmo3, FiniteSolarSource(atmo3, table3),
-                                           90.0 - sun_elev)[0]
-    repeats = int(sens.get("repeats", 16))
-    photons = int(sens.get("photons_per_wavelength", 100_000))
-    suns = protocol["scenario"]["sun_elevations_deg"]
-    # the sensitivity wave is a fixed-full-set experiment: the protocol
-    # must declare exactly the supported item sets, checked BEFORE any
-    # compute -- running a subset, or writing metadata for items the
-    # protocol never declared, would execute a different experiment than
-    # the protocol declares and produce output the summarizer must refuse
     proto_mc = {d.split(" (")[0].strip() for d in sens.get("mc_items", [])}
     proto_single = {d.split(" (")[0].strip()
                     for d in sens.get("single_items", [])}
@@ -968,6 +951,35 @@ def stage_sensitivity(protocol, atmo, table, data_dir, state, *, protocol_path,
             f"sensitivity: protocol single_items {sorted(proto_single)} "
             f"!= the fixed supported set {sorted(tool_single)} -- this "
             "stage runs the full declared experiment or refuses")
+
+
+def stage_sensitivity(protocol, atmo, table, data_dir, state, *, protocol_path,
+                      input_root, max_stage_hours=None) -> int:
+    """Discretisation/refinement sensitivity (plan Step 4).
+
+    Three anchor wavelengths, 16 seeds per depth at 100k photons, on the
+    frozen 3-wavelength planning table; every MC item is compared against
+    the same-seed baseline run, and the single-scattering refinements are
+    deterministic and compared directly.  Curved-diffuse transport is NOT
+    in this stage: the experiment backend exists but its inclusion is a
+    documented unknown, not a run under this budget.
+    """
+    require_supported_sensitivity_items(protocol)
+    from tools.twilight_second_order import estimate  # noqa: F401 (parity)
+
+    sens = protocol.get("sensitivity", {})
+    anchors = [int(np.argmin(np.abs(WL_COARSE - a)))
+               for a in protocol["scenario"]["anchor_wavelengths_nm"]]
+    wl3 = WL_COARSE[anchors]
+    atmo3 = atmo._restrict(anchors)
+    table3 = candidate_table_load(protocol, input_root, atmo3)
+    singles3 = {}
+    for sun_elev in protocol["scenario"]["sun_elevations_deg"]:
+        singles3[sun_elev] = single_zenith(atmo3, FiniteSolarSource(atmo3, table3),
+                                           90.0 - sun_elev)[0]
+    repeats = int(sens.get("repeats", 16))
+    photons = int(sens.get("photons_per_wavelength", 100_000))
+    suns = protocol["scenario"]["sun_elevations_deg"]
     spent, budget_left = stage_budget(data_dir, "sensitivity", protocol, max_stage_hours)
     started = time.perf_counter()
     billed = started
@@ -1172,6 +1184,12 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
 
     protocol = load_protocol(args.protocol)
+    if args.stage == "sensitivity":
+        # entry-level contract gate (generation-3 review round-1): refuse
+        # an unsupported sensitivity protocol BEFORE any numeric work --
+        # the stage-level gate alone would already have built the
+        # atmosphere, loaded tables and evaluated deterministic singles
+        require_supported_sensitivity_items(protocol)
     atmo = build_scenario(protocol)
     table = load_source_table(protocol, atmo)
 
