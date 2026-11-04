@@ -31,6 +31,7 @@ from tools.cssp_observation_inputs import (  # noqa: E402
     check_external_refs,
     check_manifest,
     dark_spectrum_from_extract,
+    evaluate_replay,
     exposure_weighted_mean,
     external_ref,
     fetch_sources,
@@ -451,9 +452,15 @@ def test_operator_isotropic_sky_gives_pi_l():
 
 
 def test_operator_flat_horizon_gives_cos_squared():
+    # Raised horizon (negative depression = obstruction at elevation h):
+    # the band 0..h leaves the upper hemisphere, E = pi L cos^2(h).
+    # Depressed horizon (positive, open site): the upper hemisphere stays
+    # fully illuminated, E = pi L - directions below the true horizon never
+    # illuminate the one-sided upward face (Omega+, r05 Major).
     for h in (0.0, 1.0, 2.0, 5.0, 10.0):
-        assert ideal_hemispheric_irradiance(1.0, h) == \
+        assert ideal_hemispheric_irradiance(1.0, -h) == \
             pytest.approx(np.pi * np.cos(np.radians(h)) ** 2)
+        assert ideal_hemispheric_irradiance(1.0, h) == pytest.approx(np.pi)
 
 
 def test_exposure_weighted_mean_matches_analytic_ramp_with_gaps():
@@ -794,21 +801,45 @@ def test_hemisphere_integral_consumes_real_directional_arrays():
     got = hemispheric_irradiance_from_field(field, elev, azim)
     assert got.shape == (times.size, n_wl)
     assert got == pytest.approx(np.full_like(got, np.pi * 2.0), rel=2.5e-4)  # E=pi*L (grid-resolved kink)
-    # Flat horizon at depression h on an isotropic sky: E = pi L cos^2(h).
+    # Omega+ contract (r05 Major): a DEPRESSED horizon admits directions
+    # below the true horizon into visibility, but they carry zero weight on
+    # the one-sided upward receiver - an isotropic sky still gives pi*L, and
+    # a below-horizon-only sky gives exactly zero (never a negative flux).
     got = hemispheric_irradiance_from_field(field, elev, azim,
                                             horizon_depression_deg=5.0)
-    # The horizon is a discontinuous indicator, so trapezoid error is
-    # first-order in the elevation step (~half-cell); assert the analytic
-    # cos^2(h) law at that tolerance AND the first-order convergence.
+    assert got == pytest.approx(np.full_like(got, np.pi * 2.0), rel=2.5e-4)
+    below = np.where(elev[:, None] < 0.0, 1.0, 0.0)
+    got = hemispheric_irradiance_from_field(
+        np.broadcast_to(below, (times.size, n_wl, elev.size, azim.size)),
+        elev, azim, horizon_depression_deg=5.0)
+    assert np.all(got == 0.0)
+    # A RAISED horizon (negative depression = obstruction) masks the band
+    # 0..h inside Omega+: E = pi L cos^2(h). The horizon is a discontinuous
+    # indicator, so trapezoid error is first-order in the elevation step
+    # (~half-cell); assert the analytic law at that tolerance AND the
+    # first-order convergence.
+    got = hemispheric_irradiance_from_field(field, elev, azim,
+                                            horizon_depression_deg=-5.0)
     analytic = np.pi * 2.0 * np.cos(np.radians(5.0)) ** 2
     assert got == pytest.approx(np.full_like(got, analytic), rel=5e-3)
     fine = np.linspace(-90.0, 90.0, 721)
     got_fine = hemispheric_irradiance_from_field(
         np.broadcast_to(2.0, (times.size, n_wl, 721, azim.size)),
-        fine, azim, horizon_depression_deg=5.0)
+        fine, azim, horizon_depression_deg=-5.0)
     err_coarse = abs(float(got[0, 0]) - analytic)
     err_fine = abs(float(got_fine[0, 0]) - analytic)
     assert err_fine < err_coarse / 1.8, "horizon cut must converge to cos^2(h)"
+    # Non-negative radiance and response can never integrate to a negative
+    # irradiance (the pre-fix negative-flux failure mode, r05 Major). The
+    # arbitrary field is built periodic in azimuth - direction space is a
+    # circle, which is exactly what the seam contract requires.
+    rng = np.random.default_rng(11)
+    base = rng.random((elev.size, azim.size - 1))
+    periodic = np.concatenate([base, base[:, :1]], axis=-1)
+    got = hemispheric_irradiance_from_field(
+        np.broadcast_to(periodic, (times.size, n_wl, elev.size, azim.size)),
+        elev, azim, horizon_depression_deg=5.0)
+    assert (got >= 0.0).all()
     # Pure azimuth structure must integrate away over the closed loop.
     az_structure = 1.0 + 0.5 * np.sin(np.radians(azim))
     field = np.broadcast_to(az_structure, (elev.size, azim.size))
@@ -817,6 +848,174 @@ def test_hemisphere_integral_consumes_real_directional_arrays():
     iso = hemispheric_irradiance_from_field(full[None, None], elev, azim)
     # The sin(azimuth) term must cancel exactly over the closed loop.
     assert got[0, 0] == pytest.approx(iso[0, 0])
+
+
+def test_hemisphere_integral_azimuth_ring_contract():
+    """Full-circle integration must be rotation invariant; partial grids are
+    rejected instead of silently returning a partial hemisphere (r05 Major)."""
+    elev = np.linspace(0.0, 90.0, 91)
+
+    def iso_pi_l(azim):
+        field = np.broadcast_to(2.0, (elev.size, azim.size))
+        got = hemispheric_irradiance_from_field(field[None, None], elev, azim)
+        return float(got[0, 0])
+
+    duplicated = np.linspace(0.0, 360.0, 73)          # restated seam value
+    restated_rotated = np.linspace(90.0, 450.0, 73)   # same ring, rotated origin
+    open_ring = np.linspace(0.0, 270.0, 61)           # four sectors, no seam sample
+    reference = iso_pi_l(duplicated)
+    assert reference == pytest.approx(np.pi * 2.0, rel=1e-3)
+    # The same sky must give the same flux in every valid representation -
+    # the pre-fix code returned 0.75 * pi L for the rotated and open rings.
+    assert iso_pi_l(restated_rotated) == pytest.approx(reference, rel=1e-12)
+    assert iso_pi_l(open_ring) == pytest.approx(reference, rel=2e-4)
+    # Non-monotonic, over-one-circle and aperiodic-seam grids are rejected
+    # with a stated reason instead of a plausible-looking partial flux.
+    with pytest.raises(ValueError, match="strictly increasing"):
+        hemispheric_irradiance_from_field(
+            np.ones((1, 1, elev.size, 3)), elev, np.array([0.0, 120.0, 60.0]))
+    with pytest.raises(ValueError, match="more than one full circle"):
+        hemispheric_irradiance_from_field(
+            np.ones((1, 1, elev.size, 3)), elev, np.array([0.0, 200.0, 380.0]))
+    with pytest.raises(ValueError, match="not periodic at the seam"):
+        field = np.ones((1, 1, elev.size, 3))
+        field[..., -1] = 5.0
+        hemispheric_irradiance_from_field(field, elev,
+                                          np.array([0.0, 180.0, 360.0]))
+    with pytest.raises(ValueError, match="closed azimuth ring needs"):
+        hemispheric_irradiance_from_field(
+            np.ones((1, 1, elev.size, 2)), elev, np.array([0.0, 360.0]))
+
+
+# ---------------------------------------------------------------------------
+# r05 revision: transactional build, structured negative-channel rejection
+# ---------------------------------------------------------------------------
+
+def _packet_hashes(root: Path) -> dict:
+    return {str(p.relative_to(root)): sha256_file(p)
+            for p in sorted(root.rglob("*")) if p.is_file()}
+
+
+def _no_preflight(cache_dir):
+    pass   # the transaction tests stub the cache preflight; acceptance stays real
+
+
+def _staged_frozen_copy_with_bad_site(staging: Path, cache_dir: Path) -> None:
+    """Heavy-build stand-in: a frozen-packet copy whose site identity is wrong."""
+    shutil.copytree(PACKET, staging, dirs_exist_ok=True)
+    sources = read_json(staging / "sources.json")
+    sources["site"] = dict(sources.get("site", {}), lat_deg=0.0)
+    write_json(staging / "sources.json", sources)
+
+
+def test_build_force_acceptance_failure_preserves_previous_packet(
+        tmp_path, monkeypatch):
+    """r05 Major: acceptance runs inside staging, so a packet that fails
+    verification never replaces the previous packet."""
+    import tools.cssp_observation_inputs as cssp
+    out = tmp_path / "packet"
+    shutil.copytree(PACKET, out)
+    before = _packet_hashes(out)
+    monkeypatch.setattr(cssp, "check_cache_inputs", _no_preflight)
+    monkeypatch.setattr(cssp, "_build_packet_into",
+                        _staged_frozen_copy_with_bad_site)
+    with pytest.raises(ValueError, match="failed verification"):
+        cssp.build_packet(tmp_path / "cache", out, force=True)
+    assert _packet_hashes(out) == before, \
+        "failed acceptance must leave the previous packet byte-identical"
+    leftovers = [p.name for p in tmp_path.iterdir() if p.name.startswith(".packet-")]
+    assert leftovers == [], f"staging/backup residue left behind: {leftovers}"
+
+
+def test_build_force_build_exception_preserves_previous_packet(
+        tmp_path, monkeypatch):
+    """An exception during the staged build withdraws only the staging."""
+    import tools.cssp_observation_inputs as cssp
+    out = tmp_path / "packet"
+    shutil.copytree(PACKET, out)
+    before = _packet_hashes(out)
+
+    def boom(staging, cache_dir):
+        raise RuntimeError("extraction blew up")
+
+    monkeypatch.setattr(cssp, "check_cache_inputs", _no_preflight)
+    monkeypatch.setattr(cssp, "_build_packet_into", boom)
+    with pytest.raises(RuntimeError):
+        cssp.build_packet(tmp_path / "cache", out, force=True)
+    assert _packet_hashes(out) == before
+    assert [p.name for p in tmp_path.iterdir() if p.name.startswith(".packet-")] == []
+
+
+def test_build_force_swap_failure_restores_previous_packet(
+        tmp_path, monkeypatch):
+    """r05 Major: the swap itself is recoverable - a rename failure restores
+    the previous packet in full instead of losing both copies."""
+    import tools.cssp_observation_inputs as cssp
+    out = tmp_path / "packet"
+    shutil.copytree(PACKET, out)
+    before = _packet_hashes(out)
+
+    def frozen_build(staging, cache_dir):   # valid staged copy: passes acceptance
+        shutil.copytree(PACKET, staging, dirs_exist_ok=True)
+
+    real_rename = Path.rename
+
+    def refusing_rename(self, target, **kwargs):
+        if "-staging-" in self.name:
+            raise OSError("swap refused")
+        return real_rename(self, target, **kwargs)
+
+    monkeypatch.setattr(cssp, "check_cache_inputs", _no_preflight)
+    monkeypatch.setattr(cssp, "_build_packet_into", frozen_build)
+    monkeypatch.setattr(Path, "rename", refusing_rename)
+    with pytest.raises(OSError):
+        cssp.build_packet(tmp_path / "cache", out, force=True)
+    assert _packet_hashes(out) == before, "swap failure must restore the old packet"
+    assert [p.name for p in tmp_path.iterdir() if p.name.startswith(".packet-")] == []
+
+
+def test_negative_published_channel_is_structurally_rejected(tmp_path):
+    """r05 Major: a negative published channel must surface as a structured,
+    per-record problem (record id + wavelength) through evaluate_replay,
+    verify and read-only replay - not an IndexError - and nothing may be
+    rewritten or silently excused."""
+    copy = tmp_path / "packet"
+    shutil.copytree(PACKET, copy)
+    spectra = load_packet_spectra(copy)
+    rid, col = spectra["record_ids"][0], spectra["columns"][0]
+    text = (copy / "spectra.csv").read_text()
+    newline = "\r\n" if "\r\n" in text else "\n"
+    lines = text.split(newline)
+    header = lines[0].split(",")
+    col_idx = header.index(f"col{col}")
+    wl_row = next(i for i, line in enumerate(lines[1:], start=1)
+                  if line and float(line.split(",")[0]) == 500.0)
+    fields = lines[wl_row].split(",")
+    assert float(fields[col_idx]) > 0.0
+    fields[col_idx] = "-1e-09"
+    lines[wl_row] = ",".join(fields)
+    (copy / "spectra.csv").write_text(newline.join(lines))
+    # Keep the manifest consistent so identity checks pass and the replay
+    # acceptance itself is what must detect the corruption.
+    manifest = read_json(copy / "inputs.sha256.json")
+    manifest["spectra.csv"] = sha256_file(copy / "spectra.csv")
+    write_json(copy / "inputs.sha256.json", manifest)
+
+    report = evaluate_replay(copy)
+    assert not report["ok"]
+    problem = next(p for p in report["problems"]
+                   if p.startswith(f"{rid}:") and "negative" in p)
+    assert "500.0" in problem, "the failing wavelength must be reported"
+    # verify and read-only replay surface the same structured failure ...
+    vreport = verify_packet(copy)
+    assert not vreport["ok"]
+    assert any("negative" in p for p in vreport["problems"])
+    before = _packet_hashes(copy)
+    rreport = run_replay(copy, write=False)
+    assert not rreport["ok"]
+    assert any("negative" in p for p in rreport["problems"])
+    # ... without touching a single packet byte.
+    assert _packet_hashes(copy) == before, "failing acceptance must stay read-only"
 
 
 def test_exposure_time_average_integrates_real_windows_with_gaps():

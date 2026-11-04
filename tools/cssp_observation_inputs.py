@@ -1231,14 +1231,21 @@ def quality_of_column(raw_cells: list[str], n_metadata_rows: int = 4) -> dict:
 
 
 def build_packet(cache_dir: Path, out: Path, force: bool) -> dict:
-    """Construct the packet from the verified cache. Refuses to overwrite."""
+    """Construct the packet from the verified cache. Refuses to overwrite.
+
+    Transactional: the build AND its full acceptance run inside a staging
+    directory; the previous packet is only retired through a recoverable
+    rename after the staged copy has passed verification, and is restored
+    if the swap itself fails. Every failure mode - preflight, extraction,
+    acceptance, swap - therefore leaves either the previous packet or a
+    clean state behind, never a half-built or failed replacement (the
+    plan's "failed attempts withdraw only their own incomplete artefacts"
+    rule).
+    """
     if out.exists() and any(out.iterdir()) and not force:
         raise ValueError(f"refusing to overwrite existing packet {out}; "
                          "pass --force only for a deliberate rebuild")
     check_cache_inputs(cache_dir)
-    # Stage the whole build, then swap: any failure (preflight, extraction,
-    # replay, verification) leaves the previous packet untouched - the plan's
-    # "failed attempts withdraw only their own incomplete artefacts" rule.
     import shutil
     import tempfile
     staging = Path(tempfile.mkdtemp(prefix=f".{out.name}-staging-",
@@ -1248,13 +1255,31 @@ def build_packet(cache_dir: Path, out: Path, force: bool) -> dict:
     except Exception:
         shutil.rmtree(staging, ignore_errors=True)
         raise
-    if out.exists():
-        shutil.rmtree(out)
-    staging.rename(out)
-    report = verify_packet(out)
+    # Full acceptance happens INSIDE staging, before the previous packet is
+    # touched: a build that cannot pass verification must never replace a
+    # good packet (r05 Major: acceptance used to run after the irreversible
+    # rmtree, so an acceptance failure destroyed the previous packet).
+    report = verify_packet(staging)
     if not report["ok"]:
+        shutil.rmtree(staging, ignore_errors=True)
         raise ValueError(f"freshly built packet failed verification: "
                          f"{report['problems'][:10]}")
+    backup = None
+    if out.exists():
+        backup = Path(tempfile.mkdtemp(prefix=f".{out.name}-previous-",
+                                       dir=out.parent))
+        backup.rmdir()
+        out.rename(backup)   # reversible: the old packet stays on disk
+    try:
+        staging.rename(out)
+    except Exception:
+        if backup is not None:
+            backup.rename(out)   # restore the previous packet in full
+            backup = None
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+    if backup is not None:
+        shutil.rmtree(backup, ignore_errors=True)
     records = read_json(out / "records.json")["records"]
     selection = read_json(out / "selection.json")
     return {"records": len(records), "sessions": len(selection["sessions"]),
@@ -2162,11 +2187,14 @@ def compute_diagnostics(packet: Path, labels: list[str], values: np.ndarray,
         night_floor[session_id] = ratios
 
     horizon = {
-        "scenario": "isotropic radiance L, horizon depression angle h: "
-                    "E(h) = pi L cos^2(h) against E(0) = pi L",
+        "scenario": "isotropic radiance L, horizon raised (terrain "
+                    "obstruction) by h: E = pi L cos^2(h) against E(0) = pi L; "
+                    "a horizon depressed below the true horizon (open site) "
+                    "leaves E = pi L because directions below 0 deg elevation "
+                    "never illuminate the upward board (Omega+)",
         "evidence": EVIDENCE_SCENARIO,
-        "depression_deg": [0.0, 1.0, 2.0, 5.0, 10.0],
-        "E_over_E0": [float(np.cos(np.radians(h)) ** 2)
+        "raised_horizon_deg": [0.0, 1.0, 2.0, 5.0, 10.0],
+        "E_over_E0": [float(ideal_hemispheric_irradiance(1.0, -h) / np.pi)
                       for h in (0.0, 1.0, 2.0, 5.0, 10.0)],
         "note": "flat-horizon geometric factor only; the real site horizon and white-board "
                 "angular response are unmeasured, so this bounds geometry, not response",
@@ -2458,7 +2486,7 @@ def evaluate_replay(packet: Path) -> dict:
         comparable = ~nan_published & ~nan_replay
         negative = comparable & (published < 0)
         if negative.any():
-            wl = np.arange(280.0, 841.0)[comparable][negative[:5]]
+            wl = np.arange(280.0, 841.0)[negative][:5]
             record_problems.append(
                 f"{int(negative.sum())} published channels are negative "
                 f"(upstream clamps to zero; first wl {wl.tolist()}) - "
@@ -2575,9 +2603,19 @@ def records_json_ids(records: list[dict]) -> set:
 
 def ideal_hemispheric_irradiance(radiance: float,
                                  horizon_depression_deg: float = 0.0) -> float:
-    """E = pi L for an isotropic radiance; pi L cos^2(h) for a flat horizon
-    at depression angle h. The analytic anchor the tests pin the operator to."""
-    return np.pi * radiance * np.cos(np.radians(horizon_depression_deg)) ** 2
+    """Analytic anchor for the operator's Omega+ direction integral.
+
+    An isotropic radiance L on a one-sided upward cosine receiver gives
+    E = pi L. A horizon raised (obstructed) by h degrees - a NEGATIVE
+    ``horizon_depression_deg`` - removes the band 0..h from the upper
+    hemisphere and gives E = pi L cos^2(h). A horizon DEPRESSED below the
+    true horizon (positive argument, open site) still gives pi L: the
+    directions it admits below 0 deg elevation never illuminate the
+    upward face, so they carry no weight (the negative-flux failure mode
+    this anchor guards against would show up here as pi L cos^2(h)).
+    """
+    raised = max(-horizon_depression_deg, 0.0)
+    return np.pi * radiance * np.cos(np.radians(raised)) ** 2
 
 
 def publish_pipeline(spectrum_full_grid: np.ndarray, extract: dict,
@@ -2636,43 +2674,79 @@ def hemispheric_irradiance_from_field(radiance: np.ndarray,
     """Linear hemisphere integral of a directional radiance field (plan §3.3).
 
     ``radiance`` has shape (..., n_time, n_wl, n_elev, n_azim) in
-    W m-2 sr-1 nm-1; ``elevation_deg``/``azimuth_deg`` are 1-D uniform grids
-    in degrees (azimuth east of north; a duplicated 360-degree endpoint is
-    detected and dropped). Returns (..., n_time, n_wl) in W m-2 nm-1:
+    W m-2 sr-1 nm-1; ``elevation_deg``/``azimuth_deg`` are 1-D grids in
+    degrees (azimuth east of north). Returns (..., n_time, n_wl) in
+    W m-2 nm-1:
 
-        E = trapz_trapz( L(λ,Ω,t) * A(Ω) * H(Ω) * cosθ )
+        E = trapz_trapz( L(λ,Ω,t) * A(Ω) * H(Ω) * cosθ )   over Omega+
 
-    ``H`` is the horizon visibility 1[elevation > -horizon_depression_deg];
-    ``angular_response`` is the white-board correction A(elev_deg, azim_deg)
-    and defaults to the documented A=1 idealisation (no measured response
-    exists). This is the operator contract's direction integral as code, so
-    consumers integrate their model's own arrays instead of re-deriving it.
+    The integration domain is the upper hemisphere Omega+ (a one-sided
+    upward cosine receiver): directions below the true horizon never
+    illuminate the board, so their weight is zero - never a negative
+    flux, whatever ``horizon_depression_deg`` admits into visibility.
+    ``H`` is the horizon visibility 1[elevation > -horizon_depression_deg]:
+    a positive depression models an open site that sees below the true
+    horizon (the admitted directions still carry zero weight), a negative
+    one raises the horizon (terrain obstruction) and masks that band
+    inside Omega+. ``angular_response`` is the white-board correction
+    A(elev_deg, azim_deg) and defaults to the documented A=1 idealisation
+    (no measured response exists). This is the operator contract's
+    direction integral as code, so consumers integrate their model's own
+    arrays instead of re-deriving it.
+
+    Azimuth contract: coordinates strictly increasing, spanning at most
+    one full circle. A grid that already spans exactly 360 deg restates
+    the seam direction in its last sample, whose value must equal the
+    first sample (direction space is periodic); the restated sample is
+    dropped and re-attached at azim[0] + 2*pi so the wrap sector keeps
+    its trapezoid weight. A shorter grid is closed periodically, with
+    the wrap sector running from the last sample back to the first
+    direction. Anything else (non-monotonic, over one circle, aperiodic
+    seam) is rejected: silently returning a partial-hemisphere flux that
+    still looks like a sky integral is exactly the failure mode this
+    contract exists to prevent.
     """
     radiance = np.asarray(radiance, dtype=float)
     elev = np.asarray(elevation_deg, dtype=float)
     azim = np.asarray(azimuth_deg, dtype=float)
     if radiance.shape[-2:] != (elev.size, azim.size):
         raise ValueError("radiance grid must match (n_elev, n_azim)")
+    if azim.size < 2 or not (np.diff(azim) > 0).all():
+        raise ValueError("azimuth grid must be strictly increasing with "
+                         ">= 2 samples")
+    span = float(azim[-1] - azim[0])
+    if span > 360.0 + 1e-3:
+        raise ValueError("azimuth grid spans more than one full circle")
     # cos(zenith) = sin(elevation); the solid-angle measure in elevation
     # representation is dOmega = cos(elevation) d(elevation) d(phi), so the
     # integrand carries sin(elev)*cos(elev) - omitting the Jacobian doubles
     # an isotropic sky (caught by the analytic anchor, not by inspection).
-    cos_theta = np.sin(np.radians(elev))
+    # Clipping sin(elevation) at zero restricts the integral to Omega+.
+    cos_theta = np.clip(np.sin(np.radians(elev)), 0.0, None)
     jacobian = np.cos(np.radians(elev))
     horizon = (elev > -horizon_depression_deg).astype(float)
     response = (angular_response(elev[:, None], azim[None, :])
                 if angular_response is not None else np.ones((elev.size, azim.size)))
     weights = cos_theta[:, None] * jacobian[:, None] * horizon[:, None] * response
-    # Solid-angle measure: dOmega = cos(theta) dtheta dphi with radians.
     values = radiance * weights   # broadcasts weights over time/wavelength
-    if azim.size > 2 and abs(azim[-1] - azim[0]) >= 359.999:
-        # Closed azimuth loop with a duplicated seam endpoint: drop the
-        # duplicate and re-attach the first sample at phi = 2*pi, so the
-        # wrap sector is integrated rather than dropped by trapezoid.
+    if abs(span - 360.0) <= 1e-3:
+        # Restated seam: drop the duplicate and re-attach the first sample
+        # at azim[0] + 2*pi, so the wrap sector is integrated, not dropped.
+        if azim.size < 3:
+            raise ValueError("a closed azimuth ring needs >= 3 samples")
+        seam_same = np.isclose(values[..., -1], values[..., 0], equal_nan=True)
+        if not bool(np.all(seam_same)):
+            raise ValueError("azimuth field is not periodic at the seam: "
+                             "first and last samples share one direction")
         values = np.concatenate([values[..., :-1], values[..., :1]], axis=-1)
-        phi = np.concatenate([np.radians(azim[:-1]), [2.0 * np.pi]])
+        phi = np.concatenate([np.radians(azim[:-1]),
+                              [np.radians(azim[0]) + 2.0 * np.pi]])
     else:
-        phi = np.radians(azim)
+        # Short of the seam: close the ring periodically - the wrap sector
+        # runs from the last sample back to the first direction.
+        values = np.concatenate([values, values[..., :1]], axis=-1)
+        phi = np.concatenate([np.radians(azim),
+                              [np.radians(azim[0]) + 2.0 * np.pi]])
     integrated = np.trapezoid(values, phi, axis=-1)
     return np.trapezoid(integrated, np.radians(elev), axis=-1)
 

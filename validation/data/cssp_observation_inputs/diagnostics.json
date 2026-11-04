@@ -3241,9 +3241,9 @@
     }
   },
   "horizon_scenarios": {
-    "scenario": "isotropic radiance L, horizon depression angle h: E(h) = pi L cos^2(h) against E(0) = pi L",
+    "scenario": "isotropic radiance L, horizon raised (terrain obstruction) by h: E = pi L cos^2(h) against E(0) = pi L; a horizon depressed below the true horizon (open site) leaves E = pi L because directions below 0 deg elevation never illuminate the upward board (Omega+)",
     "evidence": "scenario",
-    "depression_deg": [
+    "raised_horizon_deg": [
       0.0,
       1.0,
       2.0,
