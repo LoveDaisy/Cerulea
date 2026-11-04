@@ -747,6 +747,184 @@ def stage_candidate(protocol, atmo, table, data_dir, state, *, protocol_path,
     return computed
 
 
+#: sensitivity items (plan Step 4): (key, description); item "baseline" must
+#: come first so every other item is a paired same-seed comparison against it
+SENSITIVITY_MC_ITEMS = (
+    ("baseline", "default configuration"),
+    ("disk4x16", "solar disk quadrature 2x8 -> 4x16 nodes"),
+    ("max_scatter100", "scattering order cap 50 -> 100"),
+    ("rr_conservative", "RR weight 0.05 -> 0.02, survival 0.75 -> 0.9"),
+    ("fine_optical", "MC fine optical grid 700 -> 1400 levels"),
+    ("fine_phase", "aerosol phase sampling table 2049 -> 4097 nodes"),
+)
+
+#: deterministic-single refinement items (no Monte Carlo involved)
+SENSITIVITY_SINGLE_ITEMS = (
+    ("ss_gauss16", "single_zenith n_gauss 8 -> 16"),
+    ("ss_fine_density", "single_zenith density step 0.025 -> 0.0125 km"),
+)
+
+#: sensitivity seeds (disjoint from direct 40000+, candidate 80000+, probes)
+SENSITIVITY_SEED_BASE = 110000
+
+
+def stage_sensitivity(protocol, atmo, table, data_dir, state, *, protocol_path,
+                      max_stage_hours=None) -> int:
+    """Discretisation/refinement sensitivity (plan Step 4).
+
+    Three anchor wavelengths, 16 seeds per depth at 100k photons, on the
+    frozen 3-wavelength planning table; every MC item is compared against
+    the same-seed baseline run, and the single-scattering refinements are
+    deterministic and compared directly.  Curved-diffuse transport is NOT
+    in this stage: the experiment backend exists but its inclusion is a
+    documented unknown, not a run under this budget.
+    """
+    from tools.twilight_second_order import estimate  # noqa: F401 (parity)
+
+    sens = protocol.get("sensitivity", {})
+    anchors = [int(np.argmin(np.abs(WL_COARSE - a)))
+               for a in protocol["scenario"]["anchor_wavelengths_nm"]]
+    wl3 = WL_COARSE[anchors]
+    atmo3 = atmo._restrict(anchors)
+    table3 = candidate_table_load(protocol, data_dir, atmo3)
+    singles3 = {}
+    for sun_elev in protocol["scenario"]["sun_elevations_deg"]:
+        singles3[sun_elev] = single_zenith(atmo3, FiniteSolarSource(atmo3, table3),
+                                           90.0 - sun_elev)[0]
+    repeats = int(sens.get("repeats", 16))
+    photons = int(sens.get("photons_per_wavelength", 100_000))
+    suns = protocol["scenario"]["sun_elevations_deg"]
+    spent, _cap = stage_budget(state, "sensitivity", protocol, max_stage_hours)
+    started = time.perf_counter()
+    billed = started
+    billed_records = 0
+    computed = 0
+    stopped = None
+
+    def remaining():
+        return _cap - (spent + (time.perf_counter() - started))
+
+    def bill(records_done):
+        nonlocal billed, billed_records
+        now = time.perf_counter()
+        note_stage_seconds(data_dir, state, "sensitivity",
+                           now - billed, records_done - billed_records)
+        billed = now
+        billed_records = records_done
+        save_state(data_dir, state)
+
+    bill(0)
+
+    def run_mc(item, sun_elev, seed):
+        """One MC record under a sensitivity configuration.
+
+        Refinement items patch the module constants for the duration of the
+        call (restored in ``finally``); the disk-node item only changes the
+        source evaluation, so the traced paths -- and the fingerprint --
+        stay identical to the baseline.
+        """
+        source = FiniteSolarSource(
+            atmo3, table3,
+            n_radial=4, n_azimuth=16 if item == "disk4x16" else 2,
+            radius_deg=16.0 / 60.0)
+        patches = {}
+        if item == "rr_conservative":
+            patches = dict(_RR_WEIGHT=0.02, _RR_SURVIVE=0.9)
+        elif item == "fine_optical":
+            patches = dict(_N_FINE=1400)
+        elif item == "fine_phase":
+            patches = dict(_N_PHASE=4097)
+        max_scatter = 100 if item == "max_scatter100" else 50
+        saved = {k: getattr(mc, k) for k in patches}
+        started = time.perf_counter()
+        try:
+            for k, v in patches.items():
+                setattr(mc, k, v)
+            result = mc.mc_radiance_split(
+                atmo3, 90.0 - sun_elev, [0.0], [0.0],
+                n_photons=photons, seed=seed, max_scatter=max_scatter,
+                diagnostics=False)
+        finally:
+            for k, v in saved.items():
+                setattr(mc, k, v)
+        seconds = time.perf_counter() - started
+        fingerprint = source.fingerprint.hexdigest()
+        per_lambda = {}
+        for pos, iw in enumerate(anchors):
+            deterministic = float(singles3[sun_elev][pos])
+            per_lambda[str(wl3[pos])] = dict(
+                deterministic_single=deterministic,
+                multiple=float(result["multiple"][0, pos]),
+                total=deterministic + float(result["multiple"][0, pos]))
+        return dict(per_lambda=per_lambda, seconds=seconds,
+                    fingerprint=fingerprint)
+
+    for sun_index, sun_elev in enumerate(suns):
+        batch_id = f"s{sun_index}mc"
+        seeds = [SENSITIVITY_SEED_BASE + 1000 * sun_index + r
+                 for r in range(repeats)]
+        meta_base = _common_meta(protocol_path, table3_hash(protocol, data_dir),
+                                 "sensitivity", sun_index, 0, photons, "disk")
+        batch = Batch(data_dir / "raw" / "sensitivity", batch_id, seeds,
+                      meta_base)
+        missing = [s for s in seeds if s not in batch.done]
+        if missing:
+            for seed in missing:
+                if remaining() <= 0.0:
+                    stopped = "budget-exhausted"
+                    break
+                items = {}
+                for item, _desc in SENSITIVITY_MC_ITEMS:
+                    items[item] = run_mc(item, sun_elev, seed)
+                record = dict(seed=int(seed), sun_elevation_deg=sun_elev,
+                              photons_per_wavelength=photons,
+                              items=items, batch_id=batch_id,
+                              attempt=batch.attempt,
+                              code_sha256=code_hashes(),
+                              table_sha256=meta_base["table_sha256"])
+                batch.record_seed(seed, record)
+                computed += 1
+                bill(computed)
+                print(json.dumps(dict(stage="sensitivity", batch_id=batch_id,
+                                      seed=seed)), flush=True)
+        still_missing = [s for s in seeds if s not in batch.done]
+        batch.close("complete" if not still_missing else "open")
+        if stopped:
+            break
+    bill(computed)
+    # deterministic single-scattering refinements (no MC, no seeds)
+    single_ref = {}
+    for sun_elev in suns:
+        base, _ = single_zenith(atmo3, FiniteSolarSource(atmo3, table3),
+                                90.0 - sun_elev)
+        g16, _ = single_zenith(atmo3, FiniteSolarSource(atmo3, table3),
+                               90.0 - sun_elev, n_gauss=16)
+        fine, _ = single_zenith(atmo3, FiniteSolarSource(atmo3, table3),
+                                90.0 - sun_elev, segment_km=0.25)
+        step, _ = single_zenith(atmo3, FiniteSolarSource(atmo3, table3),
+                                90.0 - sun_elev, density_step_km=0.0125)
+        single_ref[str(sun_elev)] = dict(
+            baseline=base.tolist(), ss_gauss16=g16.tolist(),
+            ss_segment_km_0_25=fine.tolist(),
+            ss_density_step_0_0125=step.tolist())
+    out = data_dir / "raw" / "sensitivity" / "singles-refinement.json"
+    out.write_text(json.dumps(dict(
+        schema="deep-twilight-reference/sensitivity-singles/1",
+        protocol_sha256=sha256_file(protocol_path),
+        items={k: d for k, d in SENSITIVITY_SINGLE_ITEMS}, by_sun=single_ref),
+        indent=1) + "\n")
+    print(json.dumps(dict(
+        stage_status="complete" if not stopped else f"incomplete-{stopped}",
+        stage="sensitivity", computed=computed,
+        stage_seconds_here=time.perf_counter() - started,
+        cumulative_seconds=spent_total(state, "sensitivity"))), flush=True)
+    return computed
+
+
+def table3_hash(protocol: dict, data_dir: Path) -> str:
+    return protocol["candidate"]["table"]["sha256"]
+
+
 STAGES = ("smoke", "cost-probe", "direct", "source-pairs", "candidate",
           "sensitivity")
 DEFAULT_PROTOCOL = ROOT / "validation/data/deep_twilight_reference/protocol.json"
@@ -790,8 +968,12 @@ def main(argv=None) -> int:
                         max_stage_hours=args.max_stage_hours)
         return 0
     if args.stage == "sensitivity":
-        raise SystemExit(
-            "stage 'sensitivity' is delivered by plan Step 4; not implemented yet")
+        data_dir = args.out if args.out is not None else args.protocol.parent
+        state = load_state(data_dir)
+        stage_sensitivity(protocol, atmo, table, data_dir, state,
+                          protocol_path=args.protocol.resolve(),
+                          max_stage_hours=args.max_stage_hours)
+        return 0
 
     data_dir = args.out if args.out is not None else args.protocol.parent
     state = load_state(data_dir)

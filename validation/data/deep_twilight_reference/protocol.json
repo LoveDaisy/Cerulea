@@ -80,6 +80,25 @@
     "estimator": "tools/twilight_second_order.py sequential importance sampler, validated by the -6 deg MC closure test",
     "comparison": "total_cand = deterministic single + candidate L2 + MC rest mean, compared against the direct baseline at the matched budget via conditional intervals (16 seeds), per-path second moments, variance x wall-clock, budget drift and tail statistics; a negative result is a valid delivery"
   },
+  "sensitivity": {
+    "table": "same frozen 3-wavelength planning table as the candidate stage",
+    "repeats": 16,
+    "photons_per_wavelength": 100000,
+    "seed_rule": "110000 + 1000*sun_index + repeat (disjoint from all other stages)",
+    "mc_items": [
+      "baseline",
+      "disk4x16 (solar disk 2x8 -> 4x16)",
+      "max_scatter100 (order cap 50 -> 100)",
+      "rr_conservative (RR weight 0.05 -> 0.02, survival 0.75 -> 0.9)",
+      "fine_optical (_N_FINE 700 -> 1400)",
+      "fine_phase (_N_PHASE 2049 -> 4097)"
+    ],
+    "single_items": [
+      "ss_gauss16 (single_zenith n_gauss 8 -> 16)",
+      "ss_fine_density (density step 0.025 -> 0.0125 km)"
+    ],
+    "not_run_here": "curved diffuse transport (experiment backend exists; its correction stays an explicitly documented unknown) and a rebuilt solar table at different SS quadrature (covered instead by the archived unified-source heldout validations plus the low-height grazing probes frozen with that table)"
+  },
   "wall_clock_caps_hours": {
     "direct_and_source_pairs": 4.0,
     "candidate": 2.0,

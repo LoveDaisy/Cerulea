@@ -254,6 +254,10 @@ def compute_summary(data_dir: Path, protocol: dict) -> dict:
     if (data_dir / "raw" / "candidate").exists():
         out["candidate"] = _candidate_stats(data_dir, protocol, wl, anchor_idx,
                                             out["direct"])
+    # ---- sensitivity (plan Step 4; may be absent/incomplete) --------------
+    if (data_dir / "raw" / "sensitivity").exists():
+        out["sensitivity"] = _sensitivity_stats(data_dir, protocol, wl,
+                                                anchor_idx)
     out["cost"] = _cost_stats(data_dir, disk_meta)
     out["unknowns"] = [
         "diffuse-transport curvature: straight diffuse lines are a fixed "
@@ -493,6 +497,67 @@ def _candidate_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
             comparison[b_key] = per_anchor
         out[str(sun)] = dict(tiers=tiers, drift=drift, comparison=comparison)
     return out
+
+
+def _sensitivity_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
+                       anchor_idx) -> dict:
+    """Paired same-seed drift of every refinement against its baseline."""
+    sens = protocol.get("sensitivity", {})
+    anchors_nm = [float(wl[i]) for i in anchor_idx]
+    confidence = protocol["direct"]["analysis"]["student"]["confidence"]
+    repeats = int(sens.get("repeats", 16))
+    suns = protocol["scenario"]["sun_elevations_deg"]
+    raw_dir = data_dir / "raw" / "sensitivity"
+    out = dict(mc_items=list(sens.get("mc_items", [])), by_sun={})
+    for sun_index, sun in enumerate(suns):
+        batch_id = f"s{sun_index}mc"
+        seeds = [110000 + 1000 * sun_index + r for r in range(repeats)]
+        records, _meta = load_batch(raw_dir / batch_id, seeds,
+                                    stage="sensitivity", batch_id=batch_id)
+        per_item = {}
+        items = [k for k in records[0]["items"] if k != "baseline"]
+        for item in items:
+            per_anchor = {}
+            for a_nm in anchors_nm:
+                base = np.array([r["items"]["baseline"]["per_lambda"][str(a_nm)]["total"]
+                                 for r in records])
+                variant = np.array([r["items"][item]["per_lambda"][str(a_nm)]["total"]
+                                    for r in records])
+                delta = variant - base
+                per_anchor[str(a_nm)] = dict(
+                    baseline_mean=float(base.mean()),
+                    variant_mean=float(variant.mean()),
+                    paired_delta_mean=float(delta.mean()),
+                    paired_delta_t95_halfwidth=float(student_halfwidth(
+                        delta.reshape(-1, 1), confidence)[0]),
+                    fingerprints_same=all(
+                        r["items"][item]["fingerprint"]
+                        == r["items"]["baseline"]["fingerprint"] for r in records))
+            per_item[item] = per_anchor
+        out["by_sun"][str(sun)] = dict(mc=per_item)
+    singles_path = raw_dir / "singles-refinement.json"
+    if singles_path.exists():
+        payload = json.loads(singles_path.read_text())
+        singles = {}
+        for sun, by in payload["by_sun"].items():
+            base = np.array(by["baseline"])
+            entries = {}
+            for item, _desc in payload["items"].items():
+                variant = np.array(by[_slug(item)])
+                entries[item] = dict(
+                    max_abs_relative_drift=float(
+                        np.max(np.abs(variant - base)
+                               / np.maximum(np.abs(base), 1e-300))),
+                    variant=variant.tolist())
+            singles[sun] = entries
+        out["singles"] = singles
+    out["not_run_here"] = sens.get("not_run_here", [])
+    return out
+
+
+def _slug(item: str) -> str:
+    return {"ss_gauss16": "ss_gauss16",
+            "ss_fine_density": "ss_density_step_0_0125"}[item]
 
 
 def _drift_stats(per_budget, anchor_idx, wl, v_curve, sun, precision):
