@@ -307,10 +307,12 @@ def _synthetic_record81(seed, zero=False):
     return row
 
 
-def _populate(data: Path, *, zero_one_record=False, point=True):
+def _populate(data: Path, *, zero_one_record=False, point=True,
+              protocol_sha256=KNOWN_SHA):
     from tools.deep_twilight_reference import contract_view
     meta = contract_view(dict(stage="direct", table_sha256="t",
-                              protocol_sha256=KNOWN_SHA, mode="disk"))
+                              protocol_sha256=protocol_sha256, mode="disk",
+                              code_sha256={"x.py": "1"}))
     for sun_index, sun in enumerate([-9.0]):
         for budget_index, photons in enumerate([400, 800]):
             batch_id = f"s{sun_index}b{budget_index}"
@@ -322,25 +324,28 @@ def _populate(data: Path, *, zero_one_record=False, point=True):
                 zero = zero_one_record and seed == 40000
                 row = _synthetic_record81(seed, zero=zero)
                 row["table_sha256"] = "t"
-                row["protocol_sha256"] = KNOWN_SHA
+                row["protocol_sha256"] = protocol_sha256
                 row["mode"] = "disk"
                 row["photons_per_wavelength"] = photons
                 row["sun_elevation_deg"] = -9.0
+                row["code_sha256"] = {"x.py": "1"}
                 batch.record_seed(seed, row)
             batch.close("complete")
         if point:
             batch = Batch(data / "raw" / "source-pairs", "s0b1-point",
                           [41000 + r for r in range(4)],
                           dict(stage="source-pairs", table_sha256="t",
-                               protocol_sha256=KNOWN_SHA, mode="point"))
+                               protocol_sha256=protocol_sha256, mode="point",
+                               code_sha256={"x.py": "1"}))
             for r in range(4):
                 seed = 41000 + r
                 row = _synthetic_record81(seed)
                 row["table_sha256"] = "t"
-                row["protocol_sha256"] = KNOWN_SHA
+                row["protocol_sha256"] = protocol_sha256
                 row["mode"] = "point"
                 row["photons_per_wavelength"] = 800
                 row["sun_elevation_deg"] = -9.0
+                row["code_sha256"] = {"x.py": "1"}
                 # point-source variant: half the higher-order radiance, same
                 # identities (split_total = single + multiple) preserved
                 multiple_p = 0.5 * np.asarray(row["fields"]["multiple"])
@@ -468,7 +473,8 @@ def test_candidate_and_sensitivity_sections(tmp_path):
                   [110000 + r for r in range(4)],
                   dict(stage="sensitivity", table_sha256="c",
                        protocol_sha256="p", mode="disk",
-                       photons_per_wavelength=300))
+                       photons_per_wavelength=300,
+                       code_sha256={"x.py": "1"}))
     for r in range(4):
         seed = 110000 + r
         items = {}
@@ -576,6 +582,14 @@ def test_candidate_and_sensitivity_sections(tmp_path):
         singles_json.write_text(json.dumps(payload_mut))
         with pytest.raises(ValueError, match="refinement-file items"):
             _sensitivity_stats(data, proto, wl, [14, 34, 54])
+    # round-6: a truncated refinement vector must refuse, not broadcast
+    # against the baseline into a fabricated physical drift
+    truncated = json.loads(json.dumps(good_singles))
+    truncated["by_sun"]["-9.0"]["ss_gauss16"] = [1e-8 * (1 + 1e-6)]
+    singles_json.write_text(json.dumps(truncated))
+    with pytest.raises(ValueError, match="must be a 1-D vector of exactly"):
+        _sensitivity_stats(data, proto, wl, [14, 34, 54])
+    singles_json.write_text(json.dumps(good_singles))
     # an MC item outside the protocol set is refused just the same
     _write_sensitivity_records(lambda r: r["items"].update(
         ss_extra=dict(
@@ -586,6 +600,28 @@ def test_candidate_and_sensitivity_sections(tmp_path):
     singles_json.write_text(json.dumps(good_singles))
     with pytest.raises(ValueError, match="unexpected \\['ss_extra'\\]"):
         _sensitivity_stats(data, proto, wl, [14, 34, 54])
+
+
+def test_declared_stage_without_data_is_recorded(tmp_path):
+    """A protocol-declared stage with no raw/ data refuses the summary;
+    only the explicit incompleteness escape records it (round-6 review)."""
+    import hashlib
+    data = _write_mini_dataset(tmp_path)
+    proto = json.loads((data / "protocol.json").read_text())
+    proto["sensitivity"] = {"repeats": 4, "photons_per_wavelength": 300,
+                            "mc_items": ["baseline"],
+                            "single_items": ["ss_gauss16 (x)"]}
+    text = json.dumps(proto)
+    sha = hashlib.sha256(text.encode()).hexdigest()
+    (data / "protocol.json").write_text(text)
+    _populate(data, protocol_sha256=sha)
+    # the sensitivity stage is declared but its raw/ data never existed
+    with pytest.raises(ValueError,
+                       match="protocol declares stages with no data"):
+        compute_summary(data, proto)
+    summary_partial = compute_summary(data, proto, allow_incomplete=True)
+    assert summary_partial["incomplete_stages"] == ["sensitivity"]
+    assert "sensitivity" not in summary_partial
 
 
 def test_candidate_tier_implementation_mismatch_refused(tmp_path):
@@ -666,6 +702,22 @@ def test_candidate_tier_implementation_mismatch_refused(tmp_path):
     build(lambda t: {"tools/twilight_second_order.py": "cand-same"})
     cand = _candidate_stats(data, proto, wl, [14, 34, 54], {})
     assert cand["-9.0"]["drift"]["550.0"]["abs_drift"] > 0.0
+    # round-6 mutation: strip the execution contract from both tier metas
+    # and mix implementations across the records of one tier -- the
+    # refusal must not depend on the meta field existing
+    for tier_index in (0, 1):
+        meta_p = data / "raw" / "candidate" / f"s0t{tier_index}" / "meta.json"
+        meta_m = json.loads(meta_p.read_text())
+        meta_m.pop("code_sha256", None)
+        meta_p.write_text(json.dumps(meta_m))
+    jsonl = data / "raw" / "candidate" / "s0t0" / "attempt-00.jsonl"
+    rows = [json.loads(l) for l in jsonl.read_text().splitlines()]
+    for i, r in enumerate(rows):
+        r["code_sha256"] = {"tools/twilight_second_order.py":
+                            f"mixed-{'0' if i % 2 == 0 else '1'}"}
+    jsonl.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    with pytest.raises(ValueError, match="multiple execution implementations"):
+        _candidate_stats(data, proto, wl, [14, 34, 54], {})
 
 
 def test_cli_smoke_real(tmp_path):
@@ -730,22 +782,45 @@ def test_batch_contract_mismatch_refused(tmp_path):
 
 def test_check_batch_contract_rejects_tampered_record():
     from tools.summarize_deep_twilight_reference import check_batch_contract
-    meta = dict(protocol_sha256=KNOWN_SHA, table_sha256="t")
+    meta = dict(protocol_sha256=KNOWN_SHA, table_sha256="t",
+                code_sha256={"x.py": "1"})
     good = [dict(seed=1, sun_elevation_deg=-9.0, photons_per_wavelength=400,
-                 mode="disk", protocol_sha256=KNOWN_SHA, table_sha256="t")]
-    notes = check_batch_contract(good, meta,
-                                 dict(sun_elevation_deg=-9.0,
-                                      photons_per_wavelength=400, mode="disk",
-                                      table_sha256="t"),
-                                 stage="direct", batch_id="b",
-                                 protocol_sha_now=KNOWN_SHA)
+                 mode="disk", protocol_sha256=KNOWN_SHA, table_sha256="t",
+                 code_sha256={"x.py": "1"})]
+    fp, notes = check_batch_contract(good, meta,
+                                     dict(sun_elevation_deg=-9.0,
+                                          photons_per_wavelength=400,
+                                          mode="disk", table_sha256="t"),
+                                     stage="direct", batch_id="b",
+                                     protocol_sha_now=KNOWN_SHA)
     assert notes == []
+    assert fp == check_batch_contract(
+        good, meta, dict(sun_elevation_deg=-9.0, photons_per_wavelength=400,
+                         mode="disk", table_sha256="t"),
+        stage="direct", batch_id="b")[0]
+    # round-6 review: the execution contract is REQUIRED -- neither the
+    # batch meta nor the records may lack it (fail-closed, not fail-open)
+    meta_no_code = dict(protocol_sha256=KNOWN_SHA, table_sha256="t")
+    good_no_code = [dict(good[0])]
+    del good_no_code[0]["code_sha256"]
+    with pytest.raises(ValueError, match="lacks the execution contract"):
+        check_batch_contract(good, meta_no_code,
+                             dict(sun_elevation_deg=-9.0,
+                                  photons_per_wavelength=400,
+                                  mode="disk", table_sha256="t"),
+                             stage="direct", batch_id="b")
+    with pytest.raises(ValueError, match="records lack.*code_sha256"):
+        check_batch_contract(good_no_code, meta,
+                             dict(sun_elevation_deg=-9.0,
+                                  photons_per_wavelength=400,
+                                  mode="disk", table_sha256="t"),
+                             stage="direct", batch_id="b")
     tampered = [dict(good[0], photons_per_wavelength=1600000)]
     with pytest.raises(ValueError, match="contract field"):
         check_batch_contract(tampered, meta,
                              dict(sun_elevation_deg=-9.0,
-                                  photons_per_wavelength=400, mode="disk",
-                                  table_sha256="t"),
+                                  photons_per_wavelength=400,
+                                  mode="disk", table_sha256="t"),
                              stage="direct", batch_id="b")
     # two-level identity: a PHYSICS-anchor change between meta and records
     # is rejected outright
@@ -825,12 +900,12 @@ def test_check_batch_contract_rejects_tampered_record():
                 _archived_fp("4be29c6c063dd6fbe361148a5476afab2dbb84e68d6c"
                              "05aa6d6edf1a5277e856"))
     assert pair_key in VERIFIED_IMPLEMENTATION_COMPAT
-    notes = check_batch_contract([rec_direct_b], meta_direct_a,
-                                 dict(sun_elevation_deg=-9.0,
-                                      photons_per_wavelength=400,
-                                      mode="disk", table_sha256="t"),
-                                 stage="direct", batch_id="b",
-                                 protocol_sha_now=KNOWN_SHA)
+    _, notes = check_batch_contract([rec_direct_b], meta_direct_a,
+                                    dict(sun_elevation_deg=-9.0,
+                                         photons_per_wavelength=400,
+                                         mode="disk", table_sha256="t"),
+                                    stage="direct", batch_id="b",
+                                    protocol_sha_now=KNOWN_SHA)
     assert any("verified compatibility exception" in n for n in notes)
     # a physics-anchor difference between meta and records stays refused
     # even in the archived-pair form
@@ -846,12 +921,12 @@ def test_check_batch_contract_rejects_tampered_record():
                              stage="direct", batch_id="b",
                              protocol_sha_now=KNOWN_SHA)
     # a known historical generation is accepted with an auditable note
-    drifted = check_batch_contract(good, meta,
-                                   dict(sun_elevation_deg=-9.0,
-                                        photons_per_wavelength=400,
-                                        mode="disk", table_sha256="t"),
-                                   stage="direct", batch_id="b",
-                                   protocol_sha_now="current")
+    _, drifted = check_batch_contract(good, meta,
+                                      dict(sun_elevation_deg=-9.0,
+                                           photons_per_wavelength=400,
+                                           mode="disk", table_sha256="t"),
+                                      stage="direct", batch_id="b",
+                                      protocol_sha_now="current")
     assert len(drifted) == 1 and "known protocol generation" in drifted[0]
     # an UNKNOWN generation must be rejected, not silently merged
     meta_unknown = dict(meta, protocol_sha256="p-unknown")
@@ -867,11 +942,11 @@ def test_check_batch_contract_rejects_tampered_record():
     no_sun = [dict(good[0])]
     del no_sun[0]["sun_elevation_deg"]
     meta_sun = dict(meta, sun_elevation_deg=-9.0)
-    notes = check_batch_contract(no_sun, meta_sun,
-                                 dict(sun_elevation_deg=-9.0,
-                                      photons_per_wavelength=400, mode="disk",
-                                      table_sha256="t"),
-                                 stage="direct", batch_id="b")
+    _, notes = check_batch_contract(no_sun, meta_sun,
+                                    dict(sun_elevation_deg=-9.0,
+                                         photons_per_wavelength=400,
+                                         mode="disk", table_sha256="t"),
+                                    stage="direct", batch_id="b")
     assert any("values taken from the batch meta" in n for n in notes)
     # ... but a meta that contradicts the protocol is refused
     meta_bad = dict(meta, sun_elevation_deg=90.0)
@@ -1040,23 +1115,34 @@ def test_fresh_run_root_full_chain(tmp_path):
     assert main(base + ["--stage", "direct", "--max-stage-hours", "0.05"]) == 0
     assert main(base + ["--stage", "source-pairs",
                         "--max-stage-hours", "0.03"]) == 0
-    # summary CLI on the run root alone
+    # summary CLI on the run root alone: the full protocol declares
+    # candidate+sensitivity stages this partial run does not carry, so a
+    # plain summary refuses -- with --allow-incomplete the incompleteness
+    # is recorded explicitly instead of the sections silently vanishing
     import subprocess
     proc = subprocess.run(
         [sys.executable, "-m", "tools.summarize_deep_twilight_reference",
          "--directory", str(run_root)],
         capture_output=True, text=True, cwd=str(ROOT))
+    assert proc.returncode != 0
+    assert "protocol declares stages with no data" in proc.stderr
+    proc = subprocess.run(
+        [sys.executable, "-m", "tools.summarize_deep_twilight_reference",
+         "--directory", str(run_root), "--allow-incomplete"],
+        capture_output=True, text=True, cwd=str(ROOT))
     assert proc.returncode == 0, proc.stdout[-500:] + proc.stderr[-1500:]
     resolved = resolve_protocol_path(run_root)
     assert resolved.name == "protocol.snapshot.json"
-    summary = compute_summary(run_root, protocol)
+    summary = compute_summary(run_root, protocol, allow_incomplete=True)
     assert summary["protocol_file"] == "protocol.snapshot.json"
+    assert summary["incomplete_stages"] == ["candidate", "sensitivity"]
     assert summary["direct"]["-9.0"]["budgets"]["800"]["n"] == 2
     assert "source_pairs" in summary
-    # verify-only on the run root
+    assert "candidate" not in summary and "sensitivity" not in summary
+    # verify-only on the run root (same flag as generation)
     proc = subprocess.run(
         [sys.executable, "-m", "tools.summarize_deep_twilight_reference",
-         "--directory", str(run_root), "--verify-only"],
+         "--directory", str(run_root), "--verify-only", "--allow-incomplete"],
         capture_output=True, text=True, cwd=str(ROOT))
     assert proc.returncode == 0, proc.stdout[-500:] + proc.stderr[-1500:]
     assert "VERIFY OK" in proc.stdout

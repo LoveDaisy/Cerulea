@@ -1,6 +1,6 @@
 {
  "schema": "deep-twilight-reference/summary/1",
- "generated": "2026-11-04T21:50:09+0800",
+ "generated": "2026-11-04T22:16:00+0800",
  "protocol_sha256": "23b46bd6784b91181c34cd5ff05656ce86f9aeecfa2bbe29c0728f1b432c87a1",
  "protocol_file": "protocol.json",
  "grid": [
@@ -1610,19 +1610,6 @@
    ]
   }
  },
- "contract_notes": [
-  "direct/s0b0: executed under known protocol generation f6da541115da... (direct/source-pairs wave (2026-11-04): identical scenario/source/direct/precision/luminance sections; candidate+sensitivity sections and the candidate wall-clock entry were appended later. Verified against the current contract for every stage-relevant field checked here.)",
-  "direct/s0b1: executed under known protocol generation f6da541115da... (direct/source-pairs wave (2026-11-04): identical scenario/source/direct/precision/luminance sections; candidate+sensitivity sections and the candidate wall-clock entry were appended later. Verified against the current contract for every stage-relevant field checked here.)",
-  "direct/s1b0: executed under known protocol generation f6da541115da... (direct/source-pairs wave (2026-11-04): identical scenario/source/direct/precision/luminance sections; candidate+sensitivity sections and the candidate wall-clock entry were appended later. Verified against the current contract for every stage-relevant field checked here.)",
-  "candidate/s0t0: records lack ['mode']; values taken from the batch meta provenance and validated against the protocol",
-  "candidate/s0t1: records lack ['mode']; values taken from the batch meta provenance and validated against the protocol",
-  "candidate/s1t0: records lack ['mode']; values taken from the batch meta provenance and validated against the protocol",
-  "candidate/s1t1: records lack ['mode']; values taken from the batch meta provenance and validated against the protocol",
-  "sensitivity/s0mc: meta and records differ under a verified compatibility exception: batch meta pinned a stale orchestration hash from before the sensitivity run started; the records carry the executed truth; verified during code-review round 3",
-  "sensitivity/s0mc: records lack ['mode']; values taken from the batch meta provenance and validated against the protocol",
-  "sensitivity/s1mc: meta and records differ under a verified compatibility exception: batch meta pinned a stale orchestration hash from before the sensitivity run started; the records carry the executed truth; verified during code-review round 3",
-  "sensitivity/s1mc: records lack ['mode']; values taken from the batch meta provenance and validated against the protocol"
- ],
  "source_pairs": {
   "-9.0": {
    "n": 16,
@@ -2067,6 +2054,22 @@
    "seconds": 2445.6028925831197
   }
  },
+ "contract_notes": [
+  "direct/s0b0: executed under known protocol generation f6da541115da... (direct/source-pairs wave (2026-11-04): identical scenario/source/direct/precision/luminance sections; candidate+sensitivity sections and the candidate wall-clock entry were appended later. Verified against the current contract for every stage-relevant field checked here.)",
+  "direct/s0b1: executed under known protocol generation f6da541115da... (direct/source-pairs wave (2026-11-04): identical scenario/source/direct/precision/luminance sections; candidate+sensitivity sections and the candidate wall-clock entry were appended later. Verified against the current contract for every stage-relevant field checked here.)",
+  "direct/s1b0: executed under known protocol generation f6da541115da... (direct/source-pairs wave (2026-11-04): identical scenario/source/direct/precision/luminance sections; candidate+sensitivity sections and the candidate wall-clock entry were appended later. Verified against the current contract for every stage-relevant field checked here.)",
+  "direct wave spans multiple orchestration versions under verified exceptions: orchestration-only diff (state merge + stage-budget accounting) within the direct wave; physics anchors bit-identical across all archived records; verified during code-review round 4",
+  "source-pairs/s0b1-point: orchestration file version differs from the direct wave under a verified exception: orchestration-only diff between the direct wave and the source-pairs run; physics anchors bit-identical; verified during code-review round 4",
+  "source-pairs/s1b1-point: orchestration file version differs from the direct wave under a verified exception: orchestration-only diff between the direct wave and the source-pairs run; physics anchors bit-identical; verified during code-review round 4",
+  "candidate/s0t0: records lack ['mode']; values taken from the batch meta provenance and validated against the protocol",
+  "candidate/s0t1: records lack ['mode']; values taken from the batch meta provenance and validated against the protocol",
+  "candidate/s1t0: records lack ['mode']; values taken from the batch meta provenance and validated against the protocol",
+  "candidate/s1t1: records lack ['mode']; values taken from the batch meta provenance and validated against the protocol",
+  "sensitivity/s0mc: meta and records differ under a verified compatibility exception: batch meta pinned a stale orchestration hash from before the sensitivity run started; the records carry the executed truth; verified during code-review round 3",
+  "sensitivity/s0mc: records lack ['mode']; values taken from the batch meta provenance and validated against the protocol",
+  "sensitivity/s1mc: meta and records differ under a verified compatibility exception: batch meta pinned a stale orchestration hash from before the sensitivity run started; the records carry the executed truth; verified during code-review round 3",
+  "sensitivity/s1mc: records lack ['mode']; values taken from the batch meta provenance and validated against the protocol"
+ ],
  "candidate": {
   "-9.0": {
    "tiers": {

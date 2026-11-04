@@ -282,7 +282,11 @@ def check_batch_contract(records, meta, expect, *, stage, batch_id,
     Checks the semantic identity (sun elevation, budget, mode, source and
     protocol hashes) of every record against ``expect`` and the batch meta;
     cross-batch protocol-hash drift is reported as an auditable note, not
-    silently merged.
+    silently merged.  Returns ``(verified_execution_fingerprint, notes)``:
+    the fingerprint is the batch's audited implementation identity, which
+    every inter-batch comparison must consume -- re-projecting identities
+    downstream (e.g. normalizing a missing one to ``{}``) is exactly the
+    fail-open path this contract exists to close.
     """
     notes = []
     meta_protocol = meta.get("protocol_sha256")
@@ -309,11 +313,10 @@ def check_batch_contract(records, meta, expect, *, stage, batch_id,
                 raise ValueError(
                     f"{stage}/{batch_id} seed {row['seed']}: contract field "
                     f"{key} is {got!r}, protocol requires {want!r}")
-        # implementation identity: every record that carries it must match
-        # the batch meta exactly; records from before the identity was
-        # recorded are covered by the meta/known-generation gate below
-        if meta.get("code_sha256") is not None and \
-                row.get("code_sha256") is None:
+        # implementation identity is a REQUIRED contract field: every
+        # record must carry it (pre-fix waves with no recorded identity
+        # are not a supported generation)
+        if row.get("code_sha256") is None:
             missing_fields.add("code_sha256")
         # executed-protocol identity: a record that carries it must match
         # the batch meta (records predating the field fall through to the
@@ -324,27 +327,33 @@ def check_batch_contract(records, meta, expect, *, stage, batch_id,
             raise ValueError(
                 f"{stage}/{batch_id} seed {row['seed']}: record "
                 "protocol_sha256 differs from the batch meta provenance")
-    # per-batch implementation identity through the single contract entry:
-    # records must not span implementations, and the batch meta must match
-    # the records unless a verified (wave, fingerprint-pair) entry binds
-    # the exact difference
+    # per-batch implementation identity through the single contract entry.
+    # None of this is conditional on the meta carrying the field: a batch
+    # without a pinned execution contract is refused outright (fail-closed)
     record_fps = {execution_fingerprint(r["code_sha256"])
                   for r in records if r.get("code_sha256") is not None}
-    if meta.get("code_sha256") is not None and record_fps:
-        if len(record_fps) > 1:
-            raise ValueError(
-                f"{stage}/{batch_id}: records span multiple execution "
-                "implementations -- mixed-implementation batches must not "
-                "be merged as independent repeats")
-        meta_fp = execution_fingerprint(meta["code_sha256"])
+    if len(record_fps) > 1:
+        raise ValueError(
+            f"{stage}/{batch_id}: records span multiple execution "
+            "implementations -- mixed-implementation batches must not be "
+            "merged as independent repeats")
+    meta_code = meta.get("code_sha256")
+    if meta_code is None:
+        raise ValueError(
+            f"{stage}/{batch_id}: batch meta lacks the execution contract "
+            "(code_sha256) -- batches without a pinned implementation "
+            "identity are refused, not silently compared")
+    verified_fp = execution_fingerprint(meta_code)
+    if record_fps:
         rec_fp = next(iter(record_fps))
         statement = require_same_execution(
-            stage, meta_fp, rec_fp,
+            stage, verified_fp, rec_fp,
             context=f"{stage}/{batch_id} (batch meta vs records)")
         if statement:
             notes.append(
                 f"{stage}/{batch_id}: meta and records differ under a "
                 f"verified compatibility exception: {statement}")
+        verified_fp = rec_fp  # the records are the executed truth
     if missing_fields:
         raise ValueError(
             f"{stage}/{batch_id}: records lack {sorted(missing_fields)} and "
@@ -366,7 +375,7 @@ def check_batch_contract(records, meta, expect, *, stage, batch_id,
         notes.append(
             f"{stage}/{batch_id}: executed under known protocol generation "
             f"{meta_protocol[:12]}... ({KNOWN_PROTOCOL_GENERATIONS[meta_protocol]})")
-    return notes
+    return verified_fp, notes
 
 
 # ---------------------------------------------------------------------------
@@ -410,7 +419,8 @@ def resolve_protocol_path(data_dir: Path) -> Path:
 
 
 def compute_summary(data_dir: Path, protocol: dict, *,
-                    protocol_path: Path | None = None) -> dict:
+                    protocol_path: Path | None = None,
+                    allow_incomplete: bool = False) -> dict:
     scenario = protocol["scenario"]
     direct_cfg = protocol["direct"]
     precision = protocol["precision"]
@@ -435,6 +445,7 @@ def compute_summary(data_dir: Path, protocol: dict, *,
     # ---- direct batches --------------------------------------------------
     disk_records = {}
     disk_meta = {}
+    batch_fp = {}
     for sun_index, sun in enumerate(suns):
         per_budget = {}
         for budget_index, photons in enumerate(budgets):
@@ -448,13 +459,14 @@ def compute_summary(data_dir: Path, protocol: dict, *,
             # NOTE: fingerprints identify the per-seed path SET, so they are
             # all distinct within a batch by design; the meaningful identity
             # is same-seed disk/point equality, checked in the pairs section
-            contract_notes.extend(check_batch_contract(
+            batch_fp[batch_id], batch_notes = check_batch_contract(
                 records, meta,
                 dict(sun_elevation_deg=sun, photons_per_wavelength=photons,
                      mode="disk",
                      table_sha256=protocol["source"]["full81_table"]["sha256"]),
                 stage="direct", batch_id=batch_id,
-                protocol_sha_now=protocol_sha_now))
+                protocol_sha_now=protocol_sha_now)
+            contract_notes.extend(batch_notes)
             disk_records[(sun, photons)] = records
             disk_meta[batch_id] = meta
             per_budget[str(photons)] = _budget_stats(
@@ -485,18 +497,19 @@ def compute_summary(data_dir: Path, protocol: dict, *,
                 failures.append("luminance drift between budgets exceeds a "
                                 "quarter of the luminance gate")
             stats["verdict_failures"] = failures
-    # cross-budget comparisons run through the single contract entry: the
-    # four batches need one compatible execution identity (verified
-    # orchestration-only exceptions pass as auditable notes)
-    direct_fps = sorted({execution_fingerprint(r.get("code_sha256") or {})
-                         for rows in disk_records.values() for r in rows})
+    # cross-budget comparisons run through the single contract entry,
+    # consuming the verified identities the batch checks returned (never a
+    # re-projection): the four batches need one compatible execution
+    # identity (verified orchestration-only exceptions pass as auditable
+    # notes appended to the single contract_notes list)
+    direct_fps = sorted(set(batch_fp.values()))
     if len(direct_fps) > 1:
         statements = [require_same_execution(
             "direct", direct_fps[0], other,
             context="direct wave (cross-budget comparison)")
             for other in direct_fps[1:]]
         unique = list(dict.fromkeys(s for s in statements if s))
-        out.setdefault("contract_notes", []).append(
+        contract_notes.append(
             "direct wave spans multiple orchestration versions under "
             f"verified exceptions: {'; '.join(unique)}")
     # ---- source pairs ----------------------------------------------------
@@ -512,22 +525,21 @@ def compute_summary(data_dir: Path, protocol: dict, *,
              for r in range(repeats)],
             stage="source-pairs", batch_id=batch_id)
         check_record_invariants(records, stage="source-pairs", batch_id=batch_id)
-        contract_notes.extend(check_batch_contract(
+        pair_fp, batch_notes = check_batch_contract(
             records, meta,
             dict(sun_elevation_deg=sun, photons_per_wavelength=photons,
                  mode="point",
                  table_sha256=protocol["source"]["full81_table"]["sha256"]),
             stage="source-pairs", batch_id=batch_id,
-            protocol_sha_now=protocol_sha_now))
+            protocol_sha_now=protocol_sha_now)
+        contract_notes.extend(batch_notes)
         disk_rows = disk_records[(sun, photons)]
         statement = require_same_execution(
-            "source-pairs",
-            execution_fingerprint(records[0].get("code_sha256") or {}),
-            execution_fingerprint(disk_rows[0].get("code_sha256") or {}),
+            "source-pairs", pair_fp, batch_fp[f"s{sun_index}b{top_budget_index}"],
             context=f"source-pairs/{batch_id} vs the disk batch it is "
                     "paired against")
         if statement:
-            out.setdefault("contract_notes", []).append(
+            contract_notes.append(
                 f"source-pairs/{batch_id}: orchestration file version "
                 f"differs from the direct wave under a verified "
                 f"exception: {statement}")
@@ -535,19 +547,34 @@ def compute_summary(data_dir: Path, protocol: dict, *,
                                       anchor_idx, sun, protocol, pair_cfg)
     out["source_pairs"] = pairs
     out["contract_notes"] = contract_notes
-    # ---- candidate experiment (plan Step 3; may be absent/incomplete) -----
-    if (data_dir / "raw" / "candidate").exists():
+    # ---- candidate experiment (plan Step 3) -------------------------------
+    # stage participation is decided by the protocol, not by what happens
+    # to exist under raw/: a declared-but-missing stage either refuses the
+    # complete summary or -- only with the explicit allow_incomplete
+    # escape -- is recorded in incomplete_stages instead of silently
+    # vanishing from the deliverable
+    missing_stages = [s for s in ("candidate", "sensitivity")
+                      if s in protocol and not (data_dir / "raw" / s).exists()]
+    if missing_stages and not allow_incomplete:
+        raise ValueError(
+            f"protocol declares stages with no data under raw/: "
+            f"{missing_stages} -- a complete summary requires every "
+            "protocol-declared stage; pass --allow-incomplete to emit an "
+            "explicit incompleteness record instead")
+    if "candidate" in protocol and (data_dir / "raw" / "candidate").exists():
         out["candidate"] = _candidate_stats(data_dir, protocol, wl, anchor_idx,
                                             out["direct"],
                                             protocol_sha_now=protocol_sha_now,
                                             contract_notes=contract_notes)
-    # ---- sensitivity (plan Step 4; may be absent/incomplete) --------------
-    if (data_dir / "raw" / "sensitivity").exists():
+    # ---- sensitivity (plan Step 4) ----------------------------------------
+    if "sensitivity" in protocol and (data_dir / "raw" / "sensitivity").exists():
         out["sensitivity"] = _sensitivity_stats(data_dir, protocol, wl,
                                                 anchor_idx,
                                                 protocol_sha_now=protocol_sha_now,
                                                 contract_notes=contract_notes)
     out["cost"] = _cost_stats(data_dir, disk_meta)
+    if missing_stages:
+        out["incomplete_stages"] = missing_stages
     out["unknowns"] = [
         "diffuse-transport curvature: straight diffuse lines are a fixed "
         "transport approximation of this reference (curved backends exist as "
@@ -712,7 +739,7 @@ def _candidate_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
     out = {}
     for sun_index, sun in enumerate(suns):
         tiers = {}
-        tiers_meta = {}
+        tiers_fp = {}
         for tier_index, tier in enumerate(cand_cfg["tiers"]):
             batch_id = f"s{sun_index}t{tier_index}"
             seeds = [80000 + 10000 * sun_index + 1000 * tier_index + r
@@ -720,8 +747,7 @@ def _candidate_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
             records, meta = load_batch(raw_dir / batch_id, seeds,
                                        stage="candidate", batch_id=batch_id)
             records = sorted(records, key=lambda r: int(r["seed"]))
-            tiers_meta[str(tier_index)] = meta
-            contract_notes.extend(check_batch_contract(
+            tiers_fp[str(tier_index)], batch_notes = check_batch_contract(
                 records, meta,
                 dict(sun_elevation_deg=sun,
                      candidate_samples=tier["candidate_samples"],
@@ -729,7 +755,8 @@ def _candidate_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
                      mode="disk",
                      table_sha256=cand_cfg["table"]["sha256"]),
                 stage="candidate", batch_id=batch_id,
-                protocol_sha_now=protocol_sha_now))
+                protocol_sha_now=protocol_sha_now)
+            contract_notes.extend(batch_notes)
             # component closure and wavelength coverage per record
             want_wl = {f"{float(a):.1f}" for a in cand_cfg["wavelengths_nm"]}
             for row in records:
@@ -818,13 +845,11 @@ def _candidate_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
                 seconds=float(sum(r["seconds"] for r in records)))
         lo_tier, hi_tier = sorted(tiers, key=int)
         # the two tiers enter one budget-drift comparison, so their
-        # execution identities must be compatible first (single contract
-        # entry; a physics-anchor difference is refused unconditionally --
-        # estimator changes must not be reported as budget drift)
+        # execution identities must be compatible first: consume the
+        # verified identities the batch checks returned -- a missing
+        # contract is already refused upstream, never normalized to {}
         tier_stmt = require_same_execution(
-            "candidate",
-            execution_fingerprint(tiers_meta[lo_tier].get("code_sha256") or {}),
-            execution_fingerprint(tiers_meta[hi_tier].get("code_sha256") or {}),
+            "candidate", tiers_fp[lo_tier], tiers_fp[hi_tier],
             context=f"candidate {sun}: tier drift ({lo_tier} vs {hi_tier})")
         if tier_stmt:
             contract_notes.append(
@@ -869,6 +894,26 @@ def _candidate_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
     return out
 
 
+def _require_anchor_vector(name, values, n_anchor, context):
+    """Anchor-grid contract for deterministic refinement evidence.
+
+    Every protocol-required vector (baseline and each refinement variant)
+    must be a finite 1-D array of exactly the anchor count -- NumPy
+    broadcasting would otherwise turn missing wavelength evidence into a
+    silently wrong physical comparison.
+    """
+    arr = np.asarray(values, dtype=float)
+    if arr.shape != (n_anchor,):
+        raise ValueError(
+            f"{context}: {name} must be a 1-D vector of exactly "
+            f"{n_anchor} anchor values, got shape {arr.shape} -- missing "
+            "wavelength evidence must not be broadcast into a comparison")
+    if not np.all(np.isfinite(arr)):
+        raise ValueError(
+            f"{context}: {name} must be finite on every anchor")
+    return arr
+
+
 def _sensitivity_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
                        anchor_idx, *, protocol_sha_now=None,
                        contract_notes=None) -> dict:
@@ -910,19 +955,26 @@ def _sensitivity_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
         raise ValueError(
             f"sensitivity singles: depths {sorted(got_suns)} != protocol "
             f"{sorted(want_suns)}")
+    n_anchor = len(protocol["scenario"]["anchor_wavelengths_nm"])
     for sun, entries in payload["by_sun"].items():
         missing_items = want_single_items - set(entries)
         if missing_items:
             raise ValueError(
                 f"sensitivity singles {sun}: missing protocol-required "
                 f"items {sorted(missing_items)}")
-        base = np.array(entries["baseline"], dtype=float)
-        n_anchor = len(protocol["scenario"]["anchor_wavelengths_nm"])
-        if base.shape != (n_anchor,) or not np.all(np.isfinite(base)) \
-                or not np.any(base > 0):
+        # the anchor-grid contract applies to the baseline AND to every
+        # protocol-required refinement: a truncated vector would otherwise
+        # broadcast against the baseline and fabricate a physical drift
+        base = _require_anchor_vector("baseline", entries["baseline"],
+                                      n_anchor, f"sensitivity singles {sun}")
+        if not np.any(base > 0):
             raise ValueError(
-                f"sensitivity singles {sun}: baseline must be finite and "
-                f"positive on the {n_anchor}-anchor grid")
+                f"sensitivity singles {sun}: baseline must be positive on "
+                f"the {n_anchor}-anchor grid")
+        for item in proto_single_items:
+            _require_anchor_vector(f"refinement {item!r}",
+                                   entries[_slug(item)], n_anchor,
+                                   f"sensitivity singles {sun}")
     out = dict(mc_items=required_items, by_sun={})
     for sun_index, sun in enumerate(suns):
         batch_id = f"s{sun_index}mc"
@@ -941,13 +993,14 @@ def _sensitivity_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
                     f"unexpected {sorted(got_mc_items - want_mc_items)}) "
                     "-- the sensitivity summary must cover every "
                     "protocol-declared experiment and nothing else")
-        contract_notes.extend(check_batch_contract(
+        _sens_fp, batch_notes = check_batch_contract(
             records, meta,
             dict(sun_elevation_deg=sun,
                  photons_per_wavelength=sens_budget, mode="disk",
                  table_sha256=protocol["candidate"]["table"]["sha256"]),
             stage="sensitivity", batch_id=batch_id,
-            protocol_sha_now=protocol_sha_now))
+            protocol_sha_now=protocol_sha_now)
+        contract_notes.extend(batch_notes)
         per_item = {}
         # "baseline" is part of the required record coverage but pairs
         # against itself, so it produces no drift entry
@@ -1135,12 +1188,18 @@ def main(argv=None) -> int:
     parser.add_argument("--verify-only", action="store_true",
                         help="recompute and compare against the stored "
                              "summary; write nothing")
+    parser.add_argument("--allow-incomplete", action="store_true",
+                        help="emit an explicit incomplete_stages record for "
+                             "protocol-declared stages with no raw/ data, "
+                             "instead of refusing the summary; generation "
+                             "and --verify-only must use the same flag")
     args = parser.parse_args(argv)
     data_dir = args.directory
     protocol_path = resolve_protocol_path(data_dir)
     protocol = json.loads(protocol_path.read_text())
 
-    summary = compute_summary(data_dir, protocol)
+    summary = compute_summary(data_dir, protocol,
+                              allow_incomplete=args.allow_incomplete)
 
     if args.verify_only:
         summary_path = data_dir / "summary.json"
