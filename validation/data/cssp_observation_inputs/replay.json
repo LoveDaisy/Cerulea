@@ -6,6 +6,10 @@
       6.64426395319122e-11,
       1.0475711665387708e-10
     ],
+    "tolerance": 1e-06,
+    "tolerance_basis": "published CSV carries ~10 significant digits; the bound is quantisation-derived and never fitted to replay output",
+    "tolerance_breaches": [],
+    "ok": true,
     "note": "agreement documents reproduction of the upstream processing chain (Preprocess.m + RawToAbsolute.m port); it is not an independent absolute calibration and must not be quoted as one",
     "filter_convention": "zero-padded sliding median over the raw 1 nm grid; convention differences vs MATLAB medfilt1 would appear as stage-level diffs, which are recorded per record"
   },

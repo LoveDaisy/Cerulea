@@ -57,7 +57,16 @@ uv run python -I tools/cssp_observation_inputs.py sensitivity \
   --packet validation/data/cssp_observation_inputs
 ```
 
-Acquisition (writes only to the cache directory, never to the packet):
+`replay`/`sensitivity` are read-only acceptance by default and compare against
+the frozen tables plus an independent quantisation-derived tolerance;
+``--write`` is the explicit re-freeze entry (build only re-freezes as part of
+construction).
+
+Acquisition (writes only to the cache directory, never to the packet). The
+fetch entry covers every input build requires - official CSV, upstream MICA
+tables, the meter-'a' calibration struct, IEM/NOAA/AERONET responses for all
+session windows, and the two JPL spot checks; known-failing probes are
+recorded as evidence and build preflight rejects an incomplete cache:
 
 ```bash
 uv run python -I tools/cssp_observation_inputs.py fetch \

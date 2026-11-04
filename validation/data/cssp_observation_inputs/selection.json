@@ -1,5 +1,8 @@
 {
-  "rule": "sessions are gap-split (900 s); candidates need twilight-level signal and independently obtainable weather/moon evidence; no sky-model residual is read at any point",
+  "rule": "sessions are gap-split (900 s); twilight-level candidates are all independently screened (moon geometry + archived neighbour weather); raw sampling is bounded to the two best-supported nights and the decision reasons quote the conditions verdicts; no sky-model residual is read at any point",
+  "cleanest_screened_windows": [
+    "s11/dusk"
+  ],
   "sessions": [
     {
       "session_id": "s00",
@@ -320,70 +323,70 @@
   "decisions": [
     {
       "session_id": "s00",
-      "decision": "rejected",
-      "reason": "twilight-level session kept out of the packet to bound cost; inventory retained for audit"
+      "decision": "not-selected",
+      "reason": "conditions verdict: dusk [moonlit; KN38: partial/high-cloud, KBFD: partial/high-cloud]; dawn [moon-free; KN38: partial/high-cloud, KBFD: partial/high-cloud]; raw sampling bounded to the two best-supported nights (s04, s11); inventory retained for audit"
     },
     {
       "session_id": "s01",
       "decision": "rejected",
-      "reason": "daytime-level signal; not a twilight comparison candidate"
+      "reason": "daytime-level signal under the frozen screening rule (median positive level >= 1e-5 W m-2 nm-1); not a twilight comparison candidate"
     },
     {
       "session_id": "s02",
-      "decision": "rejected",
-      "reason": "twilight-level session kept out of the packet to bound cost; inventory retained for audit"
+      "decision": "not-selected",
+      "reason": "conditions verdict: dusk [moonlit; KN38: CLR, KBFD: CLR]; raw sampling bounded to the two best-supported nights (s04, s11); inventory retained for audit"
     },
     {
       "session_id": "s03",
-      "decision": "rejected",
-      "reason": "twilight-level session kept out of the packet to bound cost; inventory retained for audit"
+      "decision": "not-selected",
+      "reason": "conditions verdict: dusk [moon-free; KN38: CLR (context rows), KBFD: partial/high-cloud]; dawn [moon-free; KN38: partial/high-cloud, KBFD: partial/high-cloud]; raw sampling bounded to the two best-supported nights (s04, s11); inventory retained for audit"
     },
     {
       "session_id": "s04",
       "decision": "selected",
       "role": "primary",
-      "reason": "complete dusk-to-dawn sampling and the only night with all three target twilight depths (-6/-9/-12 deg); moon below horizon at the dawn targets, while the dawn window shows valley fog at KN38 and BR/BKN at KBFD (blocked for absolute use, kept for spectral/relative use)"
+      "reason": "selected for raw sampling (primary); conditions verdict: dusk [moonlit; KN38: CLR, KBFD: no observation archived in window]; dawn [moon-free; KN38: fog/low-cloud, KBFD: partial/high-cloud]; the only night with all three target twilight depths (-6/-9/-12 deg)"
     },
     {
       "session_id": "s05",
-      "decision": "rejected",
-      "reason": "twilight-level session kept out of the packet to bound cost; inventory retained for audit"
+      "decision": "not-selected",
+      "reason": "conditions verdict: dusk [moonlit; KN38: CLR, KBFD: CLR]; raw sampling bounded to the two best-supported nights (s04, s11); inventory retained for audit"
     },
     {
       "session_id": "s06",
       "decision": "rejected",
-      "reason": "daytime-level signal; not a twilight comparison candidate"
+      "reason": "daytime-level signal under the frozen screening rule (median positive level >= 1e-5 W m-2 nm-1); not a twilight comparison candidate"
     },
     {
       "session_id": "s07",
       "decision": "rejected",
-      "reason": "daytime-level signal; not a twilight comparison candidate"
+      "reason": "daytime-level signal under the frozen screening rule (median positive level >= 1e-5 W m-2 nm-1); not a twilight comparison candidate"
     },
     {
       "session_id": "s08",
       "decision": "rejected",
-      "reason": "daytime-level signal; not a twilight comparison candidate"
+      "reason": "daytime-level signal under the frozen screening rule (median positive level >= 1e-5 W m-2 nm-1); not a twilight comparison candidate"
     },
     {
       "session_id": "s09",
       "decision": "rejected",
-      "reason": "daytime-level signal; not a twilight comparison candidate"
+      "reason": "daytime-level signal under the frozen screening rule (median positive level >= 1e-5 W m-2 nm-1); not a twilight comparison candidate"
     },
     {
       "session_id": "s10",
       "decision": "rejected",
-      "reason": "daytime-level signal; not a twilight comparison candidate"
+      "reason": "daytime-level signal under the frozen screening rule (median positive level >= 1e-5 W m-2 nm-1); not a twilight comparison candidate"
     },
     {
       "session_id": "s11",
       "decision": "selected",
       "role": "secondary",
-      "reason": "its dusk -6 deg window is the cleanest in the dataset (both neighbour stations CLR, moon below horizon); its dawn targets are moonlit (+43..+50 deg) and retained only as a documented moonlit sample"
+      "reason": "selected for raw sampling (secondary); conditions verdict: dusk [moon-free; KN38: CLR, KBFD: CLR (context rows)]; dawn [moonlit; KN38: partial/high-cloud, KBFD: partial/high-cloud]; its window is among the dataset's cleanest screened windows (s11/dusk)"
     },
     {
       "session_id": "s12",
       "decision": "rejected",
-      "reason": "daytime-level signal; not a twilight comparison candidate"
+      "reason": "daytime-level signal under the frozen screening rule (median positive level >= 1e-5 W m-2 nm-1); not a twilight comparison candidate"
     }
   ]
 }

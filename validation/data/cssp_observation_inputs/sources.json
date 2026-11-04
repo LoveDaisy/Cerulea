@@ -289,135 +289,161 @@
       {
         "packet_path": "raw/weather/aeronet-Penn_State_Univ-20140712-14-AOD20.txt",
         "bytes": 45,
-        "sha256": "3a33c751dcdbb73ffe8d88d23bd7eea9d40dec747937d2a5bf45cdc96c2bd786"
+        "sha256": "3a33c751dcdbb73ffe8d88d23bd7eea9d40dec747937d2a5bf45cdc96c2bd786",
+        "request_url": "https://aeronet.gsfc.nasa.gov/cgi-bin/print_web_data_v3?site=Penn_State_Univ&year=2014&month=7&day=20&year2=2014&month2=7&day2=40&AOD20=1&AVG=10&if_no_html=1"
       },
       {
         "packet_path": "raw/weather/aeronet-Penn_State_Univ-20140718-19-AOD20.txt",
         "bytes": 45,
-        "sha256": "3a33c751dcdbb73ffe8d88d23bd7eea9d40dec747937d2a5bf45cdc96c2bd786"
+        "sha256": "3a33c751dcdbb73ffe8d88d23bd7eea9d40dec747937d2a5bf45cdc96c2bd786",
+        "request_url": "https://aeronet.gsfc.nasa.gov/cgi-bin/print_web_data_v3?site=Penn_State_Univ&year=2014&month=7&day=20&year2=2014&month2=7&day2=40&AOD20=1&AVG=10&if_no_html=1"
       },
       {
         "packet_path": "raw/weather/aeronet-Toronto-20140712-14-AOD20.txt",
         "bytes": 200992,
-        "sha256": "bc40cbf00b7307039887590c29ab70bdc7d2f6b304e9725c6bd54dfb09c4fe53"
+        "sha256": "bc40cbf00b7307039887590c29ab70bdc7d2f6b304e9725c6bd54dfb09c4fe53",
+        "request_url": "https://aeronet.gsfc.nasa.gov/cgi-bin/print_web_data_v3?site=Toronto&year=2014&month=7&day=20&year2=2014&month2=7&day2=40&AOD20=1&AVG=10&if_no_html=1"
       },
       {
         "packet_path": "raw/weather/aeronet-Toronto-20140718-19-AOD20.txt",
         "bytes": 237984,
-        "sha256": "a0b9d7d942ff41cc937e254e09173dc0c10beb4fe8954ea68c182a05acdd224f"
+        "sha256": "a0b9d7d942ff41cc937e254e09173dc0c10beb4fe8954ea68c182a05acdd224f",
+        "request_url": "https://aeronet.gsfc.nasa.gov/cgi-bin/print_web_data_v3?site=Toronto&year=2014&month=7&day=20&year2=2014&month2=7&day2=40&AOD20=1&AVG=10&if_no_html=1"
       },
       {
         "packet_path": "raw/weather/frozen-iem-N38-window.json",
         "bytes": 3244,
-        "sha256": "bde40a98bd3c6ed9bdb06c430a8df132fa8ee041eb8fb57bcc587f22933adf4f"
+        "sha256": "bde40a98bd3c6ed9bdb06c430a8df132fa8ee041eb8fb57bcc587f22933adf4f",
+        "request_url": null
       },
       {
         "packet_path": "raw/weather/frozen-noaa-BFD-window.json",
         "bytes": 940,
-        "sha256": "152cdb7bd46242714395906b5845da41570e54433879ffb838b4a2ee01b53808"
+        "sha256": "152cdb7bd46242714395906b5845da41570e54433879ffb838b4a2ee01b53808",
+        "request_url": null
       },
       {
         "packet_path": "raw/weather/iem-N38-daily-20140712-month.json",
         "bytes": 22,
-        "sha256": "37ec4665a8102d115ffd1ac20dae94c98b4dac64b0c1a68228aa2a531caeb35d"
+        "sha256": "37ec4665a8102d115ffd1ac20dae94c98b4dac64b0c1a68228aa2a531caeb35d",
+        "request_url": null
       },
       {
         "packet_path": "raw/weather/iem-N38-daily-20140714-month.json",
         "bytes": 22,
-        "sha256": "37ec4665a8102d115ffd1ac20dae94c98b4dac64b0c1a68228aa2a531caeb35d"
+        "sha256": "37ec4665a8102d115ffd1ac20dae94c98b4dac64b0c1a68228aa2a531caeb35d",
+        "request_url": null
       },
       {
         "packet_path": "raw/weather/iem-N38-daily-20140718-month.json",
         "bytes": 22,
-        "sha256": "37ec4665a8102d115ffd1ac20dae94c98b4dac64b0c1a68228aa2a531caeb35d"
+        "sha256": "37ec4665a8102d115ffd1ac20dae94c98b4dac64b0c1a68228aa2a531caeb35d",
+        "request_url": null
       },
       {
         "packet_path": "raw/weather/iem-N38-obhistory-20140630.json",
         "bytes": 44840,
-        "sha256": "cb75fa924f82420965ae198d452d5ae7c8a73d396a00d7e9a1e1d38a50365500"
+        "sha256": "cb75fa924f82420965ae198d452d5ae7c8a73d396a00d7e9a1e1d38a50365500",
+        "request_url": "https://mesonet.agron.iastate.edu/api/1/obhistory.json?station=N38&network=PA_ASOS&date=2014-06-30"
       },
       {
         "packet_path": "raw/weather/iem-N38-obhistory-20140701.json",
         "bytes": 44855,
-        "sha256": "b81ec82a8fe563cf3cae99deccd0937d5ec881bf6ecda5975bd4ab409af175d3"
+        "sha256": "b81ec82a8fe563cf3cae99deccd0937d5ec881bf6ecda5975bd4ab409af175d3",
+        "request_url": "https://mesonet.agron.iastate.edu/api/1/obhistory.json?station=N38&network=PA_ASOS&date=2014-07-01"
       },
       {
         "packet_path": "raw/weather/iem-N38-obhistory-20140702.json",
         "bytes": 44696,
-        "sha256": "e6466972728855fceb1f85446eb4d875a0fcd14f62e4a28f61be18f5b2630c30"
+        "sha256": "e6466972728855fceb1f85446eb4d875a0fcd14f62e4a28f61be18f5b2630c30",
+        "request_url": "https://mesonet.agron.iastate.edu/api/1/obhistory.json?station=N38&network=PA_ASOS&date=2014-07-02"
       },
       {
         "packet_path": "raw/weather/iem-N38-obhistory-20140703.json",
         "bytes": 44958,
-        "sha256": "cddda0ee6af4613dd0905e31b701f781155d8245749cc1b724f461bcc4bf7c2a"
+        "sha256": "cddda0ee6af4613dd0905e31b701f781155d8245749cc1b724f461bcc4bf7c2a",
+        "request_url": "https://mesonet.agron.iastate.edu/api/1/obhistory.json?station=N38&network=PA_ASOS&date=2014-07-03"
       },
       {
         "packet_path": "raw/weather/iem-N38-obhistory-20140712.json",
         "bytes": 20859,
-        "sha256": "a47a73704732d8178997bd50c50e0913cbe160da0926eacce046960ac46a2f5a"
+        "sha256": "a47a73704732d8178997bd50c50e0913cbe160da0926eacce046960ac46a2f5a",
+        "request_url": "https://mesonet.agron.iastate.edu/api/1/obhistory.json?station=N38&network=PA_ASOS&date=2014-07-12"
       },
       {
         "packet_path": "raw/weather/iem-N38-obhistory-20140713.json",
         "bytes": 42638,
-        "sha256": "1fdb7e10558c294e215e6aca0282ac94f823b06ee5674ebe394f5d850c34f382"
+        "sha256": "1fdb7e10558c294e215e6aca0282ac94f823b06ee5674ebe394f5d850c34f382",
+        "request_url": "https://mesonet.agron.iastate.edu/api/1/obhistory.json?station=N38&network=PA_ASOS&date=2014-07-13"
       },
       {
         "packet_path": "raw/weather/iem-N38-obhistory-20140714.json",
         "bytes": 44131,
-        "sha256": "72eabe2028a933fdc1d2d1210d0704704905fa8d22a31b75cdfced90d39bab22"
+        "sha256": "72eabe2028a933fdc1d2d1210d0704704905fa8d22a31b75cdfced90d39bab22",
+        "request_url": "https://mesonet.agron.iastate.edu/api/1/obhistory.json?station=N38&network=PA_ASOS&date=2014-07-14"
       },
       {
         "packet_path": "raw/weather/iem-N38-obhistory-20140718.json",
         "bytes": 44148,
-        "sha256": "5909507721f47c5fc6147af8dabd65a06ea1cb52c19863e1f3fbd18599e83977"
+        "sha256": "5909507721f47c5fc6147af8dabd65a06ea1cb52c19863e1f3fbd18599e83977",
+        "request_url": "https://mesonet.agron.iastate.edu/api/1/obhistory.json?station=N38&network=PA_ASOS&date=2014-07-18"
       },
       {
         "packet_path": "raw/weather/iem-N38-obhistory-20140719.json",
         "bytes": 44718,
-        "sha256": "bf1b882722dde5226d32fd26df58c3b7e1d550c875b2bcf7525a97483c2a6ddf"
+        "sha256": "bf1b882722dde5226d32fd26df58c3b7e1d550c875b2bcf7525a97483c2a6ddf",
+        "request_url": "https://mesonet.agron.iastate.edu/api/1/obhistory.json?station=N38&network=PA_ASOS&date=2014-07-19"
       },
       {
         "packet_path": "raw/weather/noaa-BFD-20140630.json",
         "bytes": 40066,
-        "sha256": "e27f314d426961a75f8d97a3f608f8cf3b4b9849af4038277a8917cbcb526dc1"
+        "sha256": "e27f314d426961a75f8d97a3f608f8cf3b4b9849af4038277a8917cbcb526dc1",
+        "request_url": "https://www.ncei.noaa.gov/access/services/data/v1?dataset=global-hourly&stations=72526604751&startDate=2014-06-30&endDate=2014-06-30&format=json&includeAttributes=true"
       },
       {
         "packet_path": "raw/weather/noaa-BFD-20140701.json",
         "bytes": 33321,
-        "sha256": "7f406c471f727d6c7be99fdc3a8c07b1154ecca546b8877d3ed37671803a9503"
+        "sha256": "7f406c471f727d6c7be99fdc3a8c07b1154ecca546b8877d3ed37671803a9503",
+        "request_url": "https://www.ncei.noaa.gov/access/services/data/v1?dataset=global-hourly&stations=72526604751&startDate=2014-07-01&endDate=2014-07-01&format=json&includeAttributes=true"
       },
       {
         "packet_path": "raw/weather/noaa-BFD-20140702.json",
         "bytes": 35877,
-        "sha256": "f6e5d9eb7dd93472f4529b7ad567a90cafa8abce82545b5bec1170b74cf3cd77"
+        "sha256": "f6e5d9eb7dd93472f4529b7ad567a90cafa8abce82545b5bec1170b74cf3cd77",
+        "request_url": "https://www.ncei.noaa.gov/access/services/data/v1?dataset=global-hourly&stations=72526604751&startDate=2014-07-02&endDate=2014-07-02&format=json&includeAttributes=true"
       },
       {
         "packet_path": "raw/weather/noaa-BFD-20140712.json",
         "bytes": 16322,
-        "sha256": "35490852be1278a90425c76c35520d6e75e8b86a4867f34c1819380f4cad2828"
+        "sha256": "35490852be1278a90425c76c35520d6e75e8b86a4867f34c1819380f4cad2828",
+        "request_url": "https://www.ncei.noaa.gov/access/services/data/v1?dataset=global-hourly&stations=72526604751&startDate=2014-07-12&endDate=2014-07-12&format=json&includeAttributes=true"
       },
       {
         "packet_path": "raw/weather/noaa-BFD-20140713.json",
         "bytes": 35769,
-        "sha256": "9e604efc462587400693e25aa7c6772d4a3c1dfebfc060e884bd80d14c116464"
+        "sha256": "9e604efc462587400693e25aa7c6772d4a3c1dfebfc060e884bd80d14c116464",
+        "request_url": "https://www.ncei.noaa.gov/access/services/data/v1?dataset=global-hourly&stations=72526604751&startDate=2014-07-13&endDate=2014-07-13&format=json&includeAttributes=true"
       },
       {
         "packet_path": "raw/weather/noaa-BFD-20140714.json",
         "bytes": 36598,
-        "sha256": "84789f9ae66701e684bc41335aab7b1d6ce79127b87079cb135089000e2b1ec6"
+        "sha256": "84789f9ae66701e684bc41335aab7b1d6ce79127b87079cb135089000e2b1ec6",
+        "request_url": "https://www.ncei.noaa.gov/access/services/data/v1?dataset=global-hourly&stations=72526604751&startDate=2014-07-14&endDate=2014-07-14&format=json&includeAttributes=true"
       },
       {
         "packet_path": "raw/weather/noaa-BFD-20140718.json",
         "bytes": 17654,
-        "sha256": "16871a6fd55886c0d7651a0af898d776fcc0d77367b377f2ce0b7c624d1a272c"
+        "sha256": "16871a6fd55886c0d7651a0af898d776fcc0d77367b377f2ce0b7c624d1a272c",
+        "request_url": "https://www.ncei.noaa.gov/access/services/data/v1?dataset=global-hourly&stations=72526604751&startDate=2014-07-18&endDate=2014-07-18&format=json&includeAttributes=true"
       },
       {
         "packet_path": "raw/weather/noaa-BFD-20140719.json",
         "bytes": 30915,
-        "sha256": "51708a667b35b3eee502b9aceeb26bab0a5d9c93e979b629850070aa26e57866"
+        "sha256": "51708a667b35b3eee502b9aceeb26bab0a5d9c93e979b629850070aa26e57866",
+        "request_url": "https://www.ncei.noaa.gov/access/services/data/v1?dataset=global-hourly&stations=72526604751&startDate=2014-07-19&endDate=2014-07-19&format=json&includeAttributes=true"
       }
     ],
-    "note": "verbatim public responses (IEM representation of GHCNh, NOAA Global Hourly, AERONET); failed probes kept as evidence"
+    "note": "verbatim public responses (IEM representation of GHCNh, NOAA Global Hourly, AERONET, JPL Horizons spot checks); request_url is the exact acquisition request; failed probes kept as evidence"
   },
   "external_refs": [
     {

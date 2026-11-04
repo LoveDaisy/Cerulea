@@ -108,6 +108,12 @@ CAL_STRUCT_SHA256 = (
 CAL_STRUCT_BYTES = 21804126
 REPLAY_FILTER_SPAN = 8          # Preprocess.m medianFilterSpan
 REPLAY_CROP_NM = (280.0, 840.0)  # Preprocess.m wlRange
+# Independent replay acceptance bound. The published CSV carries ~10
+# significant digits, so faithful reproduction is quantisation-limited at
+# ~1e-10 relative; the port performs the same arithmetic on the same bytes,
+# and 1e-6 leaves four orders of magnitude of margin. This bound is derived
+# from the publication precision, never fitted to observed replay output.
+REPLAY_MEDIAN_REL_TOLERANCE = 1e-6
 
 # Full-CSV layout: 5 metadata rows then 561 spectrum rows, all x 3192 columns.
 # Row 0 is the authors' sequence (acquisition-run) index; rows 1/2 are the
@@ -129,6 +135,69 @@ EVIDENCE_UNKNOWN = "unknown"
 
 IEM_STATION = {"station": "N38", "network": "PA_ASOS"}
 NOAA_STATION = "72526604751"
+# UTC dates whose archived responses cover every twilight-level session's
+# windows (IEM days are not UTC-midnight aligned, so both boundary dates of
+# each night are included).
+WEATHER_DATES = ["2014-06-30", "2014-07-01", "2014-07-02", "2014-07-03",
+                 "2014-07-12", "2014-07-13", "2014-07-14", "2014-07-18",
+                 "2014-07-19"]
+AERONET_RANGES = [("2014-07-12", "2014-07-14"), ("2014-07-18", "2014-07-19")]
+AERONET_SITES = ["Penn_State_Univ", "Toronto"]
+JPL_SPOT_CHECKS = [
+    {"name": "horizons-cssp-0703.json", "record_id": "c1743",
+     "start": "2014-07-03 08:24:49", "stop": "2014-07-03 08:25:49"},
+    {"name": "horizons-cssp-0719.json", "record_id": "c3074",
+     "start": "2014-07-19 08:39:17", "stop": "2014-07-19 08:40:17"},
+]
+
+
+def iem_obhistory_url(date: str) -> str:
+    return (f"https://mesonet.agron.iastate.edu/api/1/obhistory.json"
+            f"?station={IEM_STATION['station']}&network={IEM_STATION['network']}"
+            f"&date={date}")
+
+
+def noaa_global_hourly_url(date: str) -> str:
+    return ("https://www.ncei.noaa.gov/access/services/data/v1"
+            f"?dataset=global-hourly&stations={NOAA_STATION}"
+            f"&startDate={date}&endDate={date}&format=json&includeAttributes=true")
+
+
+def aeronet_url(site: str, start: str, end: str) -> str:
+    return ("https://aeronet.gsfc.nasa.gov/cgi-bin/print_web_data_v3"
+            f"?site={site}&year={start[:4]}&month={int(start[5:7])}"
+            f"&day={int(start[8:10])}&year2={end[:4]}&month2={int(end[5:7])}"
+            f"&day2={int(end[8:10])}&AOD20=1&AVG=10&if_no_html=1")
+
+
+def jpl_horizons_url(start: str, stop: str) -> str:
+    quote = lambda s: s.replace(" ", "+").replace(":", "%3A")
+    return ("https://ssd.jpl.nasa.gov/api/horizons.api?format=json&COMMAND=%2710%27"
+            "&OBJ_DATA=%27NO%27&MAKE_EPHEM=%27YES%27&EPHEM_TYPE=%27OBSERVER%27"
+            "&CENTER=%27coord%40399%27&COORD_TYPE=%27GEODETIC%27"
+            "&SITE_COORD=%27-77.8125%2C41.6646%2C0.710%27"
+            f"&START_TIME=%27{quote(start)}%27&STOP_TIME=%27{quote(stop)}%27"
+            "&STEP_SIZE=%271+m%27&QUANTITIES=%274%27&TIME_DIGITS=%27SECONDS%27"
+            "&APPARENT=%27AIRLESS%27&CSV_FORMAT=%27YES%27")
+
+
+def weather_source_url(filename: str) -> str | None:
+    """Canonical request URL for an archived weather/JPL response file name,
+    so sources.json records the exact request even without fetch provenance."""
+    if filename.startswith("iem-N38-obhistory-"):
+        return iem_obhistory_url(f"{filename[18:22]}-{filename[22:24]}-{filename[24:26]}")
+    if filename.startswith("noaa-BFD-") and filename.endswith(".json"):
+        d = filename[9:17]
+        return noaa_global_hourly_url(f"{d[:4]}-{d[4:6]}-{d[6:]}")
+    if filename.startswith("aeronet-"):
+        stem = filename[len("aeronet-"):-len("-AOD20.txt")]
+        for site in AERONET_SITES:
+            if stem.startswith(site + "-"):
+                span = stem[len(site) + 1:]
+                return aeronet_url(site, f"2014-07-{span[:2]}", f"2014-07-{span[3:]}")
+    if filename.startswith("frozen-"):
+        return None  # feasibility-packet subsets; see frozen_feasibility_refs
+    return None
 
 
 def sha256_file(path: Path) -> str:
@@ -717,36 +786,16 @@ def verify_packet(packet: Path, source_dir: Path | None = None) -> dict:
         else:
             problems.append(f"{record_id}: no raw member bound (AC1 requires one)")
 
-    # Calibration extract and replay coherence (M3). The extract must cover
-    # every record's integration-time node and temperature; the replay table
-    # must cover every record and one pinned record is re-computed here as
-    # tamper detection.
-    extract = load_calibration_extract(packet)
-    for record in records["records"]:
-        t_us = record["instrument"]["integration_time_us"]["value"]
-        node_us = min(extract["dark_nodes"], key=lambda u: abs(u - t_us))
-        temps, _ = extract["dark_nodes"][node_us]
-        temp = float(np.mean(record["instrument"]["board_temp_c"]["value"]))
-        if not temps.min() <= temp <= temps.max():
-            problems.append(f"{record['record_id']}: calibration extract lacks "
-                            f"temperature coverage ({temp} C)")
-    replay = read_json(packet / "replay.json")
-    replay_ids = set(replay["records"])
-    expected_ids = {r["record_id"] for r in records["records"]}
-    if replay_ids != expected_ids:
-        problems.append("replay.json does not cover exactly the packet records")
-    pinned = "c1743"
-    if pinned in replay_ids:
-        member = next(r for r in records["records"] if r["record_id"] == pinned)
-        published_col = spectra["data"][:, spectra["columns"].index(
-            member["source_column_zero_based"])]
-        fresh = replay_record(extract, packet / member["raw"]["packet_path"],
-                              published_col)
-        stored = replay["records"][pinned]["published_vs_replay"]
-        if fresh["published_vs_replay"]["median_abs_relative_diff"] != \
-                stored["median_abs_relative_diff"]:
-            problems.append(f"replay recomputation for {pinned} differs from "
-                            "the frozen table")
+    # Replay acceptance is read-only and independent (M3/M4 revision): every
+    # record is recomputed from the vendored extract + MAT + published excerpt
+    # and judged against the quantisation-derived tolerance plus zero-cell and
+    # NaN-mask correspondence - never against the generator's own stored copy.
+    replay_eval = evaluate_replay(packet)
+    report["replay_acceptance"] = {k: v for k, v in replay_eval.items()
+                                   if k != "detail"}
+    problems += replay_eval["problems"]
+    if not (packet / "replay.json").is_file():
+        problems.append("packet has no frozen replay.json")
 
     # Independent axis checks must recompute from the vendored JPL responses.
     for check in conditions_doc.get("independent_axis_checks", []):
@@ -763,8 +812,16 @@ def verify_packet(packet: Path, source_dir: Path | None = None) -> dict:
         if abs(jpl - mica) >= check["agreement_bound_deg"]:
             problems.append(f"jpl check {check['record_id']}: agreement bound exceeded")
 
-    # Selection and conditions coherence.
+    # Selection and conditions coherence, including the single authority for
+    # 'cleanest' claims and full twilight-session coverage.
     inventory_ids = {s["session_id"] for s in selection["sessions"]}
+    if selection.get("cleanest_screened_windows") != cleanest_windows(conditions):
+        problems.append("selection cleanest-screened-window list disagrees with "
+                        "the conditions verdicts")
+    for sess in selection["sessions"]:
+        sid = sess["session_id"]
+        if sess.get("signal_kind") == "twilight-or-night" and sid not in conditions:
+            problems.append(f"{sid}: twilight-level session lacks a conditions entry")
     for decision in selection["decisions"]:
         if decision["session_id"] not in inventory_ids:
             problems.append(f"selection references unknown {decision['session_id']}")
@@ -788,10 +845,16 @@ def verify_packet(packet: Path, source_dir: Path | None = None) -> dict:
     if source_dir is not None:
         csv_path = source_dir / "CSSP_spectra.csv"
         digest = sha256_file(csv_path)
-        report["full_csv"] = {"sha256": digest, "bytes": csv_path.stat().st_size,
-                              "match": digest == FULL_CSV_SHA256
-                              and csv_path.stat().st_size == FULL_CSV_BYTES}
-        if report["full_csv"]["match"]:
+        size = csv_path.stat().st_size
+        matched = digest == FULL_CSV_SHA256 and size == FULL_CSV_BYTES
+        report["full_csv"] = {"sha256": digest, "bytes": size, "match": matched}
+        if not matched:
+            # A full-source check with the wrong source must fail loudly, not
+            # silently skip the stronger comparison.
+            problems.append(f"full-source CSV identity mismatch (sha {digest[:12]}…, "
+                            f"{size} bytes; expected {FULL_CSV_SHA256[:12]}…, "
+                            f"{FULL_CSV_BYTES} bytes)")
+        else:
             with csv_path.open(newline="") as stream:
                 rows = list(csv.reader(stream))
             _, _, raw_cols = parse_full_csv_rows(rows)
@@ -813,16 +876,13 @@ def verify_packet(packet: Path, source_dir: Path | None = None) -> dict:
 # fetch (online; explicit subcommand, cache outside Git)
 # ---------------------------------------------------------------------------
 
-def fetch_sources(cache_dir: Path, with_raw_archive: bool) -> dict:
-    """Download public sources into ``cache_dir``; skip items already cached.
+def acquisition_items(with_raw_archive: bool) -> list[dict]:
+    """The full acquisition contract: every item build's preflight requires.
 
-    Every item records URL, bytes and sha256 in ``fetch-provenance.json``.
-    Identity is checked after download; a wrong identity leaves the failure
-    in the provenance and raises. Failed probes (e.g. an endpoint returning
-    an error page) are kept as evidence, never turned into empty success.
+    Weather/JPL responses and the calibration struct are required inputs, so
+    the explicit fetch entry covers them; known-failing probes stay in the
+    contract as recorded evidence (optional items never fail the fetch).
     """
-    import urllib.request
-    cache_dir.mkdir(parents=True, exist_ok=True)
     items: list[dict] = [
         {"id": "full-csv", "url": FULL_CSV_URL, "path": "CSSP_spectra.csv",
          "sha256": FULL_CSV_SHA256, "bytes": FULL_CSV_BYTES},
@@ -833,15 +893,15 @@ def fetch_sources(cache_dir: Path, with_raw_archive: bool) -> dict:
          "path": "CSSP_SunLocalZenith.txt"},
         {"id": "mica-cssp-moon", "url": EPHEMERIS_URL.format("CSSP_MoonLocalZenith"),
          "path": "CSSP_MoonLocalZenith.txt"},
+        {"id": "cal-struct-a", "url": CAL_STRUCT_URL,
+         "path": "calibration/OO_USB2000+a.mat",
+         "bytes": CAL_STRUCT_BYTES, "sha256": CAL_STRUCT_SHA256},
     ]
     if with_raw_archive:
         items.append({"id": "raw-archive", "url": RAW_ARCHIVE_URL,
                       "final_url": RAW_ARCHIVE_FINAL_URL, "path": "dataraw.tar.gz",
                       "bytes": RAW_ARCHIVE_TOTAL_BYTES,
                       "sha256": RAW_ARCHIVE_FULL_SHA256})
-    items.append({"id": "cal-struct-a", "url": CAL_STRUCT_URL,
-                  "path": "calibration/OO_USB2000+a.mat",
-                  "bytes": CAL_STRUCT_BYTES, "sha256": CAL_STRUCT_SHA256})
     for source_name in ("IlluminationSpectraDataset_SpecCal_GetDarkSpectrum.m",
                         "IlluminationSpectraDataset_SpecCal_DarkCalibration.m",
                         "IlluminationSpectraDataset_SpecCal_WavelengthCalibration.m",
@@ -851,23 +911,85 @@ def fetch_sources(cache_dir: Path, with_raw_archive: bool) -> dict:
                               "IlluminationSpectraDataset/" + AUTHOR_REPO_COMMIT +
                               "/calibration/" + source_name),
                       "path": f"calibration/{source_name}"})
+    for date in WEATHER_DATES:
+        compact = date.replace("-", "")
+        items.append({"id": f"iem-{compact}",
+                      "url": iem_obhistory_url(date),
+                      "path": f"weather/iem-N38-obhistory-{compact}.json"})
+        items.append({"id": f"noaa-{compact}",
+                      "url": noaa_global_hourly_url(date),
+                      "path": f"weather/noaa-BFD-{compact}.json"})
+    for start, end in AERONET_RANGES:
+        for site in AERONET_SITES:
+            compact = f"{start[8:]}-{end[8:]}"
+            items.append({"id": f"aeronet-{site}-{compact}",
+                          "url": aeronet_url(site, start, end),
+                          "path": f"weather/aeronet-{site}-{compact}-AOD20.txt"})
+    for check in JPL_SPOT_CHECKS:
+        items.append({"id": f"jpl-{check['name']}",
+                      "url": jpl_horizons_url(check["start"], check["stop"]),
+                      "path": f"jpl/{check['name']}"})
+    for date in ("2014-07-12", "2014-07-14", "2014-07-18"):
+        compact = date.replace("-", "")
+        items.append({"id": f"iem-daily-{compact}",
+                      "url": ("https://mesonet.agron.iastate.edu/api/1/"
+                              "daily_history.json?station=N38&network=PA_ASOS"
+                              f"&year={date[:4]}&month={date[5:7]}"),
+                      "path": f"weather/iem-N38-daily-{compact}-month.json",
+                      "optional": True,
+                      "note": "endpoint returned 404 at acquisition time; kept as "
+                              "a recorded failed probe"})
+    return items
+
+
+def fetch_sources(cache_dir: Path, with_raw_archive: bool,
+                  items: list[dict] | None = None) -> dict:
+    """Download the acquisition contract into ``cache_dir``; skip cached hits.
+
+    Every item records URL, bytes and sha256 in ``fetch-provenance.json``.
+    Identity is checked after download; a wrong identity leaves the failure
+    in the provenance and raises. Failed optional probes are kept as
+    evidence, never turned into empty success. Download targets create their
+    parent directories (calibration/, weather/, jpl/ are part of the
+    contract).
+    """
+    import urllib.request
+    cache_dir.mkdir(parents=True, exist_ok=True)
     provenance = []
-    for item in items:
+    for item in (items if items is not None
+                 else acquisition_items(with_raw_archive)):
         target = cache_dir / item["path"]
+        target.parent.mkdir(parents=True, exist_ok=True)
         entry = dict(item)
         entry.pop("final_url", None)
         entry["cached"] = target.is_file()
         if not target.is_file():
             request = urllib.request.Request(item["url"],
                                              headers={"User-Agent": "sky-color-sim/1.0"})
-            with urllib.request.urlopen(request, timeout=600) as resp, \
-                    target.open("wb") as out:
-                while True:
-                    chunk = resp.read(1 << 20)
-                    if not chunk:
-                        break
-                    out.write(chunk)
+            try:
+                with urllib.request.urlopen(request, timeout=600) as resp, \
+                        target.open("wb") as out:
+                    while True:
+                        chunk = resp.read(1 << 20)
+                        if not chunk:
+                            break
+                        out.write(chunk)
+            except Exception as exc:   # failed probes are evidence, not errors
+                target.unlink(missing_ok=True)
+                if item.get("optional"):
+                    entry["cached"] = False
+                    entry["identity"] = "failed-probe"
+                    entry["error"] = f"{type(exc).__name__}: {exc}"
+                    provenance.append(entry)
+                    continue
+                provenance.append(entry)
+                write_json(cache_dir / "fetch-provenance.json", provenance)
+                raise
             entry["cached"] = True
+        elif item.get("optional"):
+            entry["identity"] = "kept-probe"
+            provenance.append(entry)
+            continue
         entry["bytes"] = target.stat().st_size
         entry["sha256"] = sha256_file(target)
         if "sha256" in item and entry["sha256"] != item["sha256"]:
@@ -885,6 +1007,31 @@ def fetch_sources(cache_dir: Path, with_raw_archive: bool) -> dict:
     write_json(cache_dir / "fetch-provenance.json", provenance)
     return {"items": [{k: v for k, v in e.items() if k != "members"}
                       for e in provenance]}
+
+
+def check_cache_inputs(cache_dir: Path) -> None:
+    """Preflight: build refuses to start without every required input.
+
+    Missing weather responses or JPL spot checks are acceptance inputs, not
+    optional extras, so they fail the build loudly instead of degrading the
+    packet silently.
+    """
+    required_files = [
+        cache_dir / "CSSP_spectra.csv",
+        cache_dir / "published-wavelengths.csv",
+        cache_dir / "CSSP_SunLocalZenith.txt",
+        cache_dir / "CSSP_MoonLocalZenith.txt",
+        cache_dir / "calibration/OO_USB2000+a.mat",
+        cache_dir / "dataraw.tar.gz",
+    ] + [cache_dir / "jpl" / c["name"] for c in JPL_SPOT_CHECKS]
+    weather_dir = cache_dir / "weather"
+    if not weather_dir.is_dir() or not any(weather_dir.iterdir()):
+        required_files.append(weather_dir)
+    missing = [str(p.relative_to(cache_dir)) if cache_dir in p.parents
+               else str(p) for p in required_files if not p.exists()]
+    if missing:
+        raise ValueError(f"cache is missing required inputs: {missing}; "
+                         "run fetch --raw-archive to acquire the full set")
 
 
 # ---------------------------------------------------------------------------
@@ -1017,6 +1164,7 @@ def build_packet(cache_dir: Path, out: Path, force: bool) -> dict:
     if force:
         import shutil
         shutil.rmtree(out)
+    check_cache_inputs(cache_dir)
     out.mkdir(parents=True, exist_ok=True)
 
     tar_path = cache_dir / "dataraw.tar.gz"
@@ -1184,46 +1332,24 @@ def build_packet(cache_dir: Path, out: Path, force: bool) -> dict:
             writer.writerow([wl] + [raw_cols[c][CSV_FIRST_SPECTRUM_ROW + i]
                                     for c in columns])
 
-    # Selection: full inventory + frozen decisions (verdict text lands with
-    # conditions; the decisions here reference the screening rules only).
-    decisions = []
-    for sess in inventory:
-        sid = sess["session_id"]
-        if sid == PRIMARY_SESSION:
-            decisions.append({"session_id": sid, "decision": "selected",
-                              "role": "primary",
-                              "reason": "complete dusk-to-dawn sampling and the only "
-                                        "night with all three target twilight depths "
-                                        "(-6/-9/-12 deg); moon below horizon at the dawn "
-                                        "targets, while the dawn window shows valley fog "
-                                        "at KN38 and BR/BKN at KBFD (blocked for absolute "
-                                        "use, kept for spectral/relative use)"})
-        elif sid == SECONDARY_SESSION:
-            decisions.append({"session_id": sid, "decision": "selected",
-                              "role": "secondary",
-                              "reason": "its dusk -6 deg window is the cleanest in the "
-                                        "dataset (both neighbour stations CLR, moon below "
-                                        "horizon); its dawn targets are moonlit (+43..+50 "
-                                        "deg) and retained only as a documented moonlit "
-                                        "sample"})
-        elif sess["signal_kind"] == "twilight-or-night":
-            decisions.append({"session_id": sid, "decision": "rejected",
-                              "reason": "twilight-level session kept out of the packet to "
-                                        "bound cost; inventory retained for audit"})
-        else:
-            decisions.append({"session_id": sid, "decision": "rejected",
-                              "reason": "daytime-level signal; not a twilight comparison "
-                                        "candidate"})
+    # Screening before selection: every twilight-level session gets its
+    # independent conditions verdict first; the selection reasons then quote
+    # those verdicts, so selection.json and conditions.json cannot diverge.
+    conditions_doc = build_conditions(out, labels, values, inventory, sun_tab,
+                                      moon_tab, selected_by_session=picks,
+                                      independent_axis_checks=jpl_checks)
+    decisions = derive_decisions(inventory, conditions_doc["conditions"],
+                                 conditions_doc["not_conditions_evaluated"], picks)
     write_json(out / "selection.json", {
-        "rule": "sessions are gap-split (900 s); candidates need twilight-level signal and "
-                "independently obtainable weather/moon evidence; no sky-model residual is "
-                "read at any point",
+        "rule": "sessions are gap-split (900 s); twilight-level candidates are all "
+                "independently screened (moon geometry + archived neighbour weather); "
+                "raw sampling is bounded to the two best-supported nights and the "
+                "decision reasons quote the conditions verdicts; no sky-model residual "
+                "is read at any point",
+        "cleanest_screened_windows": cleanest_windows(conditions_doc["conditions"]),
         "sessions": inventory,
         "decisions": decisions})
-    write_json(out / "conditions.json",
-               build_conditions(out, labels, values, inventory, decisions, sun_tab,
-                                moon_tab, selected_by_session=picks,
-                                independent_axis_checks=jpl_checks))
+    write_json(out / "conditions.json", conditions_doc)
 
     write_json(out / "operator.json", operator_contract())
 
@@ -1246,7 +1372,7 @@ def build_packet(cache_dir: Path, out: Path, force: bool) -> dict:
     diagnostics = compute_diagnostics(out, labels, values, raw_cols)
     write_json(out / "diagnostics.json", diagnostics)
     write_json(out / "sources.json", build_sources(out, cache_dir, columns))
-    run_replay(out)
+    run_replay(out, write=True)  # explicit re-freeze at construction time only
 
     # README and manifest last.
     write_readme(out, columns)
@@ -1298,7 +1424,10 @@ def operator_contract() -> dict:
                     "unknown": "per-exposure gaps/latencies; see records.json timing"},
             "R_p": {"text": "spectral channel kernel; published 1 nm grid suggests but "
                             "does not prove a ~1 nm triangular response; the slit function "
-                            "was not measured",
+                            "was not measured. Unit convention: kernels are normalised to "
+                            "unit transmission so band integrals keep spectral-density "
+                            "units (W m-2 nm-1); band-integral quantities use the "
+                            "trapezoidal band integral explicitly",
                     "evidence": EVIDENCE_UNKNOWN,
                     "reason": "line-spread function not published; band integrals on the "
                               "published grid assume unit-transmission channels"},
@@ -1310,16 +1439,24 @@ def operator_contract() -> dict:
             "H": {"text": "horizon visibility (terrain/obstruction mask above the board)",
                   "evidence": EVIDENCE_UNKNOWN,
                   "reason": "site horizon not characterised; H=1 is the idealisation"},
-            "P": {"text": "upstream publishing steps (dark subtraction by nearest "
-                          "integration-time node + temperature interpolation, wavelength "
-                          "shift, 1 nm resampling, median filter span 8, sensitivity "
-                          "correction factor, pi factor, negative clamp): replayed per "
-                          "record in replay.json, which reproduces the published columns "
-                          "to ~5e-11 median relative difference (CSV print precision). "
-                          "This proves reproduction of the upstream pipeline from the "
-                          "archived raw members; it does not independently certify the "
-                          "absolute radiometric scale",
-                  "evidence": EVIDENCE_DERIVED},
+            "P_publish": {"text": "publishing steps that apply to already-calibrated "
+                                  "physical spectra (W m-2 nm-1 in and out): resampling "
+                                  "onto the 1 nm published grid, median filter span 8 "
+                                  "(published smoothing), negative-value clamp to zero. "
+                                  "Implemented in publish_pipeline(); a model spectrum "
+                                  "expressed in physical units passes through these and "
+                                  "only these steps before band comparison",
+                          "evidence": EVIDENCE_DERIVED},
+            "C_capture": {"text": "the raw-count-to-physical calibration chain (dark "
+                                  "subtraction by nearest integration-time node and "
+                                  "temperature interpolation, division by integration "
+                                  "time in microseconds, sensitivity correction factor, "
+                                  "pi factor). Defined ONLY on detector counts; it is "
+                                  "replayed per record in replay.json to prove the raw/"
+                                  "published binding. Applying C_capture to a model's "
+                                  "physical irradiance would double-calibrate and must "
+                                  "never happen",
+                          "evidence": EVIDENCE_DERIVED},
             "L_bg": {"text": "astronomical + artificial night background; distinct from "
                              "instrument dark residual r_dark",
                      "evidence": EVIDENCE_DERIVED},
@@ -1335,6 +1472,10 @@ def operator_contract() -> dict:
             "band_integrals": "W m-2 (per band, trapezoidal on the published grid)",
             "radiance_terms": "W m-2 sr-1 nm-1",
             "cos_theta": "applied once, inside the hemisphere integral",
+            "operator_domain": "the formula integrates PHYSICAL radiance; only "
+                               "P_publish applies to its output. C_capture lives on the "
+                               "detector-count side of replay.json and is documentation "
+                               "of the upstream pipeline, not a model-facing step",
         },
         "reference_bands_nm": REFERENCE_BANDS_NM,
         "forbidden_comparisons": [
@@ -1342,6 +1483,9 @@ def operator_contract() -> dict:
             "published spectra vs model spectra without integrating model radiance over "
             "the hemisphere and the exposure window",
             "treating night-spectrum medians as a measured background subtraction",
+            "applying C_capture (dark counts, sensitivity correction factor, pi) to a "
+            "model's physical irradiance - that chain is defined on detector counts only "
+            "and would double-calibrate",
         ],
         "scenario_policy": "response/horizon/background scenarios demonstrate dependence; "
                            "they are not confidence intervals",
@@ -1504,65 +1648,78 @@ def session_verdict(side_windows: dict) -> str:
 
 
 def build_conditions(out: Path, labels: list[str], values: np.ndarray,
-                     inventory: list[dict], decisions: list[dict],
-                     sun_tab: dict, moon_tab: dict,
+                     inventory: list[dict], sun_tab: dict, moon_tab: dict,
                      selected_by_session: dict[str, list[int]] | None = None,
                      independent_axis_checks: list[dict] | None = None) -> dict:
-    """Independent conditions per selected session; verdicts stay explicit.
+    """Independent conditions for every twilight-level session.
 
-    Each side (dusk/dawn) of a selected night gets its own weather window,
-    moon geometry at the actual target instants and a data-referenced
-    verdict. No model quantity is read here; neighbour-station rows are kept
-    verbatim so every verdict clause traces back to an archived response.
+    The plan's screening is over all existing candidates, so this evaluates
+    moon geometry and weather windows for each twilight-or-night session,
+    selected or not (raw extraction stays bounded to the selected nights;
+    screening costs no raw downloads). Daytime-level sessions are recorded
+    as rule-screened, not conditions-evaluated. No model quantity is read
+    here; neighbour-station rows stay verbatim.
     """
     conditions: dict[str, dict] = {}
+    not_evaluated: dict[str, dict] = {}
     weather_files = sorted(p.name for p in (out / "raw/weather").iterdir())
-    for decision in decisions:
-        if decision["decision"] != "selected":
+    weather_paths_all = {
+        "KN38": [out / "raw/weather" / f for f in weather_files
+                 if f.startswith(("iem-N38-obhistory", "frozen-iem"))],
+        "KBFD": [out / "raw/weather" / f for f in weather_files
+                 if f.startswith(("noaa-BFD", "frozen-noaa"))],
+    }
+    station_meta = {
+        "KN38": {"station": KN38,
+                 "distance_km": round(haversine_km(CSSP["lat_deg"], CSSP["lon_deg"],
+                                                   KN38["lat_deg"], KN38["lon_deg"]), 2),
+                 "elevation_diff_m": round(KN38["elevation_m"] - CSSP["elevation_m"], 2)},
+        "KBFD": {"station": KBFD,
+                 "distance_km": round(haversine_km(CSSP["lat_deg"], CSSP["lon_deg"],
+                                                   KBFD["lat_deg"], KBFD["lon_deg"]), 2),
+                 "elevation_diff_m": round(KBFD["elevation_m"] - CSSP["elevation_m"], 2)},
+    }
+    for sess in inventory:
+        sid = sess["session_id"]
+        if sess["signal_kind"] != "twilight-or-night":
+            not_evaluated[sid] = {
+                "reason": "daytime-level signal under the frozen screening rule "
+                          "(median positive level >= 1e-5 W m-2 nm-1); not a twilight "
+                          "comparison candidate",
+                "signal_kind": sess["signal_kind"],
+            }
             continue
-        sess = next(s for s in inventory if s["session_id"] == decision["session_id"])
         start, end = sess["start_utc"], sess["end_utc"]
         a, b = sess["columns_zero_based"]
-        cols = list(range(a, b + 1))
-        if selected_by_session and decision["session_id"] in selected_by_session:
-            cols = sorted(selected_by_session[decision["session_id"]])
+        all_cols = list(range(a, b + 1))
+        cols = sorted(selected_by_session.get(sid, all_cols)) \
+            if selected_by_session else all_cols
+        selected_here = bool(selected_by_session and sid in selected_by_session)
         moon = [mica_elevation(moon_tab, unix_of(label_to_utc_iso(labels[c])))
                 ["elevation_deg"] for c in cols]
         fractions = values[CSV_MOONFRAC_ROW, a:b + 1]
         dates = utc_dates_between(start, end)
         date_keys = [d.replace("-", "") for d in dates]
         weather_paths = {
-            "KN38": [out / "raw/weather" / f for f in weather_files
-                     if (f.startswith("iem-N38-obhistory") or f.startswith("frozen-iem"))
-                     and (any(k in f for k in date_keys) or f.startswith("frozen"))],
-            "KBFD": [out / "raw/weather" / f for f in weather_files
-                     if (f.startswith("noaa-BFD") or f.startswith("frozen-noaa"))
-                     and (any(k in f for k in date_keys) or f.startswith("frozen"))],
+            key: [p for p in paths
+                  if p.name.startswith("frozen")
+                  or any(k in p.name for k in date_keys)]
+            for key, paths in weather_paths_all.items()
         }
-        station_meta = {
-            "KN38": {"station": KN38,
-                     "distance_km": round(haversine_km(CSSP["lat_deg"], CSSP["lon_deg"],
-                                                       KN38["lat_deg"], KN38["lon_deg"]), 2),
-                     "elevation_diff_m": round(KN38["elevation_m"] - CSSP["elevation_m"], 2)},
-            "KBFD": {"station": KBFD,
-                     "distance_km": round(haversine_km(CSSP["lat_deg"], CSSP["lon_deg"],
-                                                       KBFD["lat_deg"], KBFD["lon_deg"]), 2),
-                     "elevation_diff_m": round(KBFD["elevation_m"] - CSSP["elevation_m"], 2)},
-        }
-        # Per-side target windows: the selected records split into dusk/dawn
-        # halves; the weather window covers the twilight-depth records only
-        # (sun above -13 deg) so deep-night samples do not dilute it, and a
-        # +-60 min context window keeps hourly stations (KBFD) represented
-        # when no observation falls inside the tight window.
+        # Per-side windows; for unselected sessions the whole session is the
+        # window basis (its own twilight columns), summarised without the
+        # per-target arrays to keep the packet small.
         side_windows = {}
         for side, hour_test in (("dusk", lambda h: h >= 12), ("dawn", lambda h: h < 12)):
-            side_cols = [c for c in cols if hour_test(parse_edt_label(labels[c]).hour)]
+            side_cols = [c for c in all_cols if hour_test(parse_edt_label(labels[c]).hour)]
             if not side_cols:
                 continue
             twilight_cols = [c for c in side_cols
                              if mica_elevation(sun_tab, unix_of(label_to_utc_iso(labels[c])))
                              ["elevation_deg"] > -13.0]
             window_cols = twilight_cols or side_cols
+            if selected_here:
+                window_cols = [c for c in window_cols if c in cols] or window_cols
             times = [parse_edt_label(labels[c]) for c in window_cols]
             w_start = (min(times) - timedelta(minutes=5)).astimezone(timezone.utc)
             w_end = (max(times) + timedelta(minutes=10)).astimezone(timezone.utc)
@@ -1608,16 +1765,20 @@ def build_conditions(out: Path, labels: list[str], values: np.ndarray,
             else:
                 verdict = "mixed: neighbour reports split between clear and cloud/fog rows"
             side_windows[side] = {
-                "columns_zero_based": [min(side_cols), max(side_cols)],
+                "columns_zero_based": [min(window_cols), max(window_cols)],
                 "window_utc": [start_iso, end_iso],
-                "moon_elevation_deg_at_targets": [round(m, 3) for m in moon_at],
+                "moon_elevation_deg_at_targets": [round(m, 3) for m in moon_at]
+                if selected_here else None,
+                "moon_elevation_deg_range": [round(min(moon_at), 3),
+                                             round(max(moon_at), 3)],
                 "moon_free": moon_free,
                 "weather": summaries,
                 "verdict": verdict,
             }
-        conditions[decision["session_id"]] = {
+        conditions[sid] = {
             "utc_window": {"start": start, "end": end},
             "local_dates_utc_covered": dates,
+            "selected_for_raw_sampling": selected_here,
             "moon": {
                 "elevation_deg_min": float(np.min(moon)),
                 "elevation_deg_max": float(np.max(moon)),
@@ -1636,8 +1797,6 @@ def build_conditions(out: Path, labels: list[str], values: np.ndarray,
             "verdict_note": "derived only from these archived responses and the MICA lunar "
                             "table; no sky-model residual is read anywhere",
         }
-    # The primary night's dawn window additionally carries frozen feasibility
-    # evidence (its original bounded probes); referenced, not duplicated.
     if PRIMARY_SESSION in conditions:
         conditions[PRIMARY_SESSION]["frozen_feasibility_refs"] = [
             external_ref("validation/data/cssp_observation_feasibility/atmosphere/"
@@ -1651,23 +1810,96 @@ def build_conditions(out: Path, labels: list[str], values: np.ndarray,
         ]
     return {
         "note": "independent conditions only; geometry from vendored MICA, weather verbatim "
-                "public responses, AOD availability as returned",
+                "public responses, AOD availability as returned; every twilight-level "
+                "session is evaluated, daytime-level sessions are rule-screened",
         "independent_axis_checks": independent_axis_checks or [],
         "conditions": conditions,
+        "not_conditions_evaluated": not_evaluated,
     }
 
 
-def refresh_diagnostics(packet: Path) -> dict:
-    """Recompute diagnostics.json from the frozen packet and refresh manifest."""
+def cleanest_windows(conditions: dict) -> list[str]:
+    """The moon-free + clear side windows among the screened sessions, as
+    'session/side' keys - the single authority for 'cleanest' claims."""
+    out = []
+    for sid, entry in conditions.items():
+        for side, window in entry.get("target_windows", {}).items():
+            states = [station_state(s["summary"], s["context_summary"])
+                      for s in window["weather"].values()]
+            if window["moon_free"] and all(s.startswith("CLR") for s in states) and states:
+                out.append(f"{sid}/{side}")
+    return out
+
+
+def derive_decisions(inventory: list[dict], conditions: dict, not_evaluated: dict,
+                     selected_by_session: dict[str, list[int]]) -> list[dict]:
+    """Selection decisions derived from the evaluated conditions.
+
+    The raw-sample bound (two nights) is a plan-side cost bound; the reasons
+    quote the same conditions verdicts recorded in conditions.json so the two
+    artefacts cannot diverge. 'Cleanest' claims are restricted to the
+    screened windows via cleanest_windows().
+    """
+    cleanest = cleanest_windows(conditions)
+    decisions = []
+    for sess in inventory:
+        sid = sess["session_id"]
+        if sid in not_evaluated:
+            decisions.append({"session_id": sid, "decision": "rejected",
+                              "reason": not_evaluated[sid]["reason"]})
+            continue
+        verdict = conditions[sid]["verdict"]
+        if sid in selected_by_session:
+            role = "primary" if sid == PRIMARY_SESSION else "secondary"
+            reason = (f"selected for raw sampling ({role}); conditions verdict: "
+                      f"{verdict}")
+            if any(w.startswith(sid) for w in cleanest):
+                reason += (f"; its window is among the dataset's cleanest screened "
+                           f"windows ({', '.join(w for w in cleanest
+                                                 if w.startswith(sid))})")
+            if len(selected_by_session[sid]) and sid == PRIMARY_SESSION:
+                reason += ("; the only night with all three target twilight depths "
+                           "(-6/-9/-12 deg)")
+            decisions.append({"session_id": sid, "decision": "selected",
+                              "role": role, "reason": reason})
+        else:
+            decisions.append({"session_id": sid, "decision": "not-selected",
+                              "reason": f"conditions verdict: {verdict}; raw sampling "
+                                        f"bounded to the two best-supported nights "
+                                        f"({', '.join(sorted(selected_by_session))}); "
+                                        "inventory retained for audit"})
+    return decisions
+
+
+def refresh_diagnostics(packet: Path, write: bool = False) -> dict:
+    """Recompute the scenario diagnostics.
+
+    Default is read-only: compare the fresh computation with the frozen
+    ``diagnostics.json`` (identity of every stored value). ``write=True`` is
+    the explicit re-freeze used by build; standalone runs must not refresh
+    the acceptance baseline as a side effect.
+    """
     records = read_json(packet / "records.json")["records"]
     labels = {r["source_column_zero_based"]: r["timestamp_label_edt"]
               for r in records}
     diagnostics = compute_diagnostics(packet, labels, None, None)
-    write_json(packet / "diagnostics.json", diagnostics)
-    manifest = read_json(packet / "inputs.sha256.json")
-    manifest["diagnostics.json"] = sha256_file(packet / "diagnostics.json")
-    write_json(packet / "inputs.sha256.json", manifest)
-    return {"ok": True, "diagnostics_files": ["diagnostics.json"],
+    frozen_path = packet / "diagnostics.json"
+    problems = []
+    if write:
+        write_json(frozen_path, diagnostics)
+        manifest_path = packet / "inputs.sha256.json"
+        if manifest_path.is_file():
+            manifest = read_json(manifest_path)
+            manifest["diagnostics.json"] = sha256_file(frozen_path)
+            write_json(manifest_path, manifest)
+    elif frozen_path.is_file():
+        frozen = read_json(frozen_path)
+        if json.dumps(frozen, sort_keys=True) != json.dumps(diagnostics, sort_keys=True):
+            problems.append("recomputed diagnostics differ from the frozen table; "
+                            "use sensitivity --write only as a deliberate re-freeze")
+    else:
+        problems.append("packet has no frozen diagnostics.json; run build")
+    return {"ok": not problems, "problems": problems,
             "scenario_not_error_bar": True}
 
 
@@ -1707,7 +1939,7 @@ def compute_diagnostics(packet: Path, labels: list[str], values: np.ndarray,
     data = spectra["data"]
     col_index = {c: i for i, c in enumerate(spectra["columns"])}
 
-    timing_offsets_s = [1, 5, 10, 30, 60]
+    timing_offsets_minutes = [1, 5, 10, 30, 60]
     adjacent = {}
     for record in records:
         col = record["source_column_zero_based"]
@@ -1716,35 +1948,54 @@ def compute_diagnostics(packet: Path, labels: list[str], values: np.ndarray,
         neighbours = [c for c in (col - 1, col + 1) if c in col_index]
         if not neighbours:
             continue
+        col_band = {name: band_energy(wl, data[:, col_index[col]], tuple(band))
+                    for name, band in REFERENCE_BANDS_NM.items()}
+        col_unix = unix_of(label_to_utc_iso(labels[col]))
         rows = []
         for nb in sorted(neighbours):
-            per_band = {name: band_energy(wl, data[:, col_index[col]], tuple(band))
-                        for name, band in REFERENCE_BANDS_NM.items()}
             nb_band = {name: band_energy(wl, data[:, col_index[nb]], tuple(band))
                        for name, band in REFERENCE_BANDS_NM.items()}
-            gap_minutes = abs(unix_of(label_to_utc_iso(labels[nb]))
-                              - unix_of(label_to_utc_iso(labels[col]))) / 60.0
+            nb_unix = unix_of(label_to_utc_iso(labels[nb]))
+            gap_minutes = (nb_unix - col_unix) / 60.0   # signed: past is negative
             rows.append({
                 "neighbour_column": nb,
-                "gap_minutes": round(gap_minutes, 3),
+                "signed_gap_minutes": round(gap_minutes, 3),
                 "relative_change_per_band": {
-                    name: (nb_band[name] - per_band[name]) / per_band[name]
-                    if per_band[name] and not np.isnan(per_band[name]) else None
+                    name: (nb_band[name] - col_band[name]) / col_band[name]
+                    if col_band[name] and not np.isnan(col_band[name]) else None
                     for name in REFERENCE_BANDS_NM},
             })
         sun = mica_elevation(sun_tab, unix_of(record["invoke_time_utc"]))["elevation_deg"] \
             if record["corrected_axis_cssp"]["sun_elevation_deg"] is not None else None
+        # Signed band-rate estimate: central difference when both neighbours
+        # exist, one-sided otherwise. rate = dE/E per minute along time, so a
+        # POSITIVE offset (later instant) maps to rate * offset.
+        rate_per_band = {}
+        for name in REFERENCE_BANDS_NM:
+            t_diff = [r["signed_gap_minutes"] for r in rows
+                      if r["relative_change_per_band"][name] is not None]
+            e_diff = [r["relative_change_per_band"][name] for r in rows
+                      if r["relative_change_per_band"][name] is not None]
+            if len(t_diff) >= 2 and (t_diff[1] - t_diff[0]) != 0:
+                rate_per_band[name] = ((e_diff[1] - e_diff[0])
+                                       / (t_diff[1] - t_diff[0]))
+            elif len(t_diff) == 1 and t_diff[0] != 0:
+                rate_per_band[name] = e_diff[0] / t_diff[0]
+            else:
+                rate_per_band[name] = None
         adjacent[record["record_id"]] = {
             "corrected_sun_elevation_deg": sun,
             "nominal_total_exposure_s": record["timing"]["nominal_total_exposure_s"],
             "neighbours": rows,
+            "signed_rate_per_minute_per_band": {k: (round(v, 8) if v is not None else None)
+                                                for k, v in rate_per_band.items()},
             "timing_offset_scenario_per_band": {
-                str(offset): {
-                    name: (rows[0]["relative_change_per_band"][name]
-                           * offset / 60.0 / max(rows[0]["gap_minutes"], 1e-9))
-                    if rows[0]["relative_change_per_band"][name] is not None else None
+                f"{'+' if offset > 0 else ''}{offset}": {
+                    name: (rate_per_band[name] * offset)
+                    if rate_per_band[name] is not None else None
                     for name in REFERENCE_BANDS_NM}
-                for offset in timing_offsets_s},
+                for offset in ([-m for m in timing_offsets_minutes]
+                               + timing_offsets_minutes)},
         }
 
     # Night-floor context: deep-night columns vs twilight targets, same night,
@@ -1787,13 +2038,14 @@ def compute_diagnostics(packet: Path, labels: list[str], values: np.ndarray,
     return {
         "generated_by": "tools/cssp_observation_inputs.py compute_diagnostics",
         "scenario_not_error_bar": True,
-        "timing_offsets_s": timing_offsets_s,
+        "timing_offsets_minutes": timing_offsets_minutes,
         "adjacent_change": adjacent,
         "night_floor_ratios": night_floor,
         "horizon_scenarios": horizon,
         "notes": [
-            "timing offsets are evaluated with the measured adjacent-spectrum change rate "
-            "over the actual sampling gap; linear extrapolation, scenario only",
+            "timing offsets use the signed central-difference band rate (per minute); "
+            "a positive offset means later in time, and the scenario values carry the "
+            "rate's sign rather than a magnitude"
             "night-floor ratios involve common device gain that may cancel; background "
             "colour structure and time variation do not cancel",
             "no background subtraction is applied anywhere in this packet",
@@ -2024,8 +2276,56 @@ def replay_record(cal: dict, mat_path: Path, published: np.ndarray,
     }
 
 
-def run_replay(packet: Path) -> dict:
-    """Replay every record and write ``replay.json`` (manifest refreshed)."""
+def evaluate_replay(packet: Path) -> dict:
+    """Read-only replay acceptance against the frozen published excerpts.
+
+    Recomputes every record from the vendored extract + MAT + published
+    column and applies the independent quantisation-derived tolerance plus
+    zero-cell and NaN-mask correspondence. This is the acceptance path; it
+    writes nothing, so a processing regression can never re-sign itself as
+    success by refreshing stored artefacts.
+    """
+    cal = load_calibration_extract(packet)
+    records = read_json(packet / "records.json")["records"]
+    spectra = load_packet_spectra(packet)
+    col_index = {c: i for i, c in enumerate(spectra["columns"])}
+    problems = []
+    per_record = {}
+    for record in records:
+        rid = record["record_id"]
+        col = record["source_column_zero_based"]
+        member = packet / record["raw"]["packet_path"]
+        published = spectra["data"][:, col_index[col]]
+        result = replay_record(cal, member, published)
+        per_record[rid] = result
+        pv = result["published_vs_replay"]
+        if pv["median_abs_relative_diff"] is None:
+            problems.append(f"{rid}: no comparable wavelengths in replay")
+            continue
+        if pv["median_abs_relative_diff"] >= REPLAY_MEDIAN_REL_TOLERANCE:
+            problems.append(f"{rid}: replay median relative diff "
+                            f"{pv['median_abs_relative_diff']:.3e} exceeds the "
+                            f"independent tolerance {REPLAY_MEDIAN_REL_TOLERANCE:.0e}")
+        if pv["replay_zero_after_clamp"] != pv["published_zero_cells"]:
+            problems.append(f"{rid}: zero-cell correspondence broken "
+                            f"(published {pv['published_zero_cells']} vs replay "
+                            f"{pv['replay_zero_after_clamp']})")
+        if pv["n_valid_wavelengths"] != int((~np.isnan(published)).sum()):
+            problems.append(f"{rid}: replay/published NaN masks differ")
+    return {"ok": not problems, "problems": problems,
+            "tolerance": REPLAY_MEDIAN_REL_TOLERANCE,
+            "records_evaluated": len(per_record), "detail": per_record}
+
+
+def run_replay(packet: Path, write: bool = False) -> dict:
+    """Compute the replay table.
+
+    Default (``write=False``) is read-only acceptance: compare against the
+    frozen ``replay.json`` identity AND the independent tolerance, touching
+    no packet byte. ``write=True`` is an explicit re-freeze (build only):
+    it rewrites ``replay.json`` and its manifest entry and still reports any
+    tolerance breach, which verify then enforces against the stored table.
+    """
     cal = load_calibration_extract(packet)
     records = read_json(packet / "records.json")["records"]
     spectra = load_packet_spectra(packet)
@@ -2046,10 +2346,19 @@ def run_replay(packet: Path) -> dict:
     rel = [v["published_vs_replay"]["median_abs_relative_diff"]
            for v in per_record.values()
            if v["published_vs_replay"]["median_abs_relative_diff"] is not None]
+    breaches = [rid for rid, v in per_record.items()
+                if v["published_vs_replay"]["median_abs_relative_diff"] is None
+                or v["published_vs_replay"]["median_abs_relative_diff"]
+                >= REPLAY_MEDIAN_REL_TOLERANCE]
     summary = {
         "n_records": len(per_record),
         "median_abs_relative_diff_range": [float(np.min(rel)), float(np.median(rel)),
                                            float(np.max(rel))] if rel else None,
+        "tolerance": REPLAY_MEDIAN_REL_TOLERANCE,
+        "tolerance_basis": "published CSV carries ~10 significant digits; the bound is "
+                           "quantisation-derived and never fitted to replay output",
+        "tolerance_breaches": breaches,
+        "ok": not breaches,
         "note": "agreement documents reproduction of the upstream processing chain "
                 "(Preprocess.m + RawToAbsolute.m port); it is not an independent "
                 "absolute calibration and must not be quoted as one",
@@ -2057,14 +2366,36 @@ def run_replay(packet: Path) -> dict:
                              "convention differences vs MATLAB medfilt1 would appear "
                              "as stage-level diffs, which are recorded per record",
     }
-    payload = {"summary": summary, "records": per_record}
-    write_json(packet / "replay.json", payload)
-    manifest_path = packet / "inputs.sha256.json"
-    if manifest_path.is_file():   # standalone runs refresh the manifest;
-        manifest = read_json(manifest_path)   # inside build it is written last
-        manifest["replay.json"] = sha256_file(packet / "replay.json")
-        write_json(manifest_path, manifest)
-    return {"ok": True, **summary}
+    if write:
+        payload = {"summary": summary, "records": per_record}
+        write_json(packet / "replay.json", payload)
+        manifest_path = packet / "inputs.sha256.json"
+        if manifest_path.is_file():   # standalone runs refresh the manifest;
+            manifest = read_json(manifest_path)   # inside build it is written last
+            manifest["replay.json"] = sha256_file(packet / "replay.json")
+            write_json(manifest_path, manifest)
+    else:
+        frozen_path = packet / "replay.json"
+        if frozen_path.is_file():
+            frozen = read_json(frozen_path)
+            if set(frozen["records"]) != set(per_record):
+                summary["ok"] = False
+                summary.setdefault("problems", []).append(
+                    "frozen replay.json record set differs from the packet records")
+            else:
+                mismatched = [
+                    rid for rid, v in per_record.items()
+                    if v["published_vs_replay"]["median_abs_relative_diff"]
+                    != frozen["records"][rid]["published_vs_replay"]["median_abs_relative_diff"]]
+                if mismatched:
+                    summary["ok"] = False
+                    summary.setdefault("problems", []).append(
+                        f"recomputed replay differs from frozen table: {mismatched[:5]}")
+        else:
+            summary["ok"] = False
+            summary.setdefault("problems", []).append(
+                "packet has no frozen replay.json; run build or replay --write")
+    return {"ok": summary["ok"], **summary}
 
 
 # ---------------------------------------------------------------------------
@@ -2076,6 +2407,28 @@ def ideal_hemispheric_irradiance(radiance: float,
     """E = pi L for an isotropic radiance; pi L cos^2(h) for a flat horizon
     at depression angle h. The analytic anchor the tests pin the operator to."""
     return np.pi * radiance * np.cos(np.radians(horizon_depression_deg)) ** 2
+
+
+def publish_pipeline(spectrum: np.ndarray, filter_span: int = REPLAY_FILTER_SPAN) -> np.ndarray:
+    """Model-facing publish steps (P_publish) on a physical 1 nm spectrum.
+
+    Input and output are spectral irradiance in W m-2 nm-1 on the published
+    grid. A model spectrum expressed on that grid passes through: median
+    filter span 8 (the published smoothing) and the negative clamp; the 1 nm
+    resampling is the identity here and must be applied explicitly when the
+    model grid differs. Count-domain calibration (C_capture) is deliberately
+    absent - see operator.json.
+    """
+    pad = filter_span // 2
+    padded = np.pad(np.asarray(spectrum, dtype=float), pad, mode="constant",
+                    constant_values=np.nan)
+    windows = np.lib.stride_tricks.sliding_window_view(padded, filter_span)
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        filtered = np.nanmedian(windows, axis=1)
+    return np.where(filtered[:len(spectrum)] < 0, 0.0,
+                    filtered[:len(spectrum)])
 
 
 def exposure_weighted_mean(values: np.ndarray, sample_seconds: list[float],
@@ -2170,10 +2523,13 @@ def build_sources(out: Path, cache_dir: Path, columns: list[int]) -> dict:
                                  "items": raw_members,
                                  "note": "byte-identical members of the raw archive; "
                                          "member hashes do not certify the whole archive"},
-        "vendored_weather": {"kind": "response", "items": weather_files,
+        "vendored_weather": {"kind": "response",
+                             "items": [{**w, "request_url": weather_source_url(
+                                 Path(w["packet_path"]).name)} for w in weather_files],
                              "note": "verbatim public responses (IEM representation of "
-                                     "GHCNh, NOAA Global Hourly, AERONET); failed probes "
-                                     "kept as evidence"},
+                                     "GHCNh, NOAA Global Hourly, AERONET, JPL Horizons "
+                                     "spot checks); request_url is the exact acquisition "
+                                     "request; failed probes kept as evidence"},
         "external_refs": [
             external_ref("validation/data/matched_twilight_observations/verify.py"),
             external_ref("validation/data/matched_twilight_observations/spectral/"
@@ -2266,7 +2622,16 @@ uv run python -I tools/cssp_observation_inputs.py sensitivity \\
   --packet validation/data/cssp_observation_inputs
 ```
 
-Acquisition (writes only to the cache directory, never to the packet):
+`replay`/`sensitivity` are read-only acceptance by default and compare against
+the frozen tables plus an independent quantisation-derived tolerance;
+``--write`` is the explicit re-freeze entry (build only re-freezes as part of
+construction).
+
+Acquisition (writes only to the cache directory, never to the packet). The
+fetch entry covers every input build requires - official CSV, upstream MICA
+tables, the meter-'a' calibration struct, IEM/NOAA/AERONET responses for all
+session windows, and the two JPL spot checks; known-failing probes are
+recorded as evidence and build preflight rejects an incomplete cache:
 
 ```bash
 uv run python -I tools/cssp_observation_inputs.py fetch \\
@@ -2336,9 +2701,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_replay = sub.add_parser("replay", help="raw->published processing replay")
     p_replay.add_argument("--packet", type=Path, default=DEFAULT_PACKET)
+    p_replay.add_argument("--write", action="store_true",
+                          help="explicit re-freeze of replay.json (build-only by "
+                               "default; acceptance stays read-only)")
 
     p_sens = sub.add_parser("sensitivity", help="recompute scenario diagnostics")
     p_sens.add_argument("--packet", type=Path, default=DEFAULT_PACKET)
+    p_sens.add_argument("--write", action="store_true",
+                        help="explicit re-freeze of diagnostics.json")
 
     return parser
 
@@ -2358,11 +2728,11 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(result["verify"], indent=2, ensure_ascii=False))
         return 0 if result["verify"]["ok"] else 1
     if args.command == "sensitivity":
-        report = refresh_diagnostics(args.packet)
+        report = refresh_diagnostics(args.packet, write=args.write)
         print(json.dumps(report, indent=2))
         return 0 if report.get("ok") else 1
     if args.command == "replay":
-        report = run_replay(args.packet)
+        report = run_replay(args.packet, write=args.write)
         print(json.dumps(report, indent=2))
         return 0 if report.get("ok") else 1
     return 2

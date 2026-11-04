@@ -9,7 +9,7 @@
       "unknown": "per-exposure gaps/latencies; see records.json timing"
     },
     "R_p": {
-      "text": "spectral channel kernel; published 1 nm grid suggests but does not prove a ~1 nm triangular response; the slit function was not measured",
+      "text": "spectral channel kernel; published 1 nm grid suggests but does not prove a ~1 nm triangular response; the slit function was not measured. Unit convention: kernels are normalised to unit transmission so band integrals keep spectral-density units (W m-2 nm-1); band-integral quantities use the trapezoidal band integral explicitly",
       "evidence": "unknown",
       "reason": "line-spread function not published; band integrals on the published grid assume unit-transmission channels"
     },
@@ -23,8 +23,12 @@
       "evidence": "unknown",
       "reason": "site horizon not characterised; H=1 is the idealisation"
     },
-    "P": {
-      "text": "upstream publishing steps (dark subtraction by nearest integration-time node + temperature interpolation, wavelength shift, 1 nm resampling, median filter span 8, sensitivity correction factor, pi factor, negative clamp): replayed per record in replay.json, which reproduces the published columns to ~5e-11 median relative difference (CSV print precision). This proves reproduction of the upstream pipeline from the archived raw members; it does not independently certify the absolute radiometric scale",
+    "P_publish": {
+      "text": "publishing steps that apply to already-calibrated physical spectra (W m-2 nm-1 in and out): resampling onto the 1 nm published grid, median filter span 8 (published smoothing), negative-value clamp to zero. Implemented in publish_pipeline(); a model spectrum expressed in physical units passes through these and only these steps before band comparison",
+      "evidence": "derived-documented"
+    },
+    "C_capture": {
+      "text": "the raw-count-to-physical calibration chain (dark subtraction by nearest integration-time node and temperature interpolation, division by integration time in microseconds, sensitivity correction factor, pi factor). Defined ONLY on detector counts; it is replayed per record in replay.json to prove the raw/published binding. Applying C_capture to a model's physical irradiance would double-calibrate and must never happen",
       "evidence": "derived-documented"
     },
     "L_bg": {
@@ -41,7 +45,8 @@
     "published_spectra": "W m-2 nm-1 (spectral density, as published)",
     "band_integrals": "W m-2 (per band, trapezoidal on the published grid)",
     "radiance_terms": "W m-2 sr-1 nm-1",
-    "cos_theta": "applied once, inside the hemisphere integral"
+    "cos_theta": "applied once, inside the hemisphere integral",
+    "operator_domain": "the formula integrates PHYSICAL radiance; only P_publish applies to its output. C_capture lives on the detector-count side of replay.json and is documentation of the upstream pipeline, not a model-facing step"
   },
   "reference_bands_nm": {
     "violet": [
@@ -64,7 +69,8 @@
   "forbidden_comparisons": [
     "hemispheric irradiance vs zenith radiance (different quantity)",
     "published spectra vs model spectra without integrating model radiance over the hemisphere and the exposure window",
-    "treating night-spectrum medians as a measured background subtraction"
+    "treating night-spectrum medians as a measured background subtraction",
+    "applying C_capture (dark counts, sensitivity correction factor, pi) to a model's physical irradiance - that chain is defined on detector counts only and would double-calibrate"
   ],
   "scenario_policy": "response/horizon/background scenarios demonstrate dependence; they are not confidence intervals"
 }

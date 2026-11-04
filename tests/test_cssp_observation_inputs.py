@@ -9,6 +9,7 @@ from the generator's own output.
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import shutil
 from datetime import datetime, timedelta, timezone
@@ -23,12 +24,15 @@ sys.path.insert(0, str(ROOT))
 
 from tools.cssp_observation_inputs import (  # noqa: E402
     CSSP, DRL, KN38,
+    REPLAY_MEDIAN_REL_TOLERANCE,
     band_energy,
+    check_cache_inputs,
     check_external_refs,
     check_manifest,
     dark_spectrum_from_extract,
     exposure_weighted_mean,
     external_ref,
+    fetch_sources,
     haversine_km,
     ideal_hemispheric_irradiance,
     invoke_time_to_utc_iso,
@@ -41,18 +45,22 @@ from tools.cssp_observation_inputs import (  # noqa: E402
     nominal_exposure_window,
     parse_edt_label,
     parse_full_csv_rows,
+    publish_pipeline,
     quality_of_column,
     read_jpl_elevation,
     read_json,
     read_mat_contract,
     read_mica_table,
     replay_record,
+    run_replay,
     session_signal_stats,
     sessions_of,
+    sha256_file,
     station_state,
     summarize_weather_rows,
     unix_of,
     verify_packet,
+    weather_source_url,
     weather_window_rows,
     write_json,
 )
@@ -476,6 +484,186 @@ def test_calibration_extract_covers_every_record_node_and_temperature():
         temps, _ = extract["dark_nodes"][node_us]
         temp = float(np.mean(record["instrument"]["board_temp_c"]["value"]))
         assert temps.min() <= temp <= temps.max()
+
+
+# ---------------------------------------------------------------------------
+# Revision round 01: acceptance/writer separation, fetch contract, screening
+# coverage, operator domains, signed sensitivity
+# ---------------------------------------------------------------------------
+
+def test_full_source_mismatch_fails_and_correct_source_passes(tmp_path):
+    report = verify_packet(PACKET)   # no source dir: full check skipped
+    assert report["ok"]
+    bad = tmp_path / "CSSP_spectra.csv"
+    bad.write_text("not the official CSV")
+    report = verify_packet(PACKET, bad.parent)
+    assert not report["ok"]
+    assert any("full-source CSV identity mismatch" in p for p in report["problems"])
+    truncated = tmp_path / "CSSP_spectra.csv"
+    truncated.write_bytes(b"x" * 1024)
+    report = verify_packet(PACKET, truncated.parent)
+    assert not report["ok"]
+
+
+def test_replay_read_only_acceptance_never_writes_and_detects_scaling_errors(tmp_path):
+    copy = tmp_path / "packet"
+    shutil.copytree(PACKET, copy)
+    before = {p.name: sha256_file(p) for p in copy.rglob("*") if p.is_file()}
+    report = run_replay(copy, write=False)
+    assert report["ok"]
+    after = {p.name: sha256_file(p) for p in copy.rglob("*") if p.is_file()}
+    assert before == after, "read-only replay must not touch any packet byte"
+    # A calibration regression (correction factor x2) must breach the
+    # independent tolerance and still not rewrite anything.
+    extract = read_json(copy / "calibration-extract.json")
+    extract["correction_factor"] = [v * 2.0 for v in extract["correction_factor"]]
+    write_json(copy / "calibration-extract.json", extract)
+    manifest = read_json(copy / "inputs.sha256.json")
+    manifest["calibration-extract.json"] = hashlib.sha256(
+        (copy / "calibration-extract.json").read_bytes()).hexdigest()
+    write_json(copy / "inputs.sha256.json", manifest)
+    tampered = {p.name: sha256_file(p) for p in copy.rglob("*") if p.is_file()}
+    report = run_replay(copy, write=False)
+    assert not report["ok"]
+    assert report["tolerance_breaches"], "x2 scaling must breach the tolerance"
+    after2 = {p.name: sha256_file(p) for p in copy.rglob("*") if p.is_file()}
+    assert tampered == after2, "failing read-only replay must not re-sign anything"
+
+
+def test_verify_enforces_independent_replay_tolerance(tmp_path):
+    copy = tmp_path / "packet"
+    shutil.copytree(PACKET, copy)
+    extract = read_json(copy / "calibration-extract.json")
+    extract["correction_factor"] = [v * 2.0 for v in extract["correction_factor"]]
+    write_json(copy / "calibration-extract.json", extract)
+    report = verify_packet(copy)
+    assert not report["ok"]
+    assert report["replay_acceptance"]["tolerance"] == REPLAY_MEDIAN_REL_TOLERANCE
+
+
+def test_fetch_creates_parent_dirs_and_records_provenance(tmp_path, monkeypatch):
+    """Directory creation and provenance mechanics with stubbed network."""
+    import urllib.error
+    import urllib.request
+    import io
+
+    class FakeResponse(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    def fake_urlopen(request, timeout=None):
+        url = request.full_url
+        if "calibration/" in url:
+            return FakeResponse(b"fake-cal")
+        if "obhistory" in url:
+            return FakeResponse(b'{"data": []}')
+        if "horizons.api" in url:
+            return FakeResponse(b'{"result": ""}')
+        if "daily_history" in url:
+            raise urllib.error.HTTPError(url, 404, "Not Found", None, None)
+        return FakeResponse(b"{}")
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    cache = tmp_path / "cache"
+    items = [
+        {"id": "cal-struct-a", "url": "https://example.com/calibration/cal.mat",
+         "path": "calibration/OO_USB2000+a.mat"},
+        {"id": "iem-20140630",
+         "url": "https://example.com/obhistory.json?station=N38",
+         "path": "weather/iem-N38-obhistory-20140630.json"},
+        {"id": "jpl-0703", "url": "https://example.com/horizons.api?x=1",
+         "path": "jpl/horizons-cssp-0703.json"},
+        {"id": "iem-daily-20140712",
+         "url": "https://example.com/daily_history.json",
+         "path": "weather/iem-N38-daily-20140712-month.json",
+         "optional": True},
+    ]
+    result = fetch_sources(cache, with_raw_archive=False, items=items)
+    assert (cache / "calibration").is_dir(), "parent dirs must be created"
+    assert (cache / "weather").is_dir() and (cache / "jpl").is_dir()
+    provenance = read_json(cache / "fetch-provenance.json")
+    failed = [e for e in provenance if e.get("identity") == "failed-probe"]
+    verified = [e for e in provenance if e.get("identity") == "verified"]
+    assert len(failed) == 1 and len(verified) == 3
+    assert all(e["url"] for e in verified)
+    assert "Not Found" in failed[0]["error"]
+
+
+def test_build_preflight_rejects_incomplete_cache(tmp_path):
+    cache = tmp_path / "cache"
+    cache.mkdir()
+    for name in ("CSSP_spectra.csv", "published-wavelengths.csv",
+                 "CSSP_SunLocalZenith.txt", "CSSP_MoonLocalZenith.txt"):
+        (cache / name).write_bytes(b"x")
+    (cache / "calibration").mkdir()
+    (cache / "calibration/OO_USB2000+a.mat").write_bytes(b"x")
+    (cache / "dataraw.tar.gz").write_bytes(b"x")
+    (cache / "jpl").mkdir()
+    for check in ("horizons-cssp-0703.json", "horizons-cssp-0719.json"):
+        (cache / "jpl" / check).write_bytes(b"x")
+    with pytest.raises(ValueError, match="missing required inputs"):
+        check_cache_inputs(cache)   # no weather responses yet
+    (cache / "weather").mkdir()
+    (cache / "weather/iem-N38-obhistory-20140703.json").write_bytes(b"x")
+    check_cache_inputs(cache)
+
+
+def test_all_twilight_sessions_screened_and_selection_derived():
+    conditions = read_json(PACKET / "conditions.json")
+    selection = read_json(PACKET / "selection.json")
+    twilight = {s["session_id"] for s in selection["sessions"]
+                if s["signal_kind"] == "twilight-or-night"}
+    assert twilight <= set(conditions["conditions"]), \
+        "every twilight-level session must carry a conditions verdict"
+    assert set(conditions["not_conditions_evaluated"]) == \
+        {s["session_id"] for s in selection["sessions"]
+         if s["signal_kind"] != "twilight-or-night"}
+    # Selection reasons quote the conditions verdicts (single authority).
+    for decision in selection["decisions"]:
+        sid = decision["session_id"]
+        if sid in conditions["conditions"]:
+            assert decision["reason"].startswith(
+                tuple({"selected": ("selected for raw sampling",),
+                       "not-selected": ("conditions verdict:",)}[decision["decision"]]))
+            assert conditions["conditions"][sid]["verdict"] in decision["reason"]
+    # 'Cleanest' claims come from the same verdicts, and s11/dusk is the
+    # unique moon-free clear window among the screened set.
+    assert selection["cleanest_screened_windows"] == ["s11/dusk"]
+
+
+def test_signed_sensitivity_rates_and_forward_operator_domain():
+    import numpy as np
+    diagnostics = read_json(PACKET / "diagnostics.json")
+    c1743 = diagnostics["adjacent_change"]["c1743"]
+    rate = c1743["signed_rate_per_minute_per_band"]["visible_all"]
+    assert rate > 0, "dawn brightening must carry a positive time-derivative sign"
+    assert "+30" in c1743["timing_offset_scenario_per_band"], \
+        "signed offsets (+/- minutes) must both be tabulated"
+    assert c1743["timing_offset_scenario_per_band"]["+30"]["visible_all"] > 0
+    assert c1743["timing_offset_scenario_per_band"]["-30"]["visible_all"] < 0
+    # Operator contract separates the model-facing publish steps from the
+    # count-domain calibration chain.
+    operator = read_json(PACKET / "operator.json")
+    assert "P_publish" in operator["definitions"]
+    assert "C_capture" in operator["definitions"]
+    assert "P_publish" not in operator["definitions"] or \
+        "correction factor" not in operator["definitions"]["P_publish"]["text"]
+    assert any("double-calibrate" in f for f in operator["forbidden_comparisons"])
+    # A constant physical spectrum passes P_publish unscaled: pi L stays pi L.
+    spectrum = np.full(561, 2.5)
+    assert publish_pipeline(spectrum) == pytest.approx(spectrum)
+
+
+def test_weather_source_urls_reconstruct_acquisition_requests():
+    assert weather_source_url("iem-N38-obhistory-20140703.json") is not None
+    assert "obhistory.json" in weather_source_url("iem-N38-obhistory-20140703.json")
+    assert "global-hourly" in weather_source_url("noaa-BFD-20140703.json")
+    assert "print_web_data_v3" in weather_source_url(
+        "aeronet-Toronto-20140718-19-AOD20.txt")
+    assert weather_source_url("frozen-noaa-BFD-window.json") is None
 
 
 def test_spectra_excerpts_match_old_packet_overlap():
