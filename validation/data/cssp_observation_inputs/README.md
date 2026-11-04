@@ -87,3 +87,14 @@ uv run python -I tools/cssp_observation_inputs.py verify \
 - `replay.json` documents reproduction of the upstream pipeline; the
   absolute radiometric scale rests on the upstream lab calibration and is
   not independently certified here.
+
+## Attribution
+
+Spitschan et al. (2016), Scientific Reports 6:26756,
+[doi:10.1038/srep26756](https://doi.org/10.1038/srep26756): published spectra
+and ephemeris tables CC BY 4.0; author code snapshots MIT (retained in the
+matched-observation and feasibility packets). The raw archive and the
+generated calibration structure are the author's public Figshare/GitHub
+releases, referenced by the identities in `sources.json`. Scientific
+interpretation and the use-verdict matrix live in
+[docs/twilight/CSSP_OBSERVATION_INPUTS.md](../../../docs/twilight/CSSP_OBSERVATION_INPUTS.md).

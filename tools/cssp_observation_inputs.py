@@ -1976,7 +1976,13 @@ def replay_record(cal: dict, mat_path: Path, published: np.ndarray,
     pad = filter_span // 2
     padded = np.pad(on_grid, pad, mode="constant", constant_values=np.nan)
     windows = np.lib.stride_tricks.sliding_window_view(padded, filter_span)
-    filtered = np.nanmedian(windows, axis=1)
+    import warnings
+    with warnings.catch_warnings():
+        # The all-NaN slices are the documented out-of-range UV boundary
+        # (interp NaNs below the corrected wavelength range); the median of
+        # such a window is legitimately NaN.
+        warnings.simplefilter("ignore", RuntimeWarning)
+        filtered = np.nanmedian(windows, axis=1)
     filtered = filtered[:cal["wls"].size]
 
     absolute = filtered * cal["correction_factor"] * np.pi
@@ -2290,6 +2296,17 @@ uv run python -I tools/cssp_observation_inputs.py verify \\
 - `replay.json` documents reproduction of the upstream pipeline; the
   absolute radiometric scale rests on the upstream lab calibration and is
   not independently certified here.
+
+## Attribution
+
+Spitschan et al. (2016), Scientific Reports 6:26756,
+[doi:10.1038/srep26756](https://doi.org/10.1038/srep26756): published spectra
+and ephemeris tables CC BY 4.0; author code snapshots MIT (retained in the
+matched-observation and feasibility packets). The raw archive and the
+generated calibration structure are the author's public Figshare/GitHub
+releases, referenced by the identities in `sources.json`. Scientific
+interpretation and the use-verdict matrix live in
+[docs/twilight/CSSP_OBSERVATION_INPUTS.md](../../../docs/twilight/CSSP_OBSERVATION_INPUTS.md).
 """
     (out / "README.md").write_text(readme, encoding="utf-8")
 
