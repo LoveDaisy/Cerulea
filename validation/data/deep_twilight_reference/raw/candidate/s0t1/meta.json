@@ -6,7 +6,8 @@
   "skycolor/rt/mc.py": "b8cab675585fe72fd74340e57cd24b66c2f757c221398cd83fa9a74a858143df",
   "tools/point_solar_table.py": "c189f8c043a2da0b234b57c36d3e1b5f5c6ed459a7c7a45e3b7048f4bf51d084",
   "tools/unified_solar_transport.py": "6ed1b03c3c49ad748540064d90ce8306b8855f08d2409ba9a1cc51e1a654dea2",
-  "tools/deep_twilight_reference.py": "78a30731e803bb996dd51f009c526ed994eb569cf9b6a8b98dd165789645fca2"
+  "tools/deep_twilight_reference.py": "9690e774b8cf8cd1767993fd2e00987558995591ce2c86092969dccbddc05489",
+  "tools/twilight_second_order.py": "8d2e3192d46eea4578d9d0867f20675c5ff1cbef76d21c96ae97262909341711"
  },
  "table_sha256": "ed2376c9a6f5c8044b26b0e51bc36347057948ed710e3a3f87b514f4e4154be7",
  "hardware": {
@@ -66,8 +67,9 @@
  "recontracts": [
   {
    "changed": [
-    "protocol_sha256",
     "candidate_samples",
+    "code_sha256",
+    "protocol_sha256",
     "rest_photons"
    ],
    "stored": {
@@ -78,10 +80,17 @@
    "incoming": {
     "protocol_sha256": "23b46bd6784b91181c34cd5ff05656ce86f9aeecfa2bbe29c0728f1b432c87a1",
     "candidate_samples": 400000,
-    "rest_photons": 1600000
+    "rest_photons": 1600000,
+    "code_sha256": {
+     "skycolor/rt/mc.py": "b8cab675585fe72fd74340e57cd24b66c2f757c221398cd83fa9a74a858143df",
+     "tools/point_solar_table.py": "c189f8c043a2da0b234b57c36d3e1b5f5c6ed459a7c7a45e3b7048f4bf51d084",
+     "tools/unified_solar_transport.py": "6ed1b03c3c49ad748540064d90ce8306b8855f08d2409ba9a1cc51e1a654dea2",
+     "tools/deep_twilight_reference.py": "9690e774b8cf8cd1767993fd2e00987558995591ce2c86092969dccbddc05489",
+     "tools/twilight_second_order.py": "8d2e3192d46eea4578d9d0867f20675c5ff1cbef76d21c96ae97262909341711"
+    }
    },
    "at": "2026-11-04T21:20:00+08:00",
-   "reason": "protocol file evolved (candidate/sensitivity sections added); contract fields made explicit in review round 1"
+   "reason": "protocol file evolved (candidate/sensitivity sections added); contract fields made explicit in review round 1; code identity synced to the attempt-01 execution fingerprints (missed in the first hand edit)"
   }
  ],
  "rest_photons": 1600000

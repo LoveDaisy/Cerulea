@@ -27,7 +27,9 @@ from skycolor.rt import mc
 from tools.deep_twilight_reference import (
     Batch, load_protocol, run_record, seed_for, DEFAULT_PROTOCOL)
 from tools.summarize_deep_twilight_reference import (
-    compute_summary, load_batch, _deep_equal)
+    compute_summary, load_batch, _deep_equal, KNOWN_PROTOCOL_GENERATIONS)
+
+KNOWN_SHA = next(iter(KNOWN_PROTOCOL_GENERATIONS))
 
 WL3 = np.array([450.0, 550.0, 650.0])
 
@@ -308,7 +310,7 @@ def _synthetic_record81(seed, zero=False):
 def _populate(data: Path, *, zero_one_record=False, point=True):
     from tools.deep_twilight_reference import contract_view
     meta = contract_view(dict(stage="direct", table_sha256="t",
-                              protocol_sha256="p", mode="disk"))
+                              protocol_sha256=KNOWN_SHA, mode="disk"))
     for sun_index, sun in enumerate([-9.0]):
         for budget_index, photons in enumerate([400, 800]):
             batch_id = f"s{sun_index}b{budget_index}"
@@ -320,7 +322,7 @@ def _populate(data: Path, *, zero_one_record=False, point=True):
                 zero = zero_one_record and seed == 40000
                 row = _synthetic_record81(seed, zero=zero)
                 row["table_sha256"] = "t"
-                row["protocol_sha256"] = "p"
+                row["protocol_sha256"] = KNOWN_SHA
                 row["mode"] = "disk"
                 row["photons_per_wavelength"] = photons
                 row["sun_elevation_deg"] = -9.0
@@ -330,12 +332,12 @@ def _populate(data: Path, *, zero_one_record=False, point=True):
             batch = Batch(data / "raw" / "source-pairs", "s0b1-point",
                           [41000 + r for r in range(4)],
                           dict(stage="source-pairs", table_sha256="t",
-                               protocol_sha256="p", mode="point"))
+                               protocol_sha256=KNOWN_SHA, mode="point"))
             for r in range(4):
                 seed = 41000 + r
                 row = _synthetic_record81(seed)
                 row["table_sha256"] = "t"
-                row["protocol_sha256"] = "p"
+                row["protocol_sha256"] = KNOWN_SHA
                 row["mode"] = "point"
                 row["photons_per_wavelength"] = 800
                 row["sun_elevation_deg"] = -9.0
@@ -436,14 +438,22 @@ def test_candidate_and_sensitivity_sections(tmp_path):
                 seed = 80000 + 10000 * sun_index + 1000 * tier_index + r
                 per_lambda = {}
                 for a in wl_anchor:
+                    # vary rest_mean per repeat; total_analog and
+                    # total_cand follow the exact closure identities, so
+                    # the two estimators share one variance sequence
+                    rest = 2e-10 + 1e-11 * ((r % 2) * 2 - 1)
+                    mc_mult = 5e-10 + rest
+                    l2 = 1e-9 * (1 + tier_index)
+                    single = 1e-8
                     per_lambda[str(a)] = dict(
-                        L2=1e-9 * (1 + tier_index), L2_second_moment=2e-18,
+                        L2=l2, L2_second_moment=2e-18,
                         L2_max_abs=1e-8, candidate_seconds=0.2,
-                        candidate_samples=cs, c2nt_mean=5e-10, rest_mean=2e-10,
+                        candidate_samples=cs, c2nt_mean=5e-10,
+                        rest_mean=rest,
                         rest_second_moment=(0.0 if r == 3 else 5e-12),
-                        mc_multiple=7e-10, deterministic_single=1e-8,
-                        total_cand=1e-8 + 1e-9 * (1 + tier_index) + 2e-10,
-                        total_analog=1.17e-8, max_fraction=0.004,
+                        mc_multiple=mc_mult, deterministic_single=single,
+                        total_cand=single + l2 + rest,
+                        total_analog=single + mc_mult, max_fraction=0.004,
                         top001_fraction=0.2, effective_contributors=50.0)
                 batch.record_seed(seed, dict(
                     seed=seed, sun_elevation_deg=-9.0, tier_index=tier_index,
@@ -571,15 +581,15 @@ def test_batch_contract_mismatch_refused(tmp_path):
 
 def test_check_batch_contract_rejects_tampered_record():
     from tools.summarize_deep_twilight_reference import check_batch_contract
-    meta = dict(protocol_sha256="p", table_sha256="t")
+    meta = dict(protocol_sha256=KNOWN_SHA, table_sha256="t")
     good = [dict(seed=1, sun_elevation_deg=-9.0, photons_per_wavelength=400,
-                 mode="disk", protocol_sha256="p", table_sha256="t")]
+                 mode="disk", protocol_sha256=KNOWN_SHA, table_sha256="t")]
     notes = check_batch_contract(good, meta,
                                  dict(sun_elevation_deg=-9.0,
                                       photons_per_wavelength=400, mode="disk",
                                       table_sha256="t"),
                                  stage="direct", batch_id="b",
-                                 protocol_sha_now="p")
+                                 protocol_sha_now=KNOWN_SHA)
     assert notes == []
     tampered = [dict(good[0], photons_per_wavelength=1600000)]
     with pytest.raises(ValueError, match="contract field"):
@@ -588,13 +598,72 @@ def test_check_batch_contract_rejects_tampered_record():
                                   photons_per_wavelength=400, mode="disk",
                                   table_sha256="t"),
                              stage="direct", batch_id="b")
+    # implementation identity: a record whose code hash differs from the
+    # batch meta keeps its own (uniform) per-record identity as the
+    # authority and the difference is reported as a note
+    meta_code = dict(meta, code_sha256={"x.py": "1"})
+    code_tampered = [dict(good[0], code_sha256={"x.py": "evil"})]
+    notes = check_batch_contract(code_tampered, meta_code,
+                                 dict(sun_elevation_deg=-9.0,
+                                      photons_per_wavelength=400,
+                                      mode="disk", table_sha256="t"),
+                                 stage="direct", batch_id="b")
+    assert any("predates the records" in n for n in notes)
+    # ... and a batch whose records span two implementations is refused
+    mixed = [dict(good[0], protocol_sha256=KNOWN_SHA,
+                  code_sha256={"x.py": "1"}),
+             dict(good[0], seed=2, protocol_sha256=KNOWN_SHA,
+                  code_sha256={"x.py": "2"})]
+    meta_known = dict(meta_code, protocol_sha256=KNOWN_SHA)
+    with pytest.raises(ValueError, match="distinct.*implementation"):
+        check_batch_contract(mixed, meta_known,
+                             dict(sun_elevation_deg=-9.0,
+                                  photons_per_wavelength=400, mode="disk",
+                                  table_sha256="t"),
+                             stage="direct", batch_id="b")
+    # a known historical generation is accepted with an auditable note
     drifted = check_batch_contract(good, meta,
                                    dict(sun_elevation_deg=-9.0,
                                         photons_per_wavelength=400,
                                         mode="disk", table_sha256="t"),
                                    stage="direct", batch_id="b",
-                                   protocol_sha_now="p2")
-    assert len(drifted) == 1 and "executed under protocol" in drifted[0]
+                                   protocol_sha_now="current")
+    assert len(drifted) == 1 and "known protocol generation" in drifted[0]
+    # an UNKNOWN generation must be rejected, not silently merged
+    meta_unknown = dict(meta, protocol_sha256="p-unknown")
+    records_unknown = [dict(good[0], protocol_sha256="p-unknown")]
+    with pytest.raises(ValueError, match="unknown protocol generation"):
+        check_batch_contract(records_unknown, meta_unknown,
+                             dict(sun_elevation_deg=-9.0,
+                                  photons_per_wavelength=400, mode="disk",
+                                  table_sha256="t"),
+                             stage="direct", batch_id="b",
+                             protocol_sha_now="current")
+    # a missing expect field with meta fallback validates against the meta
+    no_sun = [dict(good[0])]
+    del no_sun[0]["sun_elevation_deg"]
+    meta_sun = dict(meta, sun_elevation_deg=-9.0)
+    notes = check_batch_contract(no_sun, meta_sun,
+                                 dict(sun_elevation_deg=-9.0,
+                                      photons_per_wavelength=400, mode="disk",
+                                      table_sha256="t"),
+                                 stage="direct", batch_id="b")
+    assert any("values taken from the batch meta" in n for n in notes)
+    # ... but a meta that contradicts the protocol is refused
+    meta_bad = dict(meta, sun_elevation_deg=90.0)
+    with pytest.raises(ValueError, match="contradicts the protocol"):
+        check_batch_contract(no_sun, meta_bad,
+                             dict(sun_elevation_deg=-9.0,
+                                  photons_per_wavelength=400, mode="disk",
+                                  table_sha256="t"),
+                             stage="direct", batch_id="b")
+    # ... and a field neither record nor meta carries is refused
+    with pytest.raises(ValueError, match="records lack"):
+        check_batch_contract(no_sun, meta,
+                             dict(sun_elevation_deg=-9.0,
+                                  photons_per_wavelength=400, mode="disk",
+                                  table_sha256="t"),
+                             stage="direct", batch_id="b")
 
 
 def test_peak_rss_units_per_platform():
@@ -647,8 +716,10 @@ def test_fresh_run_root_direct_resume(tmp_path):
     assert (run_root / "protocol.snapshot.json").exists()
     batch_dirs = list((run_root / "raw" / "direct").iterdir())
     assert batch_dirs, "a batch directory must exist"
-    state = json.loads((run_root / "state.json").read_text())
-    assert state["stages"]["direct_and_source_pairs"]["cumulative_seconds"] > 0
+    group_state = json.loads(
+        (run_root / "state.direct_and_source_pairs.json").read_text())
+    assert (group_state["stages"]["direct_and_source_pairs"]
+            ["cumulative_seconds"] > 0)
     # resume under the same contract continues the same attempt lineage
     rc2 = main(argv + ["--max-stage-hours", "0.05"])
     assert rc2 == 0
@@ -688,28 +759,43 @@ def test_efficiency_metric_direction(tmp_path):
                            code_sha256={"x.py": "1"}))
         for r in range(4):
             seed = 80000 + 1000 * tier_index + r
-            # identical distributions and equal candidate/analog variances;
-            # only the candidate is SLOWER (seconds 2.0 vs mc 1.0)
+            # NON-identical repeats via the closure identities: rest_mean
+            # varies per repeat, mc_multiple = c2nt + rest, so
+            # total_analog = single + mc_multiple varies while
+            # total_cand = single + L2 + rest carries the same variance
+            # (both sequences identical after the fixed offset); the
+            # candidate is SLOWER (t_cand + t_mc vs t_mc) -- a correct
+            # variance-x-time metric must score it strictly worse with
+            # ratio == repeat-time ratio
+            rest = 2e-10 + 1e-11 * ((r % 2) * 2 - 1)
+            mc_mult = 7e-10 + 1e-11 * ((r % 2) * 2 - 1)
             per_lambda = {str(a): dict(
                 L2=1e-9, L2_second_moment=2e-18, L2_max_abs=1e-8,
                 candidate_seconds=t_cand, candidate_samples=cs, c2nt_mean=5e-10,
-                rest_mean=2e-10, rest_second_moment=5e-12, mc_multiple=7e-10,
-                deterministic_single=1e-8, total_cand=1.12e-8, total_analog=1.12e-8,
-                max_fraction=0.004, top001_fraction=0.2,
-                effective_contributors=50.0) for a in wl_anchor}
+                rest_mean=rest, rest_second_moment=5e-12,
+                mc_multiple=mc_mult,
+                deterministic_single=1e-8, total_cand=1e-8 + 1e-9 + rest,
+                total_analog=1e-8 + mc_mult, max_fraction=0.004,
+                top001_fraction=0.2, effective_contributors=50.0)
+                for a in wl_anchor}
             batch.record_seed(seed, dict(
                 seed=seed, sun_elevation_deg=-9.0, tier_index=tier_index,
                 candidate_samples=cs, rest_photons=rp, mode="disk",
-                per_lambda=per_lambda, mc_seconds=t_mc, seconds=t_cand + t_mc,
+                per_lambda=per_lambda, mc_seconds=t_mc,
+                seconds=t_cand + t_mc,
                 table_sha256="c", protocol_sha256="p",
                 code_sha256={"x.py": "1"}, batch_id="x", attempt=0))
         batch.close("complete")
     wl = np.arange(380.0, 781.0, 5.0)
     out = _candidate_stats(data, proto, wl, [14, 34, 54], {})
     eff = out["-9.0"]["efficiency"]["550.0"]
-    assert eff["candidate_var_x_time"] >= eff["analog_var_x_time"]
-    assert eff["verdict"] == "candidate-not-more-efficient", (
-        "a slower estimator with equal variance must not win")
+    assert eff["candidate_var_x_time"] > eff["analog_var_x_time"]
+    assert eff["verdict"] == "candidate-not-more-efficient"
+    # ratio must equal the repeat-time ratio exactly (equal variances)
+    assert abs(eff["ratio"] - (2.0 + 1.0) / 1.0) < 1e-9
+    # the real archived flip case: -9 deg tier-1 650 nm, candidate worse
+    # (ratios from summary.json after the variance-x-time correction)
+    assert out["-9.0"]["efficiency"]["650.0"]["ratio"] > 1.0
 
 
 def test_fresh_run_root_full_chain(tmp_path):
@@ -750,3 +836,26 @@ def test_fresh_run_root_full_chain(tmp_path):
         capture_output=True, text=True, cwd=str(ROOT))
     assert proc.returncode == 0, proc.stdout[-500:] + proc.stderr[-1500:]
     assert "VERIFY OK" in proc.stdout
+
+
+def test_group_state_files_no_cross_group_loss(tmp_path):
+    """Concurrent cap groups must not lose each other's accounting."""
+    from tools.deep_twilight_reference import (
+        load_state, note_stage_seconds, save_state, STAGE_CAP_GROUP)
+    state = {"stages": {}}
+    note_stage_seconds(tmp_path, state, "direct", 100.0, 64)
+    save_state(tmp_path, state, stage="direct")
+    # a different group saves its own file afterwards (its in-memory view
+    # never contained the direct group)
+    other = {"stages": {}}
+    note_stage_seconds(tmp_path, other, "candidate", 200.0, 64)
+    save_state(tmp_path, other, stage="candidate")
+    merged = load_state(tmp_path)
+    assert merged["stages"]["direct_and_source_pairs"]["cumulative_seconds"] == 100.0
+    assert merged["stages"]["candidate"]["cumulative_seconds"] == 200.0
+    # budget accounting for a stage reads its own group, not the merge
+    from tools.deep_twilight_reference import stage_budget, DEFAULT_PROTOCOL
+    protocol = json.loads(DEFAULT_PROTOCOL.read_text())
+    spent, left = stage_budget(tmp_path, "source-pairs", protocol, None)
+    assert spent == 100.0
+    assert left == protocol["wall_clock_caps_hours"]["direct_and_source_pairs"] * 3600.0 - 100.0

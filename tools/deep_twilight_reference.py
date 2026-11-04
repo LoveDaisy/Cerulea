@@ -59,6 +59,7 @@ Run from the repository root::
 from __future__ import annotations
 
 import argparse
+import shutil
 import hashlib
 import json
 import os
@@ -414,33 +415,69 @@ class Batch:
 # ---------------------------------------------------------------------------
 # wall-clock budget state
 # ---------------------------------------------------------------------------
-def load_state(data_dir: Path) -> dict:
-    path = data_dir / "state.json"
+def _group_state_path(data_dir: Path, group: str) -> Path:
+    return data_dir / f"state.{group}.json"
+
+
+def _read_group_state(data_dir: Path, group: str) -> dict | None:
+    """This cap group's own state file (the only writer is its stage)."""
+    path = _group_state_path(data_dir, group)
     if path.exists():
-        return json.loads(path.read_text())
-    return {"stages": {}}
+        return json.loads(path.read_text())["stages"][group]
+    return None
+
+
+def load_state(data_dir: Path, *, group: str | None = None) -> dict:
+    """Stage view of the cost accounting.
+
+    With ``group``, only that cap group is loaded (its own file, falling
+    back to the legacy combined ``state.json`` archived by the first
+    formal wave).  Without it, the merged view across all known sources
+    (group files take precedence; legacy fills the gaps).
+    """
+    merged = {"stages": {}}
+    legacy = data_dir / "state.json"
+    if legacy.exists():
+        merged["stages"].update(json.loads(legacy.read_text())["stages"])
+    for path in sorted(data_dir.glob("state.*.json")):
+        merged["stages"].update(json.loads(path.read_text())["stages"])
+    if group is not None:
+        own = _read_group_state(data_dir, group)
+        if own is not None:
+            merged["stages"][group] = own
+    return merged
 
 
 def save_state(data_dir: Path, state: dict, *, stage: str | None = None) -> None:
-    """Persist state; with ``stage``, merge only this stage's cap group.
+    """Persist cost accounting.
 
-    Group-scoped merging lets different cap-group stages run concurrently
-    (each process owns exactly one group) without losing the other's
-    cumulative accounting.
+    With ``stage`` the write is scoped to the stage's own cap-group file
+    via atomic replace: concurrent stages in *different* groups each own
+    one file and cannot lose each other's updates; stages inside the same
+    group are serial by protocol (single writer per file).  The legacy
+    combined ``state.json`` is never written again.
     """
-    path = data_dir / "state.json"
-    if stage is not None:
-        disk = load_state(data_dir)
-        group = STAGE_CAP_GROUP[stage]
-        disk.setdefault("stages", {})[group] = state["stages"][group]
-        state = disk
-    path.write_text(json.dumps(state, indent=1) + "\n")
-
-
-def stage_budget(state: dict, stage: str, protocol: dict, override_hours):
-    """Cumulative seconds spent and the remaining budget for this stage."""
+    if stage is None:
+        raise ValueError("save_state requires a stage (group-scoped files)")
     group = STAGE_CAP_GROUP[stage]
-    spent = float(state["stages"].get(group, {}).get("cumulative_seconds", 0.0))
+    path = _group_state_path(data_dir, group)
+    payload = {"stages": {group: state["stages"][group]}}
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(payload, indent=1) + "\n")
+    os.replace(tmp, path)
+
+
+def stage_budget(data_dir: Path, stage: str, protocol: dict, override_hours):
+    """Cumulative seconds spent and the remaining budget for this stage.
+
+    Reads this stage's cap-group accounting (own file first, legacy
+    combined state.json as fallback) -- never the merged cross-group view.
+    """
+    group = STAGE_CAP_GROUP[stage]
+    group_state = _read_group_state(data_dir, group)
+    if group_state is None:
+        group_state = load_state(data_dir)["stages"].get(group, {})
+    spent = float(group_state.get("cumulative_seconds", 0.0))
     if override_hours is not None:
         cap = float(override_hours) * 3600.0
     else:
@@ -510,7 +547,7 @@ def run_formal_stage(protocol, atmo, table, stage, data_dir, state, *,
     repeats = int(direct["repeats"])
     suns = protocol["scenario"]["sun_elevations_deg"]
     singles = deterministic_singles(protocol, atmo, table)
-    spent, budget_left = stage_budget(state, stage, protocol, max_stage_hours)
+    spent, budget_left = stage_budget(data_dir, stage, protocol, max_stage_hours)
     started = time.perf_counter()
     billed = started  # seconds of this invocation already noted into state
     computed = 0
@@ -580,7 +617,7 @@ def run_formal_stage(protocol, atmo, table, stage, data_dir, state, *,
                 print(json.dumps(dict(
                     stage=stage, batch_id=batch_id, seed=seed,
                     seconds=record["seconds"],
-                    cumulative_stage_seconds=spent_total(state, stage))),
+                    cumulative_stage_seconds=spent_total(data_dir, stage))),
                   flush=True)
             still_missing = [s for s in seeds if s not in batch.done]
             batch.close("complete" if not still_missing else "open")
@@ -593,13 +630,17 @@ def run_formal_stage(protocol, atmo, table, stage, data_dir, state, *,
         stage_status="complete" if not stopped else f"incomplete-{stopped}",
         stage=stage, computed=computed,
         stage_seconds_here=time.perf_counter() - started,
-        cumulative_seconds=spent_total(state, stage))), flush=True)
+        cumulative_seconds=spent_total(data_dir, stage))), flush=True)
     return computed
 
 
-def spent_total(state: dict, stage: str) -> float:
+def spent_total(data_dir: Path, stage: str) -> float:
     group = STAGE_CAP_GROUP[stage]
-    return float(state["stages"].get(group, {}).get("cumulative_seconds", 0.0))
+    own = _read_group_state(data_dir, group)
+    if own is not None:
+        return float(own.get("cumulative_seconds", 0.0))
+    return float(load_state(data_dir)["stages"].get(group, {})
+                 .get("cumulative_seconds", 0.0))
 
 
 def stage_smoke(protocol, atmo, table, out: Path) -> dict:
@@ -701,7 +742,7 @@ def stage_candidate(protocol, atmo, table, data_dir, state, *, protocol_path,
         singles3[sun_elev] = value
         print(json.dumps(dict(candidate_single=sun_elev,
                               seconds=time.perf_counter() - started)), flush=True)
-    spent, budget_left = stage_budget(state, "candidate", protocol, max_stage_hours)
+    spent, budget_left = stage_budget(data_dir, "candidate", protocol, max_stage_hours)
     started = time.perf_counter()
     billed = started
     billed_records = 0
@@ -809,7 +850,7 @@ def stage_candidate(protocol, atmo, table, data_dir, state, *, protocol_path,
                 print(json.dumps(dict(stage="candidate", batch_id=batch_id,
                                       seed=seed,
                                       seconds=record["seconds"],
-                                      cumulative_stage_seconds=spent_total(state, "candidate"))),
+                                      cumulative_stage_seconds=spent_total(data_dir, "candidate"))),
                       flush=True)
             still_missing = [s for s in seeds if s not in batch.done]
             batch.close("complete" if not still_missing else "open")
@@ -822,7 +863,7 @@ def stage_candidate(protocol, atmo, table, data_dir, state, *, protocol_path,
         stage_status="complete" if not stopped else f"incomplete-{stopped}",
         stage="candidate", computed=computed,
         stage_seconds_here=time.perf_counter() - started,
-        cumulative_seconds=spent_total(state, "candidate"))), flush=True)
+        cumulative_seconds=spent_total(data_dir, "candidate"))), flush=True)
     return computed
 
 
@@ -873,7 +914,7 @@ def stage_sensitivity(protocol, atmo, table, data_dir, state, *, protocol_path,
     repeats = int(sens.get("repeats", 16))
     photons = int(sens.get("photons_per_wavelength", 100_000))
     suns = protocol["scenario"]["sun_elevations_deg"]
-    spent, budget_left = stage_budget(state, "sensitivity", protocol, max_stage_hours)
+    spent, budget_left = stage_budget(data_dir, "sensitivity", protocol, max_stage_hours)
     started = time.perf_counter()
     billed = started
     billed_records = 0
@@ -1002,7 +1043,7 @@ def stage_sensitivity(protocol, atmo, table, data_dir, state, *, protocol_path,
         stage_status="complete" if not stopped else f"incomplete-{stopped}",
         stage="sensitivity", computed=computed,
         stage_seconds_here=time.perf_counter() - started,
-        cumulative_seconds=spent_total(state, "sensitivity"))), flush=True)
+        cumulative_seconds=spent_total(data_dir, "sensitivity"))), flush=True)
     return computed
 
 
@@ -1074,7 +1115,11 @@ def main(argv=None) -> int:
                     "protocol in contract-relevant sections; use a fresh "
                     "run root or consciously delete the snapshot")
         else:
-            snapshot.write_text(json.dumps(current, indent=1) + "\n")
+            # verbatim byte copy: the snapshot must carry the SAME sha as
+            # the executed protocol, or the summarizer's generation gate
+            # would see a fabricated third generation
+            import shutil
+            shutil.copyfile(args.protocol, snapshot)
     state = load_state(run_root)
     if args.stage == "candidate":
         stage_candidate(protocol, atmo, table, run_root, state,

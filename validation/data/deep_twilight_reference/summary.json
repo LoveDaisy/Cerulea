@@ -1,6 +1,6 @@
 {
  "schema": "deep-twilight-reference/summary/1",
- "generated": "2026-11-04T20:05:45+0800",
+ "generated": "2026-11-04T20:33:18+0800",
  "protocol_sha256": "23b46bd6784b91181c34cd5ff05656ce86f9aeecfa2bbe29c0728f1b432c87a1",
  "protocol_file": "protocol.json",
  "grid": [
@@ -2055,15 +2055,17 @@
   }
  },
  "contract_notes": [
-  "direct/s0b0: executed under protocol sha f6da541115da... (current file 23b46bd6784b...); stage-relevant sections validated semantically above",
-  "direct/s0b1: executed under protocol sha f6da541115da... (current file 23b46bd6784b...); stage-relevant sections validated semantically above",
-  "direct/s1b0: executed under protocol sha f6da541115da... (current file 23b46bd6784b...); stage-relevant sections validated semantically above",
-  "candidate/s0t0: records lack ['mode'] (pre-fix instrumentation); batch-meta provenance applies",
-  "candidate/s0t1: records lack ['mode'] (pre-fix instrumentation); batch-meta provenance applies",
-  "candidate/s1t0: records lack ['mode'] (pre-fix instrumentation); batch-meta provenance applies",
-  "candidate/s1t1: records lack ['mode'] (pre-fix instrumentation); batch-meta provenance applies",
-  "sensitivity/s0mc: records lack ['mode', 'protocol_sha256'] (pre-fix instrumentation); batch-meta provenance applies",
-  "sensitivity/s1mc: records lack ['mode', 'protocol_sha256'] (pre-fix instrumentation); batch-meta provenance applies"
+  "direct/s0b0: executed under known protocol generation f6da541115da... (direct/source-pairs wave (2026-11-04): identical scenario/source/direct/precision/luminance sections; candidate+sensitivity sections and the candidate wall-clock entry were appended later. Verified against the current contract for every stage-relevant field checked here.)",
+  "direct/s0b1: executed under known protocol generation f6da541115da... (direct/source-pairs wave (2026-11-04): identical scenario/source/direct/precision/luminance sections; candidate+sensitivity sections and the candidate wall-clock entry were appended later. Verified against the current contract for every stage-relevant field checked here.)",
+  "direct/s1b0: executed under known protocol generation f6da541115da... (direct/source-pairs wave (2026-11-04): identical scenario/source/direct/precision/luminance sections; candidate+sensitivity sections and the candidate wall-clock entry were appended later. Verified against the current contract for every stage-relevant field checked here.)",
+  "candidate/s0t0: records lack ['mode']; values taken from the batch meta provenance and validated against the protocol",
+  "candidate/s0t1: records lack ['mode']; values taken from the batch meta provenance and validated against the protocol",
+  "candidate/s1t0: records lack ['mode']; values taken from the batch meta provenance and validated against the protocol",
+  "candidate/s1t1: records lack ['mode']; values taken from the batch meta provenance and validated against the protocol",
+  "sensitivity/s0mc: batch-meta code_sha256 predates the records' implementation identity; the uniform per-record identity is authoritative",
+  "sensitivity/s0mc: records lack ['mode']; values taken from the batch meta provenance and validated against the protocol",
+  "sensitivity/s1mc: batch-meta code_sha256 predates the records' implementation identity; the uniform per-record identity is authoritative",
+  "sensitivity/s1mc: records lack ['mode']; values taken from the batch meta provenance and validated against the protocol"
  ],
  "candidate": {
   "-9.0": {
@@ -2420,11 +2422,11 @@
  "sensitivity": {
   "mc_items": [
    "baseline",
-   "disk4x16 (solar disk 2x8 -> 4x16)",
-   "max_scatter100 (order cap 50 -> 100)",
-   "rr_conservative (RR weight 0.05 -> 0.02, survival 0.75 -> 0.9)",
-   "fine_optical (_N_FINE 700 -> 1400)",
-   "fine_phase (_N_PHASE 2049 -> 4097)"
+   "disk4x16",
+   "max_scatter100",
+   "rr_conservative",
+   "fine_optical",
+   "fine_phase"
   ],
   "by_sun": {
    "-9.0": {

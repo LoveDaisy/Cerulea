@@ -142,6 +142,22 @@ def check_record_invariants(records, *, stage, batch_id):
                              "spectrum does not span the 81-wavelength grid")
 
 
+#: verified compatibility mapping for protocol generations older than the
+#: current file.  Each entry: executed protocol SHA256 -> human-verified
+#: statement of what the generation changed relative to the current file.
+#: A batch whose meta pins an unknown protocol generation is REJECTED, not
+#: silently accepted; the mapping is the auditable witness for the archived
+#: pre-candidate-section wave.
+KNOWN_PROTOCOL_GENERATIONS = {
+    "f6da541115dadeb612f7f9ec8eaf9449858f780b33c700fa0a039f1f37274f1e":
+        "direct/source-pairs wave (2026-11-04): identical scenario/source/"
+        "direct/precision/luminance sections; candidate+sensitivity "
+        "sections and the candidate wall-clock entry were appended later. "
+        "Verified against the current contract for every stage-relevant "
+        "field checked here.",
+}
+
+
 def check_batch_contract(records, meta, expect, *, stage, batch_id,
                          protocol_sha_now=None):
     """Records and batch meta must agree with the pre-registered contract.
@@ -154,36 +170,81 @@ def check_batch_contract(records, meta, expect, *, stage, batch_id,
     notes = []
     meta_protocol = meta.get("protocol_sha256")
     missing_fields = set()
+    filled_from_meta = set()
     for row in records:
         for key, want in expect.items():
             got = row.get(key)
             if got is None:
-                # pre-fix instrumentation: field absent from the record.
-                # Tolerated with an auditable note; a WRONG value is refused
-                missing_fields.add(key)
+                # pre-fix instrumentation: the record lacks the field.  The
+                # value is accepted only when the batch meta pins it AND it
+                # matches the protocol expectation (checked below when the
+                # meta pins an expect-listed field); otherwise rejected.
+                if meta.get(key) is not None:
+                    if meta[key] != want:
+                        raise ValueError(
+                            f"{stage}/{batch_id} seed {row['seed']}: batch "
+                            f"meta {key}={meta[key]!r} contradicts the "
+                            f"protocol requirement {want!r}")
+                    filled_from_meta.add(key)
+                else:
+                    missing_fields.add(key)
             elif got != want:
                 raise ValueError(
                     f"{stage}/{batch_id} seed {row['seed']}: contract field "
                     f"{key} is {got!r}, protocol requires {want!r}")
-        for key in ("protocol_sha256", "table_sha256"):
-            if meta.get(key) is None:
-                continue
-            got = row.get(key)
-            if got is None:
-                missing_fields.add(key)
-            elif got != meta[key]:
-                raise ValueError(
-                    f"{stage}/{batch_id} seed {row['seed']}: record {key} "
-                    "differs from the batch meta provenance")
+        # implementation identity: every record that carries it must match
+        # the batch meta exactly; records from before the identity was
+        # recorded are covered by the meta/known-generation gate below
+        if meta.get("code_sha256") is not None and \
+                row.get("code_sha256") is None:
+            missing_fields.add("code_sha256")
+        # executed-protocol identity: a record that carries it must match
+        # the batch meta (records predating the field fall through to the
+        # meta fallback / known-generation gate)
+        if (meta.get("protocol_sha256") is not None
+                and row.get("protocol_sha256") is not None
+                and row["protocol_sha256"] != meta["protocol_sha256"]):
+            raise ValueError(
+                f"{stage}/{batch_id} seed {row['seed']}: record "
+                "protocol_sha256 differs from the batch meta provenance")
+    # per-batch implementation uniformity: all records of one batch must
+    # share a single implementation identity (a batch spanning an edit is
+    # heterogeneous evidence and is refused); a stale batch-meta hash is an
+    # auditable note, with the per-record identity as the authority
+    record_codes = {json.dumps(r.get("code_sha256"), sort_keys=True)
+                    for r in records if r.get("code_sha256") is not None}
+    if len(record_codes) > 1:
+        raise ValueError(
+            f"{stage}/{batch_id}: records span {len(record_codes)} distinct "
+            "implementation identities -- mixed-implementation batches "
+            "must not be merged as independent repeats")
+    if meta.get("code_sha256") is not None and record_codes and \
+            json.dumps(meta["code_sha256"], sort_keys=True) not in record_codes:
+        notes.append(
+            f"{stage}/{batch_id}: batch-meta code_sha256 predates the "
+            "records' implementation identity; the uniform per-record "
+            "identity is authoritative")
     if missing_fields:
-        notes.append(f"{stage}/{batch_id}: records lack {sorted(missing_fields)} "
-                     "(pre-fix instrumentation); batch-meta provenance applies")
+        raise ValueError(
+            f"{stage}/{batch_id}: records lack {sorted(missing_fields)} and "
+            "the batch meta cannot substitute them; this generation is not "
+            "a known pre-fix wave")
+    if filled_from_meta:
+        notes.append(f"{stage}/{batch_id}: records lack {sorted(filled_from_meta)}; "
+                     "values taken from the batch meta provenance and "
+                     "validated against the protocol")
     if (protocol_sha_now is not None and meta_protocol is not None
             and meta_protocol != protocol_sha_now):
+        if meta_protocol not in KNOWN_PROTOCOL_GENERATIONS:
+            raise ValueError(
+                f"{stage}/{batch_id}: executed under unknown protocol "
+                f"generation {meta_protocol[:12]}...; no verified "
+                "compatibility mapping exists -- extend "
+                "KNOWN_PROTOCOL_GENERATIONS only after verifying the "
+                "stage-relevant sections are equivalent")
         notes.append(
-            f"{stage}/{batch_id}: executed under protocol sha "
-            f"{meta_protocol[:12]}... (current file {protocol_sha_now[:12]}...); "
-            "stage-relevant sections validated semantically above")
+            f"{stage}/{batch_id}: executed under known protocol generation "
+            f"{meta_protocol[:12]}... ({KNOWN_PROTOCOL_GENERATIONS[meta_protocol]})")
     return notes
 
 
@@ -521,6 +582,28 @@ def _candidate_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
                      table_sha256=cand_cfg["table"]["sha256"]),
                 stage="candidate", batch_id=batch_id,
                 protocol_sha_now=protocol_sha_now))
+            # component closure and wavelength coverage per record
+            want_wl = {f"{float(a):.1f}" for a in cand_cfg["wavelengths_nm"]}
+            for row in records:
+                got_wl = set(row["per_lambda"])
+                if got_wl != want_wl:
+                    raise ValueError(
+                        f"candidate/{batch_id} seed {row['seed']}: wavelength "
+                        f"set {sorted(got_wl)} != protocol {sorted(want_wl)}")
+                for a_nm, v in row["per_lambda"].items():
+                    recomposed = (v["deterministic_single"] + v["L2"]
+                                  + v["rest_mean"])
+                    if not math.isclose(v["total_cand"], recomposed,
+                                        rel_tol=1e-12, abs_tol=0.0):
+                        raise ValueError(
+                            f"candidate/{batch_id} seed {row['seed']} {a_nm}: "
+                            "total_cand != single + L2 + rest")
+                    if not math.isclose(v["rest_mean"],
+                                        v["mc_multiple"] - v["c2nt_mean"],
+                                        rel_tol=1e-12, abs_tol=0.0):
+                        raise ValueError(
+                            f"candidate/{batch_id} seed {row['seed']} {a_nm}: "
+                            "rest_mean != mc_multiple - c2nt_mean")
             per_anchor = {}
             for a_nm in anchors_nm:
                 cand_total = np.array([r["per_lambda"][str(a_nm)]["total_cand"]
@@ -620,13 +703,29 @@ def _sensitivity_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
     raw_dir = data_dir / "raw" / "sensitivity"
     if contract_notes is None:
         contract_notes = []
-    out = dict(mc_items=list(sens.get("mc_items", [])), by_sun={})
+    # protocol entries are "key (description)"; the records carry the key
+    required_items = [i.split(" (")[0].strip() for i in sens.get("mc_items", [])]
+    singles_path = raw_dir / "singles-refinement.json"
+    if not singles_path.exists():
+        raise ValueError(
+            "sensitivity: singles-refinement.json missing -- the "
+            "deterministic refinement evidence is required for a complete "
+            "sensitivity summary")
+    out = dict(mc_items=required_items, by_sun={})
     for sun_index, sun in enumerate(suns):
         batch_id = f"s{sun_index}mc"
         seeds = [110000 + 1000 * sun_index + r for r in range(repeats)]
         records, meta = load_batch(raw_dir / batch_id, seeds,
                                    stage="sensitivity", batch_id=batch_id)
         sens_budget = int(sens.get("photons_per_wavelength", 100_000))
+        for row in records:
+            got_items = set(row.get("items", {}))
+            lacking = [i for i in required_items if i not in got_items]
+            if lacking:
+                raise ValueError(
+                    f"sensitivity/{batch_id} seed {row['seed']}: missing "
+                    f"required items {lacking} -- the sensitivity summary "
+                    "must cover every protocol-declared experiment")
         contract_notes.extend(check_batch_contract(
             records, meta,
             dict(sun_elevation_deg=sun,
@@ -745,9 +844,15 @@ RSS_ERRATUM = ("direct/source-pairs records executed on Darwin between "
 
 
 def _cost_stats(data_dir, disk_meta):
-    state_path = data_dir / "state.json"
-    state = json.loads(state_path.read_text()) if state_path.exists() else {}
-    return dict(stage_state=state.get("stages", {}), rss_erratum=RSS_ERRATUM,
+    # per-group state files take precedence; the legacy combined
+    # state.json (first formal wave) fills the groups without a file
+    stages = {}
+    legacy = data_dir / "state.json"
+    if legacy.exists():
+        stages.update(json.loads(legacy.read_text())["stages"])
+    for path in sorted(data_dir.glob("state.*.json")):
+        stages.update(json.loads(path.read_text())["stages"])
+    return dict(stage_state=stages, rss_erratum=RSS_ERRATUM,
                 batches={bid: {"created": meta.get("created"),
                                "photons": meta.get("photons_per_wavelength"),
                                "mode": meta.get("mode"),
