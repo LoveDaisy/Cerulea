@@ -1,6 +1,6 @@
 {
  "schema": "deep-twilight-reference/manifest/1",
- "generated": "2026-11-04T19:00:59+0800",
+ "generated": "2026-11-04T19:03:25+0800",
  "files": {
   "README.md": "e42170fc87e544963cd71f9e555a2e730531932770ba06800688d43f1d13c91b",
   "probe/README.md": "93ed32f692d0e7509cf0397da6e46b20f1af4a2284322171b93718208bda8d07",
@@ -55,7 +55,7 @@
   "raw/source-pairs/s1b1-point/attempt-00.jsonl": "fa60d708c02daf9ca9fe5d7864dda46d6d52a77e237541302f5984431763b8b3",
   "raw/source-pairs/s1b1-point/meta.json": "3e595659d07c8afee95042af777a4346dbe5e2a4366415b1e90840af9a51877d",
   "regression-run-all.log": "70e663fe60257ffa6899949127c681ed3b2d74b93c7d3c3d6fc4a6427c48f3b7",
-  "state.json": "3874899eed8475cb5277ab99fc81899af2b0d787047f5049ec2a7b20e2958936",
+  "state.json": "0707e2949eb4195691e9c2bd0ce807fbd17b6941d1ea48e3f1b2fae95996f1b1",
   "table-heldout.json": "66fdb9c9e128dfd3c6e2369916b10d10bf95e4b432abe28c5e6c5562d686c8d9",
   "table-heldout.log": "ab48e2f7bacf786a9f8d768976be38a2f8470f23c7788f5c3741135d0a548e52"
  }

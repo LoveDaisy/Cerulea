@@ -1,6 +1,6 @@
 {
  "schema": "deep-twilight-reference/summary/1",
- "generated": "2026-11-04T19:00:59+0800",
+ "generated": "2026-11-04T19:03:25+0800",
  "protocol_sha256": "23b46bd6784b91181c34cd5ff05656ce86f9aeecfa2bbe29c0728f1b432c87a1",
  "grid": [
   380.0,
@@ -2682,11 +2682,26 @@
   "stage_state": {
    "direct_and_source_pairs": {
     "cumulative_seconds": 12622.206062375917,
-    "records": 2176,
+    "records": 96,
     "stages": [
      "direct",
      "source-pairs"
     ]
+   },
+   "candidate": {
+    "cumulative_seconds": 1303.54373024893,
+    "records": 64,
+    "stages": [
+     "candidate"
+    ]
+   },
+   "sensitivity": {
+    "cumulative_seconds": 140.14375508670807,
+    "records": 32,
+    "stages": [
+     "sensitivity"
+    ],
+    "note": "attempt-00 cost included; its data is superseded"
    }
   },
   "batches": {
