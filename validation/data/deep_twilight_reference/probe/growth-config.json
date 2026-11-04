@@ -1,0 +1,32 @@
+{
+  "wavelengths": [
+    450.0,
+    550.0,
+    650.0
+  ],
+  "suns": [
+    -9.0,
+    -12.0
+  ],
+  "budgets": [
+    100000,
+    400000,
+    1600000
+  ],
+  "repeats": 8,
+  "seed_rule": "20000 + sun_index*1000 + budget_index*100 + replicate",
+  "modes": [
+    "disk",
+    "point"
+  ],
+  "max_scatter": 50,
+  "disk_nodes": [
+    2,
+    8
+  ],
+  "table_sha256": "ed2376c9a6f5c8044b26b0e51bc36347057948ed710e3a3f87b514f4e4154be7",
+  "probe_sha256": "b13b52566a4cbb34cf634e7f464071872ecf0b8284fd907823443eb9fdfd28da",
+  "inherited_hardware_and_source_config": "config.json",
+  "timeout_seconds": 1800,
+  "precision_candidate": "finite-disk minus point-disk source effect on identical native paths"
+}

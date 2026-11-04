@@ -25,6 +25,7 @@ repository's `tools/` and `validation/data/` trees, linked from each report.
 | [AEROSOL_GRID_AUDIT.md](AEROSOL_GRID_AUDIT.md) | AOD550 slicing defect fixed; golden and physical-check changes independently attributed |
 | [TWILIGHT_REFERENCE_AUDIT.md](TWILIGHT_REFERENCE_AUDIT.md) | Primary observations, solar-axis uncertainty and limited synthetic V response |
 | [CURVED_TRANSPORT_AUDIT.md](CURVED_TRANSPORT_AUDIT.md) | Continuous diffuse refraction, independent checks and final exploration limits |
+| [DEEP_TWILIGHT_REFERENCE.md](DEEP_TWILIGHT_REFERENCE.md) | −9°/−12° zenith reference: pre-registered budgets/gates, paired finite-disk correction, two-scatter candidate and tail diagnostics |
 
 ## Matched-observation follow-up
 
@@ -33,12 +34,6 @@ raw-data checks: recoverable FORS metadata and same-twilight candidates, an
 independently identified station-ephemeris mismatch in published CSSP spectra,
 and original photometric time series. These are candidate validation inputs;
 instrument, background and atmospheric matching are still incomplete.
-The CSSP completion is carried by
-[CSSP_OBSERVATION_INPUTS.md](CSSP_OBSERVATION_INPUTS.md) and its frozen
-packet (`validation/data/cssp_observation_inputs/`): source identity, the raw
-acquisition contract (42 records, byte-exact pipeline replay), per-side
-weather/moon screening and the three-use verdict matrix (spectral shape and
-same-night decay conditional; absolute irradiance not certified).
 
 General scattering/refraction methods are in [physics/](../physics/README.md).
 Reference transcription is in [SECOND_DATASET.md](../../validation/SECOND_DATASET.md).

@@ -1,0 +1,35 @@
+{
+  "seconds": 75.70082745794207,
+  "table_seconds": 75.62852329097223,
+  "parameters": {
+    "n_height": 33,
+    "angle_tolerance_deg": 0.0002,
+    "derivative_tolerance": 0.005,
+    "tau_tolerance": 0.005,
+    "n_quad": 8,
+    "max_refine": 20,
+    "grazing_epsilon_deg": 1e-06,
+    "refracted": true,
+    "explicit_profile": false,
+    "low_height_grid": "sqrt(h) step .05 below 1km, .1 from 1 to 5km"
+  },
+  "definition": {
+    "sample_sha256": "0c9934700dd95581d44b01e3ced0c51932f83ccd94d457ef1e135f4ce0abc3eb",
+    "n_species": 4,
+    "ground_km": 0.0,
+    "top_km": 200.0,
+    "wavelengths": [
+      450.0,
+      550.0,
+      650.0
+    ],
+    "limitation": "Sampled signature does not prove arbitrary callable equality; load only the explicitly labelled frozen experiment definition"
+  },
+  "rows": 125,
+  "sha256": "ed2376c9a6f5c8044b26b0e51bc36347057948ed710e3a3f87b514f4e4154be7",
+  "ground_albedo": [
+    0.1,
+    0.1,
+    0.1
+  ]
+}

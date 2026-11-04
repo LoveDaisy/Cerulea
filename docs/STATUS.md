@@ -42,6 +42,10 @@ in [CURVED_TRANSPORT_AUDIT.md](twilight/CURVED_TRANSPORT_AUDIT.md).
 | 6 — Koomen twilight | PASS within stated tolerances; −6° deterministic 0.69×, −9°/−12° engine 1.12×/0.59× |
 
 Check6's deep points are one low-budget seed, not converged predictions. The
+[deep-twilight reference](twilight/DEEP_TWILIGHT_REFERENCE.md) quantifies
+what those points actually are: at 16 seeds × 1.6M photons/λ the −9°/−12°
+zenith anchors are still heavy-tail dominated (9–61 % conditional
+intervals), so no deep number in this file is a converged prediction. The
 older engine ratios 0.85–0.87× at −6° and 0.54× Patat at −9° predate the
 [AOD550 anchor-optics fix](twilight/AEROSOL_GRID_AUDIT.md); they are historical benchmarks.
 Independent numerical checks also cover Mie moments, SOS/MC agreement and
@@ -82,12 +86,6 @@ These backends have not replaced production defaults.
   The [2026-11-04 raw-observation follow-up](twilight/MATCHED_OBSERVATIONS.md)
   recovers candidate timestamps/site geometry and identifies a wrong-site
   ephemeris in published rural spectra; full observation matching is pending.
-  The CSSP completion ([CSSP_OBSERVATION_INPUTS](twilight/CSSP_OBSERVATION_INPUTS.md))
-  freezes a 42-record acquisition-contract packet with byte-exact pipeline
-  replay and screens nights independently: spectral shape and same-night decay
-  are conditional (neighbour fog at the 7/3 dawn window; moonlit 7/18–19
-  windows), and absolute irradiance stays uncertified (no angular response,
-  no in-situ columns, no certified-clear night in the dataset).
 - Rare-path MC uncertainty remains large in deep twilight. A single error bar or
   a better fit does not identify missing scattering or calibration error.
 - Horizon luminance and the 32-moment aureole remain unresolved; delta-fit,
