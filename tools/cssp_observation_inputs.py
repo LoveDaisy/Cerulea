@@ -905,9 +905,9 @@ def verify_packet(packet: Path, source_dir: Path | None = None) -> dict:
             # for unselected sessions, so the envelope bounds instead of
             # replaying the derivation).
             lo, hi = window["moon_elevation_deg_range"]
-            if window["moon_free"] != (hi < 0.0):
-                problems.append(f"{sid}/{side}: moon_free contradicts the stored "
-                                "moon elevation range")
+            if not (np.isfinite([lo, hi]).all() and lo <= hi):
+                problems.append(f"{sid}/{side}: stored moon range is not a "
+                                "finite ordered interval")
             w_start = datetime.fromisoformat(window["window_utc"][0])
             w_end = datetime.fromisoformat(window["window_utc"][1])
             instants = [(w_start + (w_end - w_start) * k / 24).isoformat()
@@ -917,6 +917,19 @@ def verify_packet(packet: Path, source_dir: Path | None = None) -> dict:
             if lo < min(envelope) - 0.05 or hi > max(envelope) + 0.05:
                 problems.append(f"{sid}/{side}: stored moon range is outside "
                                 "the vendored MICA envelope for the window")
+            # moon_free is re-decided from the MICA evidence itself whenever
+            # the moon stays on one side of the horizon for the whole stated
+            # window - the stored range is not trusted to carry the flag
+            # (r04 Major: [42.301, -1.0] plus moon_free=true used to pass).
+            if max(envelope) < 0.0 and window["moon_free"] is not True:
+                problems.append(f"{sid}/{side}: moon is below the horizon "
+                                "across the window but not marked moon-free")
+            if min(envelope) > 0.0 and window["moon_free"] is not False:
+                problems.append(f"{sid}/{side}: moon is above the horizon "
+                                "across the window but marked moon-free")
+            if window["moon_free"] != (hi < 0.0):
+                problems.append(f"{sid}/{side}: moon_free contradicts the stored "
+                                "moon elevation range")
             # Weather: summaries must recompute from the archived verbatim
             # responses, and states/verdict must re-render through the same
             # single source the build used.
@@ -2911,13 +2924,18 @@ def exposure_time_average(samples: np.ndarray, sample_times: np.ndarray,
     times = np.asarray(sample_times, dtype=float)
     if times.size != samples.size or times.size < 2:
         raise ValueError("need aligned sample times/values with >= 2 samples")
+    if not (np.isfinite(times).all() and np.isfinite(samples).all()):
+        raise ValueError("sample times and values must be finite")
     # np.interp requires ascending coordinates; an unordered series would
     # otherwise change the integral silently with the array order (r03).
     if not (np.diff(times) > 0).all():
         raise ValueError("sample times must be strictly increasing")
-    lo, hi = min(window), max(window)
-    if hi <= lo:
-        raise ValueError("window must have positive duration")
+    # Ordered input, not min/max normalisation: silently flipping a reversed
+    # window would launder an illegal exposure contract into a positive one
+    # (r04 Major).
+    lo, hi = float(window[0]), float(window[1])
+    if not lo < hi:
+        raise ValueError("window must be ordered with positive duration")
     if not (times.min() <= lo and hi <= times.max()):
         raise ValueError("window extends beyond the measured samples")
     grid = np.unique(np.concatenate(([lo, hi], times[(times > lo) & (times < hi)])))
@@ -2941,8 +2959,18 @@ def record_exposure_average(samples: np.ndarray, sample_times: np.ndarray,
         gaps.append(0.0)   # gaps are BETWEEN windows; no trailing gap
     if len(gaps) != len(exposure_seconds):
         raise ValueError("gaps_seconds needs len(exposures) or len(exposures)-1")
-    if any(g < 0 for g in gaps):
-        raise ValueError("gaps must be non-negative")
+    # The same exposure contract as exposure_weighted_mean, enforced here
+    # (r04 Major): this is the entry model consumers actually call, so a
+    # negative duration must be rejected - it used to flow through as a
+    # reversed window and a negative weight, returning negative flux for an
+    # all-positive sky. An empty list is a contract error, not a
+    # ZeroDivisionError.
+    if not exposure_seconds:
+        raise ValueError("at least one exposure is required")
+    if not all(np.isfinite(d) and d > 0 for d in exposure_seconds):
+        raise ValueError("exposure durations must be positive and finite")
+    if not all(np.isfinite(g) and g >= 0 for g in gaps):
+        raise ValueError("gaps must be finite and non-negative")
     averages, durations = [], []
     cursor = float(window_start)
     for duration, gap in zip(exposure_seconds, gaps):
@@ -2968,10 +2996,12 @@ def exposure_weighted_mean(values: np.ndarray, sample_seconds: list[float],
     if len(values) != len(sample_seconds) or len(values) != len(gaps):
         raise ValueError("values, sample_seconds and gaps_seconds must align "
                          "one-to-one; silent truncation would drop exposures")
-    if any(d <= 0 for d in sample_seconds):
-        raise ValueError("exposure durations must be positive")
-    if any(g < 0 for g in gaps):
-        raise ValueError("inter-exposure gaps must be non-negative")
+    if not np.isfinite(np.asarray(values, dtype=float)).all():
+        raise ValueError("exposure values must be finite")
+    if not all(np.isfinite(d) and d > 0 for d in sample_seconds):
+        raise ValueError("exposure durations must be positive and finite")
+    if not all(np.isfinite(g) and g >= 0 for g in gaps):
+        raise ValueError("inter-exposure gaps must be finite and non-negative")
     total = 0.0
     weight_sum = 0.0
     for value, duration, gap in zip(values, sample_seconds, gaps):

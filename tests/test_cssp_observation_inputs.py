@@ -915,11 +915,25 @@ def test_time_series_contract_rejects_unordered_and_illegal_exposures():
     assert exposure_time_average(samples, times, (0.0, 2.0)) == pytest.approx(2.0)
     with pytest.raises(ValueError, match="strictly increasing"):
         exposure_time_average(samples[::-1], times[::-1], (0.0, 2.0))
+    with pytest.raises(ValueError, match="ordered"):
+        exposure_time_average(samples, times, (2.0, 0.0))
+    with pytest.raises(ValueError, match="finite"):
+        exposure_time_average(np.array([1.0, 2.0, 3.0]),
+                              np.array([0.0, 1.0, np.inf]), (1.0, 2.0))
     with pytest.raises(ValueError, match="positive"):
         exposure_weighted_mean(np.array([1.0, 3.0]), [2.0, -1.0])
+    with pytest.raises(ValueError, match="positive"):
+        exposure_weighted_mean(np.array([1.0, 3.0]), [2.0, float("nan")])
     with pytest.raises(ValueError, match="non-negative"):
         exposure_weighted_mean(np.array([1.0, 3.0]), [2.0, 2.0],
                                gaps_seconds=[-1.0, 0.0])
+    # The entry model consumers actually call enforces the same contract
+    # (r04 Major): a negative duration used to flow through as a reversed
+    # window and a negative weight, returning -48.5 for an all-positive sky.
+    with pytest.raises(ValueError, match="positive and finite"):
+        record_exposure_average(samples, times, [2.0, -1.0], [1.0], 0.0)
+    with pytest.raises(ValueError, match="at least one exposure"):
+        record_exposure_average(samples, times, [], [], 0.0)
     with pytest.raises(ValueError, match="non-negative"):
         record_exposure_average(samples, times, [2.0, 2.0], [-1.0], 0.0)
 
@@ -984,6 +998,19 @@ def test_verify_recomputes_moon_and_weather_marks(tmp_path):
     assert not report["ok"]
     assert any("s11/dawn" in p and "weather_states do not recompute" in p
                for p in report["problems"])
+    # r04 Major: an unordered fabricated range must not launder a moonlit
+    # window either - moon_free is re-decided from the MICA envelope (the
+    # moon never dips below the horizon anywhere in this window), and the
+    # range itself must be a finite ordered interval.
+    def fabricate_range(doc):
+        w = doc["conditions"]["s11"]["target_windows"]["dawn"]
+        w["moon_elevation_deg_range"] = [42.301, -1.0]
+        w["moon_free"] = True
+
+    flip(fabricate_range)
+    report = verify_packet(copy)
+    assert not report["ok"]
+    assert any("s11/dawn" in p for p in report["problems"])
     # Elevation contract (r02 Major): a descending grid integrates the same
     # sky with a negated coordinate axis (negative flux), a partial band
     # silently returns a partial hemisphere - both are rejected outright
