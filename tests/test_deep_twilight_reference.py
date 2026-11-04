@@ -1198,7 +1198,7 @@ def test_fresh_run_root_direct_resume(tmp_path):
     # test_batch_contract_mismatch_refused)
     protocol["direct"]["budgets_photons"] = [400, 1600]
     (input_dir / "protocol.json").write_text(json.dumps(protocol))
-    with pytest.raises(SystemExit, match="snapshot differs"):
+    with pytest.raises(SystemExit, match="protocol snapshot"):
         main(["--protocol", str(input_dir / "protocol.json"),
               "--stage", "direct", "--out", str(run_root),
               "--max-stage-hours", "0.01"])
@@ -1239,6 +1239,55 @@ def test_sensitivity_item_gate_refuses_before_any_compute(tmp_path, monkeypatch)
     proto["sensitivity"]["mc_items"] = ["baseline"]
     with pytest.raises(ValueError, match="fixed supported set"):
         dtr.require_supported_sensitivity_items(proto)
+
+
+def test_run_root_protocol_identity_refuses_cross_stage_switch(
+        tmp_path, monkeypatch):
+    """One run root has exactly one protocol identity: a protocol that
+    only changes a not-yet-run stage's budgets must be refused BEFORE any
+    numeric work when the run root already carries a snapshot -- the old
+    section whitelist accepted such a run, which then wrote evidence the
+    frozen snapshot's own summarizer must refuse (generation-3 review
+    round-2)."""
+    import tools.deep_twilight_reference as dtr
+    input_a = tmp_path / "in-a"
+    input_a.mkdir()
+    proto_a = json.loads(DEFAULT_PROTOCOL.read_text())
+    proto_a["direct"]["repeats"] = 1
+    proto_a["direct"]["budgets_photons"] = [400, 800]
+    (input_a / "protocol.json").write_text(json.dumps(proto_a))
+    run_root = tmp_path / "run"
+    rc = dtr.main(["--protocol", str(input_a / "protocol.json"),
+                   "--stage", "direct", "--out", str(run_root),
+                   "--max-stage-hours", "0"])
+    assert rc == 0
+    snapshot = run_root / "protocol.snapshot.json"
+    frozen_bytes = snapshot.read_bytes()
+    # protocol B differs ONLY in sensitivity budgets (a stage that has
+    # not run in this run root); physical scenario / source / direct are
+    # byte-identical to protocol A
+    input_b = tmp_path / "in-b"
+    input_b.mkdir()
+    proto_b = json.loads(json.dumps(proto_a))
+    proto_b["sensitivity"]["repeats"] = 2
+    proto_b["sensitivity"]["photons_per_wavelength"] = 100
+    (input_b / "protocol.json").write_text(json.dumps(proto_b))
+    calls = []
+    monkeypatch.setattr(dtr, "build_scenario",
+                        lambda *a, **k: calls.append("build_scenario"))
+    monkeypatch.setattr(dtr, "load_source_table",
+                        lambda *a, **k: calls.append("load_source_table"))
+    with pytest.raises(SystemExit, match="protocol snapshot"):
+        dtr.main(["--protocol", str(input_b / "protocol.json"),
+                  "--stage", "sensitivity", "--out", str(run_root)])
+    assert calls == [], "numeric work ran before the identity refusal"
+    assert snapshot.read_bytes() == frozen_bytes, "snapshot was touched"
+    # the exact protocol bytes still resume the same run root
+    monkeypatch.undo()
+    rc2 = dtr.main(["--protocol", str(input_a / "protocol.json"),
+                    "--stage", "direct", "--out", str(run_root),
+                    "--max-stage-hours", "0.02"])
+    assert rc2 == 0
 
 
 def test_sensitivity_full_set_fresh_compute_passes_shared_contract(tmp_path):

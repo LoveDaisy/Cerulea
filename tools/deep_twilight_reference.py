@@ -1190,9 +1190,6 @@ def main(argv=None) -> int:
         # the stage-level gate alone would already have built the
         # atmosphere, loaded tables and evaluated deterministic singles
         require_supported_sensitivity_items(protocol)
-    atmo = build_scenario(protocol)
-    table = load_source_table(protocol, atmo)
-
     # the protocol directory is the READ-ONLY input root (frozen tables,
     # frozen protocol); --out is the writable run root and defaults to the
     # input root for the default archive layout.  A fresh run root is
@@ -1203,6 +1200,34 @@ def main(argv=None) -> int:
     if args.stage in SCRATCH_STAGES:
         if args.out is None:
             parser.error(f"--stage {args.stage} requires --out (scratch only)")
+    elif run_root != input_root:
+        # One run root has exactly one protocol identity -- the snapshot's
+        # bytes -- shared by execution, evidence validation and offline
+        # summarization.  (generation-3 review round-2: a local section
+        # whitelist here let a run root accept a protocol whose
+        # not-yet-run stage had different budgets, so the stage ran and
+        # wrote evidence under the new protocol that the frozen
+        # snapshot's own summarizer must refuse -- complete on the
+        # execution side, unusable on the consumption side.)
+        snapshot = run_root / "protocol.snapshot.json"
+        if snapshot.exists():
+            if args.protocol.read_bytes() != snapshot.read_bytes():
+                raise SystemExit(
+                    "input protocol bytes differ from the run-root "
+                    "protocol snapshot; a run root never switches "
+                    "protocol identity -- use a fresh run root or "
+                    "consciously delete the snapshot")
+        else:
+            run_root.mkdir(parents=True, exist_ok=True)
+            # verbatim byte copy: the snapshot must carry the SAME sha as
+            # the executed protocol, or the summarizer's generation gate
+            # would see a fabricated third generation
+            import shutil
+            shutil.copyfile(args.protocol, snapshot)
+
+    atmo = build_scenario(protocol)
+    table = load_source_table(protocol, atmo)
+    if args.stage in SCRATCH_STAGES:
         if args.stage == "smoke":
             summary = stage_smoke(protocol, atmo, table, args.out)
             print(json.dumps(dict(stage=args.stage, status=summary["status"],
@@ -1215,29 +1240,6 @@ def main(argv=None) -> int:
                                   summary["seconds_per_wavelength_path"]))))
         return 0
 
-    run_root.mkdir(parents=True, exist_ok=True)
-    if run_root != input_root:
-        snapshot = run_root / "protocol.snapshot.json"
-        current = json.loads(args.protocol.read_text())
-        if snapshot.exists():
-            frozen = json.loads(snapshot.read_text())
-            relevant = {k: current[k] for k in
-                        ("scenario", "source", "direct", "precision",
-                         "luminance") if k in current}
-            frozen_relevant = {k: frozen[k] for k in
-                               ("scenario", "source", "direct", "precision",
-                                "luminance") if k in frozen}
-            if relevant != frozen_relevant:
-                raise SystemExit(
-                    "run-root protocol snapshot differs from the input "
-                    "protocol in contract-relevant sections; use a fresh "
-                    "run root or consciously delete the snapshot")
-        else:
-            # verbatim byte copy: the snapshot must carry the SAME sha as
-            # the executed protocol, or the summarizer's generation gate
-            # would see a fabricated third generation
-            import shutil
-            shutil.copyfile(args.protocol, snapshot)
     state = load_state(run_root)
     if args.stage == "candidate":
         stage_candidate(protocol, atmo, table, run_root, state,
