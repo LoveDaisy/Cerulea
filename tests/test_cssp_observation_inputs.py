@@ -503,6 +503,11 @@ def test_replay_reproduces_published_columns_to_print_precision():
     # The hard-saturated record stays flagged even though upstream kept it.
     assert replay["records"]["c3114"]["stages"]["dark"][
         "saturated_pixels_mean_equals_65535"] == 0
+    # The pre-clamp negative count is real evidence of the nonlinear stray
+    # clamp (r03 Minor): counting after np.where made it identically zero.
+    # c1600's 47 was established by an independent recomputation (r03).
+    assert replay["records"]["c1600"]["stages"]["negative_clamped_pixels"] == 47
+    assert replay["records"]["c1743"]["stages"]["negative_clamped_pixels"] > 0
 
 
 def test_calibration_extract_covers_every_record_node_and_temperature():
@@ -885,6 +890,100 @@ def test_hemisphere_integral_azimuth_ring_contract():
     with pytest.raises(ValueError, match="closed azimuth ring needs"):
         hemispheric_irradiance_from_field(
             np.ones((1, 1, elev.size, 2)), elev, np.array([0.0, 360.0]))
+
+
+def test_seam_periodicity_check_is_scale_relative():
+    """r03 Major: an order-of-magnitude seam mismatch must be rejected at
+    deep-twilight radiance levels (~1e-9), not only at unit scale - the
+    check is scale-relative (rtol only), with no absolute slack."""
+    elev = np.linspace(0.0, 90.0, 91)
+    azim = np.array([0.0, 180.0, 360.0])
+    tiny = np.full((1, 1, elev.size, 3), 1e-9)
+    got = hemispheric_irradiance_from_field(tiny, elev, azim)
+    assert got[0, 0] == pytest.approx(np.pi * 1e-9, rel=2e-4)
+    tiny[..., -1] = 1e-8          # same direction, ten times brighter
+    with pytest.raises(ValueError, match="not periodic at the seam"):
+        hemispheric_irradiance_from_field(tiny, elev, azim)
+
+
+def test_time_series_contract_rejects_unordered_and_illegal_exposures():
+    """r03 Major: reordering the same samples must not change the exposure
+    mean, and nonpositive durations / negative gaps are illegal exposure
+    contracts that must be rejected, not silently integrated."""
+    times = np.arange(0.0, 6.0)
+    samples = 1.0 + times
+    assert exposure_time_average(samples, times, (0.0, 2.0)) == pytest.approx(2.0)
+    with pytest.raises(ValueError, match="strictly increasing"):
+        exposure_time_average(samples[::-1], times[::-1], (0.0, 2.0))
+    with pytest.raises(ValueError, match="positive"):
+        exposure_weighted_mean(np.array([1.0, 3.0]), [2.0, -1.0])
+    with pytest.raises(ValueError, match="non-negative"):
+        exposure_weighted_mean(np.array([1.0, 3.0]), [2.0, 2.0],
+                               gaps_seconds=[-1.0, 0.0])
+    with pytest.raises(ValueError, match="non-negative"):
+        record_exposure_average(samples, times, [2.0, 2.0], [-1.0], 0.0)
+
+
+def test_verify_recomputes_saturation_from_raw(tmp_path):
+    """r03 Major: the saturation flag is derived, raw-evidenced content -
+    flipping it must be rejected even with a re-signed manifest."""
+    copy = tmp_path / "packet"
+    shutil.copytree(PACKET, copy)
+    records = read_json(copy / "records.json")
+    target = next(r for r in records["records"] if r["record_id"] == "c3114")
+    assert target["saturation"]["suspect"] is True
+    assert target["instrument"]["spd_max_value"]["value"] == 65535.0
+    target["saturation"]["suspect"] = False
+    write_json(copy / "records.json", records)
+    manifest = read_json(copy / "inputs.sha256.json")
+    manifest["records.json"] = sha256_file(copy / "records.json")
+    write_json(copy / "inputs.sha256.json", manifest)
+    report = verify_packet(copy)
+    assert not report["ok"]
+    assert any(p.startswith("c3114:")
+               and "saturation block does not recompute" in p
+               for p in report["problems"])
+
+
+def test_verify_recomputes_moon_and_weather_marks(tmp_path):
+    """r03 Major: moon_free and weather states derive from the vendored MICA
+    tables and archived verbatim responses - flipping either must be rejected
+    even with a re-signed manifest (hashes prove identity, not derivation)."""
+    copy = tmp_path / "packet"
+    shutil.copytree(PACKET, copy)
+
+    def flip(mutate):
+        conditions = read_json(copy / "conditions.json")
+        mutate(conditions)
+        write_json(copy / "conditions.json", conditions)
+        manifest = read_json(copy / "inputs.sha256.json")
+        manifest["conditions.json"] = sha256_file(copy / "conditions.json")
+        write_json(copy / "inputs.sha256.json", manifest)
+
+    # A moonlit window marked moon-free contradicts its own stored range...
+    def flip_moon(doc):
+        w = doc["conditions"]["s11"]["target_windows"]["dawn"]
+        assert w["moon_free"] is False
+        assert w["moon_elevation_deg_range"][0] > 40.0
+        w["moon_free"] = True
+
+    flip(flip_moon)
+    report = verify_packet(copy)
+    assert not report["ok"]
+    assert any("s11/dawn" in p and "moon_free contradicts" in p
+               for p in report["problems"])
+    # ...and a fabricated clear-sky state cannot survive recomputation from
+    # the archived responses.
+    def flip_weather(doc):
+        w = doc["conditions"]["s11"]["target_windows"]["dawn"]
+        w["weather_states"]["stations"]["KN38"]["state"] = "CLR"
+        w["weather_states"]["all_clear"] = True
+
+    flip(flip_weather)
+    report = verify_packet(copy)
+    assert not report["ok"]
+    assert any("s11/dawn" in p and "weather_states do not recompute" in p
+               for p in report["problems"])
     # Elevation contract (r02 Major): a descending grid integrates the same
     # sky with a negated coordinate axis (negative flux), a partial band
     # silently returns a partial hemisphere - both are rejected outright

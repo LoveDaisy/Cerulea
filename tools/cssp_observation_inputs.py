@@ -830,6 +830,12 @@ def verify_packet(packet: Path, source_dir: Path | None = None) -> dict:
                     problems.append(f"{record_id}: timing block does not recompute "
                                     "from the raw contract via "
                                     "nominal_exposure_window")
+                expected_saturation = saturation_block(
+                    contract["spd_max_value"]["value"])
+                if json.dumps(expected_saturation, sort_keys=True) != \
+                        json.dumps(record.get("saturation"), sort_keys=True):
+                    problems.append(f"{record_id}: saturation block does not "
+                                    "recompute from the raw spd maximum")
         else:
             problems.append(f"{record_id}: no raw member bound (AC1 requires one)")
 
@@ -876,6 +882,72 @@ def verify_packet(packet: Path, source_dir: Path | None = None) -> dict:
             problems.append(f"{decision['session_id']}: decision without reason")
         if decision["decision"] == "selected" and decision["session_id"] not in conditions:
             problems.append(f"{decision['session_id']}: selected but no conditions entry")
+
+    # Derived availability marks must recompute from the vendored evidence
+    # (r03 Major, AC7): a hand-flipped saturation flag or a moonlit window
+    # marked moon-free used to pass with a re-signed manifest - hashes prove
+    # frozen identity, not that the derivation agrees with the evidence.
+    station_meta = _weather_station_meta()
+    weather_dir = packet / "raw/weather"
+    weather_files = sorted(p.name for p in weather_dir.iterdir())
+    paths_by_station = {
+        "KN38": [weather_dir / f for f in weather_files
+                 if f.startswith(("iem-N38-obhistory", "frozen-iem"))],
+        "KBFD": [weather_dir / f for f in weather_files
+                 if f.startswith(("noaa-BFD", "frozen-noaa"))],
+    }
+    for sid, cond in conditions.items():
+        date_keys = [d.replace("-", "") for d in cond["local_dates_utc_covered"]]
+        for side, window in cond.get("target_windows", {}).items():
+            # Moon: moon_free must follow from the stored range, and the
+            # range must sit inside the vendored MICA envelope over the
+            # stated window (the window columns' own labels are not vendored
+            # for unselected sessions, so the envelope bounds instead of
+            # replaying the derivation).
+            lo, hi = window["moon_elevation_deg_range"]
+            if window["moon_free"] != (hi < 0.0):
+                problems.append(f"{sid}/{side}: moon_free contradicts the stored "
+                                "moon elevation range")
+            w_start = datetime.fromisoformat(window["window_utc"][0])
+            w_end = datetime.fromisoformat(window["window_utc"][1])
+            instants = [(w_start + (w_end - w_start) * k / 24).isoformat()
+                        for k in range(25)]
+            envelope = [mica_elevation(moon_tab, unix_of(iso))["elevation_deg"]
+                        for iso in instants]
+            if lo < min(envelope) - 0.05 or hi > max(envelope) + 0.05:
+                problems.append(f"{sid}/{side}: stored moon range is outside "
+                                "the vendored MICA envelope for the window")
+            # Weather: summaries must recompute from the archived verbatim
+            # responses, and states/verdict must re-render through the same
+            # single source the build used.
+            summaries = {}
+            for station_key, station_paths in paths_by_station.items():
+                paths = [p for p in station_paths
+                         if p.name.startswith("frozen")
+                         or any(k in p.name for k in date_keys)]
+                frozen_station = window["weather"][station_key]
+                rows = weather_rows_for_window(paths, *window["window_utc"])
+                context_rows = weather_rows_for_window(
+                    paths, *frozen_station["context_window_utc"])
+                summaries[station_key] = {
+                    **station_meta[station_key],
+                    "window_utc": window["window_utc"],
+                    "summary": summarize_weather_rows(rows, station_key),
+                    "context_window_utc": frozen_station["context_window_utc"],
+                    "context_summary": summarize_weather_rows(context_rows, station_key),
+                }
+            if json.dumps(summaries, sort_keys=True) != \
+                    json.dumps(window["weather"], sort_keys=True):
+                problems.append(f"{sid}/{side}: weather summaries do not "
+                                "recompute from the archived responses")
+            states = window_states({"weather": summaries})
+            if json.dumps(states, sort_keys=True) != \
+                    json.dumps(window["weather_states"], sort_keys=True):
+                problems.append(f"{sid}/{side}: weather_states do not recompute "
+                                "from the archived responses")
+            if render_window_verdict(window["moon_free"], states) != window["verdict"]:
+                problems.append(f"{sid}/{side}: verdict does not re-render from "
+                                "the recomputed states")
 
     # Selected-session coherence: every record's session_id must be the
     # session that actually contains its column.
@@ -1440,20 +1512,7 @@ def _build_packet_into(out: Path, cache_dir: Path) -> None:
                     "integration_time_set_us", "n_exposures", "n_pixels",
                     "board_temp_c", "wls_first_nm", "wls_last_nm", "wls_sha256",
                     "spd_shape", "spd_max_value")},
-            "saturation": {
-                "suspect": bool(contract["spd_max_value"]["value"] is not None
-                                and contract["spd_max_value"]["value"] >= 62258.0),
-                "assumed_ceiling_counts": 65535,
-                "suspect_threshold_counts": 62258,
-                "spd_max_over_assumed_ceiling": (
-                    None if contract["spd_max_value"]["value"] is None
-                    else round(contract["spd_max_value"]["value"] / 65535.0, 4)),
-                "evidence": EVIDENCE_SCENARIO,
-                "note": "USB2000+ is a 16-bit detector; the 65535 ceiling is an "
-                        "assumption (not a published specification) so the flag is "
-                        "scenario-level. The raw-measured spd_max_over_assumed_ceiling "
-                        "is the dependable quantity; values within a few percent of "
-                        "ceiling need exposure context before band ratios are trusted"},
+            "saturation": saturation_block(contract["spd_max_value"]["value"]),
             "integration_set_readback_consistent": (
                 None if (t_us is None or set_us is None)
                 else bool(t_us == set_us)),
@@ -1844,6 +1903,45 @@ def session_verdict(side_windows: dict) -> str:
     return "; ".join(parts)
 
 
+def saturation_block(spd_max_value: float | None) -> dict:
+    """Scenario-level saturation flag derived from the raw spd maximum.
+
+    USB2000+ is a 16-bit detector; the 65535 ceiling is an assumption (not a
+    published specification), so the flag is scenario-level. The raw-measured
+    ratio is the dependable quantity; values within a few percent of ceiling
+    need exposure context before band ratios are trusted. Single source for
+    build and acceptance (r03 Major): a flipped frozen flag must fail verify.
+    """
+    return {
+        "suspect": bool(spd_max_value is not None and spd_max_value >= 62258.0),
+        "assumed_ceiling_counts": 65535,
+        "suspect_threshold_counts": 62258,
+        "spd_max_over_assumed_ceiling": (
+            None if spd_max_value is None
+            else round(spd_max_value / 65535.0, 4)),
+        "evidence": EVIDENCE_SCENARIO,
+        "note": "USB2000+ is a 16-bit detector; the 65535 ceiling is an "
+                "assumption (not a published specification) so the flag is "
+                "scenario-level. The raw-measured spd_max_over_assumed_ceiling "
+                "is the dependable quantity; values within a few percent of "
+                "ceiling need exposure context before band ratios are trusted",
+    }
+
+
+def _weather_station_meta() -> dict:
+    """Neighbour-station geometry relative to CSSP (shared build+verify)."""
+    return {
+        "KN38": {"station": KN38,
+                 "distance_km": round(haversine_km(CSSP["lat_deg"], CSSP["lon_deg"],
+                                                   KN38["lat_deg"], KN38["lon_deg"]), 2),
+                 "elevation_diff_m": round(KN38["elevation_m"] - CSSP["elevation_m"], 2)},
+        "KBFD": {"station": KBFD,
+                 "distance_km": round(haversine_km(CSSP["lat_deg"], CSSP["lon_deg"],
+                                                   KBFD["lat_deg"], KBFD["lon_deg"]), 2),
+                 "elevation_diff_m": round(KBFD["elevation_m"] - CSSP["elevation_m"], 2)},
+    }
+
+
 def build_conditions(out: Path, labels: list[str], values: np.ndarray,
                      inventory: list[dict], sun_tab: dict, moon_tab: dict,
                      selected_by_session: dict[str, list[int]] | None = None,
@@ -1866,16 +1964,7 @@ def build_conditions(out: Path, labels: list[str], values: np.ndarray,
         "KBFD": [out / "raw/weather" / f for f in weather_files
                  if f.startswith(("noaa-BFD", "frozen-noaa"))],
     }
-    station_meta = {
-        "KN38": {"station": KN38,
-                 "distance_km": round(haversine_km(CSSP["lat_deg"], CSSP["lon_deg"],
-                                                   KN38["lat_deg"], KN38["lon_deg"]), 2),
-                 "elevation_diff_m": round(KN38["elevation_m"] - CSSP["elevation_m"], 2)},
-        "KBFD": {"station": KBFD,
-                 "distance_km": round(haversine_km(CSSP["lat_deg"], CSSP["lon_deg"],
-                                                   KBFD["lat_deg"], KBFD["lon_deg"]), 2),
-                 "elevation_diff_m": round(KBFD["elevation_m"] - CSSP["elevation_m"], 2)},
-    }
+    station_meta = _weather_station_meta()
     for sess in inventory:
         sid = sess["session_id"]
         if sess["signal_kind"] != "twilight-or-night":
@@ -2430,6 +2519,10 @@ def replay_record(cal: dict, mat_path: Path, published: np.ndarray,
     filtered = filtered[:cal["wls"].size]
 
     absolute = filtered * cal["correction_factor"] * np.pi
+    # Count the negatives BEFORE the stray clamp - after np.where the
+    # counter was identically zero and the nonlinear step left no trace in
+    # the staged evidence (r03 Minor).
+    negative_clamped = int((absolute < 0).sum())
     absolute = np.where(absolute < 0, 0.0, absolute)   # Preprocess.m stray clamp
 
     crop = (cal["wls"] >= REPLAY_CROP_NM[0]) & (cal["wls"] <= REPLAY_CROP_NM[1])
@@ -2456,7 +2549,7 @@ def replay_record(cal: dict, mat_path: Path, published: np.ndarray,
             "per_us_max": float(np.nanmax(per_us)),
             "interp_nan_outside_count": int(outside.sum()),
             "filter_span": filter_span,
-            "negative_clamped_pixels": int((absolute < 0).sum()),
+            "negative_clamped_pixels": negative_clamped,
         },
         "published_vs_replay": {
             "n_valid_wavelengths": int(valid.sum()),
@@ -2781,7 +2874,11 @@ def hemispheric_irradiance_from_field(radiance: np.ndarray,
         # at azim[0] + 2*pi, so the wrap sector is integrated, not dropped.
         if azim.size < 3:
             raise ValueError("a closed azimuth ring needs >= 3 samples")
-        seam_same = np.isclose(values[..., -1], values[..., 0], equal_nan=True)
+        # Scale-relative only (rtol, atol=0): an absolute tolerance would
+        # pass seams that are off by an order of magnitude exactly at
+        # deep-twilight radiance levels (~1e-9 W m-2 sr-1 nm-1).
+        seam_same = np.isclose(values[..., -1], values[..., 0],
+                               rtol=1e-5, atol=0.0, equal_nan=True)
         if not bool(np.all(seam_same)):
             raise ValueError("azimuth field is not periodic at the seam: "
                              "first and last samples share one direction")
@@ -2814,6 +2911,10 @@ def exposure_time_average(samples: np.ndarray, sample_times: np.ndarray,
     times = np.asarray(sample_times, dtype=float)
     if times.size != samples.size or times.size < 2:
         raise ValueError("need aligned sample times/values with >= 2 samples")
+    # np.interp requires ascending coordinates; an unordered series would
+    # otherwise change the integral silently with the array order (r03).
+    if not (np.diff(times) > 0).all():
+        raise ValueError("sample times must be strictly increasing")
     lo, hi = min(window), max(window)
     if hi <= lo:
         raise ValueError("window must have positive duration")
@@ -2840,6 +2941,8 @@ def record_exposure_average(samples: np.ndarray, sample_times: np.ndarray,
         gaps.append(0.0)   # gaps are BETWEEN windows; no trailing gap
     if len(gaps) != len(exposure_seconds):
         raise ValueError("gaps_seconds needs len(exposures) or len(exposures)-1")
+    if any(g < 0 for g in gaps):
+        raise ValueError("gaps must be non-negative")
     averages, durations = [], []
     cursor = float(window_start)
     for duration, gap in zip(exposure_seconds, gaps):
@@ -2865,6 +2968,10 @@ def exposure_weighted_mean(values: np.ndarray, sample_seconds: list[float],
     if len(values) != len(sample_seconds) or len(values) != len(gaps):
         raise ValueError("values, sample_seconds and gaps_seconds must align "
                          "one-to-one; silent truncation would drop exposures")
+    if any(d <= 0 for d in sample_seconds):
+        raise ValueError("exposure durations must be positive")
+    if any(g < 0 for g in gaps):
+        raise ValueError("inter-exposure gaps must be non-negative")
     total = 0.0
     weight_sum = 0.0
     for value, duration, gap in zip(values, sample_seconds, gaps):

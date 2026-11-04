@@ -188,7 +188,7 @@
         "per_us_max": 0.00017129656437096777,
         "interp_nan_outside_count": 243,
         "filter_span": 8,
-        "negative_clamped_pixels": 0
+        "negative_clamped_pixels": 4
       },
       "published_vs_replay": {
         "n_valid_wavelengths": 561,
@@ -219,7 +219,7 @@
         "per_us_max": 0.00016692756437096772,
         "interp_nan_outside_count": 243,
         "filter_span": 8,
-        "negative_clamped_pixels": 0
+        "negative_clamped_pixels": 2
       },
       "published_vs_replay": {
         "n_valid_wavelengths": 561,
@@ -250,7 +250,7 @@
         "per_us_max": 0.00015660904568959568,
         "interp_nan_outside_count": 243,
         "filter_span": 8,
-        "negative_clamped_pixels": 0
+        "negative_clamped_pixels": 47
       },
       "published_vs_replay": {
         "n_valid_wavelengths": 561,
@@ -281,7 +281,7 @@
         "per_us_max": 0.00015214762771155737,
         "interp_nan_outside_count": 243,
         "filter_span": 8,
-        "negative_clamped_pixels": 0
+        "negative_clamped_pixels": 206
       },
       "published_vs_replay": {
         "n_valid_wavelengths": 561,
@@ -312,7 +312,7 @@
         "per_us_max": 0.00017344631560317685,
         "interp_nan_outside_count": 243,
         "filter_span": 8,
-        "negative_clamped_pixels": 0
+        "negative_clamped_pixels": 123
       },
       "published_vs_replay": {
         "n_valid_wavelengths": 561,
@@ -343,7 +343,7 @@
         "per_us_max": 0.0001757071022522821,
         "interp_nan_outside_count": 243,
         "filter_span": 8,
-        "negative_clamped_pixels": 0
+        "negative_clamped_pixels": 6
       },
       "published_vs_replay": {
         "n_valid_wavelengths": 561,
@@ -405,7 +405,7 @@
         "per_us_max": 0.00018202367782080834,
         "interp_nan_outside_count": 243,
         "filter_span": 8,
-        "negative_clamped_pixels": 0
+        "negative_clamped_pixels": 6
       },
       "published_vs_replay": {
         "n_valid_wavelengths": 561,
@@ -436,7 +436,7 @@
         "per_us_max": 0.00018096756588933466,
         "interp_nan_outside_count": 243,
         "filter_span": 8,
-        "negative_clamped_pixels": 0
+        "negative_clamped_pixels": 7
       },
       "published_vs_replay": {
         "n_valid_wavelengths": 561,
@@ -622,7 +622,7 @@
         "per_us_max": 0.0014281737630208334,
         "interp_nan_outside_count": 243,
         "filter_span": 8,
-        "negative_clamped_pixels": 0
+        "negative_clamped_pixels": 5
       },
       "published_vs_replay": {
         "n_valid_wavelengths": 561,
@@ -901,7 +901,7 @@
         "per_us_max": 0.00024334302172057088,
         "interp_nan_outside_count": 243,
         "filter_span": 8,
-        "negative_clamped_pixels": 0
+        "negative_clamped_pixels": 42
       },
       "published_vs_replay": {
         "n_valid_wavelengths": 561,
@@ -932,7 +932,7 @@
         "per_us_max": 0.0002432747560955709,
         "interp_nan_outside_count": 243,
         "filter_span": 8,
-        "negative_clamped_pixels": 0
+        "negative_clamped_pixels": 20
       },
       "published_vs_replay": {
         "n_valid_wavelengths": 561,
@@ -963,7 +963,7 @@
         "per_us_max": 0.0002474687458142852,
         "interp_nan_outside_count": 243,
         "filter_span": 8,
-        "negative_clamped_pixels": 0
+        "negative_clamped_pixels": 22
       },
       "published_vs_replay": {
         "n_valid_wavelengths": 561,
@@ -994,7 +994,7 @@
         "per_us_max": 0.0002597354071808344,
         "interp_nan_outside_count": 243,
         "filter_span": 8,
-        "negative_clamped_pixels": 0
+        "negative_clamped_pixels": 18
       },
       "published_vs_replay": {
         "n_valid_wavelengths": 561,
@@ -1025,7 +1025,7 @@
         "per_us_max": 0.0002603659845069995,
         "interp_nan_outside_count": 243,
         "filter_span": 8,
-        "negative_clamped_pixels": 0
+        "negative_clamped_pixels": 16
       },
       "published_vs_replay": {
         "n_valid_wavelengths": 561,
@@ -1056,7 +1056,7 @@
         "per_us_max": 0.00028458403863875,
         "interp_nan_outside_count": 243,
         "filter_span": 8,
-        "negative_clamped_pixels": 0
+        "negative_clamped_pixels": 40
       },
       "published_vs_replay": {
         "n_valid_wavelengths": 561,
@@ -1087,7 +1087,7 @@
         "per_us_max": 0.0002772013729668929,
         "interp_nan_outside_count": 243,
         "filter_span": 8,
-        "negative_clamped_pixels": 0
+        "negative_clamped_pixels": 20
       },
       "published_vs_replay": {
         "n_valid_wavelengths": 561,
@@ -1118,7 +1118,7 @@
         "per_us_max": 0.000278976279216893,
         "interp_nan_outside_count": 243,
         "filter_span": 8,
-        "negative_clamped_pixels": 0
+        "negative_clamped_pixels": 13
       },
       "published_vs_replay": {
         "n_valid_wavelengths": 561,
@@ -1149,7 +1149,7 @@
         "per_us_max": 0.00040115697523986294,
         "interp_nan_outside_count": 243,
         "filter_span": 8,
-        "negative_clamped_pixels": 0
+        "negative_clamped_pixels": 8
       },
       "published_vs_replay": {
         "n_valid_wavelengths": 561,
@@ -1180,7 +1180,7 @@
         "per_us_max": 0.0004445651185670056,
         "interp_nan_outside_count": 243,
         "filter_span": 8,
-        "negative_clamped_pixels": 0
+        "negative_clamped_pixels": 7
       },
       "published_vs_replay": {
         "n_valid_wavelengths": 561,
@@ -1211,7 +1211,7 @@
         "per_us_max": 0.0004922739962691486,
         "interp_nan_outside_count": 243,
         "filter_span": 8,
-        "negative_clamped_pixels": 0
+        "negative_clamped_pixels": 16
       },
       "published_vs_replay": {
         "n_valid_wavelengths": 561,
@@ -1242,7 +1242,7 @@
         "per_us_max": 0.00750974701013551,
         "interp_nan_outside_count": 243,
         "filter_span": 8,
-        "negative_clamped_pixels": 0
+        "negative_clamped_pixels": 4
       },
       "published_vs_replay": {
         "n_valid_wavelengths": 561,
