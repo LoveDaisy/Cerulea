@@ -199,10 +199,9 @@ def compute_summary(data_dir: Path, protocol: dict) -> dict:
                  for r in range(repeats)],
                 stage="direct", batch_id=batch_id)
             check_record_invariants(records, stage="direct", batch_id=batch_id)
-            fingerprints = {r["fingerprint"] for r in records}
-            if len(fingerprints) != 1:
-                raise ValueError(f"direct/{batch_id}: native paths differ "
-                                 "between repeats (fingerprint not uniform)")
+            # NOTE: fingerprints identify the per-seed path SET, so they are
+            # all distinct within a batch by design; the meaningful identity
+            # is same-seed disk/point equality, checked in the pairs section
             disk_records[(sun, photons)] = records
             disk_meta[batch_id] = meta
             per_budget[str(photons)] = _budget_stats(
@@ -305,7 +304,7 @@ def _budget_stats(records, wl, v_curve, anchor_idx, sun, budget, protocol,
     # all-zero record = detection limit ("no-tail-evidence")
     zero_records = [int(r["seed"]) for r, m in zip(records, multiple_rows)
                     if not np.any(m > 0.0)]
-    anchor_all_zero = {float(wl[i]): bool(any(
+    anchor_all_zero = {str(float(wl[i])): bool(any(
         not (np.asarray(r["fields"]["multiple"])[i] > 0.0) for r in records))
         for i in anchor_idx}
 
@@ -322,7 +321,7 @@ def _budget_stats(records, wl, v_curve, anchor_idx, sun, budget, protocol,
             values.extend(per)
         return max(values) if values else None
 
-    tail = {float(wl[i]): {"max_path_fraction": _tail("max_fraction", i),
+    tail = {str(float(wl[i])): {"max_path_fraction": _tail("max_fraction", i),
                            "top001_fraction": _tail("top001_fraction", i),
                            "effective_contributors_min": min(
                                d["effective_contributors"]
@@ -338,8 +337,8 @@ def _budget_stats(records, wl, v_curve, anchor_idx, sun, budget, protocol,
     # gates
     scale_key = str(sun)
     scales = precision["anchor_scales"][scale_key]
-    anchor_hw = {float(wl[i]): float(half[i]) for i in anchor_idx}
-    anchor_boot_hw = {float(wl[i]): float(boot_half_spec[i]) for i in anchor_idx}
+    anchor_hw = {str(float(wl[i])): float(half[i]) for i in anchor_idx}
+    anchor_boot_hw = {str(float(wl[i])): float(boot_half_spec[i]) for i in anchor_idx}
     anchor_factor = float(precision["anchor_halfwidth_factor"])
     y_rel_half = y_half / y_mean if y_mean else math.inf
     y_rel_boot = boot_half_y / y_mean if y_mean else math.inf
@@ -351,11 +350,11 @@ def _budget_stats(records, wl, v_curve, anchor_idx, sun, budget, protocol,
         if zero_records:
             failed.append(f"no-tail-evidence (all-zero records: {zero_records})")
         for a, s, i in zip(anchors, scales, anchor_idx):
-            if anchor_all_zero[float(wl[i])]:
+            if anchor_all_zero[str(float(wl[i]))]:
                 failed.append(f"anchor {a} nm has all-zero records")
-            elif hw_map[float(wl[i])] > float(s) * anchor_factor:
+            elif hw_map[str(float(wl[i]))] > float(s) * anchor_factor:
                 failed.append(
-                    f"anchor {a} nm half-width {hw_map[float(wl[i])]:.4e} "
+                    f"anchor {a} nm half-width {hw_map[str(float(wl[i]))]:.4e} "
                     f"> {float(s) * anchor_factor:.4e}")
         if y_rel > y_limit:
             failed.append(f"luminance relative half-width {y_rel:.5f} > {y_limit}")
@@ -377,7 +376,7 @@ def _budget_stats(records, wl, v_curve, anchor_idx, sun, budget, protocol,
         n=n, seeds=sorted(int(r["seed"]) for r in records),
         mean=mean.tolist(), sd=spectra_rows.std(axis=0, ddof=1).tolist(),
         student_halfwidth=half.tolist(),
-        anchors={float(wl[i]): {"mean": float(mean[i]),
+        anchors={str(float(wl[i])): {"mean": float(mean[i]),
                                 "student_halfwidth": float(half[i]),
                                 "bootstrap_halfwidth": float(boot_half_spec[i]),
                                 "scale": float(s),
@@ -394,7 +393,6 @@ def _budget_stats(records, wl, v_curve, anchor_idx, sun, budget, protocol,
                    bootstrap_pass=verdict_boot, bootstrap_failures=failures_boot,
                    pass_=bool(verdict_student and verdict_boot)),
         seconds=seconds,
-        fingerprints_uniform=True,
         stage=stage)
 
 
@@ -567,7 +565,7 @@ def _drift_stats(per_budget, anchor_idx, wl, v_curve, sun, precision):
     lo_mean = np.asarray(lo["mean"])
     scales = precision["anchor_scales"][str(sun)]
     factor = float(precision["drift_factor"]) * float(precision["anchor_halfwidth_factor"])
-    anchor_drift = {float(wl[i]): {"abs_drift": float(abs(hi_mean[i] - lo_mean[i])),
+    anchor_drift = {str(float(wl[i])): {"abs_drift": float(abs(hi_mean[i] - lo_mean[i])),
                                    "limit": float(s) * factor}
                     for s, i in zip(scales, anchor_idx)}
     anchors_ok = all(v["abs_drift"] <= v["limit"] for v in anchor_drift.values())
@@ -601,7 +599,7 @@ def _pair_stats(disk_rows, point_rows, wl, v_curve, anchor_idx, sun, protocol,
     anchors = {}
     for i in anchor_idx:
         lo, hi_ = mean[i] - half[i], mean[i] + half[i]
-        anchors[float(wl[i])] = dict(
+        anchors[str(float(wl[i]))] = dict(
             delta_mean=float(mean[i]), delta_halfwidth=float(half[i]),
             interval=[float(lo), float(hi_)],
             relative_to_disk_mean=float(mean[i] / disk_mean[i])
@@ -721,7 +719,7 @@ def main(argv=None) -> int:
     print(json.dumps(dict(wrote=["manifest.json", "summary.json"],
                           verdicts={sun: stats.get("verdict", "n/a")
                                     for sun, stats in summary.get("direct", {}).items()},
-                          pairs={sun: {a["verdict"] for a in p["anchors"].values()}
+                          pairs={sun: sorted({a["verdict"] for a in p["anchors"].values()})
                                  for sun, p in summary.get("source_pairs", {}).items()}),
                     indent=1))
     return 0

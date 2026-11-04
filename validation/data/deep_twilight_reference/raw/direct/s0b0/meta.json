@@ -1,0 +1,58 @@
+{
+ "stage": "direct",
+ "schema": "deep-twilight-reference/1",
+ "protocol_sha256": "f6da541115dadeb612f7f9ec8eaf9449858f780b33c700fa0a039f1f37274f1e",
+ "code_sha256": {
+  "skycolor/rt/mc.py": "b8cab675585fe72fd74340e57cd24b66c2f757c221398cd83fa9a74a858143df",
+  "tools/point_solar_table.py": "c189f8c043a2da0b234b57c36d3e1b5f5c6ed459a7c7a45e3b7048f4bf51d084",
+  "tools/unified_solar_transport.py": "6ed1b03c3c49ad748540064d90ce8306b8855f08d2409ba9a1cc51e1a654dea2",
+  "tools/deep_twilight_reference.py": "0326e2ebe70d1e4abeea77c8c808229d243e28b5f0146b499283d75c0db04c62"
+ },
+ "table_sha256": "1e6bef75ad5d17d66e3c6ed73f9979c53fb8727f657a02d6ac272b443d16b313",
+ "hardware": {
+  "platform": "macOS-14.7-arm64-arm-64bit",
+  "machine": "arm64",
+  "cpu_brand": "Apple M2 Max",
+  "cpu_count": 12,
+  "thread_env": {
+   "OMP_NUM_THREADS": null,
+   "OPENBLAS_NUM_THREADS": null,
+   "MKL_NUM_THREADS": null,
+   "NUMEXPR_NUM_THREADS": null
+  },
+  "python": "3.12.11",
+  "numpy": "2.5.4"
+ },
+ "sun_index": 0,
+ "budget_index": 0,
+ "photons_per_wavelength": 400000,
+ "mode": "disk",
+ "created": "2026-11-04T15:22:52+0800",
+ "batch_id": "s0b0",
+ "attempts": [
+  {
+   "index": 0,
+   "status": "complete",
+   "seeds": [],
+   "path": "attempt-00.jsonl"
+  }
+ ],
+ "expected_seeds": [
+  40000,
+  40001,
+  40002,
+  40003,
+  40004,
+  40005,
+  40006,
+  40007,
+  40008,
+  40009,
+  40010,
+  40011,
+  40012,
+  40013,
+  40014,
+  40015
+ ]
+}

@@ -1,0 +1,12 @@
+{
+ "stages": {
+  "direct_and_source_pairs": {
+   "cumulative_seconds": 12622.206062375917,
+   "records": 2176,
+   "stages": [
+    "direct",
+    "source-pairs"
+   ]
+  }
+ }
+}
