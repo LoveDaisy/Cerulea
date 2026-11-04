@@ -26,6 +26,14 @@ repository's `tools/` and `validation/data/` trees, linked from each report.
 | [TWILIGHT_REFERENCE_AUDIT.md](TWILIGHT_REFERENCE_AUDIT.md) | Primary observations, solar-axis uncertainty and limited synthetic V response |
 | [CURVED_TRANSPORT_AUDIT.md](CURVED_TRANSPORT_AUDIT.md) | Continuous diffuse refraction, independent checks and final exploration limits |
 
+## Matched-observation follow-up
+
+[MATCHED_OBSERVATIONS.md](MATCHED_OBSERVATIONS.md) records the 2026-11-04
+raw-data checks: recoverable FORS metadata and same-twilight candidates, an
+independently identified station-ephemeris mismatch in published CSSP spectra,
+and original photometric time series. These are candidate validation inputs;
+instrument, background and atmospheric matching are still incomplete.
+
 General scattering/refraction methods are in [physics/](../physics/README.md).
 Reference transcription is in [SECOND_DATASET.md](../../validation/SECOND_DATASET.md).
 [Documentation guide](../README.md).

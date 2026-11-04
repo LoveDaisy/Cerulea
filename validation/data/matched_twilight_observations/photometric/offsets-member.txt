@@ -1,0 +1,75 @@
+
+Offsets to be subtracted from the detector readings (mag) to express them
+in the reference detector frame (mag_corr):
+
+
+
+if strcmp(BaseNome,'01_Lardeira')
+    Offset=0.0173    
+    mag_corr=mag-Offset;
+end
+
+if strcmp(BaseNome,'02_Cebreiro')
+    Offset=-0.0024    
+    mag_corr=mag-Offset;
+end
+
+if strcmp(BaseNome,'03_Guisamo')
+    Offset=0.0071    
+    mag_corr=mag-Offset;
+end
+
+if strcmp(BaseNome,'04_Areeiro')
+    Offset=-0.0587    
+    mag_corr=mag-Offset;
+end
+
+if strcmp(BaseNome,'05_Manzaneda')
+    Offset=-0.0059     
+    mag_corr=mag-Offset;
+end
+
+if strcmp(BaseNome,'06_Xares')
+    Offset=0.0642    
+    mag_corr=mag-Offset;    
+end
+
+if strcmp(BaseNome,'07_PortoiVigo')
+    Offset=-0.0087    
+    mag_corr=mag-Offset;
+end
+
+if strcmp(BaseNome,'08_Fontaneira')
+    Offset=0.0366    
+    mag_corr=mag-Offset;
+end
+
+if strcmp(BaseNome,'09_Santiago')
+    Offset=-0.0017    
+    mag_corr=mag-Offset;
+end
+
+if strcmp(BaseNome,'10_Labrada')
+    Offset=0.0315    
+    mag_corr=mag-Offset;
+end
+
+if strcmp(BaseNome,'11_Cies')
+    Offset=0.0585    
+    mag_corr=mag-Offset;
+end
+
+if strcmp(BaseNome,'12_Paramos')
+    Offset=-0.0080    
+    mag_corr=mag-Offset;
+end
+
+if strcmp(BaseNome,'13_Ons')
+    Offset=0.0227    
+    mag_corr=mag-Offset;
+end
+
+if strcmp(BaseNome,'14_Salvora')
+    Offset=-0.0675    
+    mag_corr=mag-Offset;
+end

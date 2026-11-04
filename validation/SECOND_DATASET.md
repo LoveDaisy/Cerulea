@@ -29,7 +29,10 @@ measured atmospheric transparency.  See §5 for what is and is not resolved.
 
 `validation/check5_twilight.py` compares the model with a single reference, the
 V-band fit of Patat, Ugolnikov & Postylyakov (2006, A&A 455, 385), obtained
-with FORS1 on the VLT at **ESO-Paranal, altitude 2400 m**.  The model
+with FORS1 on the VLT at **ESO-Paranal, approximately 2600 m**. The later
+[raw-header audit](../docs/twilight/MATCHED_OBSERVATIONS.md) finds telescope
+positions of 2648/2681 m for selected spectra; 2.4 km was the historical model
+truncation experiment, not the exact observed site height. The model
 atmosphere is a **sea-level** standard atmosphere (1013 hPa, 300 DU O₃,
 AOD₅₅₀ = 0.05 in `presets.clear`).  The comparison therefore mixes a model
 error with a site difference.  A second measurement at a *different altitude*
@@ -138,7 +141,7 @@ AOD₅₅₀ 0.05, *pristine* = Rayleigh + O₃ only.  Deterministic
 (`twilight_radiance`, `quality="medium"`) at −9° and −12°; the faster
 `quality="low"` check6 run gives 0.0124 ± 0.0043 and 0.0030 ± 0.0026.
 
-| h | Koomen 1952<br>(Maryland, 30 m) | Patat 2006<br>(Paranal, 2400 m) | model<br>clear | model<br>pristine | **model / Koomen** | model / Patat |
+| h | Koomen 1952<br>(Maryland, 30 m) | Patat 2006<br>(Paranal) | model<br>clear | model<br>pristine | **model / Koomen** | model / Patat |
 |---:|---:|---:|---:|---:|---:|---:|
 | 0° | 161.5 | — | 157 | — | **0.97** | — |
 | −3° | 21.53 | 40.09 † | 20.1 | 22.3 | **0.93** | 0.50 |

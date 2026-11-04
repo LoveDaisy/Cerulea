@@ -1,0 +1,82 @@
+{
+  "checked_utc": "2026-11-04T03:41:55.613171+00:00",
+  "note": "Read-only anonymous queries; old spectra explicitly selected via published Table 2. Derived solar-altitude probes use this project NOAA function and are not independent ephemerides.",
+  "queries": [
+    {
+      "result": "raw-schema.csv",
+      "adql": "SELECT column_name, datatype, description FROM TAP_SCHEMA.columns WHERE table_name='dbo.raw'",
+      "url": "https://archive.eso.org/tap_obs/sync?REQUEST=doQuery&LANG=ADQL&FORMAT=csv&QUERY=SELECT+column_name%2C+datatype%2C+description+FROM+TAP_SCHEMA.columns+WHERE+table_name%3D%27dbo.raw%27"
+    },
+    {
+      "result": "paper-spectrum-2003-11-29.csv",
+      "adql": "SELECT TOP 10 * FROM dbo.raw WHERE instrument LIKE 'FORS%' AND date_obs BETWEEN '2003-11-29T09:01:00' AND '2003-11-29T09:04:00'",
+      "url": "https://archive.eso.org/tap_obs/sync?REQUEST=doQuery&LANG=ADQL&FORMAT=csv&QUERY=SELECT+TOP+10+%2A+FROM+dbo.raw+WHERE+instrument+LIKE+%27FORS%25%27+AND+date_obs+BETWEEN+%272003-11-29T09%3A01%3A00%27+AND+%272003-11-29T09%3A04%3A00%27"
+    },
+    {
+      "ADQL": "SELECT TOP 2000 dp_id,date_obs,dp_type,dp_tech,exposure,target,filter_path,prog_id,det_chip1id,tel_alt,tel_az,tel_ambi_pres_start,tel_ambi_rhum,access_url FROM dbo.raw WHERE instrument='FORS1' AND date_obs BETWEEN '2005-01-01T00:00:00' AND '2005-10-01T00:00:00' AND dp_tech='IMAGE' AND filter_path='V_BESS' AND dp_type IN ('STD','FLAT,SKY') ORDER BY date_obs",
+      "url": "https://archive.eso.org/tap_obs/sync?REQUEST=doQuery&LANG=ADQL&FORMAT=csv&QUERY=SELECT+TOP+2000+dp_id%2Cdate_obs%2Cdp_type%2Cdp_tech%2Cexposure%2Ctarget%2Cfilter_path%2Cprog_id%2Cdet_chip1id%2Ctel_alt%2Ctel_az%2Ctel_ambi_pres_start%2Ctel_ambi_rhum%2Caccess_url+FROM+dbo.raw+WHERE+instrument%3D%27FORS1%27+AND+date_obs+BETWEEN+%272005-01-01T00%3A00%3A00%27+AND+%272005-10-01T00%3A00%3A00%27+AND+dp_tech%3D%27IMAGE%27+AND+filter_path%3D%27V_BESS%27+AND+dp_type+IN+%28%27STD%27%2C%27FLAT%2CSKY%27%29+ORDER+BY+date_obs"
+    },
+    {
+      "ADQL": "SELECT TOP 200 dp_id,date_obs,dp_type,dp_tech,exposure,target,filter_path,prog_id,det_chip1id,tel_alt,tel_az,tel_ambi_pres_start,tel_ambi_rhum,access_url FROM dbo.raw WHERE instrument='FORS1' AND date_obs BETWEEN '2005-04-04T12:00:00' AND '2005-04-05T12:00:00' AND dp_tech='IMAGE' AND filter_path='V_BESS' ORDER BY date_obs",
+      "url": "https://archive.eso.org/tap_obs/sync?REQUEST=doQuery&LANG=ADQL&FORMAT=csv&QUERY=SELECT+TOP+200+dp_id%2Cdate_obs%2Cdp_type%2Cdp_tech%2Cexposure%2Ctarget%2Cfilter_path%2Cprog_id%2Cdet_chip1id%2Ctel_alt%2Ctel_az%2Ctel_ambi_pres_start%2Ctel_ambi_rhum%2Caccess_url+FROM+dbo.raw+WHERE+instrument%3D%27FORS1%27+AND+date_obs+BETWEEN+%272005-04-04T12%3A00%3A00%27+AND+%272005-04-05T12%3A00%3A00%27+AND+dp_tech%3D%27IMAGE%27+AND+filter_path%3D%27V_BESS%27+ORDER+BY+date_obs"
+    },
+    {
+      "result": "qc-v-night-first-week-2005.txt",
+      "url": "https://archive.eso.org/qc1/qc1_cgi?action=qc1_browse_get&table=fors1_zp_night&from=2005-01-01&to=2005-01-09&output=ascii&filter_filter_name=V_BESS&filter_det_chip1_id=%2A&filter_det_chip_num=%2A&field_mjd_obs=mjd_obs&field_civil_date=civil_date&field_zeropoint=zeropoint&field_sigma_zeropoint=sigma_zeropoint&field_num_stars=num_stars&field_col_term=col_term&field_sig_col_term=sig_col_term&field_color=color&field_ext_coeff=ext_coeff&field_sig_ext_coeff=sig_ext_coeff&field_photometric=photometric&field_filter_name=filter_name&field_det_chip1_id=det_chip1_id&field_det_chip_num=det_chip_num"
+    },
+    {
+      "result": "qc-v-night-2005-paper-period.txt",
+      "url": "https://archive.eso.org/qc1/qc1_cgi?action=qc1_browse_get&table=fors1_zp_night&from=2005-01-01&to=2005-10-01&output=ascii&filter_filter_name=V_BESS&filter_det_chip1_id=%2A&filter_det_chip_num=%2A&field_mjd_obs=mjd_obs&field_civil_date=civil_date&field_zeropoint=zeropoint&field_sigma_zeropoint=sigma_zeropoint&field_num_stars=num_stars&field_col_term=col_term&field_sig_col_term=sig_col_term&field_color=color&field_ext_coeff=ext_coeff&field_sig_ext_coeff=sig_ext_coeff&field_photometric=photometric&field_filter_name=filter_name&field_det_chip1_id=det_chip1_id&field_det_chip_num=det_chip_num"
+    }
+  ],
+  "sources": [
+    {
+      "result": "patat2006.html",
+      "url": "https://arxiv.org/html/astro-ph/0604128"
+    },
+    {
+      "result": "fors1-old-qe.html",
+      "url": "https://www.eso.org/sci/php/optdet/instruments/fors1/qe.html"
+    },
+    {
+      "result": "fors1-old-detector-index.html",
+      "url": "https://www.eso.org/sci/php/optdet/instruments/fors1/index.html"
+    },
+    {
+      "result": "qc-completeness.html",
+      "url": "https://www.eso.org/observing/dfo/quality/FORS1/qc/fors1_complete.html"
+    },
+    {
+      "result": "qc-zeropoints.html",
+      "url": "https://www.eso.org/observing/dfo/quality/FORS1/qc/zeropoints/zeropoints.html"
+    },
+    {
+      "result": "FORS1.2001-09-21T10-06-58.303.fits.Z",
+      "url": "https://dataportal.eso.org/dataPortal/file/FORS1.2001-09-21T10:06:58.303"
+    },
+    {
+      "result": "FORS2.2003-11-29T09-02-25.596.fits.Z",
+      "url": "https://dataportal.eso.org/dataPortal/file/FORS2.2003-11-29T09:02:25.596"
+    },
+    {
+      "result": "FORS.1999-04-16T09-54-36.194.remote-header.html",
+      "url": "https://archive.eso.org/hdr?DpId=FORS.1999-04-16T09:54:36.194"
+    },
+    {
+      "result": "FORS1.2005-08-02T22-50-05.454.remote-header.html",
+      "url": "https://archive.eso.org/hdr?DpId=FORS1.2005-08-02T22:50:05.454"
+    },
+    {
+      "result": "FORS1.2005-08-02T22-59-30.485.remote-header.html",
+      "url": "https://archive.eso.org/hdr?DpId=FORS1.2005-08-02T22:59:30.485"
+    },
+    {
+      "result": "spectrum-datalink.xml",
+      "url": "https://archive.eso.org/datalink/links?ID=FORS2.2003-11-29T09:02:25.596"
+    },
+    {
+      "result": "calselector-2001-spectrum.xml",
+      "url": "https://archive.eso.org/calselector/v1/associations?dp_id=FORS1.2001-09-21T10:06:58.303&mode=Raw2Raw&responseformat=votable"
+    }
+  ]
+}

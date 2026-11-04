@@ -1,0 +1,614 @@
+{
+  "source_sha256": "e0e3e895b3a66fc83d9f63bd02e92899a11a44b1d1707f8a6d7a05279cbe6bab",
+  "spectrum_count": 3192,
+  "wavelength_nm": {
+    "min": 280,
+    "max": 840,
+    "step": 1,
+    "count": 561
+  },
+  "measured_quantity": "Downwelling hemispherical spectral irradiance, not zenith radiance",
+  "published_unit": "W m^-2 nm^-1",
+  "time_contract": "Timestamp labels interpreted as EDT (UTC-4); author helper subtracts 4/24 from UT1 MICA table dates",
+  "ephemeris_independent_reinterpolation": {
+    "CSSP_Sun": {
+      "max_abs_diff_from_csv_deg": 2.621785453333329,
+      "rms_diff_from_csv_deg": 1.9716678338951839
+    },
+    "CSSP_Moon": {
+      "max_abs_diff_from_csv_deg": 2.655900316666667,
+      "rms_diff_from_csv_deg": 2.0209864713479266
+    },
+    "DRL_Sun": {
+      "max_abs_diff_from_csv_deg": 3.666666970048027e-08,
+      "rms_diff_from_csv_deg": 1.1251790479395212e-08
+    },
+    "DRL_Moon": {
+      "max_abs_diff_from_csv_deg": 4.333333691874941e-08,
+      "rms_diff_from_csv_deg": 1.2684237757051665e-08
+    }
+  },
+  "selected_original_columns": [
+    {
+      "source_column_zero_based": 132,
+      "sequence": 1,
+      "selection_target_csv_solar_elevation_deg": -6,
+      "local_timestamp_EDT": "2014-06-30T21:06:06-04:00",
+      "utc_timestamp": "2014-07-01T01:06:06+00:00",
+      "original_solar_elevation_deg": -6.003061184,
+      "original_lunar_elevation_deg": 13.91758402,
+      "original_lunar_illuminated_fraction": 0.121,
+      "integrated_380_780_W_m2": 0.2088771441553,
+      "spectral_irradiance_550_W_m2_nm": 0.0004255581818,
+      "visible_nan_count": 0,
+      "visible_zero_count": 0,
+      "CSSP_Sun_reinterpolated_deg": -3.3894500000000014,
+      "CSSP_Moon_reinterpolated_deg": 15.920112399999997,
+      "DRL_Sun_reinterpolated_deg": -6.003061200000003,
+      "DRL_Moon_reinterpolated_deg": 13.917583999999998
+    },
+    {
+      "source_column_zero_based": 152,
+      "sequence": 1,
+      "selection_target_csv_solar_elevation_deg": -9,
+      "local_timestamp_EDT": "2014-06-30T21:26:16-04:00",
+      "utc_timestamp": "2014-07-01T01:26:16+00:00",
+      "original_solar_elevation_deg": -9.012280532,
+      "original_lunar_elevation_deg": 10.13056013,
+      "original_lunar_illuminated_fraction": 0.122,
+      "integrated_380_780_W_m2": 0.0076163516618099995,
+      "spectral_irradiance_550_W_m2_nm": 1.442498197e-05,
+      "visible_nan_count": 0,
+      "visible_zero_count": 0,
+      "CSSP_Sun_reinterpolated_deg": -6.3908937333333276,
+      "CSSP_Moon_reinterpolated_deg": 12.221399733333339,
+      "DRL_Sun_reinterpolated_deg": -9.012280533333332,
+      "DRL_Moon_reinterpolated_deg": 10.13056013333333
+    },
+    {
+      "source_column_zero_based": 173,
+      "sequence": 1,
+      "selection_target_csv_solar_elevation_deg": -12,
+      "local_timestamp_EDT": "2014-06-30T21:47:35-04:00",
+      "utc_timestamp": "2014-07-01T01:47:35+00:00",
+      "original_solar_elevation_deg": -12.01866867,
+      "original_lunar_elevation_deg": 6.148640324,
+      "original_lunar_illuminated_fraction": 0.123,
+      "integrated_380_780_W_m2": 0.00030565136339005,
+      "spectral_irradiance_550_W_m2_nm": 5.403977784e-07,
+      "visible_nan_count": 0,
+      "visible_zero_count": 0,
+      "CSSP_Sun_reinterpolated_deg": -9.400410500000001,
+      "CSSP_Moon_reinterpolated_deg": 8.325055499999996,
+      "DRL_Sun_reinterpolated_deg": -12.018668666666672,
+      "DRL_Moon_reinterpolated_deg": 6.148640333333333
+    },
+    {
+      "source_column_zero_based": 593,
+      "sequence": 2,
+      "selection_target_csv_solar_elevation_deg": -6,
+      "local_timestamp_EDT": "2014-07-01T05:02:44-04:00",
+      "utc_timestamp": "2014-07-01T09:02:44+00:00",
+      "original_solar_elevation_deg": -6.063314814,
+      "original_lunar_elevation_deg": -39.41373467,
+      "original_lunar_illuminated_fraction": 0.1475466666,
+      "integrated_380_780_W_m2": 0.005878196605165999,
+      "spectral_irradiance_550_W_m2_nm": 1.07559723e-05,
+      "visible_nan_count": 0,
+      "visible_zero_count": 0,
+      "CSSP_Sun_reinterpolated_deg": -6.568432799999997,
+      "CSSP_Moon_reinterpolated_deg": -38.38434133333334,
+      "DRL_Sun_reinterpolated_deg": -6.063314800000004,
+      "DRL_Moon_reinterpolated_deg": -39.413734666666656
+    },
+    {
+      "source_column_zero_based": 574,
+      "sequence": 2,
+      "selection_target_csv_solar_elevation_deg": -9,
+      "local_timestamp_EDT": "2014-07-01T04:42:56-04:00",
+      "utc_timestamp": "2014-07-01T08:42:56+00:00",
+      "original_solar_elevation_deg": -9.016320292,
+      "original_lunar_elevation_deg": -40.38833241,
+      "original_lunar_illuminated_fraction": 0.146,
+      "integrated_380_780_W_m2": 0.00030349466485665,
+      "spectral_irradiance_550_W_m2_nm": 4.727254323e-07,
+      "visible_nan_count": 0,
+      "visible_zero_count": 0,
+      "CSSP_Sun_reinterpolated_deg": -9.360556000000004,
+      "CSSP_Moon_reinterpolated_deg": -39.116932133333336,
+      "DRL_Sun_reinterpolated_deg": -9.01632026666667,
+      "DRL_Moon_reinterpolated_deg": -40.38833240000001
+    },
+    {
+      "source_column_zero_based": 566,
+      "sequence": 2,
+      "selection_target_csv_solar_elevation_deg": -12,
+      "local_timestamp_EDT": "2014-07-01T04:21:39-04:00",
+      "utc_timestamp": "2014-07-01T08:21:39+00:00",
+      "original_solar_elevation_deg": -12.01829141,
+      "original_lunar_elevation_deg": -41.0159166,
+      "original_lunar_illuminated_fraction": 0.145,
+      "integrated_380_780_W_m2": 2.125057676827e-05,
+      "spectral_irradiance_550_W_m2_nm": 3.522466377e-08,
+      "visible_nan_count": 0,
+      "visible_zero_count": 0,
+      "CSSP_Sun_reinterpolated_deg": -12.1803086,
+      "CSSP_Moon_reinterpolated_deg": -39.4946798,
+      "DRL_Sun_reinterpolated_deg": -12.018291400000004,
+      "DRL_Moon_reinterpolated_deg": -41.01591659999999
+    },
+    {
+      "source_column_zero_based": 1312,
+      "sequence": 4,
+      "selection_target_csv_solar_elevation_deg": -6,
+      "local_timestamp_EDT": "2014-07-02T21:05:55-04:00",
+      "utc_timestamp": "2014-07-03T01:05:55+00:00",
+      "original_solar_elevation_deg": -6.024510649,
+      "original_lunar_elevation_deg": 25.05006152,
+      "original_lunar_illuminated_fraction": 0.269,
+      "integrated_380_780_W_m2": 0.27706506418800003,
+      "spectral_irradiance_550_W_m2_nm": 0.0005743051483,
+      "visible_nan_count": 0,
+      "visible_zero_count": 0,
+      "CSSP_Sun_reinterpolated_deg": -3.411599666666667,
+      "CSSP_Moon_reinterpolated_deg": 26.331489000000005,
+      "DRL_Sun_reinterpolated_deg": -6.0245106666666715,
+      "DRL_Moon_reinterpolated_deg": 25.050061499999995
+    },
+    {
+      "source_column_zero_based": 1332,
+      "sequence": 4,
+      "selection_target_csv_solar_elevation_deg": -9,
+      "local_timestamp_EDT": "2014-07-02T21:26:02-04:00",
+      "utc_timestamp": "2014-07-03T01:26:02+00:00",
+      "original_solar_elevation_deg": -9.034845055,
+      "original_lunar_elevation_deg": 21.40981828,
+      "original_lunar_illuminated_fraction": 0.27,
+      "integrated_380_780_W_m2": 0.008613230264711,
+      "spectral_irradiance_550_W_m2_nm": 1.665707911e-05,
+      "visible_nan_count": 0,
+      "visible_zero_count": 0,
+      "CSSP_Sun_reinterpolated_deg": -6.413620733333335,
+      "CSSP_Moon_reinterpolated_deg": 22.83574733333333,
+      "DRL_Sun_reinterpolated_deg": -9.034845066666666,
+      "DRL_Moon_reinterpolated_deg": 21.409818266666672
+    },
+    {
+      "source_column_zero_based": 1353,
+      "sequence": 4,
+      "selection_target_csv_solar_elevation_deg": -12,
+      "local_timestamp_EDT": "2014-07-02T21:47:28-04:00",
+      "utc_timestamp": "2014-07-03T01:47:28+00:00",
+      "original_solar_elevation_deg": -12.06709574,
+      "original_lunar_elevation_deg": 17.46976733,
+      "original_lunar_illuminated_fraction": 0.271,
+      "integrated_380_780_W_m2": 0.0003406179480061,
+      "spectral_irradiance_550_W_m2_nm": 5.872801358e-07,
+      "visible_nan_count": 0,
+      "visible_zero_count": 0,
+      "CSSP_Sun_reinterpolated_deg": -9.4484168,
+      "CSSP_Moon_reinterpolated_deg": 19.035834400000002,
+      "DRL_Sun_reinterpolated_deg": -12.067095733333328,
+      "DRL_Moon_reinterpolated_deg": 17.46976733333334
+    },
+    {
+      "source_column_zero_based": 1780,
+      "sequence": 5,
+      "selection_target_csv_solar_elevation_deg": -6,
+      "local_timestamp_EDT": "2014-07-03T05:04:04-04:00",
+      "utc_timestamp": "2014-07-03T09:04:04+00:00",
+      "original_solar_elevation_deg": -6.029060553,
+      "original_lunar_elevation_deg": -48.30366186,
+      "original_lunar_illuminated_fraction": 0.3018133333,
+      "integrated_380_780_W_m2": 0.005708009420172,
+      "spectral_irradiance_550_W_m2_nm": 1.075337969e-05,
+      "visible_nan_count": 0,
+      "visible_zero_count": 0,
+      "CSSP_Sun_reinterpolated_deg": -6.546121733333333,
+      "CSSP_Moon_reinterpolated_deg": -46.306320933333325,
+      "DRL_Sun_reinterpolated_deg": -6.029060533333338,
+      "DRL_Moon_reinterpolated_deg": -48.30366186666666
+    },
+    {
+      "source_column_zero_based": 1762,
+      "sequence": 5,
+      "selection_target_csv_solar_elevation_deg": -9,
+      "local_timestamp_EDT": "2014-07-03T04:43:49-04:00",
+      "utc_timestamp": "2014-07-03T08:43:49+00:00",
+      "original_solar_elevation_deg": -9.058501783,
+      "original_lunar_elevation_deg": -47.50849463,
+      "original_lunar_illuminated_fraction": 0.3,
+      "integrated_380_780_W_m2": 0.00021266549680645002,
+      "spectral_irradiance_550_W_m2_nm": 3.601352217e-07,
+      "visible_nan_count": 0,
+      "visible_zero_count": 0,
+      "CSSP_Sun_reinterpolated_deg": -9.411166733333333,
+      "CSSP_Moon_reinterpolated_deg": -45.324746266666665,
+      "DRL_Sun_reinterpolated_deg": -9.058501766666664,
+      "DRL_Moon_reinterpolated_deg": -47.508494633333335
+    },
+    {
+      "source_column_zero_based": 1741,
+      "sequence": 5,
+      "selection_target_csv_solar_elevation_deg": -12,
+      "local_timestamp_EDT": "2014-07-03T04:22:49-04:00",
+      "utc_timestamp": "2014-07-03T08:22:49+00:00",
+      "original_solar_elevation_deg": -12.03002637,
+      "original_lunar_elevation_deg": -46.2194488,
+      "original_lunar_illuminated_fraction": 0.2985633333,
+      "integrated_380_780_W_m2": 2.0349807187085e-05,
+      "spectral_irradiance_550_W_m2_nm": 3.259389872e-08,
+      "visible_nan_count": 0,
+      "visible_zero_count": 0,
+      "CSSP_Sun_reinterpolated_deg": -12.202944866666671,
+      "CSSP_Moon_reinterpolated_deg": -43.88220139999999,
+      "DRL_Sun_reinterpolated_deg": -12.03002636666667,
+      "DRL_Moon_reinterpolated_deg": -46.2194488
+    }
+  ],
+  "samples_selected_on_reconstructed_CSSP_axis": [
+    {
+      "source_column_zero_based": 149,
+      "sequence": 1,
+      "selection_target_reconstructed_CSSP_solar_elevation_deg": -6,
+      "local_timestamp_EDT": "2014-06-30T21:23:11-04:00",
+      "utc_timestamp": "2014-07-01T01:23:11+00:00",
+      "original_solar_elevation_deg": -8.561867997,
+      "CSSP_Sun_reinterpolated_deg": -5.941043099999997,
+      "original_lunar_elevation_deg": 10.70860854,
+      "CSSP_Moon_reinterpolated_deg": 12.786415900000003,
+      "original_lunar_illuminated_fraction": 0.122,
+      "nearest_spectrum_integrated_380_780_W_m2": 0.012840129106700003,
+      "target_integrated_380_780_W_m2_log_linear_interpolation": 0.01201957415248494,
+      "interpolation_bracket_source_columns_zero_based": [
+        150,
+        149
+      ],
+      "interpolation_bracket_CSSP_solar_elevations_deg": [
+        -6.090133199999996,
+        -5.941043099999997
+      ],
+      "interpolation_bracket_span_deg": 0.14909009999999867,
+      "interpolation_bracket_time_gap_s": 61.0,
+      "interpolation_caution": "A descriptive local interpolation, not an extra observation; review the bracket width and time gap before use"
+    },
+    {
+      "source_column_zero_based": 170,
+      "sequence": 1,
+      "selection_target_reconstructed_CSSP_solar_elevation_deg": -9,
+      "local_timestamp_EDT": "2014-06-30T21:44:35-04:00",
+      "utc_timestamp": "2014-07-01T01:44:35+00:00",
+      "original_solar_elevation_deg": -11.60812501,
+      "CSSP_Sun_reinterpolated_deg": -8.98860166666667,
+      "original_lunar_elevation_deg": 6.707134987,
+      "CSSP_Moon_reinterpolated_deg": 8.871991666666664,
+      "original_lunar_illuminated_fraction": 0.123,
+      "nearest_spectrum_integrated_380_780_W_m2": 0.0004351346044693997,
+      "target_integrated_380_780_W_m2_log_linear_interpolation": 0.0004323941645872699,
+      "interpolation_bracket_source_columns_zero_based": [
+        171,
+        170
+      ],
+      "interpolation_bracket_CSSP_solar_elevations_deg": [
+        -9.126438500000004,
+        -8.98860166666667
+      ],
+      "interpolation_bracket_span_deg": 0.13783683333333485,
+      "interpolation_bracket_time_gap_s": 60.0,
+      "interpolation_caution": "A descriptive local interpolation, not an extra observation; review the bracket width and time gap before use"
+    },
+    {
+      "source_column_zero_based": 193,
+      "sequence": 1,
+      "selection_target_reconstructed_CSSP_solar_elevation_deg": -12,
+      "local_timestamp_EDT": "2014-06-30T22:07:39-04:00",
+      "utc_timestamp": "2014-07-01T02:07:39+00:00",
+      "original_solar_elevation_deg": -14.665014,
+      "CSSP_Sun_reinterpolated_deg": -12.061778300000004,
+      "original_lunar_elevation_deg": 2.430722996,
+      "CSSP_Moon_reinterpolated_deg": 4.681032199999999,
+      "original_lunar_illuminated_fraction": 0.124,
+      "nearest_spectrum_integrated_380_780_W_m2": 2.6603232665939974e-05,
+      "target_integrated_380_780_W_m2_log_linear_interpolation": 2.7984595442321994e-05,
+      "interpolation_bracket_source_columns_zero_based": [
+        193,
+        192
+      ],
+      "interpolation_bracket_CSSP_solar_elevations_deg": [
+        -12.061778300000004,
+        -11.933556300000005
+      ],
+      "interpolation_bracket_span_deg": 0.12822199999999917,
+      "interpolation_bracket_time_gap_s": 60.0,
+      "interpolation_caution": "A descriptive local interpolation, not an extra observation; review the bracket width and time gap before use"
+    },
+    {
+      "source_column_zero_based": 597,
+      "sequence": 2,
+      "selection_target_reconstructed_CSSP_solar_elevation_deg": -6,
+      "local_timestamp_EDT": "2014-07-01T05:06:50-04:00",
+      "utc_timestamp": "2014-07-01T09:06:50+00:00",
+      "original_solar_elevation_deg": -5.434256344,
+      "CSSP_Sun_reinterpolated_deg": -5.971662999999995,
+      "original_lunar_elevation_deg": -39.16695767,
+      "CSSP_Moon_reinterpolated_deg": -38.188258000000005,
+      "original_lunar_illuminated_fraction": 0.148,
+      "nearest_spectrum_integrated_380_780_W_m2": 0.012821929937758995,
+      "target_integrated_380_780_W_m2_log_linear_interpolation": 0.012262011576508748,
+      "interpolation_bracket_source_columns_zero_based": [
+        596,
+        597
+      ],
+      "interpolation_bracket_CSSP_solar_elevations_deg": [
+        -6.120667699999995,
+        -5.971662999999995
+      ],
+      "interpolation_bracket_span_deg": 0.14900469999999988,
+      "interpolation_bracket_time_gap_s": 61.0,
+      "interpolation_caution": "A descriptive local interpolation, not an extra observation; review the bracket width and time gap before use"
+    },
+    {
+      "source_column_zero_based": 576,
+      "sequence": 2,
+      "selection_target_reconstructed_CSSP_solar_elevation_deg": -9,
+      "local_timestamp_EDT": "2014-07-01T04:44:56-04:00",
+      "utc_timestamp": "2014-07-01T08:44:56+00:00",
+      "original_solar_elevation_deg": -8.725852287,
+      "CSSP_Sun_reinterpolated_deg": -9.086776000000006,
+      "original_lunar_elevation_deg": -40.30942041,
+      "CSSP_Moon_reinterpolated_deg": -39.06208813333333,
+      "original_lunar_illuminated_fraction": 0.146,
+      "nearest_spectrum_integrated_380_780_W_m2": 0.0004488895970045001,
+      "target_integrated_380_780_W_m2_log_linear_interpolation": 0.00046245085353155467,
+      "interpolation_bracket_source_columns_zero_based": [
+        576,
+        577
+      ],
+      "interpolation_bracket_CSSP_solar_elevations_deg": [
+        -9.086776000000006,
+        -8.873877200000004
+      ],
+      "interpolation_bracket_span_deg": 0.2128988000000014,
+      "interpolation_bracket_time_gap_s": 92.0,
+      "interpolation_caution": "A descriptive local interpolation, not an extra observation; review the bracket width and time gap before use"
+    },
+    {
+      "source_column_zero_based": 566,
+      "sequence": 2,
+      "selection_target_reconstructed_CSSP_solar_elevation_deg": -12,
+      "local_timestamp_EDT": "2014-07-01T04:21:39-04:00",
+      "utc_timestamp": "2014-07-01T08:21:39+00:00",
+      "original_solar_elevation_deg": -12.01829141,
+      "CSSP_Sun_reinterpolated_deg": -12.1803086,
+      "original_lunar_elevation_deg": -41.0159166,
+      "CSSP_Moon_reinterpolated_deg": -39.4946798,
+      "original_lunar_illuminated_fraction": 0.145,
+      "nearest_spectrum_integrated_380_780_W_m2": 2.1250576768270014e-05,
+      "target_integrated_380_780_W_m2_log_linear_interpolation": 2.543673567313465e-05,
+      "interpolation_bracket_source_columns_zero_based": [
+        566,
+        567
+      ],
+      "interpolation_bracket_CSSP_solar_elevations_deg": [
+        -12.1803086,
+        -10.444861466666666
+      ],
+      "interpolation_bracket_span_deg": 1.7354471333333343,
+      "interpolation_bracket_time_gap_s": 797.0,
+      "interpolation_caution": "A descriptive local interpolation, not an extra observation; review the bracket width and time gap before use"
+    },
+    {
+      "source_column_zero_based": 1329,
+      "sequence": 4,
+      "selection_target_reconstructed_CSSP_solar_elevation_deg": -6,
+      "local_timestamp_EDT": "2014-07-02T21:22:59-04:00",
+      "utc_timestamp": "2014-07-03T01:22:59+00:00",
+      "original_solar_elevation_deg": -8.587784075,
+      "CSSP_Sun_reinterpolated_deg": -5.967214366666667,
+      "original_lunar_elevation_deg": 21.96560912,
+      "CSSP_Moon_reinterpolated_deg": 23.37045103333333,
+      "original_lunar_illuminated_fraction": 0.27,
+      "nearest_spectrum_integrated_380_780_W_m2": 0.014365425425004996,
+      "target_integrated_380_780_W_m2_log_linear_interpolation": 0.013834683320245848,
+      "interpolation_bracket_source_columns_zero_based": [
+        1330,
+        1329
+      ],
+      "interpolation_bracket_CSSP_solar_elevations_deg": [
+        -6.1166420000000015,
+        -5.967214366666667
+      ],
+      "interpolation_bracket_span_deg": 0.14942763333333442,
+      "interpolation_bracket_time_gap_s": 61.0,
+      "interpolation_caution": "A descriptive local interpolation, not an extra observation; review the bracket width and time gap before use"
+    },
+    {
+      "source_column_zero_based": 1350,
+      "sequence": 4,
+      "selection_target_reconstructed_CSSP_solar_elevation_deg": -9,
+      "local_timestamp_EDT": "2014-07-02T21:44:28-04:00",
+      "utc_timestamp": "2014-07-03T01:44:28+00:00",
+      "original_solar_elevation_deg": -11.65514694,
+      "CSSP_Sun_reinterpolated_deg": -9.035291866666663,
+      "original_lunar_elevation_deg": 18.02455319,
+      "CSSP_Moon_reinterpolated_deg": 19.57183480000001,
+      "original_lunar_illuminated_fraction": 0.271,
+      "nearest_spectrum_integrated_380_780_W_m2": 0.00048016328292390005,
+      "target_integrated_380_780_W_m2_log_linear_interpolation": 0.0004884600012915478,
+      "interpolation_bracket_source_columns_zero_based": [
+        1350,
+        1349
+      ],
+      "interpolation_bracket_CSSP_solar_elevations_deg": [
+        -9.035291866666663,
+        -8.886615599999999
+      ],
+      "interpolation_bracket_span_deg": 0.1486762666666639,
+      "interpolation_bracket_time_gap_s": 64.0,
+      "interpolation_caution": "A descriptive local interpolation, not an extra observation; review the bracket width and time gap before use"
+    },
+    {
+      "source_column_zero_based": 1372,
+      "sequence": 4,
+      "selection_target_reconstructed_CSSP_solar_elevation_deg": -12,
+      "local_timestamp_EDT": "2014-07-02T22:06:33-04:00",
+      "utc_timestamp": "2014-07-03T02:06:33+00:00",
+      "original_solar_elevation_deg": -14.5970242,
+      "CSSP_Sun_reinterpolated_deg": -11.991793100000002,
+      "original_lunar_elevation_deg": 13.92322871,
+      "CSSP_Moon_reinterpolated_deg": 15.603689500000003,
+      "original_lunar_illuminated_fraction": 0.272,
+      "nearest_spectrum_integrated_380_780_W_m2": 3.398754116730498e-05,
+      "target_integrated_380_780_W_m2_log_linear_interpolation": 3.380187812379397e-05,
+      "interpolation_bracket_source_columns_zero_based": [
+        1373,
+        1372
+      ],
+      "interpolation_bracket_CSSP_solar_elevations_deg": [
+        -12.1203951,
+        -11.991793100000002
+      ],
+      "interpolation_bracket_span_deg": 0.12860199999999722,
+      "interpolation_bracket_time_gap_s": 60.0,
+      "interpolation_caution": "A descriptive local interpolation, not an extra observation; review the bracket width and time gap before use"
+    },
+    {
+      "source_column_zero_based": 1784,
+      "sequence": 5,
+      "selection_target_reconstructed_CSSP_solar_elevation_deg": -6,
+      "local_timestamp_EDT": "2014-07-03T05:08:12-04:00",
+      "utc_timestamp": "2014-07-03T09:08:12+00:00",
+      "original_solar_elevation_deg": -5.392299218,
+      "CSSP_Sun_reinterpolated_deg": -5.941831600000001,
+      "original_lunar_elevation_deg": -48.4081736,
+      "CSSP_Moon_reinterpolated_deg": -46.453449199999994,
+      "original_lunar_illuminated_fraction": 0.302,
+      "nearest_spectrum_integrated_380_780_W_m2": 0.011126018321576992,
+      "target_integrated_380_780_W_m2_log_linear_interpolation": 0.010410684931993458,
+      "interpolation_bracket_source_columns_zero_based": [
+        1783,
+        1784
+      ],
+      "interpolation_bracket_CSSP_solar_elevations_deg": [
+        -6.093330666666668,
+        -5.941831600000001
+      ],
+      "interpolation_bracket_span_deg": 0.15149906666666624,
+      "interpolation_bracket_time_gap_s": 62.0,
+      "interpolation_caution": "A descriptive local interpolation, not an extra observation; review the bracket width and time gap before use"
+    },
+    {
+      "source_column_zero_based": 1765,
+      "sequence": 5,
+      "selection_target_reconstructed_CSSP_solar_elevation_deg": -9,
+      "local_timestamp_EDT": "2014-07-03T04:46:49-04:00",
+      "utc_timestamp": "2014-07-03T08:46:49+00:00",
+      "original_solar_elevation_deg": -8.619115812,
+      "CSSP_Sun_reinterpolated_deg": -8.996666933333332,
+      "original_lunar_elevation_deg": -47.65404153,
+      "CSSP_Moon_reinterpolated_deg": -45.49561483333333,
+      "original_lunar_illuminated_fraction": 0.3003633333,
+      "nearest_spectrum_integrated_380_780_W_m2": 0.0003128564402064999,
+      "target_integrated_380_780_W_m2_log_linear_interpolation": 0.00031170595782721165,
+      "interpolation_bracket_source_columns_zero_based": [
+        1764,
+        1765
+      ],
+      "interpolation_bracket_CSSP_solar_elevations_deg": [
+        -9.135642933333331,
+        -8.996666933333332
+      ],
+      "interpolation_bracket_span_deg": 0.13897599999999954,
+      "interpolation_bracket_time_gap_s": 60.0,
+      "interpolation_caution": "A descriptive local interpolation, not an extra observation; review the bracket width and time gap before use"
+    },
+    {
+      "source_column_zero_based": 1743,
+      "sequence": 5,
+      "selection_target_reconstructed_CSSP_solar_elevation_deg": -12,
+      "local_timestamp_EDT": "2014-07-03T04:24:49-04:00",
+      "utc_timestamp": "2014-07-03T08:24:49+00:00",
+      "original_solar_elevation_deg": -11.75618239,
+      "CSSP_Sun_reinterpolated_deg": -11.946680866666672,
+      "original_lunar_elevation_deg": -46.36407279,
+      "CSSP_Moon_reinterpolated_deg": -44.0394734,
+      "original_lunar_illuminated_fraction": 0.2989633333,
+      "nearest_spectrum_integrated_380_780_W_m2": 2.4609748495194987e-05,
+      "target_integrated_380_780_W_m2_log_linear_interpolation": 2.3863215587214278e-05,
+      "interpolation_bracket_source_columns_zero_based": [
+        1742,
+        1743
+      ],
+      "interpolation_bracket_CSSP_solar_elevations_deg": [
+        -12.07481286666667,
+        -11.946680866666672
+      ],
+      "interpolation_bracket_span_deg": 0.12813199999999902,
+      "interpolation_bracket_time_gap_s": 60.0,
+      "interpolation_caution": "A descriptive local interpolation, not an extra observation; review the bracket width and time gap before use"
+    }
+  ],
+  "sequence_summary_on_reconstructed_CSSP_axis": [
+    {
+      "sequence": 1,
+      "start_EDT": "2014-06-30T18:52:55-04:00",
+      "end_EDT": "2014-07-01T01:04:39-04:00",
+      "target_380_780_W_m2": {
+        "-6": 0.01201957415248494,
+        "-9": 0.0004323941645872699,
+        "-12": 2.7984595442321994e-05
+      },
+      "ratio_minus6_over_minus9": 27.79772517040765,
+      "ratio_minus9_over_minus12": 15.4511493824687,
+      "example_night_solar_below_minus20_moon_below0_count": 105,
+      "example_night_380_780_median_W_m2": 4.500605789077499e-06,
+      "night_caution": "Descriptive observed dark-time floor, not a measured contemporaneous background to subtract at twilight"
+    },
+    {
+      "sequence": 2,
+      "start_EDT": "2014-07-01T01:05:39-04:00",
+      "end_EDT": "2014-07-01T08:08:23-04:00",
+      "target_380_780_W_m2": {
+        "-6": 0.012262011576508748,
+        "-9": 0.00046245085353155467,
+        "-12": 2.543673567313465e-05
+      },
+      "ratio_minus6_over_minus9": 26.51527504570184,
+      "ratio_minus9_over_minus12": 18.18043240587582,
+      "example_night_solar_below_minus20_moon_below0_count": 125,
+      "example_night_380_780_median_W_m2": 3.537282225010401e-06,
+      "night_caution": "Descriptive observed dark-time floor, not a measured contemporaneous background to subtract at twilight"
+    },
+    {
+      "sequence": 4,
+      "start_EDT": "2014-07-02T19:38:19-04:00",
+      "end_EDT": "2014-07-03T01:04:48-04:00",
+      "target_380_780_W_m2": {
+        "-6": 0.013834683320245848,
+        "-9": 0.0004884600012915478,
+        "-12": 3.380187812379397e-05
+      },
+      "ratio_minus6_over_minus9": 28.323062858095355,
+      "ratio_minus9_over_minus12": 14.450676364864734,
+      "example_night_solar_below_minus20_moon_below0_count": 87,
+      "example_night_380_780_median_W_m2": 6.176582876470996e-06,
+      "night_caution": "Descriptive observed dark-time floor, not a measured contemporaneous background to subtract at twilight"
+    },
+    {
+      "sequence": 5,
+      "start_EDT": "2014-07-03T01:05:48-04:00",
+      "end_EDT": "2014-07-03T06:07:19-04:00",
+      "target_380_780_W_m2": {
+        "-6": 0.010410684931993458,
+        "-9": 0.00031170595782721165,
+        "-12": 2.3863215587214278e-05
+      },
+      "ratio_minus6_over_minus9": 33.399056612720976,
+      "ratio_minus9_over_minus12": 13.062194266652867,
+      "example_night_solar_below_minus20_moon_below0_count": 126,
+      "example_night_380_780_median_W_m2": 3.07528096834473e-06,
+      "night_caution": "Descriptive observed dark-time floor, not a measured contemporaneous background to subtract at twilight"
+    }
+  ],
+  "caution": "Reinterpolated fields are diagnostics, not a replacement dataset or corrected validation target."
+}
