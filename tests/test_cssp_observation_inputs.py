@@ -38,11 +38,14 @@ from tools.cssp_observation_inputs import (  # noqa: E402
     parse_edt_label,
     parse_full_csv_rows,
     quality_of_column,
+    read_jpl_elevation,
     read_json,
     read_mat_contract,
     read_mica_table,
     session_signal_stats,
     sessions_of,
+    station_state,
+    summarize_weather_rows,
     unix_of,
     verify_packet,
     weather_window_rows,
@@ -353,6 +356,53 @@ def test_external_ref_mismatch_is_detected(tmp_path):
     write_json(tmp_packet / "sources.json", {"external_refs": [ref]})
     result = check_external_refs(tmp_packet)
     assert result["failures"] and result["failures"][0]["problem"] == "hash mismatch"
+
+
+# ---------------------------------------------------------------------------
+# Conditions verdicts and independent axis checks (M2 semantics)
+# ---------------------------------------------------------------------------
+
+def test_conditions_verdicts_match_frozen_evidence():
+    """The primary/secondary roles must follow the archived weather rows."""
+    conditions = read_json(PACKET / "conditions.json")
+    s04 = conditions["conditions"]["s04"]
+    s11 = conditions["conditions"]["s11"]
+    assert s04["target_windows"]["dawn"]["moon_free"] is True
+    assert s04["target_windows"]["dusk"]["moon_free"] is False
+    assert "fog/low-cloud" in s04["verdict"]
+    assert s11["target_windows"]["dusk"]["moon_free"] is True
+    assert s11["target_windows"]["dawn"]["moon_free"] is False
+    assert "moon-free" in s11["verdict"]
+
+
+def test_independent_axis_checks_present_and_recomputable():
+    checks = read_json(PACKET / "conditions.json")["independent_axis_checks"]
+    assert len(checks) == 2
+    sun = read_mica_table(PACKET / "ephemeris/CSSP_SunLocalZenith.txt")
+    for check in checks:
+        jpl = read_jpl_elevation(PACKET / check["response_path"])
+        assert jpl == pytest.approx(check["jpl_elevation_deg"], abs=1e-9)
+        mica = mica_elevation(sun, unix_of(check["instant_utc"]))["elevation_deg"]
+        assert abs(jpl - mica) < check["agreement_bound_deg"]
+
+
+def test_weather_classification_and_context_fallback():
+    fog = summarize_weather_rows(
+        [{"utc": "2014-07-03T08:15Z", "visibility_mi_or_m": 0.25, "cloud_cover": "VV",
+          "cloud_height_ft": 0.0, "wx_codes": "FG"}], "KN38")
+    assert fog["fog"] and not fog["clear"]
+    clear = summarize_weather_rows(
+        [{"utc": "2014-07-02T23:15Z", "visibility_mi_or_m": 10.0, "cloud_cover": "CLR",
+          "cloud_height_ft": None, "wx_codes": None}], "KN38")
+    assert clear["clear"] and not fog["clear"]
+    haze = summarize_weather_rows(
+        [{"utc": "2014-07-03T08:53:00", "visibility_mi_or_m": "016093,5,N,5",
+          "cloud_cover": None, "cloud_height_ft": None,
+          "wx_codes": "KBFD 030853Z 00000KT 5SM BR BKN039 OVC090 16/15 A3000"}], "KBFD")
+    assert haze["other"] and not haze["fog"]
+    empty = {"n_rows": 0, "fog": [], "low_opaque": [], "clear": [], "other": []}
+    assert station_state(empty, empty) == "no observation archived in window"
+    assert station_state(empty, clear) == "CLR (context rows)"
 
 
 def test_spectra_excerpts_match_old_packet_overlap():

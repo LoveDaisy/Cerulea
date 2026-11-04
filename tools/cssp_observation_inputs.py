@@ -627,7 +627,8 @@ def verify_packet(packet: Path, source_dir: Path | None = None) -> dict:
 
     records = read_json(packet / "records.json")
     selection = read_json(packet / "selection.json")
-    conditions = read_json(packet / "conditions.json")["conditions"]
+    conditions_doc = read_json(packet / "conditions.json")
+    conditions = conditions_doc["conditions"]
     operator = read_json(packet / "operator.json")
     sources = read_json(packet / "sources.json")
     report["n_records"] = len(records["records"])
@@ -704,6 +705,21 @@ def verify_packet(packet: Path, source_dir: Path | None = None) -> dict:
                                         f"({got_value!r} vs {claimed_value!r})")
         else:
             problems.append(f"{record_id}: no raw member bound (AC1 requires one)")
+
+    # Independent axis checks must recompute from the vendored JPL responses.
+    for check in conditions_doc.get("independent_axis_checks", []):
+        path = packet / check["response_path"]
+        if not path.is_file():
+            problems.append(f"jpl check {check['record_id']}: response missing")
+            continue
+        jpl = read_jpl_elevation(path)
+        mica = mica_elevation(sun_tab, unix_of(check["instant_utc"]))["elevation_deg"]
+        if abs(jpl - check["jpl_elevation_deg"]) > 1e-9 or \
+                abs(mica - check["mica_elevation_deg"]) > 1e-9:
+            problems.append(f"jpl check {check['record_id']}: stored values differ from "
+                            "a fresh recomputation")
+        if abs(jpl - mica) >= check["agreement_bound_deg"]:
+            problems.append(f"jpl check {check['record_id']}: agreement bound exceeded")
 
     # Selection and conditions coherence.
     inventory_ids = {s["session_id"] for s in selection["sessions"]}
@@ -982,6 +998,45 @@ def build_packet(cache_dir: Path, out: Path, force: bool) -> dict:
     # Weather responses for candidate-night windows (verbatim).
     for name in sorted((cache_dir / "weather").iterdir()):
         (out / "raw/weather" / name.name).write_bytes(name.read_bytes())
+    # The primary night's frozen feasibility window rows join the response
+    # set (byte-identical copies; the original stays referenced in sources).
+    for src_rel, vendored_name in (
+            ("validation/data/cssp_observation_feasibility/atmosphere/"
+             "noaa-BFD-window.json", "frozen-noaa-BFD-window.json"),
+            ("validation/data/cssp_observation_feasibility/atmosphere/"
+             "iem-N38-window.json", "frozen-iem-N38-window.json")):
+        src = ROOT / src_rel
+        (out / "raw/weather" / vendored_name).write_bytes(src.read_bytes())
+        if sha256_file(out / "raw/weather" / vendored_name) != sha256_file(src):
+            raise ValueError(f"{vendored_name}: vendored copy differs from source")
+    # Independent JPL AIRLESS spot checks for the final windows.
+    (out / "raw/jpl").mkdir(parents=True, exist_ok=True)
+    jpl_checks = []
+    for name, record_id, label in (
+            ("horizons-cssp-0703.json", "c1743", "03-Jul-2014 04:24:49"),
+            ("horizons-cssp-0719.json", "c3074", "19-Jul-2014 04:39:17")):
+        src = cache_dir / "jpl" / name
+        if not src.is_file():
+            continue
+        (out / "raw/jpl" / name).write_bytes(src.read_bytes())
+        jpl_elev = read_jpl_elevation(out / "raw/jpl" / name)
+        mica_elev = mica_elevation(sun_tab, unix_of(label_to_utc_iso(label)))["elevation_deg"]
+        jpl_checks.append({
+            "record_id": record_id,
+            "instant_utc": label_to_utc_iso(label),
+            "jpl_elevation_deg": jpl_elev,
+            "mica_elevation_deg": mica_elev,
+            "diff_deg": round(jpl_elev - mica_elev, 6),
+            "response_path": f"raw/jpl/{name}",
+            "url": ("https://ssd.jpl.nasa.gov/api/horizons.api (COMMAND=10, "
+                    "APPARENT=AIRLESS, geodetic CSSP coordinates)"),
+            "agreement_bound_deg": 0.01,
+            "note": "independent ephemeris source vs the vendored MICA table; the bound "
+                    "is a cross-source agreement statement, not a fitted tolerance",
+        })
+    jpl_ok = all(abs(c["diff_deg"]) < c["agreement_bound_deg"] for c in jpl_checks)
+    if jpl_checks and not jpl_ok:
+        raise ValueError("JPL/MICA axis disagreement exceeds the stated bound")
 
     # Raw members: one sequential extraction pass.
     wanted = [mapping[c]["upstream_member"] for c in columns]
@@ -1083,14 +1138,20 @@ def build_packet(cache_dir: Path, out: Path, force: bool) -> dict:
         if sid == PRIMARY_SESSION:
             decisions.append({"session_id": sid, "decision": "selected",
                               "role": "primary",
-                              "reason": "complete dusk-to-dawn sampling, three target "
-                                        "twilight depths present, moon below horizon at "
-                                        "dawn targets, weather evidence already frozen"})
+                              "reason": "complete dusk-to-dawn sampling and the only "
+                                        "night with all three target twilight depths "
+                                        "(-6/-9/-12 deg); moon below horizon at the dawn "
+                                        "targets, while the dawn window shows valley fog "
+                                        "at KN38 and BR/BKN at KBFD (blocked for absolute "
+                                        "use, kept for spectral/relative use)"})
         elif sid == SECONDARY_SESSION:
             decisions.append({"session_id": sid, "decision": "selected",
                               "role": "secondary",
-                              "reason": "second full night with independent weather "
-                                        "coverage; same selection rules as primary"})
+                              "reason": "its dusk -6 deg window is the cleanest in the "
+                                        "dataset (both neighbour stations CLR, moon below "
+                                        "horizon); its dawn targets are moonlit (+43..+50 "
+                                        "deg) and retained only as a documented moonlit "
+                                        "sample"})
         elif sess["signal_kind"] == "twilight-or-night":
             decisions.append({"session_id": sid, "decision": "rejected",
                               "reason": "twilight-level session kept out of the packet to "
@@ -1107,7 +1168,8 @@ def build_packet(cache_dir: Path, out: Path, force: bool) -> dict:
         "decisions": decisions})
     write_json(out / "conditions.json",
                build_conditions(out, labels, values, inventory, decisions, sun_tab,
-                                moon_tab))
+                                moon_tab, selected_by_session=picks,
+                                independent_axis_checks=jpl_checks))
 
     write_json(out / "operator.json", operator_contract())
     diagnostics = compute_diagnostics(out, labels, values, raw_cols)
@@ -1209,6 +1271,15 @@ def operator_contract() -> dict:
     }
 
 
+def read_jpl_elevation(path: Path) -> float:
+    """Extract the solar elevation from one archived Horizons AIRLESS CSV
+    response (first ephemeris row, second-to-last CSV field, as verify.py in
+    the matched-observation packet does)."""
+    body = read_json(path)["result"]
+    line = body.split("$$SOE")[1].strip().splitlines()[0]
+    return float([f.strip() for f in line.split(",")][-2])
+
+
 # ---------------------------------------------------------------------------
 # Conditions: independent (non-model) evidence per selected night
 # ---------------------------------------------------------------------------
@@ -1220,41 +1291,152 @@ def utc_dates_between(start_iso: str, end_iso: str) -> list[str]:
     return [(d0 + timedelta(days=k)).isoformat() for k in range(days + 1)]
 
 
+def _parse_response_stamp(stamp: str) -> float | None:
+    """Parse IEM (``2014-07-03T08:15Z``), NOAA (``2014-07-03T08:53:00``) and
+    frozen-window (``2014-07-03 08:15``) stamps as UTC."""
+    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%MZ", "%Y-%m-%d %H:%M"):
+        try:
+            return datetime.strptime(stamp, fmt).replace(tzinfo=timezone.utc).timestamp()
+        except ValueError:
+            continue
+    return None
+
+
 def weather_window_rows(response_path: Path, start_iso: str, end_iso: str) -> list[dict]:
     """Extract the observation rows inside the UTC window from raw responses.
 
-    Handles both response shapes actually archived: IEM obhistory
-    (``{"data": [...]}``, keys ``utc_valid``/``vsby``/``skyc1``/``skyl1``/
-    ``wxcodes``) and NOAA Global Hourly (list of dicts, key ``DATE``/``REM``).
+    Handles the three shapes actually archived: IEM obhistory
+    (``{"data": [...]}`` with ``utc_valid``/``raw``), NOAA Global Hourly
+    (list with ``DATE``/``REM``) and the frozen feasibility window subset
+    (list with ``valid``/``metar``). Rows whose stamp cannot be parsed are
+    kept with a null utc so missing times stay visible instead of being
+    silently dropped.
     """
     payload = read_json(response_path)
     rows = payload.get("data") if isinstance(payload, dict) else payload
+    lo = unix_of(start_iso)
+    hi = unix_of(end_iso)
     out = []
     for row in rows or []:
-        stamp = row.get("utc_valid") or row.get("DATE") or ""
-        if stamp.startswith("2014"):
-            # IEM stamps look like 2014-07-03T08:15Z; NOAA like 2014-07-03T08:53:00.
-            if not (start_iso[:10] <= stamp[:10] <= end_iso[:10]):
-                continue
-            out.append({
-                "utc": stamp,
-                "visibility_mi_or_m": row.get("vsby", row.get("VIS")),
-                "cloud_cover": row.get("skyc1"),
-                "cloud_height_ft": row.get("skyl1"),
-                "wx_codes": row.get("wxcodes", row.get("REM")),
-                "raw": (row.get("raw") or "")[:120] or None,
-            })
+        stamp = row.get("utc_valid") or row.get("DATE") or row.get("valid") or ""
+        unix = _parse_response_stamp(stamp) if stamp.startswith("2014") else None
+        if unix is not None and not (lo <= unix <= hi):
+            continue
+        out.append({
+            "utc": stamp if stamp.startswith("2014") else None,
+            "visibility_mi_or_m": row.get("vsby", row.get("VIS")),
+            "cloud_cover": (row.get("skyc1") or "").strip() or None,
+            "cloud_height_ft": row.get("skyl1"),
+            "wx_codes": row.get("wxcodes", row.get("REM") or row.get("metar")),
+            "raw": (row.get("raw") or row.get("metar") or "")[:120] or None,
+        })
     return out
+
+
+def summarize_weather_rows(rows: list[dict], source: str) -> dict:
+    """Classify window rows into explicit, data-referenced categories.
+
+    IEM rows carry structured vsby/skyc1/wxcodes; NOAA rows carry the METAR
+    text in ``wx_codes`` (the REM field). Everything stays verbatim-quoted so
+    the verdict can be traced back to the archived responses.
+    """
+    fog_rows, low_opaque_rows, clear_rows, other_rows = [], [], [], []
+    cloud_re = None
+    if source == "KBFD":
+        import re
+        cloud_re = re.compile(r"\b(CLR|FEW\d+|SCT\d+|BKN\d+|OVC\d+|VV\d*)\b")
+    for row in rows:
+        text = str(row.get("wx_codes") or "")
+        cloud = row.get("cloud_cover")
+        vis = row.get("visibility_mi_or_m")
+        try:
+            vis_value = float(vis) if vis is not None and str(vis).replace(".", "").isdigit() else None
+        except ValueError:
+            vis_value = None
+        if cloud_re is not None:
+            tokens = cloud_re.findall(text)
+            cloud = tokens[0] if tokens else None
+            vis_value = None
+            if "VIS" in row and isinstance(row.get("VIS"), str):
+                head = row["VIS"].split(",")[0]
+                vis_value = float(head) / 1609.34 if head.isdigit() else None
+        label = str(row.get("utc") or "?")
+        entry = {"utc": label, "visibility": vis, "cloud": cloud, "wx": text[:40]}
+        if "FG" in text or (cloud or "").upper() == "FG":
+            fog_rows.append(entry)
+        elif (cloud or "").upper().startswith("VV") or (
+                cloud in ("OVC", "BKN") and isinstance(row.get("cloud_height_ft"),
+                                                       (int, float))
+                and row["cloud_height_ft"] <= 200):
+            low_opaque_rows.append(entry)
+        elif cloud == "CLR" and "BR" not in text:
+            clear_rows.append(entry)
+        else:
+            other_rows.append(entry)
+    return {"n_rows": len(rows), "fog": fog_rows, "low_opaque": low_opaque_rows,
+            "clear": clear_rows, "other": other_rows}
+
+
+def weather_rows_for_window(response_paths: list[Path], start_iso: str,
+                            end_iso: str) -> list[dict]:
+    """Merge window rows across daily response files (IEM days are not
+    UTC-midnight aligned - the archived 7/2 file runs 04:15Z..03:55Z), dedupe
+    by stamp and keep chronological order."""
+    merged: dict[str, dict] = {}
+    for path in response_paths:
+        if not path.is_file():
+            continue
+        for row in weather_window_rows(path, start_iso, end_iso):
+            key = str(row.get("utc") or id(row))
+            merged.setdefault(key, row)
+    rows = [r for r in merged.values() if r.get("utc")]
+    rows.sort(key=lambda r: _parse_response_stamp(r["utc"]) or 0.0)
+    return rows
+
+
+def station_state(summary: dict, context_summary: dict) -> str:
+    """Classify one station's window, falling back to the +-60 min context
+    rows when no observation falls inside the tight window (hourly stations).
+    The label names which rows were used so the verdict stays traceable."""
+    effective, from_context = summary, False
+    if not summary["n_rows"] and context_summary["n_rows"]:
+        effective, from_context = context_summary, True
+    if not effective["n_rows"]:
+        return "no observation archived in window"
+    if effective["fog"] or effective["low_opaque"]:
+        state = "fog/low-cloud"
+    elif effective["clear"] and not effective["other"]:
+        state = "CLR"
+    else:
+        state = "partial/high-cloud"
+    return f"{state} (context rows)" if from_context else state
+
+
+def session_verdict(side_windows: dict) -> str:
+    """Compose the per-session verdict text from the per-side windows."""
+    parts = []
+    for side in ("dusk", "dawn"):
+        window = side_windows.get(side)
+        if window is None:
+            continue
+        moon_state = "moon-free" if window["moon_free"] else "moonlit"
+        states = [f"{key}: {station_state(s['summary'], s['context_summary'])}"
+                  for key, s in window["weather"].items()]
+        parts.append(f"{side} [{moon_state}; {', '.join(states)}]")
+    return "; ".join(parts)
 
 
 def build_conditions(out: Path, labels: list[str], values: np.ndarray,
                      inventory: list[dict], decisions: list[dict],
-                     sun_tab: dict, moon_tab: dict) -> dict:
+                     sun_tab: dict, moon_tab: dict,
+                     selected_by_session: dict[str, list[int]] | None = None,
+                     independent_axis_checks: list[dict] | None = None) -> dict:
     """Independent conditions per selected session; verdicts stay explicit.
 
-    M1 freezes the geometry and the verbatim-response inventory; the
-    clear-sky verdicts themselves are finalised in selection (M2) from these
-    same files. No model quantity is read here.
+    Each side (dusk/dawn) of a selected night gets its own weather window,
+    moon geometry at the actual target instants and a data-referenced
+    verdict. No model quantity is read here; neighbour-station rows are kept
+    verbatim so every verdict clause traces back to an archived response.
     """
     conditions: dict[str, dict] = {}
     weather_files = sorted(p.name for p in (out / "raw/weather").iterdir())
@@ -1265,28 +1447,97 @@ def build_conditions(out: Path, labels: list[str], values: np.ndarray,
         start, end = sess["start_utc"], sess["end_utc"]
         a, b = sess["columns_zero_based"]
         cols = list(range(a, b + 1))
+        if selected_by_session and decision["session_id"] in selected_by_session:
+            cols = sorted(selected_by_session[decision["session_id"]])
         moon = [mica_elevation(moon_tab, unix_of(label_to_utc_iso(labels[c])))
                 ["elevation_deg"] for c in cols]
         fractions = values[CSV_MOONFRAC_ROW, a:b + 1]
         dates = utc_dates_between(start, end)
         date_keys = [d.replace("-", "") for d in dates]
-        windows = {}
-        for station_key, station in (("KN38", KN38), ("KBFD", KBFD)):
-            files = [f for f in weather_files
-                     if ((station_key == "KN38" and f.startswith("iem"))
-                         or (station_key == "KBFD" and f.startswith("noaa")))
-                     and any(k in f for k in date_keys)]
-            windows[station_key] = {
-                "station": station,
-                "distance_km": round(haversine_km(CSSP["lat_deg"], CSSP["lon_deg"],
-                                                  station["lat_deg"], station["lon_deg"]), 2),
-                "elevation_diff_m": round(station["elevation_m"] - CSSP["elevation_m"], 2),
-                "responses": files,
-                "note": "neighbour station, not an in-situ CSSP measurement; IEM rows are "
-                        "a structured representation of GHCNh, not a second sensor",
+        weather_paths = {
+            "KN38": [out / "raw/weather" / f for f in weather_files
+                     if (f.startswith("iem-N38-obhistory") or f.startswith("frozen-iem"))
+                     and (any(k in f for k in date_keys) or f.startswith("frozen"))],
+            "KBFD": [out / "raw/weather" / f for f in weather_files
+                     if (f.startswith("noaa-BFD") or f.startswith("frozen-noaa"))
+                     and (any(k in f for k in date_keys) or f.startswith("frozen"))],
+        }
+        station_meta = {
+            "KN38": {"station": KN38,
+                     "distance_km": round(haversine_km(CSSP["lat_deg"], CSSP["lon_deg"],
+                                                       KN38["lat_deg"], KN38["lon_deg"]), 2),
+                     "elevation_diff_m": round(KN38["elevation_m"] - CSSP["elevation_m"], 2)},
+            "KBFD": {"station": KBFD,
+                     "distance_km": round(haversine_km(CSSP["lat_deg"], CSSP["lon_deg"],
+                                                       KBFD["lat_deg"], KBFD["lon_deg"]), 2),
+                     "elevation_diff_m": round(KBFD["elevation_m"] - CSSP["elevation_m"], 2)},
+        }
+        # Per-side target windows: the selected records split into dusk/dawn
+        # halves; the weather window covers the twilight-depth records only
+        # (sun above -13 deg) so deep-night samples do not dilute it, and a
+        # +-60 min context window keeps hourly stations (KBFD) represented
+        # when no observation falls inside the tight window.
+        side_windows = {}
+        for side, hour_test in (("dusk", lambda h: h >= 12), ("dawn", lambda h: h < 12)):
+            side_cols = [c for c in cols if hour_test(parse_edt_label(labels[c]).hour)]
+            if not side_cols:
+                continue
+            twilight_cols = [c for c in side_cols
+                             if mica_elevation(sun_tab, unix_of(label_to_utc_iso(labels[c])))
+                             ["elevation_deg"] > -13.0]
+            window_cols = twilight_cols or side_cols
+            times = [parse_edt_label(labels[c]) for c in window_cols]
+            w_start = (min(times) - timedelta(minutes=5)).astimezone(timezone.utc)
+            w_end = (max(times) + timedelta(minutes=10)).astimezone(timezone.utc)
+            start_iso, end_iso = w_start.isoformat(), w_end.isoformat()
+            ctx_start = (min(times) - timedelta(minutes=60)).astimezone(timezone.utc)
+            ctx_end = (max(times) + timedelta(minutes=60)).astimezone(timezone.utc)
+            ctx_iso = [ctx_start.isoformat(), ctx_end.isoformat()]
+            moon_at = [mica_elevation(moon_tab, unix_of(label_to_utc_iso(labels[c])))
+                       ["elevation_deg"] for c in window_cols]
+            summaries = {}
+            for station_key, paths in weather_paths.items():
+                rows = weather_rows_for_window(paths, start_iso, end_iso)
+                context_rows = weather_rows_for_window(paths, ctx_iso[0], ctx_iso[1])
+                summaries[station_key] = {
+                    **station_meta[station_key],
+                    "window_utc": [start_iso, end_iso],
+                    "summary": summarize_weather_rows(rows, station_key),
+                    "context_window_utc": ctx_iso,
+                    "context_summary": summarize_weather_rows(context_rows, station_key),
+                }
+            moon_free = all(m < 0.0 for m in moon_at)
+            any_fog = any(s["summary"]["fog"] or s["summary"]["low_opaque"]
+                          or s["summary"]["other"] and not s["summary"]["clear"]
+                          for s in summaries.values())
+            all_clear = all(s["summary"]["clear"] and not s["summary"]["fog"]
+                            and not s["summary"]["low_opaque"]
+                            and not s["summary"]["other"]
+                            for s in summaries.values())
+            if moon_free and all_clear:
+                verdict = ("cleanest-available: moon below horizon at all target instants "
+                           "and both neighbour stations report CLR through the window")
+            elif moon_free and any_fog:
+                verdict = ("conditional: moon below horizon, but fog or low cloud is "
+                           "reported at neighbour stations inside the window; CSSP itself "
+                           "(710 m plateau) has no in-situ evidence, so absolute use is "
+                           "blocked and spectral/relative use carries this caveat")
+            elif not moon_free:
+                verdict = ("moonlit: moon above the horizon at target instants "
+                           f"(range {min(moon_at):.1f}..{max(moon_at):.1f} deg); "
+                           "hemispheric irradiance includes moonlight, so clean solar "
+                           "twilight comparisons are blocked; retained as a moonlit-sky "
+                           "sample")
+            else:
+                verdict = "mixed: neighbour reports split between clear and cloud/fog rows"
+            side_windows[side] = {
+                "columns_zero_based": [min(side_cols), max(side_cols)],
+                "window_utc": [start_iso, end_iso],
+                "moon_elevation_deg_at_targets": [round(m, 3) for m in moon_at],
+                "moon_free": moon_free,
+                "weather": summaries,
+                "verdict": verdict,
             }
-        aeronet_files = [f for f in weather_files if f.startswith("aeronet")
-                         and any(k in f for k in date_keys)]
         conditions[decision["session_id"]] = {
             "utc_window": {"start": start, "end": end},
             "local_dates_utc_covered": dates,
@@ -1297,15 +1548,16 @@ def build_conditions(out: Path, labels: list[str], values: np.ndarray,
                 "published_illumination_fraction_max": float(np.max(fractions)),
                 "axis_source": "vendored upstream MICA lunar table",
             },
-            "weather": windows,
+            "target_windows": side_windows,
             "aod": {
-                "queried": aeronet_files,
+                "queried": [f for f in weather_files if f.startswith("aeronet")
+                            and any(k in f for k in date_keys)],
                 "note": "AERONET direct-sun products are daytime; any return is a far-site "
                         "column, not an in-situ twilight value",
             },
-            "verdict": "pending-independent-screening",
-            "verdict_note": "finalised with the selection review; must reference these same "
-                            "files and must not use model residuals",
+            "verdict": session_verdict(side_windows),
+            "verdict_note": "derived only from these archived responses and the MICA lunar "
+                            "table; no sky-model residual is read anywhere",
         }
     # The primary night's dawn window additionally carries frozen feasibility
     # evidence (its original bounded probes); referenced, not duplicated.
@@ -1323,6 +1575,7 @@ def build_conditions(out: Path, labels: list[str], values: np.ndarray,
     return {
         "note": "independent conditions only; geometry from vendored MICA, weather verbatim "
                 "public responses, AOD availability as returned",
+        "independent_axis_checks": independent_axis_checks or [],
         "conditions": conditions,
     }
 

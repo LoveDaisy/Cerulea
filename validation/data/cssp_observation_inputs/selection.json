@@ -342,7 +342,7 @@
       "session_id": "s04",
       "decision": "selected",
       "role": "primary",
-      "reason": "complete dusk-to-dawn sampling, three target twilight depths present, moon below horizon at dawn targets, weather evidence already frozen"
+      "reason": "complete dusk-to-dawn sampling and the only night with all three target twilight depths (-6/-9/-12 deg); moon below horizon at the dawn targets, while the dawn window shows valley fog at KN38 and BR/BKN at KBFD (blocked for absolute use, kept for spectral/relative use)"
     },
     {
       "session_id": "s05",
@@ -378,7 +378,7 @@
       "session_id": "s11",
       "decision": "selected",
       "role": "secondary",
-      "reason": "second full night with independent weather coverage; same selection rules as primary"
+      "reason": "its dusk -6 deg window is the cleanest in the dataset (both neighbour stations CLR, moon below horizon); its dawn targets are moonlit (+43..+50 deg) and retained only as a documented moonlit sample"
     },
     {
       "session_id": "s12",

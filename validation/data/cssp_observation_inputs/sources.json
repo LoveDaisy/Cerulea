@@ -297,6 +297,16 @@
         "sha256": "a0b9d7d942ff41cc937e254e09173dc0c10beb4fe8954ea68c182a05acdd224f"
       },
       {
+        "packet_path": "raw/weather/frozen-iem-N38-window.json",
+        "bytes": 3244,
+        "sha256": "bde40a98bd3c6ed9bdb06c430a8df132fa8ee041eb8fb57bcc587f22933adf4f"
+      },
+      {
+        "packet_path": "raw/weather/frozen-noaa-BFD-window.json",
+        "bytes": 940,
+        "sha256": "152cdb7bd46242714395906b5845da41570e54433879ffb838b4a2ee01b53808"
+      },
+      {
         "packet_path": "raw/weather/iem-N38-daily-20140712-month.json",
         "bytes": 22,
         "sha256": "37ec4665a8102d115ffd1ac20dae94c98b4dac64b0c1a68228aa2a531caeb35d"

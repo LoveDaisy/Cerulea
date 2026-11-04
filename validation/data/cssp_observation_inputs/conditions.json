@@ -1,5 +1,29 @@
 {
   "note": "independent conditions only; geometry from vendored MICA, weather verbatim public responses, AOD availability as returned",
+  "independent_axis_checks": [
+    {
+      "record_id": "c1743",
+      "instant_utc": "2014-07-03T08:24:49+00:00",
+      "jpl_elevation_deg": -11.947551,
+      "mica_elevation_deg": -11.946680866666672,
+      "diff_deg": -0.00087,
+      "response_path": "raw/jpl/horizons-cssp-0703.json",
+      "url": "https://ssd.jpl.nasa.gov/api/horizons.api (COMMAND=10, APPARENT=AIRLESS, geodetic CSSP coordinates)",
+      "agreement_bound_deg": 0.01,
+      "note": "independent ephemeris source vs the vendored MICA table; the bound is a cross-source agreement statement, not a fitted tolerance"
+    },
+    {
+      "record_id": "c3074",
+      "instant_utc": "2014-07-19T08:39:17+00:00",
+      "jpl_elevation_deg": -12.030429,
+      "mica_elevation_deg": -12.029036933333336,
+      "diff_deg": -0.001392,
+      "response_path": "raw/jpl/horizons-cssp-0719.json",
+      "url": "https://ssd.jpl.nasa.gov/api/horizons.api (COMMAND=10, APPARENT=AIRLESS, geodetic CSSP coordinates)",
+      "agreement_bound_deg": 0.01,
+      "note": "independent ephemeris source vs the vendored MICA table; the bound is a cross-source agreement statement, not a fitted tolerance"
+    }
+  ],
   "conditions": {
     "s04": {
       "utc_window": {
@@ -11,49 +35,369 @@
         "2014-07-03"
       ],
       "moon": {
-        "elevation_deg_min": -46.97916539999999,
-        "elevation_deg_max": 40.1900841,
+        "elevation_deg_min": -46.522164866666664,
+        "elevation_deg_max": 23.7263291,
         "published_illumination_fraction_min": 0.265,
         "published_illumination_fraction_max": 0.307,
         "axis_source": "vendored upstream MICA lunar table"
       },
-      "weather": {
-        "KN38": {
-          "station": {
-            "name": "Wellsboro/KN38 (AWOS, via IEM)",
-            "lat_deg": 41.7279,
-            "lon_deg": -77.3965,
-            "elevation_m": 572.88
-          },
-          "distance_km": 35.25,
-          "elevation_diff_m": -137.12,
-          "responses": [
-            "iem-N38-obhistory-20140702.json",
-            "iem-N38-obhistory-20140703.json"
+      "target_windows": {
+        "dusk": {
+          "columns_zero_based": [
+            1327,
+            1331
           ],
-          "note": "neighbour station, not an in-situ CSSP measurement; IEM rows are a structured representation of GHCNh, not a second sensor"
+          "window_utc": [
+            "2014-07-03T01:15:57+00:00",
+            "2014-07-03T01:35:02+00:00"
+          ],
+          "moon_elevation_deg_at_targets": [
+            23.726,
+            23.548,
+            23.37,
+            23.193,
+            23.012
+          ],
+          "moon_free": false,
+          "weather": {
+            "KN38": {
+              "station": {
+                "name": "Wellsboro/KN38 (AWOS, via IEM)",
+                "lat_deg": 41.7279,
+                "lon_deg": -77.3965,
+                "elevation_m": 572.88
+              },
+              "distance_km": 35.25,
+              "elevation_diff_m": -137.12,
+              "window_utc": [
+                "2014-07-03T01:15:57+00:00",
+                "2014-07-03T01:35:02+00:00"
+              ],
+              "summary": {
+                "n_rows": 1,
+                "fog": [],
+                "low_opaque": [],
+                "clear": [
+                  {
+                    "utc": "2014-07-03T01:35Z",
+                    "visibility": 10.0,
+                    "cloud": "CLR",
+                    "wx": ""
+                  }
+                ],
+                "other": []
+              },
+              "context_window_utc": [
+                "2014-07-03T00:20:57+00:00",
+                "2014-07-03T02:25:02+00:00"
+              ],
+              "context_summary": {
+                "n_rows": 6,
+                "fog": [],
+                "low_opaque": [],
+                "clear": [
+                  {
+                    "utc": "2014-07-03T00:35Z",
+                    "visibility": 10.0,
+                    "cloud": "CLR",
+                    "wx": ""
+                  },
+                  {
+                    "utc": "2014-07-03T00:55Z",
+                    "visibility": 10.0,
+                    "cloud": "CLR",
+                    "wx": ""
+                  },
+                  {
+                    "utc": "2014-07-03T01:15Z",
+                    "visibility": 10.0,
+                    "cloud": "CLR",
+                    "wx": ""
+                  },
+                  {
+                    "utc": "2014-07-03T01:35Z",
+                    "visibility": 10.0,
+                    "cloud": "CLR",
+                    "wx": ""
+                  },
+                  {
+                    "utc": "2014-07-03T01:55Z",
+                    "visibility": 10.0,
+                    "cloud": "CLR",
+                    "wx": ""
+                  },
+                  {
+                    "utc": "2014-07-03T02:15Z",
+                    "visibility": 10.0,
+                    "cloud": "CLR",
+                    "wx": ""
+                  }
+                ],
+                "other": []
+              }
+            },
+            "KBFD": {
+              "station": {
+                "name": "Bradford/KBFD (NOAA Global Hourly)",
+                "lat_deg": 41.79835,
+                "lon_deg": -78.6355,
+                "elevation_m": 652.9
+              },
+              "distance_km": 69.89,
+              "elevation_diff_m": -57.1,
+              "window_utc": [
+                "2014-07-03T01:15:57+00:00",
+                "2014-07-03T01:35:02+00:00"
+              ],
+              "summary": {
+                "n_rows": 0,
+                "fog": [],
+                "low_opaque": [],
+                "clear": [],
+                "other": []
+              },
+              "context_window_utc": [
+                "2014-07-03T00:20:57+00:00",
+                "2014-07-03T02:25:02+00:00"
+              ],
+              "context_summary": {
+                "n_rows": 0,
+                "fog": [],
+                "low_opaque": [],
+                "clear": [],
+                "other": []
+              }
+            }
+          },
+          "verdict": "moonlit: moon above the horizon at target instants (range 23.0..23.7 deg); hemispheric irradiance includes moonlight, so clean solar twilight comparisons are blocked; retained as a moonlit-sky sample"
         },
-        "KBFD": {
-          "station": {
-            "name": "Bradford/KBFD (NOAA Global Hourly)",
-            "lat_deg": 41.79835,
-            "lon_deg": -78.6355,
-            "elevation_m": 652.9
-          },
-          "distance_km": 69.89,
-          "elevation_diff_m": -57.1,
-          "responses": [
-            "noaa-BFD-20140702.json"
+        "dawn": {
+          "columns_zero_based": [
+            1544,
+            1786
           ],
-          "note": "neighbour station, not an in-situ CSSP measurement; IEM rows are a structured representation of GHCNh, not a second sensor"
+          "window_utc": [
+            "2014-07-03T08:17:49+00:00",
+            "2014-07-03T09:20:14+00:00"
+          ],
+          "moon_elevation_deg_at_targets": [
+            -43.882,
+            -43.961,
+            -44.039,
+            -44.114,
+            -44.189,
+            -45.385,
+            -45.441,
+            -45.496,
+            -45.658,
+            -45.709,
+            -46.382,
+            -46.418,
+            -46.453,
+            -46.488,
+            -46.522
+          ],
+          "moon_free": true,
+          "weather": {
+            "KN38": {
+              "station": {
+                "name": "Wellsboro/KN38 (AWOS, via IEM)",
+                "lat_deg": 41.7279,
+                "lon_deg": -77.3965,
+                "elevation_m": 572.88
+              },
+              "distance_km": 35.25,
+              "elevation_diff_m": -137.12,
+              "window_utc": [
+                "2014-07-03T08:17:49+00:00",
+                "2014-07-03T09:20:14+00:00"
+              ],
+              "summary": {
+                "n_rows": 6,
+                "fog": [
+                  {
+                    "utc": "2014-07-03 08:35",
+                    "visibility": "0.25",
+                    "cloud": "VV",
+                    "wx": "FG"
+                  },
+                  {
+                    "utc": "2014-07-03T08:35Z",
+                    "visibility": 0.25,
+                    "cloud": "VV",
+                    "wx": "FG"
+                  },
+                  {
+                    "utc": "2014-07-03 08:55",
+                    "visibility": "0.25",
+                    "cloud": "OVC",
+                    "wx": "FG"
+                  },
+                  {
+                    "utc": "2014-07-03T08:55Z",
+                    "visibility": 0.25,
+                    "cloud": "OVC",
+                    "wx": "FG"
+                  },
+                  {
+                    "utc": "2014-07-03 09:15",
+                    "visibility": "0.25",
+                    "cloud": "OVC",
+                    "wx": "FG"
+                  },
+                  {
+                    "utc": "2014-07-03T09:15Z",
+                    "visibility": 0.25,
+                    "cloud": "OVC",
+                    "wx": "FG"
+                  }
+                ],
+                "low_opaque": [],
+                "clear": [],
+                "other": []
+              },
+              "context_window_utc": [
+                "2014-07-03T07:22:49+00:00",
+                "2014-07-03T10:10:14+00:00"
+              ],
+              "context_summary": {
+                "n_rows": 12,
+                "fog": [
+                  {
+                    "utc": "2014-07-03T07:55Z",
+                    "visibility": 0.25,
+                    "cloud": "VV",
+                    "wx": "FG"
+                  },
+                  {
+                    "utc": "2014-07-03 08:15",
+                    "visibility": "0.25",
+                    "cloud": "VV",
+                    "wx": "FG"
+                  },
+                  {
+                    "utc": "2014-07-03T08:15Z",
+                    "visibility": 0.25,
+                    "cloud": "VV",
+                    "wx": "FG"
+                  },
+                  {
+                    "utc": "2014-07-03 08:35",
+                    "visibility": "0.25",
+                    "cloud": "VV",
+                    "wx": "FG"
+                  },
+                  {
+                    "utc": "2014-07-03T08:35Z",
+                    "visibility": 0.25,
+                    "cloud": "VV",
+                    "wx": "FG"
+                  },
+                  {
+                    "utc": "2014-07-03 08:55",
+                    "visibility": "0.25",
+                    "cloud": "OVC",
+                    "wx": "FG"
+                  },
+                  {
+                    "utc": "2014-07-03T08:55Z",
+                    "visibility": 0.25,
+                    "cloud": "OVC",
+                    "wx": "FG"
+                  },
+                  {
+                    "utc": "2014-07-03 09:15",
+                    "visibility": "0.25",
+                    "cloud": "OVC",
+                    "wx": "FG"
+                  },
+                  {
+                    "utc": "2014-07-03T09:15Z",
+                    "visibility": 0.25,
+                    "cloud": "OVC",
+                    "wx": "FG"
+                  },
+                  {
+                    "utc": "2014-07-03T09:35Z",
+                    "visibility": 0.25,
+                    "cloud": "OVC",
+                    "wx": "FG"
+                  },
+                  {
+                    "utc": "2014-07-03T09:55Z",
+                    "visibility": 0.25,
+                    "cloud": "OVC",
+                    "wx": "FG"
+                  }
+                ],
+                "low_opaque": [],
+                "clear": [],
+                "other": [
+                  {
+                    "utc": "2014-07-03T07:35Z",
+                    "visibility": 3.0,
+                    "cloud": "CLR",
+                    "wx": "BR"
+                  }
+                ]
+              }
+            },
+            "KBFD": {
+              "station": {
+                "name": "Bradford/KBFD (NOAA Global Hourly)",
+                "lat_deg": 41.79835,
+                "lon_deg": -78.6355,
+                "elevation_m": 652.9
+              },
+              "distance_km": 69.89,
+              "elevation_diff_m": -57.1,
+              "window_utc": [
+                "2014-07-03T08:17:49+00:00",
+                "2014-07-03T09:20:14+00:00"
+              ],
+              "summary": {
+                "n_rows": 1,
+                "fog": [],
+                "low_opaque": [],
+                "clear": [],
+                "other": [
+                  {
+                    "utc": "2014-07-03T08:53:00",
+                    "visibility": "008047,5,N,5",
+                    "cloud": "BKN039",
+                    "wx": "MET10807/03/14 03:53:02 METAR KBFD 03085"
+                  }
+                ]
+              },
+              "context_window_utc": [
+                "2014-07-03T07:22:49+00:00",
+                "2014-07-03T10:10:14+00:00"
+              ],
+              "context_summary": {
+                "n_rows": 1,
+                "fog": [],
+                "low_opaque": [],
+                "clear": [],
+                "other": [
+                  {
+                    "utc": "2014-07-03T08:53:00",
+                    "visibility": "008047,5,N,5",
+                    "cloud": "BKN039",
+                    "wx": "MET10807/03/14 03:53:02 METAR KBFD 03085"
+                  }
+                ]
+              }
+            }
+          },
+          "verdict": "conditional: moon below horizon, but fog or low cloud is reported at neighbour stations inside the window; CSSP itself (710 m plateau) has no in-situ evidence, so absolute use is blocked and spectral/relative use carries this caveat"
         }
       },
       "aod": {
         "queried": [],
         "note": "AERONET direct-sun products are daytime; any return is a far-site column, not an in-situ twilight value"
       },
-      "verdict": "pending-independent-screening",
-      "verdict_note": "finalised with the selection review; must reference these same files and must not use model residuals",
+      "verdict": "dusk [moonlit; KN38: CLR, KBFD: no observation archived in window]; dawn [moon-free; KN38: fog/low-cloud, KBFD: partial/high-cloud]",
+      "verdict_note": "derived only from these archived responses and the MICA lunar table; no sky-model residual is read anywhere",
       "frozen_feasibility_refs": [
         {
           "path": "validation/data/cssp_observation_feasibility/atmosphere/noaa-BFD-window.json",
@@ -87,43 +431,349 @@
         "2014-07-19"
       ],
       "moon": {
-        "elevation_deg_min": -39.63128233333333,
-        "elevation_deg_max": 54.265298099999995,
+        "elevation_deg_min": -30.933813333333326,
+        "elevation_deg_max": 49.767997666666666,
         "published_illumination_fraction_min": 0.466,
         "published_illumination_fraction_max": 0.523,
         "axis_source": "vendored upstream MICA lunar table"
       },
-      "weather": {
-        "KN38": {
-          "station": {
-            "name": "Wellsboro/KN38 (AWOS, via IEM)",
-            "lat_deg": 41.7279,
-            "lon_deg": -77.3965,
-            "elevation_m": 572.88
-          },
-          "distance_km": 35.25,
-          "elevation_diff_m": -137.12,
-          "responses": [
-            "iem-N38-daily-20140718-month.json",
-            "iem-N38-obhistory-20140718.json",
-            "iem-N38-obhistory-20140719.json"
+      "target_windows": {
+        "dusk": {
+          "columns_zero_based": [
+            2629,
+            2631
           ],
-          "note": "neighbour station, not an in-situ CSSP measurement; IEM rows are a structured representation of GHCNh, not a second sensor"
+          "window_utc": [
+            "2014-07-19T01:08:44+00:00",
+            "2014-07-19T01:25:46+00:00"
+          ],
+          "moon_elevation_deg_at_targets": [
+            -30.934,
+            -30.82,
+            -30.701
+          ],
+          "moon_free": true,
+          "weather": {
+            "KN38": {
+              "station": {
+                "name": "Wellsboro/KN38 (AWOS, via IEM)",
+                "lat_deg": 41.7279,
+                "lon_deg": -77.3965,
+                "elevation_m": 572.88
+              },
+              "distance_km": 35.25,
+              "elevation_diff_m": -137.12,
+              "window_utc": [
+                "2014-07-19T01:08:44+00:00",
+                "2014-07-19T01:25:46+00:00"
+              ],
+              "summary": {
+                "n_rows": 1,
+                "fog": [],
+                "low_opaque": [],
+                "clear": [
+                  {
+                    "utc": "2014-07-19T01:15Z",
+                    "visibility": 10.0,
+                    "cloud": "CLR",
+                    "wx": ""
+                  }
+                ],
+                "other": []
+              },
+              "context_window_utc": [
+                "2014-07-19T00:13:44+00:00",
+                "2014-07-19T02:15:46+00:00"
+              ],
+              "context_summary": {
+                "n_rows": 7,
+                "fog": [],
+                "low_opaque": [],
+                "clear": [
+                  {
+                    "utc": "2014-07-19T00:15Z",
+                    "visibility": 10.0,
+                    "cloud": "CLR",
+                    "wx": ""
+                  },
+                  {
+                    "utc": "2014-07-19T00:35Z",
+                    "visibility": 10.0,
+                    "cloud": "CLR",
+                    "wx": ""
+                  },
+                  {
+                    "utc": "2014-07-19T00:55Z",
+                    "visibility": 10.0,
+                    "cloud": "CLR",
+                    "wx": ""
+                  },
+                  {
+                    "utc": "2014-07-19T01:15Z",
+                    "visibility": 10.0,
+                    "cloud": "CLR",
+                    "wx": ""
+                  },
+                  {
+                    "utc": "2014-07-19T01:35Z",
+                    "visibility": 10.0,
+                    "cloud": "CLR",
+                    "wx": ""
+                  },
+                  {
+                    "utc": "2014-07-19T01:55Z",
+                    "visibility": 10.0,
+                    "cloud": "CLR",
+                    "wx": ""
+                  },
+                  {
+                    "utc": "2014-07-19T02:15Z",
+                    "visibility": 10.0,
+                    "cloud": "CLR",
+                    "wx": ""
+                  }
+                ],
+                "other": []
+              }
+            },
+            "KBFD": {
+              "station": {
+                "name": "Bradford/KBFD (NOAA Global Hourly)",
+                "lat_deg": 41.79835,
+                "lon_deg": -78.6355,
+                "elevation_m": 652.9
+              },
+              "distance_km": 69.89,
+              "elevation_diff_m": -57.1,
+              "window_utc": [
+                "2014-07-19T01:08:44+00:00",
+                "2014-07-19T01:25:46+00:00"
+              ],
+              "summary": {
+                "n_rows": 0,
+                "fog": [],
+                "low_opaque": [],
+                "clear": [],
+                "other": []
+              },
+              "context_window_utc": [
+                "2014-07-19T00:13:44+00:00",
+                "2014-07-19T02:15:46+00:00"
+              ],
+              "context_summary": {
+                "n_rows": 2,
+                "fog": [],
+                "low_opaque": [],
+                "clear": [
+                  {
+                    "utc": "2014-07-19T00:53:00",
+                    "visibility": "016093,5,N,5",
+                    "cloud": "CLR",
+                    "wx": "MET09007/18/14 19:53:01 METAR KBFD 19005"
+                  },
+                  {
+                    "utc": "2014-07-19T01:53:00",
+                    "visibility": "016093,5,N,5",
+                    "cloud": "CLR",
+                    "wx": "MET09007/18/14 20:53:01 METAR KBFD 19015"
+                  }
+                ],
+                "other": []
+              }
+            }
+          },
+          "verdict": "mixed: neighbour reports split between clear and cloud/fog rows"
         },
-        "KBFD": {
-          "station": {
-            "name": "Bradford/KBFD (NOAA Global Hourly)",
-            "lat_deg": 41.79835,
-            "lon_deg": -78.6355,
-            "elevation_m": 652.9
-          },
-          "distance_km": 69.89,
-          "elevation_diff_m": -57.1,
-          "responses": [
-            "noaa-BFD-20140718.json",
-            "noaa-BFD-20140719.json"
+        "dawn": {
+          "columns_zero_based": [
+            2860,
+            3116
           ],
-          "note": "neighbour station, not an in-situ CSSP measurement; IEM rows are a structured representation of GHCNh, not a second sensor"
+          "window_utc": [
+            "2014-07-19T08:33:17+00:00",
+            "2014-07-19T09:31:50+00:00"
+          ],
+          "moon_elevation_deg_at_targets": [
+            43.265,
+            43.425,
+            43.584,
+            46.521,
+            46.671,
+            46.82,
+            49.484,
+            49.622,
+            49.768
+          ],
+          "moon_free": false,
+          "weather": {
+            "KN38": {
+              "station": {
+                "name": "Wellsboro/KN38 (AWOS, via IEM)",
+                "lat_deg": 41.7279,
+                "lon_deg": -77.3965,
+                "elevation_m": 572.88
+              },
+              "distance_km": 35.25,
+              "elevation_diff_m": -137.12,
+              "window_utc": [
+                "2014-07-19T08:33:17+00:00",
+                "2014-07-19T09:31:50+00:00"
+              ],
+              "summary": {
+                "n_rows": 3,
+                "fog": [],
+                "low_opaque": [],
+                "clear": [
+                  {
+                    "utc": "2014-07-19T08:35Z",
+                    "visibility": 10.0,
+                    "cloud": "CLR",
+                    "wx": ""
+                  },
+                  {
+                    "utc": "2014-07-19T08:55Z",
+                    "visibility": 10.0,
+                    "cloud": "CLR",
+                    "wx": ""
+                  }
+                ],
+                "other": [
+                  {
+                    "utc": "2014-07-19T09:15Z",
+                    "visibility": 6.0,
+                    "cloud": "FEW",
+                    "wx": "BR"
+                  }
+                ]
+              },
+              "context_window_utc": [
+                "2014-07-19T07:38:17+00:00",
+                "2014-07-19T10:21:50+00:00"
+              ],
+              "context_summary": {
+                "n_rows": 8,
+                "fog": [],
+                "low_opaque": [],
+                "clear": [
+                  {
+                    "utc": "2014-07-19T07:55Z",
+                    "visibility": 10.0,
+                    "cloud": "CLR",
+                    "wx": ""
+                  },
+                  {
+                    "utc": "2014-07-19T08:15Z",
+                    "visibility": 10.0,
+                    "cloud": "CLR",
+                    "wx": ""
+                  },
+                  {
+                    "utc": "2014-07-19T08:35Z",
+                    "visibility": 10.0,
+                    "cloud": "CLR",
+                    "wx": ""
+                  },
+                  {
+                    "utc": "2014-07-19T08:55Z",
+                    "visibility": 10.0,
+                    "cloud": "CLR",
+                    "wx": ""
+                  }
+                ],
+                "other": [
+                  {
+                    "utc": "2014-07-19T09:15Z",
+                    "visibility": 6.0,
+                    "cloud": "FEW",
+                    "wx": "BR"
+                  },
+                  {
+                    "utc": "2014-07-19T09:35Z",
+                    "visibility": 10.0,
+                    "cloud": "BKN",
+                    "wx": ""
+                  },
+                  {
+                    "utc": "2014-07-19T09:55Z",
+                    "visibility": 10.0,
+                    "cloud": "BKN",
+                    "wx": ""
+                  },
+                  {
+                    "utc": "2014-07-19T10:15Z",
+                    "visibility": 10.0,
+                    "cloud": "SCT",
+                    "wx": ""
+                  }
+                ]
+              }
+            },
+            "KBFD": {
+              "station": {
+                "name": "Bradford/KBFD (NOAA Global Hourly)",
+                "lat_deg": 41.79835,
+                "lon_deg": -78.6355,
+                "elevation_m": 652.9
+              },
+              "distance_km": 69.89,
+              "elevation_diff_m": -57.1,
+              "window_utc": [
+                "2014-07-19T08:33:17+00:00",
+                "2014-07-19T09:31:50+00:00"
+              ],
+              "summary": {
+                "n_rows": 1,
+                "fog": [],
+                "low_opaque": [],
+                "clear": [],
+                "other": [
+                  {
+                    "utc": "2014-07-19T08:53:00",
+                    "visibility": "016093,5,N,5",
+                    "cloud": "FEW038",
+                    "wx": "MET11307/19/14 03:53:02 METAR KBFD 19085"
+                  }
+                ]
+              },
+              "context_window_utc": [
+                "2014-07-19T07:38:17+00:00",
+                "2014-07-19T10:21:50+00:00"
+              ],
+              "context_summary": {
+                "n_rows": 4,
+                "fog": [],
+                "low_opaque": [],
+                "clear": [],
+                "other": [
+                  {
+                    "utc": "2014-07-19T07:53:00",
+                    "visibility": "016093,5,N,5",
+                    "cloud": "BKN044",
+                    "wx": "MET10007/19/14 02:53:02 METAR KBFD 19075"
+                  },
+                  {
+                    "utc": "2014-07-19T08:53:00",
+                    "visibility": "016093,5,N,5",
+                    "cloud": "FEW038",
+                    "wx": "MET11307/19/14 03:53:02 METAR KBFD 19085"
+                  },
+                  {
+                    "utc": "2014-07-19T09:53:00",
+                    "visibility": "016093,5,N,5",
+                    "cloud": "SCT026",
+                    "wx": "MET10707/19/14 04:53:02 METAR KBFD 19095"
+                  },
+                  {
+                    "utc": "2014-07-19T10:10:00",
+                    "visibility": "016093,5,N,5",
+                    "cloud": "BKN024",
+                    "wx": "MET10007/19/14 05:10:02 SPECI KBFD 19101"
+                  }
+                ]
+              }
+            }
+          },
+          "verdict": "moonlit: moon above the horizon at target instants (range 43.3..49.8 deg); hemispheric irradiance includes moonlight, so clean solar twilight comparisons are blocked; retained as a moonlit-sky sample"
         }
       },
       "aod": {
@@ -133,8 +783,8 @@
         ],
         "note": "AERONET direct-sun products are daytime; any return is a far-site column, not an in-situ twilight value"
       },
-      "verdict": "pending-independent-screening",
-      "verdict_note": "finalised with the selection review; must reference these same files and must not use model residuals"
+      "verdict": "dusk [moon-free; KN38: CLR, KBFD: CLR (context rows)]; dawn [moonlit; KN38: partial/high-cloud, KBFD: partial/high-cloud]",
+      "verdict_note": "derived only from these archived responses and the MICA lunar table; no sky-model residual is read anywhere"
     }
   }
 }
