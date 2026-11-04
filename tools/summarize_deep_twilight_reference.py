@@ -519,11 +519,28 @@ def photopic(radiance_row: np.ndarray, v_curve: np.ndarray, wl: np.ndarray) -> f
 # ---------------------------------------------------------------------------
 def resolve_protocol_path(data_dir: Path) -> Path:
     """The run directory's protocol file: protocol.json, or the validated
-    snapshot a fresh --out run root received."""
+    snapshot a fresh --out run root received.  If both exist they must
+    agree byte-for-byte: a run root carrying two different protocol
+    identities has no single authority (a later protocol.json must never
+    silently shadow the frozen snapshot, else stages executed under
+    different contracts each report complete while no one protocol can
+    summarize the whole run root), so the conflict is refused outright.
+
+    Raises FileNotFoundError when neither file exists; ValueError when
+    the two identity files disagree.
+    """
     path = data_dir / "protocol.json"
+    snapshot = data_dir / "protocol.snapshot.json"
+    if path.exists() and snapshot.exists():
+        if path.read_bytes() != snapshot.read_bytes():
+            raise ValueError(
+                f"{data_dir}: protocol.json and protocol.snapshot.json "
+                "disagree -- the run root carries two protocol identities; "
+                "resolve the conflict explicitly before any further "
+                "execution or summarization")
+        return path
     if path.exists():
         return path
-    snapshot = data_dir / "protocol.snapshot.json"
     if snapshot.exists():
         return snapshot
     raise FileNotFoundError(

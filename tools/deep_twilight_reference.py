@@ -1201,15 +1201,17 @@ def main(argv=None) -> int:
     else:
         # One run root has exactly one protocol identity, shared by
         # execution, evidence validation and offline summarization: the
-        # file resolve_protocol_path prefers (protocol.json first, then
-        # protocol.snapshot.json).  Byte-checked here BEFORE any numeric
-        # work for EVERY layout -- including protocol-inside-output-root
-        # and snapshot-only roots.  (generation-3 review round-3: the
-        # previous check only ran when run_root != input_root, so a
-        # second contract could enter an established run root through
-        # the default layout or through a protocol file placed inside
-        # the run root, execute, report complete, and leave evidence the
-        # run root's own frozen protocol must refuse.)
+        # file resolve_protocol_path resolves (protocol.json, or the
+        # snapshot; conflicting identity files are refused there, so a
+        # new protocol.json can never silently shadow a frozen
+        # snapshot).  Byte-checked here BEFORE any numeric work for
+        # EVERY layout -- including protocol-inside-output-root and
+        # snapshot-only roots.  (generation-3 review rounds 2-4: the
+        # check began as run_root != input_root only, then as a
+        # filename preference that let a new protocol.json shadow the
+        # frozen snapshot -- either way a second contract could enter an
+        # established run root, execute, report complete, and leave
+        # evidence no single run-root protocol can summarize.)
         from tools.summarize_deep_twilight_reference import \
             resolve_protocol_path
         try:

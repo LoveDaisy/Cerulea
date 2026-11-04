@@ -1368,6 +1368,68 @@ def test_run_root_identity_covers_default_and_inner_protocol_layouts(
     assert rc == 0
 
 
+def test_conflicting_protocol_identity_files_are_refused(tmp_path, monkeypatch):
+    """A run root carrying both protocol.json and protocol.snapshot.json
+    with different bytes has NO single protocol authority: the file-name
+    preference used to let a new protocol.json silently shadow the frozen
+    snapshot, so a stage executed under the shadowing contract reported
+    complete while no one run-root protocol could summarize the whole
+    root (generation-3 review round-4).  The conflict is refused at the
+    single resolution authority, before any numeric work."""
+    import tools.deep_twilight_reference as dtr
+    from tools.summarize_deep_twilight_reference import resolve_protocol_path
+    full = json.loads(DEFAULT_PROTOCOL.read_text())
+
+    def tiny(sens=False):
+        proto = json.loads(json.dumps(full))
+        proto["direct"]["repeats"] = 1
+        proto["direct"]["budgets_photons"] = [400, 800]
+        if sens:
+            proto["sensitivity"]["repeats"] = 2
+            proto["sensitivity"]["photons_per_wavelength"] = 100
+        return proto
+
+    # summarizer unit: agreeing files resolve to protocol.json, a
+    # conflict raises, snapshot-only still resolves to the snapshot
+    root = tmp_path / "unit"
+    root.mkdir()
+    (root / "protocol.json").write_text(json.dumps(tiny()))
+    (root / "protocol.snapshot.json").write_text(json.dumps(tiny()))
+    assert resolve_protocol_path(root).name == "protocol.json"
+    (root / "protocol.json").write_text(json.dumps(tiny(sens=True)))
+    with pytest.raises(ValueError, match="disagree"):
+        resolve_protocol_path(root)
+
+    # executor e2e (the reviewer probe): a snapshot-only run root with
+    # existing direct evidence; a NEW protocol.json shadowing the frozen
+    # snapshot must not enter as the second contract
+    in_a = tmp_path / "in-a"
+    in_a.mkdir()
+    (in_a / "protocol.json").write_text(json.dumps(tiny()))
+    run_root = tmp_path / "run"
+    assert dtr.main(["--protocol", str(in_a / "protocol.json"),
+                     "--stage", "direct", "--out", str(run_root),
+                     "--max-stage-hours", "0"]) == 0
+    snapshot_bytes = (run_root / "protocol.snapshot.json").read_bytes()
+    (run_root / "protocol.json").write_text(json.dumps(tiny(sens=True)))
+    calls = []
+    monkeypatch.setattr(dtr, "build_scenario",
+                        lambda *a, **k: calls.append("build_scenario"))
+    monkeypatch.setattr(dtr, "load_source_table",
+                        lambda *a, **k: calls.append("load_source_table"))
+    with pytest.raises(ValueError, match="disagree"):
+        dtr.main(["--protocol", str(run_root / "protocol.json"),
+                  "--stage", "sensitivity"])
+    assert calls == [], "numeric work ran before the conflict refusal"
+    assert (run_root / "protocol.snapshot.json").read_bytes() == snapshot_bytes
+    # removing the shadowing file restores the single identity
+    (run_root / "protocol.json").unlink()
+    monkeypatch.undo()
+    assert dtr.main(["--protocol", str(in_a / "protocol.json"),
+                     "--stage", "direct", "--out", str(run_root),
+                     "--max-stage-hours", "0.02"]) == 0
+
+
 def test_sensitivity_full_set_fresh_compute_passes_shared_contract(tmp_path):
     """Positive control for the entry gate: a legal full-set protocol
     actually recomputed in a fresh run root must produce records and
