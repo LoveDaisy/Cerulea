@@ -885,6 +885,23 @@ def test_hemisphere_integral_azimuth_ring_contract():
     with pytest.raises(ValueError, match="closed azimuth ring needs"):
         hemispheric_irradiance_from_field(
             np.ones((1, 1, elev.size, 2)), elev, np.array([0.0, 360.0]))
+    # Elevation contract (r02 Major): a descending grid integrates the same
+    # sky with a negated coordinate axis (negative flux), a partial band
+    # silently returns a partial hemisphere - both are rejected outright
+    # rather than reordering or extrapolating the caller's array.
+    full_azim = np.linspace(0.0, 360.0, 73)
+    with pytest.raises(ValueError, match="strictly increasing"):
+        hemispheric_irradiance_from_field(
+            np.ones((1, 1, 3, full_azim.size)), np.array([90.0, 45.0, 0.0]),
+            full_azim)
+    with pytest.raises(ValueError, match="cover the integrated upper"):
+        hemispheric_irradiance_from_field(
+            np.ones((1, 1, 46, full_azim.size)), np.linspace(0.0, 45.0, 46),
+            full_azim)
+    with pytest.raises(ValueError, match="cover the integrated upper"):
+        hemispheric_irradiance_from_field(
+            np.ones((1, 1, 46, full_azim.size)), np.linspace(5.0, 90.0, 46),
+            full_azim)
 
 
 # ---------------------------------------------------------------------------
@@ -972,6 +989,113 @@ def test_build_force_swap_failure_restores_previous_packet(
         cssp.build_packet(tmp_path / "cache", out, force=True)
     assert _packet_hashes(out) == before, "swap failure must restore the old packet"
     assert [p.name for p in tmp_path.iterdir() if p.name.startswith(".packet-")] == []
+
+
+def test_build_force_acceptance_exception_preserves_packet_and_cleans_staging(
+        tmp_path, monkeypatch):
+    """r02 Minor: acceptance RAISING (corrupt staged records, not merely a
+    failed report) must also withdraw the staging and leave the previous
+    packet byte-identical."""
+    import tools.cssp_observation_inputs as cssp
+    out = tmp_path / "packet"
+    shutil.copytree(PACKET, out)
+    before = _packet_hashes(out)
+
+    def build_with_corrupt_records(staging, cache_dir):
+        shutil.copytree(PACKET, staging, dirs_exist_ok=True)
+        (staging / "records.json").write_text("{not json")
+
+    monkeypatch.setattr(cssp, "check_cache_inputs", _no_preflight)
+    monkeypatch.setattr(cssp, "_build_packet_into", build_with_corrupt_records)
+    with pytest.raises(Exception) as excinfo:
+        cssp.build_packet(tmp_path / "cache", out, force=True)
+    assert "failed verification" not in str(excinfo.value), \
+        "corrupt staged records must crash acceptance, not fail it gracefully"
+    assert _packet_hashes(out) == before
+    assert [p.name for p in tmp_path.iterdir() if p.name.startswith(".packet-")] == []
+
+
+def test_verify_recomputes_timing_contract_from_raw(tmp_path):
+    """r02 Major: the timing block is derived, raw-evidenced content - a
+    single-exposure midpoint and a reshaped exposure list must both be
+    rejected through verify even with a synced manifest, while acceptance
+    stays read-only."""
+    copy = tmp_path / "packet"
+    shutil.copytree(PACKET, copy)
+
+    def sync_manifest():
+        manifest = read_json(copy / "inputs.sha256.json")
+        manifest["records.json"] = sha256_file(copy / "records.json")
+        write_json(copy / "inputs.sha256.json", manifest)
+
+    records = read_json(copy / "records.json")
+    target = next(r for r in records["records"] if r["record_id"] == "c1784")
+    # The exact failure mode plan §3.2 forbids: invokeTime + one exposure / 2
+    # quoted as the window midpoint (correct scenario value is invoke + N*T/2).
+    target["timing"]["midpoint_utc_scenario"] = "2014-07-03T09:08:13+00:00"
+    write_json(copy / "records.json", records)
+    sync_manifest()
+    report = verify_packet(copy)
+    assert not report["ok"]
+    assert any(p.startswith("c1784:") and "timing block does not recompute" in p
+               for p in report["problems"])
+    # A reshaped exposure list that keeps the headline total is the same
+    # class of internal contradiction and is equally rejected.
+    records = read_json(copy / "records.json")
+    target = next(r for r in records["records"] if r["record_id"] == "c1784")
+    target["timing"]["exposure_seconds"] = [60.0] * 10
+    write_json(copy / "records.json", records)
+    sync_manifest()
+    watched = _packet_hashes(copy)   # snapshot AFTER the test's own tampering
+    report = verify_packet(copy)
+    assert not report["ok"]
+    assert any("timing block does not recompute" in p for p in report["problems"])
+    assert _packet_hashes(copy) == watched, "failing verify must stay read-only"
+
+
+@pytest.mark.filterwarnings(
+    "ignore::RuntimeWarning")   # the corrupted probe trips an internal
+# stage-diff divide inside replay_record; the acceptance handles it structurally
+def test_nonfinite_published_channel_is_structurally_rejected(tmp_path):
+    """r02 Major: +-inf published values must be rejected as corrupted
+    excerpts - not silently skipped via NaN comparisons (inf/inf = NaN
+    compared False against the tolerance) - with record id and wavelength
+    through evaluate_replay, verify and read-only replay."""
+    copy = tmp_path / "packet"
+    shutil.copytree(PACKET, copy)
+    spectra = load_packet_spectra(copy)
+    rid, col = spectra["record_ids"][0], spectra["columns"][0]
+    text = (copy / "spectra.csv").read_text()
+    newline = "\r\n" if "\r\n" in text else "\n"
+    lines = text.split(newline)
+    header = lines[0].split(",")
+    col_idx = header.index(f"col{col}")
+    wl_row = next(i for i, line in enumerate(lines[1:], start=1)
+                  if line and float(line.split(",")[0]) == 500.0)
+    fields = lines[wl_row].split(",")
+    assert np.isfinite(float(fields[col_idx]))
+    fields[col_idx] = "inf"
+    lines[wl_row] = ",".join(fields)
+    (copy / "spectra.csv").write_text(newline.join(lines))
+    # Keep the manifest consistent so identity checks pass and the numeric
+    # replay acceptance itself is what must detect the corruption.
+    manifest = read_json(copy / "inputs.sha256.json")
+    manifest["spectra.csv"] = sha256_file(copy / "spectra.csv")
+    write_json(copy / "inputs.sha256.json", manifest)
+
+    report = evaluate_replay(copy)
+    assert not report["ok"]
+    problem = next(p for p in report["problems"]
+                   if p.startswith(f"{rid}:") and "non-finite" in p)
+    assert "500.0" in problem
+    vreport = verify_packet(copy)
+    assert not vreport["ok"]
+    assert any("non-finite" in p for p in vreport["problems"])
+    before = _packet_hashes(copy)
+    rreport = run_replay(copy, write=False)
+    assert not rreport["ok"]
+    assert any("non-finite" in p for p in rreport["problems"])
+    assert _packet_hashes(copy) == before, "failing acceptance must stay read-only"
 
 
 def test_negative_published_channel_is_structurally_rejected(tmp_path):

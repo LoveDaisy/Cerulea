@@ -814,6 +814,22 @@ def verify_packet(packet: Path, source_dir: Path | None = None) -> dict:
                     if got_value != claimed_value:
                         problems.append(f"{record_id}: instrument field {key} mismatch "
                                         f"({got_value!r} vs {claimed_value!r})")
+                # The timing contract is derived, raw-evidenced content: the
+                # acceptance re-derives it through the build's single source
+                # instead of trusting the frozen copy (r02 Major: a hand-edited
+                # exposure list or a single-exposure midpoint used to pass all
+                # three entries while internally contradicting the raw MAT).
+                if invoke_time_to_utc_iso(contract["invoke_time"]["value"]) \
+                        != record["invoke_time_utc"]:
+                    problems.append(f"{record_id}: raw invokeTime does not bind "
+                                    "to the record's UTC instant")
+                expected_timing = nominal_exposure_window(
+                    contract, record["invoke_time_utc"])
+                if json.dumps(expected_timing, sort_keys=True) != \
+                        json.dumps(record.get("timing"), sort_keys=True):
+                    problems.append(f"{record_id}: timing block does not recompute "
+                                    "from the raw contract via "
+                                    "nominal_exposure_window")
         else:
             problems.append(f"{record_id}: no raw member bound (AC1 requires one)")
 
@@ -1237,7 +1253,7 @@ def build_packet(cache_dir: Path, out: Path, force: bool) -> dict:
     directory; the previous packet is only retired through a recoverable
     rename after the staged copy has passed verification, and is restored
     if the swap itself fails. Every failure mode - preflight, extraction,
-    acceptance, swap - therefore leaves either the previous packet or a
+    acceptance (a failed report or a raised error), swap - therefore leaves either the previous packet or a
     clean state behind, never a half-built or failed replacement (the
     plan's "failed attempts withdraw only their own incomplete artefacts"
     rule).
@@ -1252,34 +1268,36 @@ def build_packet(cache_dir: Path, out: Path, force: bool) -> dict:
                                     dir=out.parent))
     try:
         _build_packet_into(staging, cache_dir)
-    except Exception:
-        shutil.rmtree(staging, ignore_errors=True)
-        raise
-    # Full acceptance happens INSIDE staging, before the previous packet is
-    # touched: a build that cannot pass verification must never replace a
-    # good packet (r05 Major: acceptance used to run after the irreversible
-    # rmtree, so an acceptance failure destroyed the previous packet).
-    report = verify_packet(staging)
-    if not report["ok"]:
-        shutil.rmtree(staging, ignore_errors=True)
-        raise ValueError(f"freshly built packet failed verification: "
-                         f"{report['problems'][:10]}")
-    backup = None
-    if out.exists():
-        backup = Path(tempfile.mkdtemp(prefix=f".{out.name}-previous-",
-                                       dir=out.parent))
-        backup.rmdir()
-        out.rename(backup)   # reversible: the old packet stays on disk
-    try:
-        staging.rename(out)
-    except Exception:
+        # Full acceptance happens INSIDE staging, before the previous packet
+        # is touched: a build that cannot pass verification must never
+        # replace a good packet (r05 Major: acceptance used to run after the
+        # irreversible rmtree, so an acceptance failure destroyed the packet).
+        report = verify_packet(staging)
+        if not report["ok"]:
+            raise ValueError(f"freshly built packet failed verification: "
+                             f"{report['problems'][:10]}")
+        backup = None
+        if out.exists():
+            backup = Path(tempfile.mkdtemp(prefix=f".{out.name}-previous-",
+                                           dir=out.parent))
+            backup.rmdir()
+            out.rename(backup)   # reversible: the old packet stays on disk
+        try:
+            staging.rename(out)
+        except Exception:
+            if backup is not None:
+                backup.rename(out)   # restore the previous packet in full
+                backup = None
+            raise
         if backup is not None:
-            backup.rename(out)   # restore the previous packet in full
-            backup = None
+            shutil.rmtree(backup, ignore_errors=True)
+    finally:
+        # This attempt owns its staging from build through acceptance to the
+        # swap: whatever escapes above - build failure, acceptance returning
+        # problems OR raising, swap failure - withdraws only the staging
+        # (r02 Minor). After a successful rename the staging is already
+        # gone, so this is a no-op.
         shutil.rmtree(staging, ignore_errors=True)
-        raise
-    if backup is not None:
-        shutil.rmtree(backup, ignore_errors=True)
     records = read_json(out / "records.json")["records"]
     selection = read_json(out / "selection.json")
     return {"records": len(records), "sessions": len(selection["sessions"]),
@@ -2484,6 +2502,18 @@ def evaluate_replay(packet: Path) -> dict:
             record_problems.append(
                 f"NaN masks differ at {int((nan_published ^ nan_replay).sum())} channels")
         comparable = ~nan_published & ~nan_replay
+        # Infinities are corrupted excerpts, not physics: without this gate a
+        # published +inf slipped through as inf/inf = NaN and NaN >= tolerance
+        # is False (r02 Major). Non-finite channels are excluded from every
+        # later comparison so they cannot poison the relative-error math.
+        nonfinite = comparable & ~(np.isfinite(published) & np.isfinite(replay))
+        if nonfinite.any():
+            wl = np.arange(280.0, 841.0)[nonfinite][:5]
+            record_problems.append(
+                f"{int(nonfinite.sum())} published channels are non-finite "
+                f"(+-inf is a corrupted excerpt, not physics; "
+                f"first wl {wl.tolist()})")
+        comparable = comparable & ~nonfinite
         negative = comparable & (published < 0)
         if negative.any():
             wl = np.arange(280.0, 841.0)[negative][:5]
@@ -2497,18 +2527,25 @@ def evaluate_replay(packet: Path) -> dict:
             record_problems.append(
                 f"{int(broken_zeros.sum())} published-zero channels replay non-zero")
         positive = comparable & (published > 0)
-        rel = np.abs(replay[positive] - published[positive]) / published[positive]
+        with np.errstate(divide="ignore", invalid="ignore"):
+            rel = np.abs(replay[positive] - published[positive]) / published[positive]
+        if rel.size and not np.isfinite(rel).all():
+            record_problems.append(
+                f"{int((~np.isfinite(rel)).sum())} comparable channels produce "
+                "a non-finite relative error (overflow or degenerate published "
+                "value) - not a tolerance pass")
+        finite_rel = rel[np.isfinite(rel)]
         breaches = np.flatnonzero(rel >= REPLAY_MEDIAN_REL_TOLERANCE)
         if breaches.size:
             wl = np.arange(280.0, 841.0)[positive][breaches[:5]]
             record_problems.append(
                 f"{breaches.size} channels exceed the per-channel tolerance "
                 f"{REPLAY_MEDIAN_REL_TOLERANCE:.0e} (worst rel "
-                f"{rel.max():.3e}; first wl {wl.tolist()})")
+                f"{rel[breaches].max():.3e}; first wl {wl.tolist()})")
         per_record[rid] = {
             "median_abs_relative_diff":
-                float(np.median(rel)) if rel.size else None,
-            "max_abs_relative_diff": float(rel.max()) if rel.size else None,
+                float(np.median(finite_rel)) if finite_rel.size else None,
+            "max_abs_relative_diff": float(finite_rel.max()) if finite_rel.size else None,
             "n_comparable_channels": int(positive.sum()),
             "n_zero_channels": int(zero_cells.sum()),
             "problems": record_problems,
@@ -2711,6 +2748,16 @@ def hemispheric_irradiance_from_field(radiance: np.ndarray,
     azim = np.asarray(azimuth_deg, dtype=float)
     if radiance.shape[-2:] != (elev.size, azim.size):
         raise ValueError("radiance grid must match (n_elev, n_azim)")
+    if elev.size < 2 or not (np.diff(elev) > 0).all() \
+            or not np.isfinite(elev).all() \
+            or elev[0] < -90.0 - 1e-9 or elev[-1] > 90.0 + 1e-9:
+        raise ValueError("elevation grid must be finite, strictly increasing, "
+                         "and within [-90, 90] degrees")
+    if elev[0] > 1e-9 or elev[-1] < 90.0 - 1e-9:
+        raise ValueError("elevation grid must cover the integrated upper "
+                         "hemisphere (first <= 0 deg, last >= 90 deg); a "
+                         "partial band would silently return a "
+                         "partial-hemisphere flux")
     if azim.size < 2 or not (np.diff(azim) > 0).all():
         raise ValueError("azimuth grid must be strictly increasing with "
                          ">= 2 samples")
