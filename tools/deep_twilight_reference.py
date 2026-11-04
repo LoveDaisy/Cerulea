@@ -374,8 +374,20 @@ def load_state(data_dir: Path) -> dict:
     return {"stages": {}}
 
 
-def save_state(data_dir: Path, state: dict) -> None:
-    (data_dir / "state.json").write_text(json.dumps(state, indent=1) + "\n")
+def save_state(data_dir: Path, state: dict, *, stage: str | None = None) -> None:
+    """Persist state; with ``stage``, merge only this stage's cap group.
+
+    Group-scoped merging lets different cap-group stages run concurrently
+    (each process owns exactly one group) without losing the other's
+    cumulative accounting.
+    """
+    path = data_dir / "state.json"
+    if stage is not None:
+        disk = load_state(data_dir)
+        group = STAGE_CAP_GROUP[stage]
+        disk.setdefault("stages", {})[group] = state["stages"][group]
+        state = disk
+    path.write_text(json.dumps(state, indent=1) + "\n")
 
 
 def stage_budget(state: dict, stage: str, protocol: dict, override_hours):
@@ -467,7 +479,7 @@ def run_formal_stage(protocol, atmo, table, stage, data_dir, state, *,
                            records_done - billed_records)
         billed = now
         billed_records = records_done
-        save_state(data_dir, state)
+        save_state(data_dir, state, stage=stage)
 
     billed_records = 0
     bill(0)  # setup (table load, deterministic singles) counts against the cap
@@ -649,7 +661,7 @@ def stage_candidate(protocol, atmo, table, data_dir, state, *, protocol_path,
                            now - billed, records_done - billed_records)
         billed = now
         billed_records = records_done
-        save_state(data_dir, state)
+        save_state(data_dir, state, stage="candidate")
 
     bill(0)
     suns = protocol["scenario"]["sun_elevations_deg"]
@@ -811,7 +823,7 @@ def stage_sensitivity(protocol, atmo, table, data_dir, state, *, protocol_path,
                            now - billed, records_done - billed_records)
         billed = now
         billed_records = records_done
-        save_state(data_dir, state)
+        save_state(data_dir, state, stage="sensitivity")
 
     bill(0)
 
