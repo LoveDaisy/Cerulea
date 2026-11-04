@@ -24,7 +24,7 @@
       "reason": "site horizon not characterised; H=1 is the idealisation"
     },
     "P": {
-      "text": "upstream publishing steps (dark subtraction, wavelength mapping, sensitivity calibration, resampling to 1 nm grid, exposure normalisation); replayed minimally in the replay command; no re-application of calibration factors to published spectra",
+      "text": "upstream publishing steps (dark subtraction by nearest integration-time node + temperature interpolation, wavelength shift, 1 nm resampling, median filter span 8, sensitivity correction factor, pi factor, negative clamp): replayed per record in replay.json, which reproduces the published columns to ~5e-11 median relative difference (CSV print precision). This proves reproduction of the upstream pipeline from the archived raw members; it does not independently certify the absolute radiometric scale",
       "evidence": "derived-documented"
     },
     "L_bg": {

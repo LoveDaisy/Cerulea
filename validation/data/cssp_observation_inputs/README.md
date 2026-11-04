@@ -29,10 +29,20 @@ and [MATCHED_OBSERVATIONS §4](../../../docs/twilight/MATCHED_OBSERVATIONS.md).
   windows. Failed probes are kept as evidence.
 - `selection.json`: the full session inventory of all 3192 published columns
   plus frozen selection decisions and reasons.
-- `conditions.json`: moon geometry and independent weather/AOD coverage per
-  selected night (what was queried, what returned, and what stays missing).
+- `conditions.json`: moon geometry, per-side (dusk/dawn) weather windows and
+  independent JPL axis checks for each selected night (what was queried,
+  what returned, and what stays missing), with data-referenced verdicts.
 - `operator.json`: the mathematical observation operator with evidence
   levels; `diagnostics.json`: timing/response/background scenario tables.
+- `calibration-extract.json`: reduced subset of the pinned generated
+  calibration struct (meter 'a' dark library nodes and temperature rows the
+  records reference, the full correction factor and wavelength shift), tied
+  to the whole-file identity of its 21.8 MB source.
+- `replay.json`: per-record port of the upstream Preprocess.m +
+  RawToAbsolute.m chain. It reproduces the published columns to ~5e-11
+  median relative difference (CSV print precision) - proof that the raw
+  members and the published spectra are the same data through the same
+  pipeline, not an independent absolute calibration.
 
 ## Commands
 
@@ -74,3 +84,6 @@ uv run python -I tools/cssp_observation_inputs.py verify \
   recorded and no in-situ column quantities are derived from them.
 - Scenario ranges in `diagnostics.json` are demonstrations of dependence,
   not confidence intervals.
+- `replay.json` documents reproduction of the upstream pipeline; the
+  absolute radiometric scale rests on the upstream lab calibration and is
+  not independently certified here.

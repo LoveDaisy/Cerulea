@@ -26,11 +26,15 @@ from tools.cssp_observation_inputs import (  # noqa: E402
     band_energy,
     check_external_refs,
     check_manifest,
+    dark_spectrum_from_extract,
+    exposure_weighted_mean,
     external_ref,
     haversine_km,
+    ideal_hemispheric_irradiance,
     invoke_time_to_utc_iso,
     label_to_invoke_time,
     label_to_utc_iso,
+    load_calibration_extract,
     load_packet_spectra,
     map_columns_to_members,
     mica_elevation,
@@ -42,6 +46,7 @@ from tools.cssp_observation_inputs import (  # noqa: E402
     read_json,
     read_mat_contract,
     read_mica_table,
+    replay_record,
     session_signal_stats,
     sessions_of,
     station_state,
@@ -403,6 +408,74 @@ def test_weather_classification_and_context_fallback():
     empty = {"n_rows": 0, "fog": [], "low_opaque": [], "clear": [], "other": []}
     assert station_state(empty, empty) == "no observation archived in window"
     assert station_state(empty, clear) == "CLR (context rows)"
+
+
+# ---------------------------------------------------------------------------
+# Observation operator analytic anchors and calibration replay (M3)
+# ---------------------------------------------------------------------------
+
+def test_operator_isotropic_sky_gives_pi_l():
+    assert ideal_hemispheric_irradiance(2.0) == pytest.approx(np.pi * 2.0)
+
+
+def test_operator_flat_horizon_gives_cos_squared():
+    for h in (0.0, 1.0, 2.0, 5.0, 10.0):
+        assert ideal_hemispheric_irradiance(1.0, h) == \
+            pytest.approx(np.pi * np.cos(np.radians(h)) ** 2)
+
+
+def test_exposure_weighted_mean_matches_analytic_ramp_with_gaps():
+    # Linear ramp L(t) = 1 + t over samples of 2 s with a 3 s gap:
+    # duration-weighted mean of the sample values (not a time-average across
+    # the gap) is the scenario the operator contract defines.
+    values = np.array([1.0, 3.0])
+    got = exposure_weighted_mean(values, [2.0, 2.0], gaps_seconds=[3.0, 0.0])
+    assert got == pytest.approx((1.0 * 2.0 + 3.0 * 2.0) / 4.0)
+    with pytest.raises(ValueError):
+        exposure_weighted_mean(values, [2.0, 2.0], gaps_seconds=[3.0])
+    # Equal weights fall out when durations are equal and gaps vanish.
+    assert exposure_weighted_mean(np.array([2.0, 6.0]), [1.0, 1.0]) == 4.0
+    with pytest.raises(ValueError):
+        exposure_weighted_mean(np.array([1.0]), [0.0])
+
+
+def test_dark_extract_semantics_follow_getdarkspectrum():
+    cal = {"dark_nodes": {
+        2000000.0: (np.array([25.0, 30.0]), np.array([[10.0] * 4, [30.0] * 4])),
+        60000000.0: (np.array([25.0, 30.0]), np.array([[20.0] * 4, [40.0] * 4])),
+    }}
+    # Nearest node wins: 32 s (32_000_000 us) resolves to the 60 s library row;
+    # 27.5 C interpolates linearly between 25 C (20) and 30 C (40) -> 30.
+    dark = dark_spectrum_from_extract(cal, 32000000.0, 27.5)
+    assert np.allclose(dark, 30.0)
+    with pytest.raises(ValueError):
+        dark_spectrum_from_extract(cal, 2000000.0, 50.0)
+
+
+def test_replay_reproduces_published_columns_to_print_precision():
+    """The ported upstream chain must reproduce the published excerpts."""
+    replay = read_json(PACKET / "replay.json")
+    assert replay["summary"]["n_records"] == 42
+    for record_id in ("c1743", "c1765", "c1784", "c3114"):
+        entry = replay["records"][record_id]
+        pv = entry["published_vs_replay"]
+        assert pv["median_abs_relative_diff"] < 1e-6
+        assert pv["replay_zero_after_clamp"] == pv["published_zero_cells"]
+    # The hard-saturated record stays flagged even though upstream kept it.
+    assert replay["records"]["c3114"]["stages"]["dark"][
+        "saturated_pixels_mean_equals_65535"] == 0
+
+
+def test_calibration_extract_covers_every_record_node_and_temperature():
+    extract = load_calibration_extract(PACKET)
+    assert extract["wl_shift"] == pytest.approx(-0.789232450342638, abs=1e-9)
+    records = read_json(PACKET / "records.json")["records"]
+    for record in records:
+        t_us = record["instrument"]["integration_time_us"]["value"]
+        node_us = min(extract["dark_nodes"], key=lambda u: abs(u - t_us))
+        temps, _ = extract["dark_nodes"][node_us]
+        temp = float(np.mean(record["instrument"]["board_temp_c"]["value"]))
+        assert temps.min() <= temp <= temps.max()
 
 
 def test_spectra_excerpts_match_old_packet_overlap():

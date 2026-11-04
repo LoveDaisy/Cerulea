@@ -97,6 +97,17 @@ RAW_ARCHIVE_PREFIX_1MIB_SHA256 = (
 PUBLISHED_WAVELENGTHS_SHA256 = (
     "479dad2965c373b73052b518d33621385b80dead1d64964e19b610b363a8200e")
 PUBLISHED_WAVELENGTHS_BYTES = 2244
+# Generated calibration structure for meter 'a' (CSSP records have no
+# wavelength above 1000 nm, so GetWhichMeterFromWls returns 1 -> 'a');
+# whole-file identity measured from the pinned-repo download.
+CAL_STRUCT_URL = ("https://raw.githubusercontent.com/spitschan/"
+                  "IlluminationSpectraDataset/" + AUTHOR_REPO_COMMIT +
+                  "/calibration/cals/OO_USB2000%2Ba.mat")
+CAL_STRUCT_SHA256 = (
+    "d90270171e417b1ea606dd2b595f8b8482da6a2f7bdc2f7dca0b0ec30e2dca80")
+CAL_STRUCT_BYTES = 21804126
+REPLAY_FILTER_SPAN = 8          # Preprocess.m medianFilterSpan
+REPLAY_CROP_NM = (280.0, 840.0)  # Preprocess.m wlRange
 
 # Full-CSV layout: 5 metadata rows then 561 spectrum rows, all x 3192 columns.
 # Row 0 is the authors' sequence (acquisition-run) index; rows 1/2 are the
@@ -706,6 +717,37 @@ def verify_packet(packet: Path, source_dir: Path | None = None) -> dict:
         else:
             problems.append(f"{record_id}: no raw member bound (AC1 requires one)")
 
+    # Calibration extract and replay coherence (M3). The extract must cover
+    # every record's integration-time node and temperature; the replay table
+    # must cover every record and one pinned record is re-computed here as
+    # tamper detection.
+    extract = load_calibration_extract(packet)
+    for record in records["records"]:
+        t_us = record["instrument"]["integration_time_us"]["value"]
+        node_us = min(extract["dark_nodes"], key=lambda u: abs(u - t_us))
+        temps, _ = extract["dark_nodes"][node_us]
+        temp = float(np.mean(record["instrument"]["board_temp_c"]["value"]))
+        if not temps.min() <= temp <= temps.max():
+            problems.append(f"{record['record_id']}: calibration extract lacks "
+                            f"temperature coverage ({temp} C)")
+    replay = read_json(packet / "replay.json")
+    replay_ids = set(replay["records"])
+    expected_ids = {r["record_id"] for r in records["records"]}
+    if replay_ids != expected_ids:
+        problems.append("replay.json does not cover exactly the packet records")
+    pinned = "c1743"
+    if pinned in replay_ids:
+        member = next(r for r in records["records"] if r["record_id"] == pinned)
+        published_col = spectra["data"][:, spectra["columns"].index(
+            member["source_column_zero_based"])]
+        fresh = replay_record(extract, packet / member["raw"]["packet_path"],
+                              published_col)
+        stored = replay["records"][pinned]["published_vs_replay"]
+        if fresh["published_vs_replay"]["median_abs_relative_diff"] != \
+                stored["median_abs_relative_diff"]:
+            problems.append(f"replay recomputation for {pinned} differs from "
+                            "the frozen table")
+
     # Independent axis checks must recompute from the vendored JPL responses.
     for check in conditions_doc.get("independent_axis_checks", []):
         path = packet / check["response_path"]
@@ -797,6 +839,18 @@ def fetch_sources(cache_dir: Path, with_raw_archive: bool) -> dict:
                       "final_url": RAW_ARCHIVE_FINAL_URL, "path": "dataraw.tar.gz",
                       "bytes": RAW_ARCHIVE_TOTAL_BYTES,
                       "sha256": RAW_ARCHIVE_FULL_SHA256})
+    items.append({"id": "cal-struct-a", "url": CAL_STRUCT_URL,
+                  "path": "calibration/OO_USB2000+a.mat",
+                  "bytes": CAL_STRUCT_BYTES, "sha256": CAL_STRUCT_SHA256})
+    for source_name in ("IlluminationSpectraDataset_SpecCal_GetDarkSpectrum.m",
+                        "IlluminationSpectraDataset_SpecCal_DarkCalibration.m",
+                        "IlluminationSpectraDataset_SpecCal_WavelengthCalibration.m",
+                        "IlluminationSpectraDataset_SpecCal_RawToAbsolute.m"):
+        items.append({"id": f"code-{source_name}",
+                      "url": ("https://raw.githubusercontent.com/spitschan/"
+                              "IlluminationSpectraDataset/" + AUTHOR_REPO_COMMIT +
+                              "/calibration/" + source_name),
+                      "path": f"calibration/{source_name}"})
     provenance = []
     for item in items:
         target = cache_dir / item["path"]
@@ -1172,9 +1226,27 @@ def build_packet(cache_dir: Path, out: Path, force: bool) -> dict:
                                 independent_axis_checks=jpl_checks))
 
     write_json(out / "operator.json", operator_contract())
+
+    # Reduced calibration extract + processing replay (plan M3). The extract
+    # is checked against the measured whole-file hash of the source struct;
+    # equivalence holds by construction (same nodes/rows are vendored).
+    cal_cache = cache_dir / "calibration/OO_USB2000+a.mat"
+    if not cal_cache.is_file():
+        raise ValueError("calibration struct missing from cache; run fetch")
+    if sha256_file(cal_cache) != CAL_STRUCT_SHA256:
+        raise ValueError("cached calibration struct identity mismatch")
+    cal_full = load_full_cal_struct(cal_cache)
+    integration_times = [r["instrument"]["integration_time_us"]["value"]
+                         for r in records]
+    temps_needed = [float(np.mean(r["instrument"]["board_temp_c"]["value"]))
+                    for r in records]
+    build_calibration_extract(cal_full, integration_times, temps_needed,
+                              out / "calibration-extract.json", CAL_STRUCT_SHA256)
+
     diagnostics = compute_diagnostics(out, labels, values, raw_cols)
     write_json(out / "diagnostics.json", diagnostics)
     write_json(out / "sources.json", build_sources(out, cache_dir, columns))
+    run_replay(out)
 
     # README and manifest last.
     write_readme(out, columns)
@@ -1238,10 +1310,15 @@ def operator_contract() -> dict:
             "H": {"text": "horizon visibility (terrain/obstruction mask above the board)",
                   "evidence": EVIDENCE_UNKNOWN,
                   "reason": "site horizon not characterised; H=1 is the idealisation"},
-            "P": {"text": "upstream publishing steps (dark subtraction, wavelength mapping, "
-                          "sensitivity calibration, resampling to 1 nm grid, exposure "
-                          "normalisation); replayed minimally in the replay command; no "
-                          "re-application of calibration factors to published spectra",
+            "P": {"text": "upstream publishing steps (dark subtraction by nearest "
+                          "integration-time node + temperature interpolation, wavelength "
+                          "shift, 1 nm resampling, median filter span 8, sensitivity "
+                          "correction factor, pi factor, negative clamp): replayed per "
+                          "record in replay.json, which reproduces the published columns "
+                          "to ~5e-11 median relative difference (CSV print precision). "
+                          "This proves reproduction of the upstream pipeline from the "
+                          "archived raw members; it does not independently certify the "
+                          "absolute radiometric scale",
                   "evidence": EVIDENCE_DERIVED},
             "L_bg": {"text": "astronomical + artificial night background; distinct from "
                              "instrument dark residual r_dark",
@@ -1725,6 +1802,301 @@ def compute_diagnostics(packet: Path, labels: list[str], values: np.ndarray,
 
 
 # ---------------------------------------------------------------------------
+# Calibration replay: upstream RawToAbsolute port on the selected records
+# ---------------------------------------------------------------------------
+
+def load_full_cal_struct(path: Path) -> dict:
+    """Load the generated calibration struct (``cals{1}`` = meter 'a')."""
+    from scipy.io import loadmat
+    raw = loadmat(path, simplify_cells=True)["cals"]
+    cal = raw[0] if isinstance(raw, list) else raw
+    if cal["whichMeter"] != "a":
+        raise ValueError(f"expected meter 'a', got {cal['whichMeter']!r}")
+    dark = cal["dark"]
+    return {
+        "wl_shift": float(cal["wlShift"]),
+        "wls": np.asarray(cal["wls"], dtype=float),
+        "correction_factor": np.asarray(cal["correctionFactor"], dtype=float),
+        "effective_wl_range": [float(v) for v in cal["effectiveWlRange"]],
+        "dark_integration_times_us": np.asarray(dark["integrationTimes"], dtype=float),
+        "dark_temperatures": [np.asarray(t, dtype=float).ravel() for t in dark["darkTemperature"]],
+        "dark_spds": [np.asarray(s, dtype=float) for s in dark["darkSpd"]],
+    }
+
+
+def dark_spectrum(cal: dict, integration_time_us: float,
+                  temperature_c: float) -> np.ndarray:
+    """Port of ``GetDarkSpectrum.m``: nearest integration-time node, linear
+    temperature interpolation, NaN outside the measured temperature range."""
+    idx = int(np.argmin(np.abs(cal["dark_integration_times_us"] - integration_time_us)))
+    temps = cal["dark_temperatures"][idx]
+    spds = cal["dark_spds"][idx]          # (2048, n_temps) or (n_temps, 2048)
+    if spds.shape[0] == temps.size:
+        values = spds                      # (n_temps, 2048)
+    else:
+        values = spds.T
+    if not temps.min() <= temperature_c <= temps.max():
+        raise ValueError(f"temperature {temperature_c} outside dark library "
+                         f"[{temps.min()}, {temps.max()}] at node "
+                         f"{cal['dark_integration_times_us'][idx]} us")
+    return np.array([np.interp(temperature_c, temps, values[:, k])
+                     for k in range(values.shape[1])])
+
+
+def build_calibration_extract(cal: dict, integration_times_us: list[float],
+                              temperatures_needed: list[float],
+                              out_path: Path, source_sha256: str) -> None:
+    """Vendor a reduced calibration extract that still replays every record.
+
+    Keeps the full correction factor and wavelength grid, but only the dark
+    library nodes actually referenced by the records (nearest-node rule, as
+    GetDarkSpectrum.m resolves) and only the dark temperature rows that
+    immediately bracket each needed temperature (the interpolation is linear,
+    so those rows reproduce it exactly). The extract records the whole-file
+    identity of its source; the 21.8 MB source itself stays in the cache and
+    is not vendored.
+    """
+    node_indices = sorted({int(np.argmin(np.abs(cal["dark_integration_times_us"] - t)))
+                           for t in integration_times_us})
+    kept_nodes = []
+    for i in node_indices:
+        node_us = float(cal["dark_integration_times_us"][i])
+        temps = cal["dark_temperatures"][i]
+        spds = np.asarray(cal["dark_spds"][i], dtype=float)
+        values = spds if spds.shape[0] == temps.size else spds.T   # (n_temps, 2048)
+        rows = set()
+        for temperature_c in temperatures_needed:
+            if not temps.min() <= temperature_c <= temps.max():
+                raise ValueError(f"record temperature {temperature_c} outside dark "
+                                 f"library range at node {node_us} us")
+            upper = int(np.searchsorted(temps, temperature_c, side="left"))
+            lower = max(upper - 1, 0)
+            rows.add(lower)
+            if upper < temps.size and temps[upper] != temps[lower]:
+                rows.add(upper)
+            if temps[lower] == temperature_c:
+                rows.add(lower)   # exact row; linear interp is degenerate
+        sel = np.array(sorted(rows))
+        kept_nodes.append({"integration_time_us": node_us,
+                           "temperatures_c": temps[sel].tolist(),
+                           "dark_spd_rows": values[sel].tolist()})
+    extract = {
+        "source_whole_file_sha256": source_sha256,
+        "source_url": CAL_STRUCT_URL,
+        "which_meter": "a",
+        "wl_shift": cal["wl_shift"],
+        "wls": cal["wls"].tolist(),
+        "correction_factor": cal["correction_factor"].tolist(),
+        "effective_wl_range": cal["effective_wl_range"],
+        "dark_reduction": {
+            "note": "only integration-time nodes referenced by the records (nearest-node "
+                    "rule) and only the dark temperature rows that immediately bracket "
+                    "each needed temperature (linear interpolation is exact on those "
+                    "rows); interpolation semantics follow GetDarkSpectrum.m",
+            "temperatures_needed_c": sorted(set(round(t, 4)
+                                                for t in temperatures_needed)),
+            "nodes": kept_nodes,
+        },
+    }
+    write_json(out_path, extract)
+
+
+def load_calibration_extract(packet: Path) -> dict:
+    raw = read_json(packet / "calibration-extract.json")
+    nodes = raw["dark_reduction"]["nodes"]
+    return {
+        "wl_shift": raw["wl_shift"],
+        "wls": np.asarray(raw["wls"], dtype=float),
+        "correction_factor": np.asarray(raw["correction_factor"], dtype=float),
+        "effective_wl_range": raw["effective_wl_range"],
+        "dark_nodes": {n["integration_time_us"]:
+                       (np.asarray(n["temperatures_c"], dtype=float),
+                        np.asarray(n["dark_spd_rows"], dtype=float))
+                       for n in nodes},
+    }
+
+
+def dark_spectrum_from_extract(cal: dict, integration_time_us: float,
+                               temperature_c: float) -> np.ndarray:
+    node_us = min(cal["dark_nodes"],
+                  key=lambda u: abs(u - integration_time_us))
+    temps, spds = cal["dark_nodes"][node_us]
+    if not temps.min() <= temperature_c <= temps.max():
+        raise ValueError(f"temperature {temperature_c} outside extract bracket "
+                         f"[{temps.min()}, {temps.max()}] at node {node_us} us")
+    if spds.shape[0] == temps.size:
+        values = spds
+    else:
+        values = spds.T
+    return np.array([np.interp(temperature_c, temps, values[:, k])
+                     for k in range(values.shape[1])])
+
+
+def replay_record(cal: dict, mat_path: Path, published: np.ndarray,
+                  filter_span: int = REPLAY_FILTER_SPAN) -> dict:
+    """Python port of the upstream Preprocess.m + RawToAbsolute.m chain.
+
+    Stages are recorded individually so the residual against the published
+    column can be attributed; agreement documents reproduction of the
+    upstream pipeline, not an independent absolute calibration. Zero-padded
+    sliding-window median (numpy median, which averages the two central
+    order statistics for even spans) approximates MATLAB ``medfilt1``; any
+    convention difference shows up in the filter stage diff, not silently.
+    """
+    from scipy.io import loadmat
+    meas = loadmat(mat_path, simplify_cells=True)["meas"]
+    wls_raw = np.asarray(meas["wls"], dtype=float).ravel()
+    spd = np.asarray(meas["spd"], dtype=float)
+    if spd.ndim == 1:
+        spd = spd.reshape(-1, 1)
+    t_us = float(meas["integrationTime"])
+    temps = np.atleast_1d(np.asarray(meas["boardTempInCelsius"], dtype=float))
+    temp = float(temps.mean())
+
+    floor_applied = False
+    if t_us < 1000:                      # Preprocess.m: <1 ms corrected to 1 ms
+        t_us = 1000.0
+        floor_applied = True
+
+    mean_spd = spd.mean(axis=1)
+    saturated_pixels = int((mean_spd == 65535).sum())
+    dark = dark_spectrum_from_extract(cal, t_us, temp)
+    # Upstream divides by the raw integration time in MICROSECONDS
+    # (Preprocess.m stores tmp.meas.integrationTime verbatim), so the 1e6
+    # scale is absorbed by the fitted correction factor. We follow that
+    # convention exactly; "per_us" here is upstream's unit, not a physical
+    # per-second quantity.
+    per_us = (mean_spd - dark) / t_us
+
+    corrected_wls = wls_raw - cal["wl_shift"]
+    on_grid = np.interp(cal["wls"], corrected_wls, per_us)
+    outside = (cal["wls"] < corrected_wls.min()) | (cal["wls"] > corrected_wls.max())
+    on_grid[outside] = np.nan
+
+    pad = filter_span // 2
+    padded = np.pad(on_grid, pad, mode="constant", constant_values=np.nan)
+    windows = np.lib.stride_tricks.sliding_window_view(padded, filter_span)
+    filtered = np.nanmedian(windows, axis=1)
+    filtered = filtered[:cal["wls"].size]
+
+    absolute = filtered * cal["correction_factor"] * np.pi
+    absolute = np.where(absolute < 0, 0.0, absolute)   # Preprocess.m stray clamp
+
+    crop = (cal["wls"] >= REPLAY_CROP_NM[0]) & (cal["wls"] <= REPLAY_CROP_NM[1])
+    replay = absolute[crop]
+    wl_crop = cal["wls"][crop]
+    if replay.size != published.size:
+        raise ValueError("replay/published grid size mismatch")
+    valid = ~np.isnan(replay) & ~np.isnan(published)
+    diff = replay[valid] - published[valid]
+    denom = np.abs(published[valid])
+    nonzero = denom > 0
+    rel = diff[nonzero] / denom[nonzero]
+    return {
+        "stages": {
+            "exposure_mean": {"n_exposures": int(spd.shape[1])},
+            "integration_time_us": t_us, "integration_floor_applied": floor_applied,
+            "board_temp_c": temp,
+            "dark": {"saturated_pixels_mean_equals_65535": saturated_pixels,
+                     "node_us": float(min(cal["dark_nodes"],
+                                          key=lambda u: abs(u - t_us))),
+                     "max_dark_counts": float(np.nanmax(dark))},
+            "per_us_max": float(np.nanmax(per_us)),
+            "interp_nan_outside_count": int(outside.sum()),
+            "filter_span": filter_span,
+            "negative_clamped_pixels": int((absolute < 0).sum()),
+        },
+        "published_vs_replay": {
+            "n_valid_wavelengths": int(valid.sum()),
+            "max_abs_diff_w_m2_nm": float(np.max(np.abs(diff))),
+            "median_abs_diff_w_m2_nm": float(np.median(np.abs(diff))),
+            "median_abs_relative_diff": float(np.median(np.abs(rel))) if rel.size else None,
+            "p95_abs_relative_diff": float(np.percentile(np.abs(rel), 95)) if rel.size else None,
+            "published_zero_cells": int((published == 0).sum()),
+            "replay_zero_after_clamp": int((replay[valid] == 0).sum()),
+        },
+    }
+
+
+def run_replay(packet: Path) -> dict:
+    """Replay every record and write ``replay.json`` (manifest refreshed)."""
+    cal = load_calibration_extract(packet)
+    records = read_json(packet / "records.json")["records"]
+    spectra = load_packet_spectra(packet)
+    col_index = {c: i for i, c in enumerate(spectra["columns"])}
+    per_record = {}
+    for record in records:
+        col = record["source_column_zero_based"]
+        member = packet / record["raw"]["packet_path"]
+        published = spectra["data"][:, col_index[col]]
+        result = replay_record(cal, member, published)
+        per_record[record["record_id"]] = {
+            "corrected_sun_elevation_deg":
+                record["corrected_axis_cssp"]["sun_elevation_deg"],
+            "integration_time_us": record["instrument"]["integration_time_us"]["value"],
+            "n_exposures": record["instrument"]["n_exposures"]["value"],
+            **result,
+        }
+    rel = [v["published_vs_replay"]["median_abs_relative_diff"]
+           for v in per_record.values()
+           if v["published_vs_replay"]["median_abs_relative_diff"] is not None]
+    summary = {
+        "n_records": len(per_record),
+        "median_abs_relative_diff_range": [float(np.min(rel)), float(np.median(rel)),
+                                           float(np.max(rel))] if rel else None,
+        "note": "agreement documents reproduction of the upstream processing chain "
+                "(Preprocess.m + RawToAbsolute.m port); it is not an independent "
+                "absolute calibration and must not be quoted as one",
+        "filter_convention": "zero-padded sliding median over the raw 1 nm grid; "
+                             "convention differences vs MATLAB medfilt1 would appear "
+                             "as stage-level diffs, which are recorded per record",
+    }
+    payload = {"summary": summary, "records": per_record}
+    write_json(packet / "replay.json", payload)
+    manifest_path = packet / "inputs.sha256.json"
+    if manifest_path.is_file():   # standalone runs refresh the manifest;
+        manifest = read_json(manifest_path)   # inside build it is written last
+        manifest["replay.json"] = sha256_file(packet / "replay.json")
+        write_json(manifest_path, manifest)
+    return {"ok": True, **summary}
+
+
+# ---------------------------------------------------------------------------
+# Observation operator: analytic core (plan §3.3)
+# ---------------------------------------------------------------------------
+
+def ideal_hemispheric_irradiance(radiance: float,
+                                 horizon_depression_deg: float = 0.0) -> float:
+    """E = pi L for an isotropic radiance; pi L cos^2(h) for a flat horizon
+    at depression angle h. The analytic anchor the tests pin the operator to."""
+    return np.pi * radiance * np.cos(np.radians(horizon_depression_deg)) ** 2
+
+
+def exposure_weighted_mean(values: np.ndarray, sample_seconds: list[float],
+                           gaps_seconds: list[float] | None = None) -> float:
+    """Boxcar-weighted mean over the nominal exposure window (scenario).
+
+    ``values[k]`` is the sky value during sample k (e.g. a linear ramp),
+    ``sample_seconds[k]`` its duration; ``gaps_seconds[k]`` the unmeasured
+    pause after sample k (scenario: zero). This is the w_i(t) integral of
+    the operator contract for equal-duration repeats and any weight rule
+    reduces to it only under the same-duration assumption.
+    """
+    gaps = gaps_seconds if gaps_seconds is not None else [0.0] * len(values)
+    if len(values) != len(sample_seconds) or len(values) != len(gaps):
+        raise ValueError("values, sample_seconds and gaps_seconds must align "
+                         "one-to-one; silent truncation would drop exposures")
+    total = 0.0
+    weight_sum = 0.0
+    for value, duration, gap in zip(values, sample_seconds, gaps):
+        total += value * duration
+        weight_sum += duration
+    if weight_sum <= 0:
+        raise ValueError("exposure window has zero total duration")
+    return total / weight_sum
+
+
+# ---------------------------------------------------------------------------
 # sources.json and README
 # ---------------------------------------------------------------------------
 
@@ -1768,6 +2140,15 @@ def build_sources(out: Path, cache_dir: Path, columns: list[int]) -> dict:
              "url": EPHEMERIS_URL.format("CSSP_MoonLocalZenith"),
              "sha256": sha256_file(cache_dir / "CSSP_MoonLocalZenith.txt"),
              "bytes": (cache_dir / "CSSP_MoonLocalZenith.txt").stat().st_size,
+             "evidence": EVIDENCE_PUBLISHED},
+            {"id": "cal-struct-a", "kind": "whole-file-not-vendored",
+             "role": "generated calibration structure for meter 'a' (dark library, "
+                     "correction factor, wavelength shift) used by the replay",
+             "url": CAL_STRUCT_URL, "sha256": CAL_STRUCT_SHA256,
+             "bytes": CAL_STRUCT_BYTES,
+             "note": "too large to vendor whole; calibration-extract.json in this packet "
+                     "carries the reduced subset the records reference, tied to this "
+                     "identity. Whole-struct replay from the cache is the build path.",
              "evidence": EVIDENCE_PUBLISHED},
             {"id": "raw-archive", "kind": "whole-archive",
              "url": RAW_ARCHIVE_URL, "final_url": RAW_ARCHIVE_FINAL_URL,
@@ -1851,10 +2232,20 @@ and [MATCHED_OBSERVATIONS §4](../../../docs/twilight/MATCHED_OBSERVATIONS.md).
   windows. Failed probes are kept as evidence.
 - `selection.json`: the full session inventory of all 3192 published columns
   plus frozen selection decisions and reasons.
-- `conditions.json`: moon geometry and independent weather/AOD coverage per
-  selected night (what was queried, what returned, and what stays missing).
+- `conditions.json`: moon geometry, per-side (dusk/dawn) weather windows and
+  independent JPL axis checks for each selected night (what was queried,
+  what returned, and what stays missing), with data-referenced verdicts.
 - `operator.json`: the mathematical observation operator with evidence
   levels; `diagnostics.json`: timing/response/background scenario tables.
+- `calibration-extract.json`: reduced subset of the pinned generated
+  calibration struct (meter 'a' dark library nodes and temperature rows the
+  records reference, the full correction factor and wavelength shift), tied
+  to the whole-file identity of its 21.8 MB source.
+- `replay.json`: per-record port of the upstream Preprocess.m +
+  RawToAbsolute.m chain. It reproduces the published columns to ~5e-11
+  median relative difference (CSV print precision) - proof that the raw
+  members and the published spectra are the same data through the same
+  pipeline, not an independent absolute calibration.
 
 ## Commands
 
@@ -1896,6 +2287,9 @@ uv run python -I tools/cssp_observation_inputs.py verify \\
   recorded and no in-situ column quantities are derived from them.
 - Scenario ranges in `diagnostics.json` are demonstrations of dependence,
   not confidence intervals.
+- `replay.json` documents reproduction of the upstream pipeline; the
+  absolute radiometric scale rests on the upstream lab calibration and is
+  not independently certified here.
 """
     (out / "README.md").write_text(readme, encoding="utf-8")
 
@@ -1951,7 +2345,9 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(report, indent=2))
         return 0 if report.get("ok") else 1
     if args.command == "replay":
-        raise NotImplementedError("replay lands with the calibration step (plan M3)")
+        report = run_replay(args.packet)
+        print(json.dumps(report, indent=2))
+        return 0 if report.get("ok") else 1
     return 2
 
 

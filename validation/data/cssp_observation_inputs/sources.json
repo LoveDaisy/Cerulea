@@ -46,6 +46,16 @@
       "evidence": "published-upstream"
     },
     {
+      "id": "cal-struct-a",
+      "kind": "whole-file-not-vendored",
+      "role": "generated calibration structure for meter 'a' (dark library, correction factor, wavelength shift) used by the replay",
+      "url": "https://raw.githubusercontent.com/spitschan/IlluminationSpectraDataset/1d2ecc69cb15885b147d2831cae89fbd15d471fa/calibration/cals/OO_USB2000%2Ba.mat",
+      "sha256": "d90270171e417b1ea606dd2b595f8b8482da6a2f7bdc2f7dca0b0ec30e2dca80",
+      "bytes": 21804126,
+      "note": "too large to vendor whole; calibration-extract.json in this packet carries the reduced subset the records reference, tied to this identity. Whole-struct replay from the cache is the build path.",
+      "evidence": "published-upstream"
+    },
+    {
       "id": "raw-archive",
       "kind": "whole-archive",
       "url": "https://ndownloader.figshare.com/files/4862119",

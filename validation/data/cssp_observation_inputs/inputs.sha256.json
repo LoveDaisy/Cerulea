@@ -1,10 +1,11 @@
 {
-  "README.md": "6261266c1f590c436608b5a7c53273f2fe161a11c7f84decb84eb14d32adef46",
+  "README.md": "e3e05b580c3befdb22d8091bcd4126d0d5c4c9efd9e9dbe83a03c6ac3f7ae961",
+  "calibration-extract.json": "9a8301c97efb9a406bbec93e427db25fbba92a7d3756acb19304531fcef147d1",
   "conditions.json": "6c299b3770fd8b7309fe35ea0e5024dc6ae47374845227f5841f263dd4d68e55",
   "diagnostics.json": "67825fa1415edbf8e71ed7d00a1928333d89a3fb5ebc3dacd0377d9aab7711b6",
   "ephemeris/CSSP_MoonLocalZenith.txt": "4fdf4c2b2792fab0042aefb1f855fc3e92d4a89be8151ce3603f6c647ebd6578",
   "ephemeris/CSSP_SunLocalZenith.txt": "12b3f2c55c936d9d5e275765b5b8c7e99d24c19e5ae0ae9a324440bb38becea6",
-  "operator.json": "0a529f22a246f969e42bc6dc49d52328ca112319cee3409730bdc0fe8adf8049",
+  "operator.json": "2cf61d5e04da544a3d5614d24ff3be47bc88be7d16d761df76a38a77d9fe5cd3",
   "raw/jpl/horizons-cssp-0703.json": "e3a81db71018298843450d603956be37ca4b96b80141325f0a652c74652fdceb",
   "raw/jpl/horizons-cssp-0719.json": "630308ab3d7b61d98589029a5ee441754265694d3d542da3a76e73720617fa3a",
   "raw/mat/20140702T212057_sOO_USB2000+_pCSSP.mat": "fa4eedaed6586281ad0eeb2a960f293033ca1ebe52e9ed62a1779578c9583bdf",
@@ -76,7 +77,8 @@
   "raw/weather/noaa-BFD-20140718.json": "16871a6fd55886c0d7651a0af898d776fcc0d77367b377f2ce0b7c624d1a272c",
   "raw/weather/noaa-BFD-20140719.json": "51708a667b35b3eee502b9aceeb26bab0a5d9c93e979b629850070aa26e57866",
   "records.json": "5c41f62959f81bf8e0a3cea861935f787611074dc5eaf301c0f68cd066ccfe37",
+  "replay.json": "b5587a6d0686065564d7ed5531a7725bb1b678285887c693c84543beefdfe675",
   "selection.json": "9587482f6fe8399273884e6a21a996e6cdb3b751a7c47d5f846709f457708127",
-  "sources.json": "78358021e0c27dbcf3a80ef5784aa4bfc5af1706ad490a8ece5dd4e19130b424",
+  "sources.json": "82cbc270426e1367d003bcb0d7015d4ddee2127d6e163c5a5c99435268569fd5",
   "spectra.csv": "d820890bab8e84f5a0690b5a1a99c325e51dff05f1c8c5720aa1df9bbb022bab"
 }
