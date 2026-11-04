@@ -1,0 +1,30 @@
+[
+  {
+    "url": "https://static-content.springer.com/esm/art%3A10.1038%2Fsrep26756/MediaObjects/41598_2016_BFsrep26756_MOESM103_ESM.csv",
+    "path": "scratchpad/explore-matched-twilight-observations/spectral-evidence/published-wavelengths.csv",
+    "bytes": 2244,
+    "sha256": "479dad2965c373b73052b518d33621385b80dead1d64964e19b610b363a8200e",
+    "content_type": "application/octet-stream"
+  },
+  {
+    "url": "https://static-content.springer.com/esm/art%3A10.1038%2Fsrep26756/MediaObjects/41598_2016_BFsrep26756_MOESM104_ESM.csv",
+    "path": "scratchpad/explore-matched-twilight-observations/spectral-evidence/published-rural.csv",
+    "bytes": 25481368,
+    "sha256": "e0e3e895b3a66fc83d9f63bd02e92899a11a44b1d1707f8a6d7a05279cbe6bab",
+    "content_type": "application/octet-stream"
+  },
+  {
+    "url": "https://static-content.springer.com/esm/art%3A10.1038%2Fsrep26756/MediaObjects/41598_2016_BFsrep26756_MOESM110_ESM.pdf",
+    "path": "scratchpad/explore-matched-twilight-observations/spectral-evidence/published-supplement.pdf",
+    "bytes": 1395651,
+    "sha256": "548fd6ef1eb254d52edf2efa259a685ca11a948f4a65c26871f6b2da0c6f6fb4",
+    "content_type": "application/pdf"
+  },
+  {
+    "url": "https://zenodo.org/records/7328594/files/Supplemental%20Document.docx?download=1",
+    "path": "scratchpad/explore-matched-twilight-observations/spectral-evidence/delft-supplement.docx",
+    "bytes": 24911,
+    "sha256": "bea0adbc310cdf549a95bf14457972ea2d2eccba7dfa9149928cae9d9a8309cd",
+    "content_type": "application/octet-stream"
+  }
+]

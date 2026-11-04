@@ -1,0 +1,7 @@
+{
+  "url": "https://archive.eso.org/wdb/wdb/asm/meteo_paranal/query?wdbo=csv%2Fdownload&start_date=2001-09-21T09%3A55..2001-09-21T10%3A20&tab_press=on&tab_temp2=on&tab_rhum2=on&tab_dustl1=on&tab_dusts1=on&tab_integration=on&order=start_date&max_rows_returned=100",
+  "status": 200,
+  "content_type": "text/plain; charset=utf-8",
+  "bytes": 3845,
+  "sha256": "bae1ea3ef60ec763d55ed7ebc5e3a1371d4f224d68f74a4119fbd30258919d88"
+}

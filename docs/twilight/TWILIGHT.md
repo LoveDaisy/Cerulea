@@ -399,8 +399,10 @@ unified-source and continuous-transport audits.
    direction), and a discrete-ordinate solution in the meridian plane would be
    deterministic.  This is the "right" long-term answer, and the Monte Carlo
    would remain as its independent check.
-3. **Site-specific atmospheres** (Paranal: 2400 m, AOD 0.02, low ground
-   albedo) to settle the −6° absolute level.
+3. **Site-specific atmospheres** (historically proposed as 2400 m, AOD 0.02,
+   low ground albedo). These were candidate assumptions. The later
+   [raw-header audit](MATCHED_OBSERVATIONS.md) recovers telescope heights of
+   2648/2681 m; matched validation needs actual exposure/site conditions.
 4. **Vectorise over wavelengths** with a common random-number stream and
    importance weights, to remove the `n_anchor` factor from the cost.
 5. **An adaptive photon budget**: a short pilot run to measure the per-direction

@@ -1,0 +1,20 @@
+[
+  {
+    "url": "https://raw.githubusercontent.com/spitschan/IlluminationSpectraDataset/1d2ecc69cb15885b147d2831cae89fbd15d471fa/analysis/data/ephemeris/DRL_SunLocalZenith.txt",
+    "path": "scratchpad/explore-matched-twilight-observations/spectral-evidence/DRL_SunLocalZenith.txt",
+    "bytes": 720617,
+    "sha256": "4ebebd7de2f3615b4b7b9da214ad519cf502d9e3361e9bd2e42bddfb50d9e3e3"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/spitschan/IlluminationSpectraDataset/1d2ecc69cb15885b147d2831cae89fbd15d471fa/analysis/data/ephemeris/DRL_MoonLocalZenith.txt",
+    "path": "scratchpad/explore-matched-twilight-observations/spectral-evidence/DRL_MoonLocalZenith.txt",
+    "bytes": 720617,
+    "sha256": "44a89b97026e386a9933b93949724ffd7bbcfe5dd56f1db3a089e81445811c93"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/spitschan/IlluminationSpectraDataset/1d2ecc69cb15885b147d2831cae89fbd15d471fa/analysis/data/ephemeris/CSSP_MoonLocalZenith.txt",
+    "path": "scratchpad/explore-matched-twilight-observations/spectral-evidence/CSSP_MoonLocalZenith.txt",
+    "bytes": 720617,
+    "sha256": "4fdf4c2b2792fab0042aefb1f855fc3e92d4a89be8151ce3603f6c647ebd6578"
+  }
+]

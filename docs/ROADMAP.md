@@ -369,6 +369,10 @@ See [CURVED_TRANSPORT_AUDIT.md](twilight/CURVED_TRANSPORT_AUDIT.md) and its froz
 3. **Matched absolute validation.** Acquire observing-time/solar-axis metadata,
    the instrument response and site atmospheric conditions before assigning
    the cross-study residual to pressure, aerosols or missing scattering.
+   [Raw-observation probes on 2026-11-04](twilight/MATCHED_OBSERVATIONS.md)
+   locate concrete spectral and same-twilight candidates and recover selected
+   geometry, including a verified wrong-site ephemeris in published rural
+   spectra. Instrument, background and atmospheric matching remain open.
 4. **Cold optical startup remains separate.** M11's warm-cache success stands;
    optimise cold Mie work independently while preserving the physical contract.
 

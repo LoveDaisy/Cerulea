@@ -1,0 +1,83 @@
+{
+  "retrieved_date": "2026-11-04",
+  "scope": "Public read-only, small probes; partial files do not verify upstream whole-file MD5/CRC.",
+  "requests": [
+    {
+      "url": "https://zenodo.org/api/records/4977265",
+      "local": "galicia-api.txt",
+      "kind": "record metadata"
+    },
+    {
+      "url": "https://zenodo.org/records/4977265/files/NightSkyBrightnessData_2015.zip",
+      "range": "bytes=-65536",
+      "status": 206,
+      "local": "galicia-tail.bin"
+    },
+    {
+      "url": "https://zenodo.org/records/4977265/files/NightSkyBrightnessData_2015.zip",
+      "range": "bytes=15758141-15823676",
+      "status": 206,
+      "local": "labrada-first64k.bin",
+      "member": "10_Labrada.txt",
+      "partial_deflate": true
+    },
+    {
+      "url": "https://zenodo.org/records/4977265/files/NightSkyBrightnessData_2015.zip",
+      "range": "bytes=15758141-15889212",
+      "status": 206,
+      "local": "labrada-first128k.bin",
+      "member": "10_Labrada.txt",
+      "partial_deflate": true
+    },
+    {
+      "url": "https://zenodo.org/records/4977265/files/NightSkyBrightnessData_2015.zip",
+      "range": "bytes=23914484-23915022",
+      "status": 206,
+      "local": "offsets-member.bin",
+      "member": "Offsets.txt"
+    },
+    {
+      "url": "https://zenodo.org/api/records/4265155",
+      "local": "TESS-record.bin"
+    },
+    {
+      "url": "https://zenodo.org/records/4265155/files/stars4all-july-2020.csv",
+      "range": "bytes=0-65535",
+      "status": 206,
+      "local": "TESS-first64k.bin",
+      "derivative": "tess-stars1-20200701-dawn.csv",
+      "geometry": "skycolor.geometry.sun_position refraction=False; coverage only; not an independent ephemeris check"
+    },
+    {
+      "url": "https://zenodo.org/records/22872783/files/report.zip",
+      "local": "tess-filter-response-report.zip",
+      "status": 200,
+      "kind": "complete small laboratory dataset, not station stars1 response"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/estevesjh/twmdb-python/main/DATA/202408/20240821.csv",
+      "local": "harvard-20240821.csv",
+      "status": 200,
+      "kind": "demo table, not validated observing series"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/estevesjh/twmdb-python/main/README.md",
+      "local": "harvard-readme.txt"
+    },
+    {
+      "url": "https://arxiv.org/html/2012.04042v1",
+      "local": "aging-method-2021.txt"
+    }
+  ],
+  "retrieval_limits": [
+    "No bulk monthly archive download",
+    "No author contact",
+    "No credentials or private archive access",
+    "No observation matched to model yet",
+    "Solar coverage calculation is not atmospheric fit"
+  ],
+  "unsuitable_http_captures": {
+    "galicia-paper.txt": "PMC returned a verification page for report=xml; use web primary text, not this capture",
+    "calibration-paper.txt": "PMC returned a verification page for report=xml; use primary article online"
+  }
+}

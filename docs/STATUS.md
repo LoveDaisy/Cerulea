@@ -79,6 +79,9 @@ These backends have not replaced production defaults.
   and instrument responses. Patat's total V-band sky includes night background.
   The limited filter-only conversion changes present −6° spectra by 0.5–0.7%;
   station ratios are not altitude-only targets. [Reference audit](twilight/TWILIGHT_REFERENCE_AUDIT.md).
+  The [2026-11-04 raw-observation follow-up](twilight/MATCHED_OBSERVATIONS.md)
+  recovers candidate timestamps/site geometry and identifies a wrong-site
+  ephemeris in published rural spectra; full observation matching is pending.
 - Rare-path MC uncertainty remains large in deep twilight. A single error bar or
   a better fit does not identify missing scattering or calibration error.
 - Horizon luminance and the 32-moment aureole remain unresolved; delta-fit,
