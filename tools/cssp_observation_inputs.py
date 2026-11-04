@@ -1235,10 +1235,38 @@ def build_packet(cache_dir: Path, out: Path, force: bool) -> dict:
     if out.exists() and any(out.iterdir()) and not force:
         raise ValueError(f"refusing to overwrite existing packet {out}; "
                          "pass --force only for a deliberate rebuild")
-    if force:
-        import shutil
-        shutil.rmtree(out)
     check_cache_inputs(cache_dir)
+    # Stage the whole build, then swap: any failure (preflight, extraction,
+    # replay, verification) leaves the previous packet untouched - the plan's
+    # "failed attempts withdraw only their own incomplete artefacts" rule.
+    import shutil
+    import tempfile
+    staging = Path(tempfile.mkdtemp(prefix=f".{out.name}-staging-",
+                                    dir=out.parent))
+    try:
+        _build_packet_into(staging, cache_dir)
+    except Exception:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+    if out.exists():
+        shutil.rmtree(out)
+    staging.rename(out)
+    report = verify_packet(out)
+    if not report["ok"]:
+        raise ValueError(f"freshly built packet failed verification: "
+                         f"{report['problems'][:10]}")
+    records = read_json(out / "records.json")["records"]
+    selection = read_json(out / "selection.json")
+    return {"records": len(records), "sessions": len(selection["sessions"]),
+            "raw_members": report["n_records"], "verify": report}
+
+
+def _build_packet_into(out: Path, cache_dir: Path) -> None:
+    """Build every packet file into ``out`` (already created, empty).
+
+    Raises on any failure; the orchestrator stages this into a temporary
+    directory so a failed attempt never destroys the previous packet.
+    """
     out.mkdir(parents=True, exist_ok=True)
 
     tar_path = cache_dir / "dataraw.tar.gz"
@@ -1457,13 +1485,6 @@ def build_packet(cache_dir: Path, out: Path, force: bool) -> dict:
         if path.is_file() and path.name != "inputs.sha256.json":
             manifest[str(path.relative_to(out))] = sha256_file(path)
     write_json(out / "inputs.sha256.json", manifest)
-
-    report = verify_packet(out)
-    if not report["ok"]:
-        raise ValueError(f"freshly built packet failed verification: "
-                         f"{report['problems'][:10]}")
-    return {"records": len(records), "sessions": len(inventory),
-            "raw_members": len(columns), "verify": report}
 
 
 # ---------------------------------------------------------------------------
@@ -2435,6 +2456,13 @@ def evaluate_replay(packet: Path) -> dict:
             record_problems.append(
                 f"NaN masks differ at {int((nan_published ^ nan_replay).sum())} channels")
         comparable = ~nan_published & ~nan_replay
+        negative = comparable & (published < 0)
+        if negative.any():
+            wl = np.arange(280.0, 841.0)[comparable][negative[:5]]
+            record_problems.append(
+                f"{int(negative.sum())} published channels are negative "
+                f"(upstream clamps to zero; first wl {wl.tolist()}) - "
+                "corrupted excerpt, not physics")
         zero_cells = comparable & (published == 0)
         broken_zeros = zero_cells & (replay != 0)
         if broken_zeros.any():
@@ -2598,6 +2626,108 @@ def publish_pipeline(spectrum_full_grid: np.ndarray, extract: dict,
     return published_full[crop]
 
 
+
+
+def hemispheric_irradiance_from_field(radiance: np.ndarray,
+                                      elevation_deg: np.ndarray,
+                                      azimuth_deg: np.ndarray,
+                                      horizon_depression_deg: float = 0.0,
+                                      angular_response=None) -> np.ndarray:
+    """Linear hemisphere integral of a directional radiance field (plan §3.3).
+
+    ``radiance`` has shape (..., n_time, n_wl, n_elev, n_azim) in
+    W m-2 sr-1 nm-1; ``elevation_deg``/``azimuth_deg`` are 1-D uniform grids
+    in degrees (azimuth east of north; a duplicated 360-degree endpoint is
+    detected and dropped). Returns (..., n_time, n_wl) in W m-2 nm-1:
+
+        E = trapz_trapz( L(λ,Ω,t) * A(Ω) * H(Ω) * cosθ )
+
+    ``H`` is the horizon visibility 1[elevation > -horizon_depression_deg];
+    ``angular_response`` is the white-board correction A(elev_deg, azim_deg)
+    and defaults to the documented A=1 idealisation (no measured response
+    exists). This is the operator contract's direction integral as code, so
+    consumers integrate their model's own arrays instead of re-deriving it.
+    """
+    radiance = np.asarray(radiance, dtype=float)
+    elev = np.asarray(elevation_deg, dtype=float)
+    azim = np.asarray(azimuth_deg, dtype=float)
+    if radiance.shape[-2:] != (elev.size, azim.size):
+        raise ValueError("radiance grid must match (n_elev, n_azim)")
+    # cos(zenith) = sin(elevation); the solid-angle measure in elevation
+    # representation is dOmega = cos(elevation) d(elevation) d(phi), so the
+    # integrand carries sin(elev)*cos(elev) - omitting the Jacobian doubles
+    # an isotropic sky (caught by the analytic anchor, not by inspection).
+    cos_theta = np.sin(np.radians(elev))
+    jacobian = np.cos(np.radians(elev))
+    horizon = (elev > -horizon_depression_deg).astype(float)
+    response = (angular_response(elev[:, None], azim[None, :])
+                if angular_response is not None else np.ones((elev.size, azim.size)))
+    weights = cos_theta[:, None] * jacobian[:, None] * horizon[:, None] * response
+    # Solid-angle measure: dOmega = cos(theta) dtheta dphi with radians.
+    values = radiance * weights   # broadcasts weights over time/wavelength
+    if azim.size > 2 and abs(azim[-1] - azim[0]) >= 359.999:
+        # Closed azimuth loop with a duplicated seam endpoint: drop the
+        # duplicate and re-attach the first sample at phi = 2*pi, so the
+        # wrap sector is integrated rather than dropped by trapezoid.
+        values = np.concatenate([values[..., :-1], values[..., :1]], axis=-1)
+        phi = np.concatenate([np.radians(azim[:-1]), [2.0 * np.pi]])
+    else:
+        phi = np.radians(azim)
+    integrated = np.trapezoid(values, phi, axis=-1)
+    return np.trapezoid(integrated, np.radians(elev), axis=-1)
+
+
+def exposure_time_average(samples: np.ndarray, sample_times: np.ndarray,
+                          window: tuple[float, float]) -> float:
+    """Boxcar exposure average of a measured time series (plan §3.3 w_i(t)).
+
+    Integrates the piecewise-linear interpolation of ``(sample_times,
+    samples)`` over ``window`` and divides by the window length. Unmeasured
+    stretches between samples are bridged linearly (the sky is continuous);
+    deliberately excluded intervals - the unmeasured gaps between a record's
+    repeated exposures - are handled by calling this once per exposure window
+    and averaging the results weighted by each window's duration (see
+    ``record_exposure_average``).
+    """
+    samples = np.asarray(samples, dtype=float)
+    times = np.asarray(sample_times, dtype=float)
+    if times.size != samples.size or times.size < 2:
+        raise ValueError("need aligned sample times/values with >= 2 samples")
+    lo, hi = min(window), max(window)
+    if hi <= lo:
+        raise ValueError("window must have positive duration")
+    if not (times.min() <= lo and hi <= times.max()):
+        raise ValueError("window extends beyond the measured samples")
+    grid = np.unique(np.concatenate(([lo, hi], times[(times > lo) & (times < hi)])))
+    values = np.interp(grid, times, samples)
+    return float(np.trapezoid(values, grid) / (hi - lo))
+
+
+def record_exposure_average(samples: np.ndarray, sample_times: np.ndarray,
+                            exposure_seconds: list[float],
+                            gaps_seconds: list[float],
+                            window_start: float) -> float:
+    """w_i(t) for a multi-exposure record with unknown-length gaps as scenario.
+
+    Builds the nominal back-to-back windows (start, start+T) separated by the
+    scenario gaps and returns the duration-weighted mean of the per-window
+    averages of the measured series. Gaps contribute no exposure time; the
+    caller decides the gap scenario (records.json timing.unknown).
+    """
+    gaps = list(gaps_seconds)
+    if len(gaps) == len(exposure_seconds) - 1:
+        gaps.append(0.0)   # gaps are BETWEEN windows; no trailing gap
+    if len(gaps) != len(exposure_seconds):
+        raise ValueError("gaps_seconds needs len(exposures) or len(exposures)-1")
+    averages, durations = [], []
+    cursor = float(window_start)
+    for duration, gap in zip(exposure_seconds, gaps):
+        averages.append(exposure_time_average(samples, sample_times,
+                                              (cursor, cursor + duration)))
+        durations.append(duration)
+        cursor += duration + gap
+    total = sum(durations)
+    return float(sum(a * d for a, d in zip(averages, durations)) / total)
 
 
 def exposure_weighted_mean(values: np.ndarray, sample_seconds: list[float],

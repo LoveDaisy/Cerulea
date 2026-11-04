@@ -35,7 +35,10 @@ from tools.cssp_observation_inputs import (  # noqa: E402
     external_ref,
     fetch_sources,
     haversine_km,
+    exposure_time_average,
+    hemispheric_irradiance_from_field,
     ideal_hemispheric_irradiance,
+    record_exposure_average,
     invoke_time_to_utc_iso,
     label_to_invoke_time,
     label_to_utc_iso,
@@ -732,8 +735,10 @@ def test_signed_sensitivity_rates_and_forward_operator_domain():
     operator = read_json(PACKET / "operator.json")
     assert "P_publish" in operator["definitions"]
     assert "C_capture" in operator["definitions"]
-    assert "P_publish" not in operator["definitions"] or \
-        "correction factor" not in operator["definitions"]["P_publish"]["text"]
+    # P_publish must declare the non-closable edge channels; C_capture stays
+    # a separate count-domain definition.
+    assert "not closable" in operator["definitions"]["P_publish"]["text"]
+    assert "dark" in operator["definitions"]["C_capture"]["text"].lower()
     assert any("double-calibrate" in f for f in operator["forbidden_comparisons"])
     # P_publish smooths in the detector-response domain (E -> D*median(E/D)):
     # a constant spectrum passes unscaled; with a wavelength-dependent D the
@@ -777,6 +782,55 @@ def test_weather_source_urls_reconstruct_acquisition_requests():
     assert "print_web_data_v3" in weather_source_url(
         "aeronet-Toronto-20140718-19-AOD20.txt")
     assert weather_source_url("frozen-noaa-BFD-window.json") is None
+
+
+def test_hemisphere_integral_consumes_real_directional_arrays():
+    """The operator contract's direction integral, as code (r04 Major)."""
+    times, n_wl = np.arange(0, 3), 5
+    elev = np.linspace(-90.0, 90.0, 181)        # full sky (sin*cos trapz exact)
+    azim = np.linspace(0.0, 360.0, 73)          # closed loop, seam duplicated
+    # Isotropic: every direction and time carries the same radiance.
+    field = np.full((times.size, n_wl, elev.size, azim.size), 2.0)
+    got = hemispheric_irradiance_from_field(field, elev, azim)
+    assert got.shape == (times.size, n_wl)
+    assert got == pytest.approx(np.full_like(got, np.pi * 2.0), rel=2.5e-4)  # E=pi*L (grid-resolved kink)
+    # Flat horizon at depression h on an isotropic sky: E = pi L cos^2(h).
+    got = hemispheric_irradiance_from_field(field, elev, azim,
+                                            horizon_depression_deg=5.0)
+    # The horizon is a discontinuous indicator, so trapezoid error is
+    # first-order in the elevation step (~half-cell); assert the analytic
+    # cos^2(h) law at that tolerance AND the first-order convergence.
+    analytic = np.pi * 2.0 * np.cos(np.radians(5.0)) ** 2
+    assert got == pytest.approx(np.full_like(got, analytic), rel=5e-3)
+    fine = np.linspace(-90.0, 90.0, 721)
+    got_fine = hemispheric_irradiance_from_field(
+        np.broadcast_to(2.0, (times.size, n_wl, 721, azim.size)),
+        fine, azim, horizon_depression_deg=5.0)
+    err_coarse = abs(float(got[0, 0]) - analytic)
+    err_fine = abs(float(got_fine[0, 0]) - analytic)
+    assert err_fine < err_coarse / 1.8, "horizon cut must converge to cos^2(h)"
+    # Pure azimuth structure must integrate away over the closed loop.
+    az_structure = 1.0 + 0.5 * np.sin(np.radians(azim))
+    field = np.broadcast_to(az_structure, (elev.size, azim.size))
+    got = hemispheric_irradiance_from_field(field[None, None], elev, azim)
+    full = np.broadcast_to(1.0, (elev.size, azim.size))
+    iso = hemispheric_irradiance_from_field(full[None, None], elev, azim)
+    # The sin(azimuth) term must cancel exactly over the closed loop.
+    assert got[0, 0] == pytest.approx(iso[0, 0])
+
+
+def test_exposure_time_average_integrates_real_windows_with_gaps():
+    """w_i(t) integrates the measured series over exposure windows (r04)."""
+    times = np.arange(0.0, 5.0 + 0.5, 0.5)
+    samples = 1.0 + times                       # L(t) = 1 + t
+    # Two 2 s exposures separated by a 1 s gap: mean of 4 and 10 -> 3.
+    got = record_exposure_average(samples, times, [2.0, 2.0], [1.0], 0.0)
+    assert got == pytest.approx(3.5)   # (4 + 10) / 4 s
+    assert got == pytest.approx((4.0 + 10.0) / 4.0)
+    # Single window equals its analytic integral.
+    assert exposure_time_average(samples, times, (0.0, 2.0)) == pytest.approx(2.0)
+    with pytest.raises(ValueError):
+        exposure_time_average(samples, times, (0.0, 99.0))
 
 
 def test_spectra_excerpts_match_old_packet_overlap():
