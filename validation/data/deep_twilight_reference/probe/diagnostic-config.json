@@ -1,0 +1,27 @@
+{
+  "n": 1600000,
+  "seeds": [
+    30000,
+    30001,
+    30002,
+    30003,
+    30004,
+    30005,
+    30006,
+    30007
+  ],
+  "suns": [
+    -9.0,
+    -12.0
+  ],
+  "wavelengths": [
+    450.0,
+    550.0,
+    650.0
+  ],
+  "timeout_seconds": 1800,
+  "method": "sys.setprofile observes source/tracer returns; no code replacement beyond existing mc_solar_source",
+  "limitations": "Vertex order sums reconstructed from unchanged source return and caller weights; final path order is NOT contribution order",
+  "table_sha256": "ed2376c9a6f5c8044b26b0e51bc36347057948ed710e3a3f87b514f4e4154be7",
+  "script_sha256": "92554146587469a639361372db97209a212bbda54614df61c889dac24bdda65f"
+}

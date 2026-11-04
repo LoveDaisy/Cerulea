@@ -490,3 +490,37 @@ reproduces many mechanisms. Quantitative closure still requires:
 
 Everything else on this page is either a different project (3D clouds) or a
 presentation concern (viewer, video, packaging).
+
+### M19 — deep-twilight reference: budgets, gates, paired source correction (2026-11-04)
+
+`task-deep-twilight-reference` turned the single-seed deep points into a
+pre-registered reference: fixed scenario/medium/source contract on the
+archived full81 finite-disk table, 16 seeds × {400k, 1.6M} photons/λ ×
+{−9°, −12°} plus same-seed point-source pairing (3.51 h wall-clock), all
+records append-only with per-record cost/hash provenance and a summary
+that recomputes bit-consistently from raw (`--verify-only`).
+
+Outcomes. Both depths are **budget-limited: unresolved** at the
+pre-registered anchor scales: 1.6M conditional half-widths are 9–15 % per
+anchor at −9° and 28–61 % at −12°, the top-0.1 % of paths carry the whole
+higher-order signal (heavy-tail dominated), and −12° 400k contains
+all-zero records (detection limits). The paired finite-disk source
+correction is **identified** at −9° (+0.76/+0.97/+0.91 % at 450/550/650)
+and at −12° 550 nm only (+0.63 %). An exactly-two-scattering candidate
+estimator was validated against independent closures including the analog
+MC's own per-path decomposition at −6°, then measured: narrower intervals
+at −9° (550 nm half-width ratio 0.55 at 1.6M), no rescue at −12°. An
+opt-in read-only diagnostics sink (`mc_radiance_split(diagnostics=True)`)
+provides order×ground NEE accounting, per-path decomposition and tail
+concentration; default-off is bit-identical. Discretisation refinements
+(disk nodes, order cap, RR, fine grids, single-scattering quadrature) sit
+below the sampling noise floor. Full pytest 338 passed; run_all baseline
+unchanged (3 PASS / 3 FAIL); `validation/results.json` untouched.
+Evidence: [DEEP_TWILIGHT_REFERENCE.md](twilight/DEEP_TWILIGHT_REFERENCE.md),
+data + protocol + manifest in
+`validation/data/deep_twilight_reference/`.
+
+Open: closing the −12° anchors needs tail-defeating estimators (the
+candidate mitigates, the rest dominates); curved diffuse transport and
+continuous-wavelength quadrature remain explicit unknowns of the
+reference contract.

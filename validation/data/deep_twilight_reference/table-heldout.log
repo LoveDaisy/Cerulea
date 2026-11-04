@@ -1,0 +1,27 @@
+{
+  "parameters": {
+    "n_height": 65,
+    "angle_tolerance_deg": 0.0002,
+    "derivative_tolerance": 0.002,
+    "tau_tolerance": 0.005,
+    "n_quad": 8,
+    "max_refine": 20,
+    "grazing_epsilon_deg": 1e-06,
+    "refracted": true,
+    "explicit_profile": false,
+    "low_height_grid": "sqrt(h) step .05 below 1km, .1 from 1 to 5km"
+  },
+  "height_rows": 157,
+  "total_angular_knots": 13832,
+  "build_seconds": 136.37411562504712,
+  "max_app_error_deg": 9.658973142023797e-05,
+  "max_gain_relative_error": 0.004003639103959289,
+  "max_transmission_relative_error": 0.0052882565314462116,
+  "max_effective_transmission_relative_error": 0.003305569916507874,
+  "max_absolute_transmission_error": 0.0015378230080568267,
+  "max_effective_source_relative_error": 0.00404509786327652,
+  "max_absolute_source_error": 0.0015903292797199708,
+  "shadow_disagreements": 0,
+  "roundtrip_bit_identical": true,
+  "query_100k_seconds": 0.08188070892356336
+}

@@ -1,0 +1,28 @@
+{
+ "schema": "deep-twilight-reference/probe-hashes/1",
+ "note": "SHA256 of the frozen planning-probe copies in this directory (byte-preserving migration from scratchpad, 2026-11-04).",
+ "files": {
+  "bounded_probe.py": "96c8c36fbaccbc8644848392da00fe17962adf1097718afa5aaa2d637436a6f2",
+  "build.json": "7d8efb89ab016417f4a16fd21bf97c6e7b163d421d0d956285f08d5e899ce266",
+  "config.json": "354f56c82ac7170dcc60be37a087f770ac92ec071f0bbc34f0f4f3e32f453d16",
+  "diagnostic-completion.json": "bc842352182f698bca90797baf5e3f78f0e288c21014b616fbff620e193a7aa3",
+  "diagnostic-config.json": "c70486a20fe4161acbd00430dba5628a59fe2dfca560a6bb0238575ea7876bea",
+  "diagnostic-controls.json": "289d237a53ea3fb3686ab241bb11e577a719c077829d91aaad86e15f5bb2b8c9",
+  "diagnostic-raw.jsonl": "db67cf11f1592a54ffa548c0c33c953561f7ed28a9fd664a790788f13d56fb2d",
+  "diagnostic-run.log": "b571d73a998267a5b947a2ac0f98a041545640af65345299d935e0f657e9b2e4",
+  "diagnostic_probe.py": "92554146587469a639361372db97209a212bbda54614df61c889dac24bdda65f",
+  "growth-config.json": "6354327bd68f6b908313d318baeae16f53293cc32af9f7cc1dc15156db50693c",
+  "growth-raw.jsonl": "36c0269d9958df90d38b40ca7e7dc890b43b2ee8260b70f15c58df8fcdbf2a4c",
+  "growth-run.log": "86a75a2316dc281f4c1cd1e18f18780ec972f2c258e4fbd409e2369abb1dd474",
+  "growth-summary.json": "81a08ba50e1a7908f8ea90f79e0c58e6cc42095d70d0b3bb3bd9487c4a947bd8",
+  "growth_probe.py": "b13b52566a4cbb34cf634e7f464071872ecf0b8284fd907823443eb9fdfd28da",
+  "point-source.npz": "ed2376c9a6f5c8044b26b0e51bc36347057948ed710e3a3f87b514f4e4154be7",
+  "probe-run.log": "d6404f7b0f90285e3425d7c876d0e0e3b5b192c2b2ddefbf4a1719275d89f7e7",
+  "raw.jsonl": "e5049a525f174747734f777cf12123ddd50c49c314aa417096e573ce910873a9",
+  "single-12.json": "314e36b58aa0df63273d0ef8cf016c2afdb3e1e684b42f8c0b0ba88a7cd9bbb0",
+  "single-9.json": "cbb3cfc857b1387f508ce9a6c5941d0d5f58f736355a36e316626be5e3845182",
+  "summarize_probes.py": "ab62e6f48c35f5f216549c72354cff36483f48c33fb8994c4098a40fa9bce97e",
+  "summary.json": "6a0ae27967861122e0adb993653acc648903880f26a01329fd1758bddbbe58f9",
+  "verified-probe-summary.json": "709cfc20ed32631fdd4a024e885843eb4cb65b40d7910158e435e5e16573da44"
+ }
+}
