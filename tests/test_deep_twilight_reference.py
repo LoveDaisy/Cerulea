@@ -290,6 +290,20 @@ def _write_mini_dataset(tmp_path):
     return data
 
 
+# Synthetic but well-formed implementation identities: they must satisfy
+# the summarizer's per-stage required-content contract (base files for
+# direct/source-pairs/sensitivity, plus the candidate estimator for the
+# candidate stage) and carry sha256-shaped values.
+_MINI_IDENTITY = {
+    "skycolor/rt/mc.py": "a" * 64,
+    "tools/deep_twilight_reference.py": "b" * 64,
+    "tools/point_solar_table.py": "c" * 64,
+    "tools/unified_solar_transport.py": "d" * 64,
+}
+_MINI_IDENTITY_CANDIDATE = dict(
+    _MINI_IDENTITY, **{"tools/twilight_second_order.py": "e" * 64})
+
+
 # The invariants check len == 81, so synthetic records are 81 wide.
 def _synthetic_record81(seed, zero=False):
     row = _synthetic_record(seed, zero=zero)
@@ -312,7 +326,7 @@ def _populate(data: Path, *, zero_one_record=False, point=True,
     from tools.deep_twilight_reference import contract_view
     meta = contract_view(dict(stage="direct", table_sha256="t",
                               protocol_sha256=protocol_sha256, mode="disk",
-                              code_sha256={"x.py": "1"}))
+                              code_sha256=dict(_MINI_IDENTITY)))
     for sun_index, sun in enumerate([-9.0]):
         for budget_index, photons in enumerate([400, 800]):
             batch_id = f"s{sun_index}b{budget_index}"
@@ -328,7 +342,7 @@ def _populate(data: Path, *, zero_one_record=False, point=True,
                 row["mode"] = "disk"
                 row["photons_per_wavelength"] = photons
                 row["sun_elevation_deg"] = -9.0
-                row["code_sha256"] = {"x.py": "1"}
+                row["code_sha256"] = dict(_MINI_IDENTITY)
                 batch.record_seed(seed, row)
             batch.close("complete")
         if point:
@@ -336,7 +350,7 @@ def _populate(data: Path, *, zero_one_record=False, point=True,
                           [41000 + r for r in range(4)],
                           dict(stage="source-pairs", table_sha256="t",
                                protocol_sha256=protocol_sha256, mode="point",
-                               code_sha256={"x.py": "1"}))
+                               code_sha256=dict(_MINI_IDENTITY)))
             for r in range(4):
                 seed = 41000 + r
                 row = _synthetic_record81(seed)
@@ -345,7 +359,7 @@ def _populate(data: Path, *, zero_one_record=False, point=True,
                 row["mode"] = "point"
                 row["photons_per_wavelength"] = 800
                 row["sun_elevation_deg"] = -9.0
-                row["code_sha256"] = {"x.py": "1"}
+                row["code_sha256"] = dict(_MINI_IDENTITY)
                 # point-source variant: half the higher-order radiance, same
                 # identities (split_total = single + multiple) preserved
                 multiple_p = 0.5 * np.asarray(row["fields"]["multiple"])
@@ -439,7 +453,7 @@ def test_candidate_and_sensitivity_sections(tmp_path):
                           dict(stage="candidate", table_sha256="c",
                                protocol_sha256="p", mode="disk",
                                candidate_samples=cs, rest_photons=rp,
-                               code_sha256={"x.py": "1"}))
+                               code_sha256=dict(_MINI_IDENTITY_CANDIDATE)))
             for r in range(4):
                 seed = 80000 + 10000 * sun_index + 1000 * tier_index + r
                 per_lambda = {}
@@ -467,14 +481,15 @@ def test_candidate_and_sensitivity_sections(tmp_path):
                     per_lambda=per_lambda, mc_seconds=0.1,
                     seconds=0.3 + 0.1 * (1 + tier_index),
                     table_sha256="c", protocol_sha256="p",
-                    code_sha256={"x.py": "1"}, batch_id="x", attempt=0))
+                    code_sha256=dict(_MINI_IDENTITY_CANDIDATE),
+                    batch_id="x", attempt=0))
             batch.close("complete")
     batch = Batch(data / "raw" / "sensitivity", "s0mc",
                   [110000 + r for r in range(4)],
                   dict(stage="sensitivity", table_sha256="c",
                        protocol_sha256="p", mode="disk",
                        photons_per_wavelength=300,
-                       code_sha256={"x.py": "1"}))
+                       code_sha256=dict(_MINI_IDENTITY)))
     for r in range(4):
         seed = 110000 + r
         items = {}
@@ -488,7 +503,7 @@ def test_candidate_and_sensitivity_sections(tmp_path):
                                      photons_per_wavelength=300, mode="disk",
                                      table_sha256="c", items=items,
                                      batch_id="s0mc", attempt=0,
-                                     code_sha256={"x.py": "1"}))
+                                     code_sha256=dict(_MINI_IDENTITY)))
     batch.close("complete")
     (data / "raw" / "sensitivity" / "singles-refinement.json").write_text(
         json.dumps(dict(schema="s/1", items={"ss_gauss16": "d"},
@@ -602,6 +617,54 @@ def test_candidate_and_sensitivity_sections(tmp_path):
         _sensitivity_stats(data, proto, wl, [14, 34, 54])
 
 
+def test_singles_file_protocol_identity_gate(tmp_path):
+    """The deterministic evidence file passes the SAME protocol generation
+    gate as the JSONL batches -- a refinement computed under another (or
+    unknown, or absent) protocol identity must not be reported as this
+    experiment's sensitivity (round-7 review)."""
+    from tools.summarize_deep_twilight_reference import _sensitivity_stats
+    data = _write_mini_dataset(tmp_path)
+    proto = json.loads((data / "protocol.json").read_text())
+    proto["sensitivity"] = {"repeats": 4, "mc_items": ["baseline"],
+                            "single_items": ["ss_gauss16 (x)"]}
+    (data / "protocol.json").write_text(json.dumps(proto))
+    singles = data / "raw" / "sensitivity" / "singles-refinement.json"
+    singles.parent.mkdir(parents=True)
+    good = dict(schema="s/1", items={"ss_gauss16": "d"},
+                protocol_sha256=KNOWN_SHA,
+                by_sun={"-9.0": dict(baseline=[1e-8] * 3,
+                                     ss_gauss16=[1e-8] * 3)})
+    singles.write_text(json.dumps(good))
+    wl = np.arange(380.0, 781.0, 5.0)
+    # the matching identity passes the gate -- the later refusal is the
+    # missing MC batch, not the identity
+    with pytest.raises(ValueError, match="missing batch meta"):
+        _sensitivity_stats(data, proto, wl, [14, 34, 54],
+                           protocol_sha_now=KNOWN_SHA)
+    for bad in ("0" * 64, None):
+        payload_mut = json.loads(json.dumps(good))
+        if bad is None:
+            payload_mut.pop("protocol_sha256")
+        else:
+            payload_mut["protocol_sha256"] = bad
+        singles.write_text(json.dumps(payload_mut))
+        with pytest.raises(ValueError,
+                           match="unknown protocol generation"
+                                 "|no protocol_sha256 recorded"):
+            _sensitivity_stats(data, proto, wl, [14, 34, 54],
+                               protocol_sha_now=KNOWN_SHA)
+    # a bound historical generation passes with an auditable note
+    payload_mut = json.loads(json.dumps(good))
+    payload_mut["protocol_sha256"] = KNOWN_SHA
+    singles.write_text(json.dumps(payload_mut))
+    from tools.summarize_deep_twilight_reference import KNOWN_PROTOCOL_GENERATIONS
+    payload_mut["protocol_sha256"] = next(iter(KNOWN_PROTOCOL_GENERATIONS))
+    singles.write_text(json.dumps(payload_mut))
+    with pytest.raises(ValueError, match="missing batch meta"):
+        _sensitivity_stats(data, proto, wl, [14, 34, 54],
+                           protocol_sha_now="current-protocol")
+
+
 def test_declared_stage_without_data_is_recorded(tmp_path):
     """A protocol-declared stage with no raw/ data refuses the summary;
     only the explicit incompleteness escape records it (round-6 review)."""
@@ -687,19 +750,20 @@ def test_candidate_tier_implementation_mismatch_refused(tmp_path):
     wl = np.arange(380.0, 781.0, 5.0)
     # mutation: candidate-estimator (physics anchor) differs between the
     # tiers, written consistently into meta and records
-    build(lambda t: {"tools/twilight_second_order.py":
-                     "cand-v0" if t == 0 else "cand-v1"})
+    build(lambda t: dict(_MINI_IDENTITY_CANDIDATE,
+                         **{"tools/twilight_second_order.py":
+                            ("0" if t == 0 else "1") * 64}))
     with pytest.raises(ValueError, match="PHYSICS implementation differs"):
         _candidate_stats(data, proto, wl, [14, 34, 54], {})
     # mutation: only the orchestration file differs, consistently within
     # each tier -- still refused, no ("candidate", ...) compatibility
     # entry exists for any fingerprint pair
-    build(lambda t: {"tools/deep_twilight_reference.py":
-                     f"orch-v{t}"})
+    build(lambda t: dict(_MINI_IDENTITY_CANDIDATE,
+                         **{"tools/deep_twilight_reference.py": f"{t}" * 64}))
     with pytest.raises(ValueError, match="no verified compatibility entry"):
         _candidate_stats(data, proto, wl, [14, 34, 54], {})
     # baseline: identical implementations across the tiers summarize fine
-    build(lambda t: {"tools/twilight_second_order.py": "cand-same"})
+    build(lambda t: dict(_MINI_IDENTITY_CANDIDATE))
     cand = _candidate_stats(data, proto, wl, [14, 34, 54], {})
     assert cand["-9.0"]["drift"]["550.0"]["abs_drift"] > 0.0
     # round-6 mutation: strip the execution contract from both tier metas
@@ -713,8 +777,9 @@ def test_candidate_tier_implementation_mismatch_refused(tmp_path):
     jsonl = data / "raw" / "candidate" / "s0t0" / "attempt-00.jsonl"
     rows = [json.loads(l) for l in jsonl.read_text().splitlines()]
     for i, r in enumerate(rows):
-        r["code_sha256"] = {"tools/twilight_second_order.py":
-                            f"mixed-{'0' if i % 2 == 0 else '1'}"}
+        r["code_sha256"] = dict(_MINI_IDENTITY_CANDIDATE,
+                                **{"tools/twilight_second_order.py":
+                                   f"{i % 2}" * 64})
     jsonl.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
     with pytest.raises(ValueError, match="multiple execution implementations"):
         _candidate_stats(data, proto, wl, [14, 34, 54], {})
@@ -783,10 +848,10 @@ def test_batch_contract_mismatch_refused(tmp_path):
 def test_check_batch_contract_rejects_tampered_record():
     from tools.summarize_deep_twilight_reference import check_batch_contract
     meta = dict(protocol_sha256=KNOWN_SHA, table_sha256="t",
-                code_sha256={"x.py": "1"})
+                code_sha256=dict(_MINI_IDENTITY))
     good = [dict(seed=1, sun_elevation_deg=-9.0, photons_per_wavelength=400,
                  mode="disk", protocol_sha256=KNOWN_SHA, table_sha256="t",
-                 code_sha256={"x.py": "1"})]
+                 code_sha256=dict(_MINI_IDENTITY))]
     fp, notes = check_batch_contract(good, meta,
                                      dict(sun_elevation_deg=-9.0,
                                           photons_per_wavelength=400,
@@ -815,6 +880,37 @@ def test_check_batch_contract_rejects_tampered_record():
                                   photons_per_wavelength=400,
                                   mode="disk", table_sha256="t"),
                              stage="direct", batch_id="b")
+    # round-7 review: the CONTENT of an identity is verified before it can
+    # act as a comparison identity -- an empty or partial mapping, or one
+    # carrying non-sha256 values, must be refused
+    with pytest.raises(ValueError, match="non-empty file-hash mapping"):
+        check_batch_contract([dict(good[0], code_sha256={})], meta,
+                             dict(sun_elevation_deg=-9.0,
+                                  photons_per_wavelength=400,
+                                  mode="disk", table_sha256="t"),
+                             stage="direct", batch_id="b")
+    partial = dict(_MINI_IDENTITY)
+    del partial["skycolor/rt/mc.py"]
+    with pytest.raises(ValueError, match="lacks the stage-required files"):
+        check_batch_contract([dict(good[0], code_sha256=partial)], meta,
+                             dict(sun_elevation_deg=-9.0,
+                                  photons_per_wavelength=400,
+                                  mode="disk", table_sha256="t"),
+                             stage="direct", batch_id="b")
+    with pytest.raises(ValueError, match="non-sha256 values"):
+        check_batch_contract([dict(good[0], code_sha256=dict(
+            _MINI_IDENTITY, **{"tools/deep_twilight_reference.py": "x"}))],
+            meta, dict(sun_elevation_deg=-9.0, photons_per_wavelength=400,
+                       mode="disk", table_sha256="t"),
+            stage="direct", batch_id="b")
+    # the candidate stage additionally requires the estimator file
+    from tools.summarize_deep_twilight_reference import check_batch_contract \
+        as cbc
+    with pytest.raises(ValueError, match="lacks the stage-required files"):
+        cbc([dict(good[0], code_sha256=dict(_MINI_IDENTITY))], meta,
+            dict(sun_elevation_deg=-9.0, photons_per_wavelength=400,
+                 mode="disk", table_sha256="t"),
+            stage="candidate", batch_id="b")
     tampered = [dict(good[0], photons_per_wavelength=1600000)]
     with pytest.raises(ValueError, match="contract field"):
         check_batch_contract(tampered, meta,
@@ -822,16 +918,11 @@ def test_check_batch_contract_rejects_tampered_record():
                                   photons_per_wavelength=400,
                                   mode="disk", table_sha256="t"),
                              stage="direct", batch_id="b")
-    # two-level identity: a PHYSICS-anchor change between meta and records
-    # is rejected outright
-    physics_meta = dict(meta, code_sha256=dict.fromkeys(
-        ("skycolor/rt/mc.py", "tools/point_solar_table.py",
-         "tools/unified_solar_transport.py", "tools/twilight_second_order.py"),
-        "good-physics"))
-    physics_tampered = [dict(good[0], code_sha256=dict.fromkeys(
-        ("skycolor/rt/mc.py", "tools/point_solar_table.py",
-         "tools/unified_solar_transport.py", "tools/twilight_second_order.py"),
-        "evil-physics"))]
+    # a PHYSICS-anchor change between meta and records is rejected outright
+    physics_meta = dict(meta, code_sha256=dict(
+        _MINI_IDENTITY, **{"skycolor/rt/mc.py": "a" * 64}))
+    physics_tampered = [dict(good[0], code_sha256=dict(
+        _MINI_IDENTITY, **{"skycolor/rt/mc.py": "9" * 64}))]
     with pytest.raises(ValueError, match="PHYSICS implementation differs"):
         check_batch_contract(physics_tampered, physics_meta,
                              dict(sun_elevation_deg=-9.0,
@@ -841,10 +932,11 @@ def test_check_batch_contract_rejects_tampered_record():
     # an orchestration-only difference with NO verified compatibility
     # entry is refused outright (a blanket "orchestration diffs are only
     # notes" bypass was removed by round-5 review)
-    meta_code = dict(meta, code_sha256={"x.py": "1"})
-    code_tampered = [dict(good[0], code_sha256={"x.py": "evil"})]
+    orch_evil = dict(_MINI_IDENTITY,
+                     **{"tools/deep_twilight_reference.py": "f" * 64})
+    code_tampered = [dict(good[0], code_sha256=orch_evil)]
     with pytest.raises(ValueError, match="no verified compatibility entry"):
-        check_batch_contract(code_tampered, meta_code,
+        check_batch_contract(code_tampered, meta,
                              dict(sun_elevation_deg=-9.0,
                                   photons_per_wavelength=400,
                                   mode="disk", table_sha256="t"),
@@ -853,26 +945,26 @@ def test_check_batch_contract_rejects_tampered_record():
     # batch are refused as well (mixed-implementation batches must not be
     # merged as independent repeats)
     mixed = [dict(good[0], protocol_sha256=KNOWN_SHA,
-                  code_sha256={"x.py": "1"}),
+                  code_sha256=dict(_MINI_IDENTITY)),
              dict(good[0], seed=2, protocol_sha256=KNOWN_SHA,
-                  code_sha256={"x.py": "2"})]
-    meta_known = dict(meta_code, protocol_sha256=KNOWN_SHA)
+                  code_sha256=orch_evil)]
     with pytest.raises(ValueError, match="multiple execution "
                                          "implementations"):
-        check_batch_contract(mixed, meta_known,
+        check_batch_contract(mixed, meta,
                              dict(sun_elevation_deg=-9.0,
                                   photons_per_wavelength=400,
                                   mode="disk", table_sha256="t"),
                              stage="direct", batch_id="b")
     mixed_phys = [dict(good[0], protocol_sha256=KNOWN_SHA,
-                       code_sha256=dict.fromkeys(
-                           ("skycolor/rt/mc.py",), "a")),
+                       code_sha256=dict(_MINI_IDENTITY,
+                                        **{"skycolor/rt/mc.py": "a" * 64})),
                   dict(good[0], seed=2, protocol_sha256=KNOWN_SHA,
-                       code_sha256=dict.fromkeys(
-                           ("skycolor/rt/mc.py",), "b"))]
+                       code_sha256=dict(_MINI_IDENTITY,
+                                        **{"skycolor/rt/mc.py": "b" * 64}))]
     meta_phys_known = dict(meta, protocol_sha256=KNOWN_SHA,
-                           code_sha256=dict.fromkeys(
-                               ("skycolor/rt/mc.py",), "a"))
+                           code_sha256=dict(_MINI_IDENTITY,
+                                            **{"skycolor/rt/mc.py":
+                                               "a" * 64}))
     with pytest.raises(ValueError, match="multiple execution "
                                          "implementations"):
         check_batch_contract(mixed_phys, meta_phys_known,
@@ -912,7 +1004,7 @@ def test_check_batch_contract_rejects_tampered_record():
     rec_evil_phys = dict(rec_direct_b, code_sha256=dict(
         json.loads(_archived_fp("0326e2ebe70d1e4abeea77c8c808229d243e28b5f"
                                 "0146b499283d75c0db04c62")),
-        **{"skycolor/rt/mc.py": "evil-physics"}))
+        **{"skycolor/rt/mc.py": "9" * 64}))
     with pytest.raises(ValueError, match="PHYSICS implementation differs"):
         check_batch_contract([rec_evil_phys], meta_direct_a,
                              dict(sun_elevation_deg=-9.0,
@@ -1055,7 +1147,7 @@ def test_efficiency_metric_direction(tmp_path):
                       dict(stage="candidate", table_sha256="c",
                            protocol_sha256="p", mode="disk",
                            candidate_samples=cs, rest_photons=rp,
-                           code_sha256={"x.py": "1"}))
+                           code_sha256=dict(_MINI_IDENTITY_CANDIDATE)))
         for r in range(4):
             seed = 80000 + 1000 * tier_index + r
             # NON-identical repeats via the closure identities: rest_mean
@@ -1083,7 +1175,8 @@ def test_efficiency_metric_direction(tmp_path):
                 per_lambda=per_lambda, mc_seconds=t_mc,
                 seconds=t_cand + t_mc,
                 table_sha256="c", protocol_sha256="p",
-                code_sha256={"x.py": "1"}, batch_id="x", attempt=0))
+                code_sha256=dict(_MINI_IDENTITY_CANDIDATE),
+                batch_id="x", attempt=0))
         batch.close("complete")
     wl = np.arange(380.0, 781.0, 5.0)
     out = _candidate_stats(data, proto, wl, [14, 34, 54], {})

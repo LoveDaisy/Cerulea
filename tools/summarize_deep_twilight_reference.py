@@ -252,6 +252,8 @@ def require_same_execution(wave: str, fp_a: str, fp_b: str, *,
     when VERIFIED_IMPLEMENTATION_COMPAT binds this exact (wave, pair).
     A PHYSICS-anchor difference is refused unconditionally: those files
     define the traced physics, and no audited exception covers them.
+    Callers must pass identities that already passed verified_identity()
+    -- this entry certifies equality/compatibility, never content.
     Returns the verified statement when a mapped exception applies
     (the caller records it as an auditable note).
     """
@@ -273,6 +275,90 @@ def require_same_execution(wave: str, fp_a: str, fp_b: str, *,
             "comparison refused; extend VERIFIED_IMPLEMENTATION_COMPAT "
             "only with a human-verified (wave, fingerprint-pair) binding")
     return statement
+
+
+#: per-stage required implementation-identity CONTENT: the files whose
+#: hashes every code_sha256 of that stage must carry.  The candidate
+#: stage depends on the candidate estimator itself; the direct,
+#: source-pairs and sensitivity waves predate that file and are
+#: contractually exempt from it (their archived identities name exactly
+#: the four base files).
+_STAGE_BASE_IDENTITY_FILES = (
+    "skycolor/rt/mc.py",
+    "tools/deep_twilight_reference.py",
+    "tools/point_solar_table.py",
+    "tools/unified_solar_transport.py",
+)
+STAGE_REQUIRED_IDENTITY_FILES = {
+    "direct": _STAGE_BASE_IDENTITY_FILES,
+    "source-pairs": _STAGE_BASE_IDENTITY_FILES,
+    "candidate": _STAGE_BASE_IDENTITY_FILES
+                 + ("tools/twilight_second_order.py",),
+    "sensitivity": _STAGE_BASE_IDENTITY_FILES,
+}
+
+
+def _is_sha256(value) -> bool:
+    return (isinstance(value, str) and len(value) == 64
+            and all(c in "0123456789abcdef" for c in value.lower()))
+
+
+def verified_identity(stage, code_sha256, context) -> str:
+    """Validate the CONTENT of an implementation identity and return its
+    canonical fingerprint.
+
+    An identity that does not name the stage's physics (an empty or
+    partial mapping, or one carrying non-sha256 values) must never be
+    serialisable into a comparison identity: equality of two hollow
+    identities proves nothing about which implementations ran.
+    """
+    if not isinstance(code_sha256, dict) or not code_sha256:
+        raise ValueError(
+            f"{context}: code_sha256 must be a non-empty file-hash "
+            "mapping -- an absent implementation identity cannot be "
+            "compared")
+    required = STAGE_REQUIRED_IDENTITY_FILES[stage]
+    missing = [f for f in required if not code_sha256.get(f)]
+    if missing:
+        raise ValueError(
+            f"{context}: implementation identity lacks the stage-required "
+            f"files {missing} -- it cannot certify that the stage's "
+            "physics ran under one implementation")
+    malformed = sorted(f for f, h in code_sha256.items()
+                       if not _is_sha256(h))
+    if malformed:
+        raise ValueError(
+            f"{context}: implementation identity carries non-sha256 "
+            f"values for {malformed}")
+    return execution_fingerprint(code_sha256)
+
+
+def require_protocol_generation(meta_protocol, protocol_sha_now, context,
+                                notes) -> None:
+    """The single protocol-generation gate: the executed protocol must
+    equal the current one or be bound by a KNOWN_PROTOCOL_GENERATIONS
+    entry; anything else (including an absent identity) refuses.  All
+    inputs -- JSONL batches and JSON evidence files alike -- pass through
+    this one rule."""
+    if protocol_sha_now is None:
+        return  # no current-protocol context to compare against
+    if meta_protocol is None:
+        raise ValueError(
+            f"{context}: no protocol_sha256 recorded -- the executed "
+            "protocol identity is required")
+    if meta_protocol == protocol_sha_now:
+        return
+    if meta_protocol in KNOWN_PROTOCOL_GENERATIONS:
+        notes.append(
+            f"{context}: executed under known protocol generation "
+            f"{meta_protocol[:12]}... "
+            f"({KNOWN_PROTOCOL_GENERATIONS[meta_protocol]})")
+        return
+    raise ValueError(
+        f"{context}: executed under unknown protocol generation "
+        f"{meta_protocol[:12]}...; no verified compatibility mapping "
+        "exists -- extend KNOWN_PROTOCOL_GENERATIONS only after "
+        "verifying the stage-relevant sections are equivalent")
 
 
 def check_batch_contract(records, meta, expect, *, stage, batch_id,
@@ -313,9 +399,9 @@ def check_batch_contract(records, meta, expect, *, stage, batch_id,
                 raise ValueError(
                     f"{stage}/{batch_id} seed {row['seed']}: contract field "
                     f"{key} is {got!r}, protocol requires {want!r}")
-        # implementation identity is a REQUIRED contract field: every
-        # record must carry it (pre-fix waves with no recorded identity
-        # are not a supported generation)
+        # implementation identity is a REQUIRED contract field whose
+        # content is verified below; a record without it is a pre-fix
+        # wave this generation does not support
         if row.get("code_sha256") is None:
             missing_fields.add("code_sha256")
         # executed-protocol identity: a record that carries it must match
@@ -328,10 +414,18 @@ def check_batch_contract(records, meta, expect, *, stage, batch_id,
                 f"{stage}/{batch_id} seed {row['seed']}: record "
                 "protocol_sha256 differs from the batch meta provenance")
     # per-batch implementation identity through the single contract entry.
-    # None of this is conditional on the meta carrying the field: a batch
-    # without a pinned execution contract is refused outright (fail-closed)
-    record_fps = {execution_fingerprint(r["code_sha256"])
-                  for r in records if r.get("code_sha256") is not None}
+    # Identity CONTENT is verified before anything is serialised into a
+    # fingerprint (round-7: an empty or partial mapping must not become a
+    # "verified" comparison identity), and none of this is conditional on
+    # the meta carrying the field: a batch without a pinned, well-formed
+    # execution contract is refused outright (fail-closed)
+    record_fps = set()
+    for row in records:
+        if row.get("code_sha256") is None:
+            continue  # already recorded in missing_fields above
+        record_fps.add(verified_identity(
+            stage, row["code_sha256"],
+            f"{stage}/{batch_id} seed {row['seed']}"))
     if len(record_fps) > 1:
         raise ValueError(
             f"{stage}/{batch_id}: records span multiple execution "
@@ -343,11 +437,13 @@ def check_batch_contract(records, meta, expect, *, stage, batch_id,
             f"{stage}/{batch_id}: batch meta lacks the execution contract "
             "(code_sha256) -- batches without a pinned implementation "
             "identity are refused, not silently compared")
-    verified_fp = execution_fingerprint(meta_code)
+    meta_fp = verified_identity(stage, meta_code,
+                                f"{stage}/{batch_id} (batch meta)")
+    verified_fp = meta_fp
     if record_fps:
         rec_fp = next(iter(record_fps))
         statement = require_same_execution(
-            stage, verified_fp, rec_fp,
+            stage, meta_fp, rec_fp,
             context=f"{stage}/{batch_id} (batch meta vs records)")
         if statement:
             notes.append(
@@ -363,18 +459,8 @@ def check_batch_contract(records, meta, expect, *, stage, batch_id,
         notes.append(f"{stage}/{batch_id}: records lack {sorted(filled_from_meta)}; "
                      "values taken from the batch meta provenance and "
                      "validated against the protocol")
-    if (protocol_sha_now is not None and meta_protocol is not None
-            and meta_protocol != protocol_sha_now):
-        if meta_protocol not in KNOWN_PROTOCOL_GENERATIONS:
-            raise ValueError(
-                f"{stage}/{batch_id}: executed under unknown protocol "
-                f"generation {meta_protocol[:12]}...; no verified "
-                "compatibility mapping exists -- extend "
-                "KNOWN_PROTOCOL_GENERATIONS only after verifying the "
-                "stage-relevant sections are equivalent")
-        notes.append(
-            f"{stage}/{batch_id}: executed under known protocol generation "
-            f"{meta_protocol[:12]}... ({KNOWN_PROTOCOL_GENERATIONS[meta_protocol]})")
+    require_protocol_generation(meta_protocol, protocol_sha_now,
+                                f"{stage}/{batch_id}", notes)
     return verified_fp, notes
 
 
@@ -941,6 +1027,13 @@ def _sensitivity_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
             "deterministic refinement evidence is required for a complete "
             "sensitivity summary")
     payload = json.loads(singles_path.read_text())
+    # round-7: the deterministic evidence file passes the SAME protocol
+    # generation gate as the JSONL batches -- a refinement computed under
+    # a different (or unknown) protocol must not be reported as this
+    # experiment's discretisation sensitivity
+    require_protocol_generation(payload.get("protocol_sha256"),
+                                protocol_sha_now,
+                                "sensitivity singles", contract_notes)
     want_suns = {str(s) for s in protocol["scenario"]["sun_elevations_deg"]}
     want_single_items = {_slug(d) for d in proto_single_items}
     got_items = set(payload.get("items", {}))
