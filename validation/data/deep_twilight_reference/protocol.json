@@ -63,6 +63,23 @@
     "constant": 683.0,
     "method": "683 * trapezoid(L * V, wl) per independent complete spectrum; V = column 1 of spectra.cie_xyz on the 380-780/5 nm grid"
   },
+  "candidate": {
+    "table": {
+      "path": "probe/point-source.npz",
+      "label": "deep-twilight-plan-probe-450-550-650-clear-v1",
+      "sha256": "ed2376c9a6f5c8044b26b0e51bc36347057948ed710e3a3f87b514f4e4154be7",
+      "note": "the candidate experiment is self-contained on the frozen planning 3-wavelength table (450/550/650 nm, same medium contract): candidate L2 + its own MC rest on the same seeds. These runs are NOT mergeable with the full81 direct reference (different SeedSequence streams); the comparison to the direct baseline is between distribution summaries at matched rest budgets, never per-seed pairing."
+    },
+    "wavelengths_nm": [450.0, 550.0, 650.0],
+    "repeats": 16,
+    "seed_rule": "80000 + 10000*sun_index + 1000*tier_index + repeat",
+    "tiers": [
+      {"candidate_samples": 100000, "rest_photons": 400000},
+      {"candidate_samples": 400000, "rest_photons": 1600000}
+    ],
+    "estimator": "tools/twilight_second_order.py sequential importance sampler, validated by the -6 deg MC closure test",
+    "comparison": "total_cand = deterministic single + candidate L2 + MC rest mean, compared against the direct baseline at the matched budget via conditional intervals (16 seeds), per-path second moments, variance x wall-clock, budget drift and tail statistics; a negative result is a valid delivery"
+  },
   "wall_clock_caps_hours": {
     "direct_and_source_pairs": 4.0,
     "candidate": 2.0,

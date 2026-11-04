@@ -134,8 +134,8 @@ def peak_rss_bytes() -> int:
 # protocol / scenario / source contract
 # ---------------------------------------------------------------------------
 REQUIRED_PROTOCOL_KEYS = {
-    "schema", "scenario", "source", "direct", "precision", "luminance",
-    "wall_clock_caps_hours",
+    "schema", "scenario", "source", "direct", "candidate", "precision",
+    "luminance", "wall_clock_caps_hours",
 }
 
 
@@ -593,6 +593,160 @@ def stage_cost_probe(protocol, atmo, table, out: Path) -> dict:
     return summary
 
 
+def candidate_table_load(protocol: dict, data_dir: Path, atmo):
+    """Load the candidate experiment's frozen 3-wavelength table."""
+    from tools.twilight_second_order import estimate  # noqa: F401 (wiring)
+
+    spec = protocol["candidate"]["table"]
+    path = data_dir / spec["path"]
+    digest = sha256_file(path)
+    if digest != spec["sha256"]:
+        raise ValueError(f"candidate table hash mismatch: {path} is {digest}, "
+                         f"protocol freezes {spec['sha256']}")
+    return PointSolarTable.load(path, atmo, expected_label=spec["label"])
+
+
+def stage_candidate(protocol, atmo, table, data_dir, state, *, protocol_path,
+                    max_stage_hours=None) -> int:
+    """Candidate estimator experiment (plan Step 3).
+
+    For every (depth, tier, seed): candidate L2 at the three anchor
+    wavelengths plus an MC rest run at the tier budget on the same frozen
+    3-wavelength table, with per-path decomposition from the diagnostics
+    sink so the comparison is per-path subtraction, never two independent
+    means.  Records go to ``raw/candidate/``; the shared 2 h cap applies.
+    """
+    from tools.twilight_second_order import estimate, sun_hat_for
+
+    cand = protocol["candidate"]
+    anchors = [int(np.argmin(np.abs(WL_COARSE - a)))
+               for a in cand["wavelengths_nm"]]
+    wl3 = WL_COARSE[anchors]
+    atmo3 = atmo._restrict(anchors)
+    table3 = candidate_table_load(protocol, data_dir, atmo3)
+    singles3 = {}
+    for sun_elev in protocol["scenario"]["sun_elevations_deg"]:
+        started = time.perf_counter()
+        value, _ = single_zenith(atmo3, FiniteSolarSource(atmo3, table3),
+                                 90.0 - sun_elev)
+        singles3[sun_elev] = value
+        print(json.dumps(dict(candidate_single=sun_elev,
+                              seconds=time.perf_counter() - started)), flush=True)
+    spent, _cap = stage_budget(state, "candidate", protocol, max_stage_hours)
+    started = time.perf_counter()
+    billed = started
+    billed_records = 0
+    computed = 0
+    stopped = None
+
+    def remaining():
+        return _cap - (spent + (time.perf_counter() - started))
+
+    def bill(records_done):
+        nonlocal billed, billed_records
+        now = time.perf_counter()
+        note_stage_seconds(data_dir, state, "candidate",
+                           now - billed, records_done - billed_records)
+        billed = now
+        billed_records = records_done
+        save_state(data_dir, state)
+
+    bill(0)
+    suns = protocol["scenario"]["sun_elevations_deg"]
+    for sun_index, sun_elev in enumerate(suns):
+        for tier_index, tier in enumerate(cand["tiers"]):
+            batch_id = f"s{sun_index}t{tier_index}"
+            seeds = [80000 + 10000 * sun_index + 1000 * tier_index + r
+                     for r in range(int(cand["repeats"]))]
+            meta_base = _common_meta(protocol_path, cand["table"]["sha256"],
+                                     "candidate", sun_index, tier_index,
+                                     tier["rest_photons"], "disk")
+            meta_base["candidate_samples"] = tier["candidate_samples"]
+            batch = Batch(data_dir / "raw" / "candidate", batch_id, seeds,
+                          meta_base)
+            missing = [s for s in seeds if s not in batch.done]
+            if not missing:
+                batch.close("complete")
+                continue
+            for seed in missing:
+                if remaining() <= 0.0:
+                    stopped = "budget-exhausted"
+                    break
+                per_lambda = {}
+                for pos, iw in enumerate(anchors):
+                    source = FiniteSolarSource(atmo3, table3)
+                    cand_res = estimate(atmo3, pos, source, sun_elev,
+                                        int(tier["candidate_samples"]),
+                                        seed=seed)
+                    # MC rest with per-path decomposition on the same seed
+                    source = FiniteSolarSource(atmo3, table3)
+                    t_mc = time.perf_counter()
+                    with mc_solar_source(source):
+                        mc_res = mc.mc_radiance_split(
+                            atmo3, 90.0 - sun_elev, [0.0], [0.0],
+                            n_photons=int(tier["rest_photons"]), seed=seed,
+                            max_scatter=50, diagnostics=True)
+                    mc_seconds = time.perf_counter() - t_mc
+                    d = mc_res["diagnostics"][pos]["per_view"][0]
+                    n_paths = int(tier["rest_photons"])
+                    c2nt_mean = d["s1"][1] / n_paths
+                    rest_mean = float(mc_res["multiple"][0, pos]) - c2nt_mean
+                    # per-path second moment of rest = mult - c2nt; an
+                    # all-zero rest batch has s2 = None ("no tail evidence")
+                    rest_second = None
+                    if d["s2"] is not None:
+                        s2 = np.array(d["s2"]) / n_paths
+                        rest_second = float(s2[0][0] + s2[1][1] - 2.0 * s2[0][1])
+                    deterministic = float(singles3[sun_elev][pos])
+                    per_lambda[str(wl3[pos])] = dict(
+                        L2=cand_res["L2"], L2_second_moment=cand_res["second_moment"],
+                        L2_max_abs=cand_res["max_abs"],
+                        candidate_seconds=cand_res["seconds"],
+                        candidate_samples=int(cand_res["n_samples"]),
+                        c2nt_mean=c2nt_mean, rest_mean=rest_mean,
+                        rest_second_moment=rest_second,
+                        mc_multiple=float(mc_res["multiple"][0, pos]),
+                        mc_seconds=mc_seconds,
+                        deterministic_single=deterministic,
+                        total_cand=deterministic + cand_res["L2"] + rest_mean,
+                        total_analog=deterministic
+                        + float(mc_res["multiple"][0, pos]),
+                        max_fraction=mc_res["diagnostics"][pos]["per_view"][0]["max_fraction"],
+                        top001_fraction=mc_res["diagnostics"][pos]["per_view"][0]["top001_fraction"],
+                        effective_contributors=mc_res["diagnostics"][pos]["per_view"][0]["effective_contributors"])
+                record = dict(seed=int(seed), sun_elevation_deg=sun_elev,
+                              tier_index=tier_index,
+                              candidate_samples=tier["candidate_samples"],
+                              rest_photons=tier["rest_photons"],
+                              per_lambda=per_lambda,
+                              seconds=sum(v["candidate_seconds"] + v["mc_seconds"]
+                                          for v in per_lambda.values()),
+                              table_sha256=cand["table"]["sha256"],
+                              code_sha256=code_hashes(),
+                              batch_id=batch_id, attempt=batch.attempt)
+                batch.record_seed(seed, record)
+                computed += 1
+                bill(computed)
+                print(json.dumps(dict(stage="candidate", batch_id=batch_id,
+                                      seed=seed,
+                                      seconds=record["seconds"],
+                                      cumulative_stage_seconds=spent_total(state, "candidate"))),
+                      flush=True)
+            still_missing = [s for s in seeds if s not in batch.done]
+            batch.close("complete" if not still_missing else "open")
+            if stopped:
+                break
+        if stopped:
+            break
+    bill(computed)
+    print(json.dumps(dict(
+        stage_status="complete" if not stopped else f"incomplete-{stopped}",
+        stage="candidate", computed=computed,
+        stage_seconds_here=time.perf_counter() - started,
+        cumulative_seconds=spent_total(state, "candidate"))), flush=True)
+    return computed
+
+
 STAGES = ("smoke", "cost-probe", "direct", "source-pairs", "candidate",
           "sensitivity")
 DEFAULT_PROTOCOL = ROOT / "validation/data/deep_twilight_reference/protocol.json"
@@ -628,10 +782,16 @@ def main(argv=None) -> int:
                               seconds=summary["seconds"])))
         return 0
 
-    if args.stage in ("candidate", "sensitivity"):
+    if args.stage == "candidate":
+        data_dir = args.out if args.out is not None else args.protocol.parent
+        state = load_state(data_dir)
+        stage_candidate(protocol, atmo, table, data_dir, state,
+                        protocol_path=args.protocol.resolve(),
+                        max_stage_hours=args.max_stage_hours)
+        return 0
+    if args.stage == "sensitivity":
         raise SystemExit(
-            f"stage {args.stage!r} is delivered by its own plan step; "
-            "this build implements smoke/cost-probe/direct/source-pairs")
+            "stage 'sensitivity' is delivered by plan Step 4; not implemented yet")
 
     data_dir = args.out if args.out is not None else args.protocol.parent
     state = load_state(data_dir)

@@ -250,6 +250,10 @@ def compute_summary(data_dir: Path, protocol: dict) -> dict:
         pairs[str(sun)] = _pair_stats(disk_rows, records, wl, v_curve,
                                       anchor_idx, sun, protocol, pair_cfg)
     out["source_pairs"] = pairs
+    # ---- candidate experiment (plan Step 3; may be absent/incomplete) -----
+    if (data_dir / "raw" / "candidate").exists():
+        out["candidate"] = _candidate_stats(data_dir, protocol, wl, anchor_idx,
+                                            out["direct"])
     out["cost"] = _cost_stats(data_dir, disk_meta)
     out["unknowns"] = [
         "diffuse-transport curvature: straight diffuse lines are a fixed "
@@ -388,6 +392,107 @@ def _budget_stats(records, wl, v_curve, anchor_idx, sun, budget, protocol,
         seconds=seconds,
         fingerprints_uniform=True,
         stage=stage)
+
+
+def _candidate_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
+                     anchor_idx, direct_section) -> dict:
+    """Candidate-vs-direct comparison at matched rest budgets.
+
+    The candidate runs are self-contained on the 3-wavelength planning
+    table (different RNG streams from the full81 reference): the comparison
+    is between distribution summaries (16-seed conditional intervals,
+    per-path second moments, variance x wall-clock, tier drift), never
+    per-seed pairing.
+    """
+    cand_cfg = protocol["candidate"]
+    anchors_nm = [float(wl[i]) for i in anchor_idx]
+    confidence = protocol["direct"]["analysis"]["student"]["confidence"]
+    repeats = int(cand_cfg["repeats"])
+    budgets = protocol["direct"]["budgets_photons"]
+    suns = protocol["scenario"]["sun_elevations_deg"]
+    raw_dir = data_dir / "raw" / "candidate"
+    out = {}
+    for sun_index, sun in enumerate(suns):
+        tiers = {}
+        for tier_index, tier in enumerate(cand_cfg["tiers"]):
+            batch_id = f"s{sun_index}t{tier_index}"
+            seeds = [80000 + 10000 * sun_index + 1000 * tier_index + r
+                     for r in range(repeats)]
+            records, _meta = load_batch(raw_dir / batch_id, seeds,
+                                        stage="candidate", batch_id=batch_id)
+            records = sorted(records, key=lambda r: int(r["seed"]))
+            per_anchor = {}
+            for a_nm in anchors_nm:
+                total = np.array([r["per_lambda"][str(a_nm)]["total_cand"]
+                                  for r in records])
+                rest_var = np.array([r["per_lambda"][str(a_nm)]["rest_second_moment"]
+                                     or np.nan for r in records])
+                seconds = np.array([r["per_lambda"][str(a_nm)]["candidate_seconds"]
+                                    + r["per_lambda"][str(a_nm)]["mc_seconds"]
+                                    for r in records])
+                per_anchor[str(a_nm)] = dict(
+                    total_mean=float(total.mean()),
+                    total_sd=float(total.std(axis=0, ddof=1)),
+                    total_t95_halfwidth=float(student_halfwidth(
+                        total.reshape(-1, 1), confidence)[0]),
+                    rest_second_moment_mean=float(np.nanmean(rest_var)),
+                    all_zero_rest=bool(np.all(np.isnan(rest_var))),
+                    seconds_mean=float(seconds.mean()),
+                    L2_mean=float(np.mean([r["per_lambda"][str(a_nm)]["L2"]
+                                           for r in records])),
+                    max_fraction=float(np.nanmax([
+                        r["per_lambda"][str(a_nm)]["max_fraction"] or np.nan
+                        for r in records])) if any(
+                        r["per_lambda"][str(a_nm)]["max_fraction"] is not None
+                        for r in records) else None,
+                    top001_fraction=float(np.nanmax([
+                        r["per_lambda"][str(a_nm)]["top001_fraction"] or np.nan
+                        for r in records])) if any(
+                        r["per_lambda"][str(a_nm)]["top001_fraction"] is not None
+                        for r in records) else None)
+            tiers[str(tier_index)] = dict(rest_photons=tier["rest_photons"],
+                                          candidate_samples=tier["candidate_samples"],
+                                          anchors=per_anchor,
+                                          seconds=float(sum(r["seconds"]
+                                                            for r in records)))
+        # tier drift of total_cand between the two tiers (anchors)
+        lo_tier, hi_tier = sorted(tiers, key=int)
+        drift = {}
+        for a_nm in anchors_nm:
+            lo = tiers[lo_tier]["anchors"][str(a_nm)]
+            hi = tiers[hi_tier]["anchors"][str(a_nm)]
+            drift[str(a_nm)] = dict(abs_drift=abs(hi["total_mean"]
+                                                  - lo["total_mean"]),
+                                    low_mean=lo["total_mean"],
+                                    high_mean=hi["total_mean"])
+        # comparison against the direct baseline at the matched budget
+        comparison = {}
+        direct_sun = direct_section.get(str(sun), {})
+        for tier_index, tier in enumerate(cand_cfg["tiers"]):
+            b_key = str(budgets[tier_index])
+            block = direct_sun.get("budgets", {}).get(b_key)
+            if block is None:
+                continue
+            per_anchor = {}
+            for i, a_nm in zip(anchor_idx, anchors_nm):
+                cand = tiers[str(tier_index)]["anchors"][str(a_nm)]
+                d_mean = block["mean"][i]
+                d_half = block["student_halfwidth"][i]
+                c_half = cand["total_t95_halfwidth"]
+                d_seconds = block["seconds"] / max(block["n"], 1)
+                c_seconds = cand["seconds_mean"]
+                per_anchor[str(a_nm)] = dict(
+                    direct_mean=float(d_mean), direct_halfwidth=float(d_half),
+                    candidate_mean=cand["total_mean"],
+                    candidate_halfwidth=c_half,
+                    halfwidth_ratio=(c_half / d_half) if d_half > 0 else None,
+                    direct_seconds_per_seed=float(d_seconds),
+                    candidate_seconds_per_seed=float(c_seconds),
+                    verdict=("candidate-narrower" if c_half < d_half
+                             else "candidate-wider"))
+            comparison[b_key] = per_anchor
+        out[str(sun)] = dict(tiers=tiers, drift=drift, comparison=comparison)
+    return out
 
 
 def _drift_stats(per_budget, anchor_idx, wl, v_curve, sun, precision):
