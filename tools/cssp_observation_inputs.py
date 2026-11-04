@@ -33,6 +33,7 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+import re
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -181,6 +182,37 @@ def jpl_horizons_url(start: str, stop: str) -> str:
             "&APPARENT=%27AIRLESS%27&CSV_FORMAT=%27YES%27")
 
 
+def aeronet_file_range(filename: str) -> tuple[str, str] | None:
+    """(start_date, end_date) as ISO dates from an archived AERONET file name.
+
+    The archive convention is ``aeronet-<site>-<YYYYMMDD>-<D2>-AOD20.txt``
+    where ``D2`` is the end day within the same month; parsing the name (not
+    substring search) is what keeps acquisition, provenance and per-session
+    AOD coverage tied to the same dates.
+    """
+    if not (filename.startswith("aeronet-") and filename.endswith("-AOD20.txt")):
+        return None
+    stem = filename[len("aeronet-"):-len("-AOD20.txt")]
+    for site in AERONET_SITES:
+        if stem.startswith(site + "-"):
+            span = stem[len(site) + 1:]
+            if re.fullmatch(r"(\d{8})-(\d{1,2})", span):
+                c1, d2 = span.split("-")
+                start = f"{c1[:4]}-{c1[4:6]}-{c1[6:]}"
+                end = f"{c1[:4]}-{c1[4:6]}-{int(d2):02d}"
+                return start, end
+    return None
+
+
+def aeronet_range_intersects(filename: str, dates: list[str]) -> bool:
+    rng = aeronet_file_range(filename)
+    if rng is None:
+        return False
+    lo = datetime.fromisoformat(rng[0]).date()
+    hi = datetime.fromisoformat(rng[1]).date()
+    return any(lo <= datetime.fromisoformat(d).date() <= hi for d in dates)
+
+
 def weather_source_url(filename: str) -> str | None:
     """Canonical request URL for an archived weather/JPL response file name,
     so sources.json records the exact request even without fetch provenance."""
@@ -189,12 +221,11 @@ def weather_source_url(filename: str) -> str | None:
     if filename.startswith("noaa-BFD-") and filename.endswith(".json"):
         d = filename[9:17]
         return noaa_global_hourly_url(f"{d[:4]}-{d[4:6]}-{d[6:]}")
-    if filename.startswith("aeronet-"):
-        stem = filename[len("aeronet-"):-len("-AOD20.txt")]
+    rng = aeronet_file_range(filename)
+    if rng is not None:
         for site in AERONET_SITES:
-            if stem.startswith(site + "-"):
-                span = stem[len(site) + 1:]
-                return aeronet_url(site, f"2014-07-{span[:2]}", f"2014-07-{span[3:]}")
+            if Path(filename).name.startswith(f"aeronet-{site}-"):
+                return aeronet_url(site, rng[0], rng[1])
     if filename.startswith("frozen-"):
         return None  # feasibility-packet subsets; see frozen_feasibility_refs
     return None
@@ -916,15 +947,25 @@ def acquisition_items(with_raw_archive: bool) -> list[dict]:
         items.append({"id": f"iem-{compact}",
                       "url": iem_obhistory_url(date),
                       "path": f"weather/iem-N38-obhistory-{compact}.json"})
-        items.append({"id": f"noaa-{compact}",
-                      "url": noaa_global_hourly_url(date),
-                      "path": f"weather/noaa-BFD-{compact}.json"})
+        noaa_item = {"id": f"noaa-{compact}",
+                     "url": noaa_global_hourly_url(date),
+                     "path": f"weather/noaa-BFD-{compact}.json"}
+        if noaa_item["path"] in WEATHER_SUBSTITUTES:
+            noaa_item["optional"] = True
+            noaa_item["substitute"] = WEATHER_SUBSTITUTES[noaa_item["path"]]
+            noaa_item["note"] = ("full-day endpoint timed out repeatedly at acquisition; "
+                                 "the frozen feasibility window subset is the documented "
+                                 "substitute and is vendored by build")
+        items.append(noaa_item)
     for start, end in AERONET_RANGES:
         for site in AERONET_SITES:
-            compact = f"{start[8:]}-{end[8:]}"
-            items.append({"id": f"aeronet-{site}-{compact}",
+            # Archive convention: YYYYMMDD of the start, bare end day (same
+            # month) - the names already frozen in the cache and packet.
+            path_name = f"weather/aeronet-{site}-{start.replace('-', '')}-" \
+                        f"{int(end[8:10])}-AOD20.txt"
+            items.append({"id": f"aeronet-{site}-{start}-{end}",
                           "url": aeronet_url(site, start, end),
-                          "path": f"weather/aeronet-{site}-{compact}-AOD20.txt"})
+                          "path": path_name})
     for check in JPL_SPOT_CHECKS:
         items.append({"id": f"jpl-{check['name']}",
                       "url": jpl_horizons_url(check["start"], check["stop"]),
@@ -1009,26 +1050,42 @@ def fetch_sources(cache_dir: Path, with_raw_archive: bool,
                       for e in provenance]}
 
 
-def check_cache_inputs(cache_dir: Path) -> None:
+# Documented cache substitutions: a cache path whose full-day fetch has
+# failed (recorded as a failed probe) may be substituted by an explicit
+# frozen source file, which build vendors alongside the cache responses.
+# The substitute must exist in the Git tree, so the packet still carries
+# real evidence - absence is never upgraded into coverage.
+WEATHER_SUBSTITUTES = {
+    "weather/noaa-BFD-20140703.json": (
+        "validation/data/cssp_observation_feasibility/atmosphere/"
+        "noaa-BFD-window.json"),
+}
+
+
+def check_cache_inputs(cache_dir: Path, substitutes: dict | None = None,
+                       substitute_root: Path | None = None) -> None:
     """Preflight: build refuses to start without every required input.
 
-    Missing weather responses or JPL spot checks are acceptance inputs, not
-    optional extras, so they fail the build loudly instead of degrading the
-    packet silently.
+    The required set is derived from the same acquisition contract fetch uses
+    (non-optional items except the documentation-only author code files), so
+    a single weather file cannot stand in for the full response set and an
+    empty directory cannot pass as evidence. Entries of WEATHER_SUBSTITUTES
+    may stand in for their cache path only while the named frozen source
+    file exists.
     """
-    required_files = [
-        cache_dir / "CSSP_spectra.csv",
-        cache_dir / "published-wavelengths.csv",
-        cache_dir / "CSSP_SunLocalZenith.txt",
-        cache_dir / "CSSP_MoonLocalZenith.txt",
-        cache_dir / "calibration/OO_USB2000+a.mat",
-        cache_dir / "dataraw.tar.gz",
-    ] + [cache_dir / "jpl" / c["name"] for c in JPL_SPOT_CHECKS]
-    weather_dir = cache_dir / "weather"
-    if not weather_dir.is_dir() or not any(weather_dir.iterdir()):
-        required_files.append(weather_dir)
-    missing = [str(p.relative_to(cache_dir)) if cache_dir in p.parents
-               else str(p) for p in required_files if not p.exists()]
+    subs = WEATHER_SUBSTITUTES if substitutes is None else substitutes
+    root = ROOT if substitute_root is None else substitute_root
+    required_paths = [
+        item["path"] for item in acquisition_items(with_raw_archive=True)
+        if not item.get("optional") and not item["id"].startswith("code-")]
+    missing, substituted = [], []
+    for name in required_paths:
+        if (cache_dir / name).is_file():
+            continue
+        if name in subs and (root / subs[name]).is_file():
+            substituted.append(f"{name} <- {subs[name]}")
+            continue
+        missing.append(name)
     if missing:
         raise ValueError(f"cache is missing required inputs: {missing}; "
                          "run fetch --raw-archive to acquire the full set")
@@ -1441,11 +1498,17 @@ def operator_contract() -> dict:
                   "reason": "site horizon not characterised; H=1 is the idealisation"},
             "P_publish": {"text": "publishing steps that apply to already-calibrated "
                                   "physical spectra (W m-2 nm-1 in and out): resampling "
-                                  "onto the 1 nm published grid, median filter span 8 "
-                                  "(published smoothing), negative-value clamp to zero. "
-                                  "Implemented in publish_pipeline(); a model spectrum "
-                                  "expressed in physical units passes through these and "
-                                  "only these steps before band comparison",
+                                  "onto the 1 nm published grid, the published median "
+                                  "filter span 8 - which the upstream chain applies in "
+                                  "the detector-response domain, i.e. E -> D*median(E/D) "
+                                  "with D = correction_factor*pi from the vendored "
+                                  "extract (filtering and a wavelength-dependent "
+                                  "scaling do not commute; filtering E directly would "
+                                  "reshape spectra by up to a few percent) - and the "
+                                  "negative-value clamp. Implemented in "
+                                  "publish_pipeline(); a model spectrum in physical "
+                                  "units passes through these and only these steps "
+                                  "before band comparison",
                           "evidence": EVIDENCE_DERIVED},
             "C_capture": {"text": "the raw-count-to-physical calibration chain (dark "
                                   "subtraction by nearest integration-time node and "
@@ -1615,22 +1678,68 @@ def weather_rows_for_window(response_paths: list[Path], start_iso: str,
     return rows
 
 
-def station_state(summary: dict, context_summary: dict) -> str:
-    """Classify one station's window, falling back to the +-60 min context
-    rows when no observation falls inside the tight window (hourly stations).
-    The label names which rows were used so the verdict stays traceable."""
-    effective, from_context = summary, False
-    if not summary["n_rows"] and context_summary["n_rows"]:
-        effective, from_context = context_summary, True
-    if not effective["n_rows"]:
-        return "no observation archived in window"
-    if effective["fog"] or effective["low_opaque"]:
-        state = "fog/low-cloud"
-    elif effective["clear"] and not effective["other"]:
-        state = "CLR"
-    else:
-        state = "partial/high-cloud"
-    return f"{state} (context rows)" if from_context else state
+def window_states(side_window: dict) -> dict:
+    """Single authority for one window's weather evidence (revision r02).
+
+    Selects the effective evidence per station (tight window when an
+    observation exists, else the +-60 min context rows, labelled as such)
+    and derives the structured flags the window verdict, session summary,
+    cleanest list and selection reasons all render from. No other code may
+    apply the fallback independently - that duplication is what produced
+    contradictory machine-readable verdicts in r01.
+    """
+    stations = {}
+    for key, s in side_window["weather"].items():
+        summary, context = s["summary"], s["context_summary"]
+        effective, from_context = summary, False
+        if not summary["n_rows"] and context["n_rows"]:
+            effective, from_context = context, True
+        if not effective["n_rows"]:
+            state = "no-observation"
+        elif effective["fog"] or effective["low_opaque"]:
+            state = "fog/low-cloud"
+        elif effective["clear"] and not effective["other"]:
+            state = "CLR"
+        else:
+            state = "partial/high-cloud"
+        stations[key] = {"state": state,
+                         "evidence_scope": "context" if from_context else "window",
+                         "n_rows_tight": summary["n_rows"],
+                         "n_rows_context": context["n_rows"]}
+    states = [v["state"] for v in stations.values()]
+    return {
+        "stations": stations,
+        "all_clear": bool(states) and all(s == "CLR" for s in states),
+        "any_fog": any(s == "fog/low-cloud" for s in states),
+        "any_clear": any(s == "CLR" for s in states),
+        "evidence_scope": ("window" if all(v["evidence_scope"] == "window"
+                                           for v in stations.values())
+                           else "mixed"
+                           if any(v["evidence_scope"] == "window"
+                                  for v in stations.values())
+                           else "context"),
+    }
+
+
+def render_window_verdict(moon_free: bool, states: dict) -> str:
+    """Render the human-readable verdict from window_states() output."""
+    states_list = [v["state"] for v in states["stations"].values()]
+    scope_note = ""
+    if states["evidence_scope"] == "context":
+        scope_note = (" (CLR established from +-60 min context rows; no in-window "
+                      "observation at hourly stations)")
+    if moon_free and states["all_clear"]:
+        return ("cleanest-available: moon below horizon at all target instants "
+                "and both neighbour stations report CLR through the window"
+                + scope_note)
+    if moon_free and states["any_fog"]:
+        return ("conditional: moon below horizon, but fog or low cloud is "
+                "reported at neighbour stations inside the window; CSSP itself "
+                "(710 m plateau) has no in-situ evidence, so absolute use is "
+                "blocked and spectral/relative use carries this caveat")
+    if not moon_free:
+        return "moonlit: moon above the horizon during the window"
+    return "mixed: neighbour reports split between clear and cloud/fog rows"
 
 
 def session_verdict(side_windows: dict) -> str:
@@ -1641,8 +1750,9 @@ def session_verdict(side_windows: dict) -> str:
         if window is None:
             continue
         moon_state = "moon-free" if window["moon_free"] else "moonlit"
-        states = [f"{key}: {station_state(s['summary'], s['context_summary'])}"
-                  for key, s in window["weather"].items()]
+        states = [f"{key}: {v['state']}"
+                  + (" (context rows)" if v["evidence_scope"] == "context" else "")
+                  for key, v in window["weather_states"]["stations"].items()]
         parts.append(f"{side} [{moon_state}; {', '.join(states)}]")
     return "; ".join(parts)
 
@@ -1692,11 +1802,7 @@ def build_conditions(out: Path, labels: list[str], values: np.ndarray,
         start, end = sess["start_utc"], sess["end_utc"]
         a, b = sess["columns_zero_based"]
         all_cols = list(range(a, b + 1))
-        cols = sorted(selected_by_session.get(sid, all_cols)) \
-            if selected_by_session else all_cols
         selected_here = bool(selected_by_session and sid in selected_by_session)
-        moon = [mica_elevation(moon_tab, unix_of(label_to_utc_iso(labels[c])))
-                ["elevation_deg"] for c in cols]
         fractions = values[CSV_MOONFRAC_ROW, a:b + 1]
         dates = utc_dates_between(start, end)
         date_keys = [d.replace("-", "") for d in dates]
@@ -1706,20 +1812,20 @@ def build_conditions(out: Path, labels: list[str], values: np.ndarray,
                   or any(k in p.name for k in date_keys)]
             for key, paths in weather_paths_all.items()
         }
-        # Per-side windows; for unselected sessions the whole session is the
-        # window basis (its own twilight columns), summarised without the
-        # per-target arrays to keep the packet small.
+        # Uniform window basis for every session (revision r02): the columns
+        # where the corrected sun sits inside the target-depth band
+        # (-13, -5.5] deg, taken from the full session regardless of which
+        # records were sampled raw. This makes the moon/weather verdicts
+        # comparable across sessions instead of tracking the raw-sample set.
         side_windows = {}
         for side, hour_test in (("dusk", lambda h: h >= 12), ("dawn", lambda h: h < 12)):
             side_cols = [c for c in all_cols if hour_test(parse_edt_label(labels[c]).hour)]
             if not side_cols:
                 continue
-            twilight_cols = [c for c in side_cols
-                             if mica_elevation(sun_tab, unix_of(label_to_utc_iso(labels[c])))
-                             ["elevation_deg"] > -13.0]
-            window_cols = twilight_cols or side_cols
-            if selected_here:
-                window_cols = [c for c in window_cols if c in cols] or window_cols
+            elevations = {c: mica_elevation(sun_tab, unix_of(label_to_utc_iso(labels[c])))
+                          ["elevation_deg"] for c in side_cols}
+            window_cols = [c for c in side_cols
+                           if -13.0 < elevations[c] <= -5.5] or side_cols
             times = [parse_edt_label(labels[c]) for c in window_cols]
             w_start = (min(times) - timedelta(minutes=5)).astimezone(timezone.utc)
             w_end = (max(times) + timedelta(minutes=10)).astimezone(timezone.utc)
@@ -1741,55 +1847,40 @@ def build_conditions(out: Path, labels: list[str], values: np.ndarray,
                     "context_summary": summarize_weather_rows(context_rows, station_key),
                 }
             moon_free = all(m < 0.0 for m in moon_at)
-            any_fog = any(s["summary"]["fog"] or s["summary"]["low_opaque"]
-                          or s["summary"]["other"] and not s["summary"]["clear"]
-                          for s in summaries.values())
-            all_clear = all(s["summary"]["clear"] and not s["summary"]["fog"]
-                            and not s["summary"]["low_opaque"]
-                            and not s["summary"]["other"]
-                            for s in summaries.values())
-            if moon_free and all_clear:
-                verdict = ("cleanest-available: moon below horizon at all target instants "
-                           "and both neighbour stations report CLR through the window")
-            elif moon_free and any_fog:
-                verdict = ("conditional: moon below horizon, but fog or low cloud is "
-                           "reported at neighbour stations inside the window; CSSP itself "
-                           "(710 m plateau) has no in-situ evidence, so absolute use is "
-                           "blocked and spectral/relative use carries this caveat")
-            elif not moon_free:
-                verdict = ("moonlit: moon above the horizon at target instants "
-                           f"(range {min(moon_at):.1f}..{max(moon_at):.1f} deg); "
-                           "hemispheric irradiance includes moonlight, so clean solar "
-                           "twilight comparisons are blocked; retained as a moonlit-sky "
-                           "sample")
-            else:
-                verdict = "mixed: neighbour reports split between clear and cloud/fog rows"
+            # One authority: window_states applies the context fallback once;
+            # the window verdict, session summary, cleanest list and selection
+            # reasons all render from this result.
+            states = window_states({"weather": summaries})
+            verdict = render_window_verdict(moon_free, states)
             side_windows[side] = {
                 "columns_zero_based": [min(window_cols), max(window_cols)],
                 "window_utc": [start_iso, end_iso],
-                "moon_elevation_deg_at_targets": [round(m, 3) for m in moon_at]
-                if selected_here else None,
+                "n_window_columns": len(window_cols),
                 "moon_elevation_deg_range": [round(min(moon_at), 3),
                                              round(max(moon_at), 3)],
                 "moon_free": moon_free,
                 "weather": summaries,
+                "weather_states": states,
                 "verdict": verdict,
             }
+        moon_ranges = [w["moon_elevation_deg_range"]
+                       for w in side_windows.values() if w]
+        aeronet_hits = [f for f in weather_files if f.startswith("aeronet")
+                        and aeronet_range_intersects(f, dates)]
         conditions[sid] = {
             "utc_window": {"start": start, "end": end},
             "local_dates_utc_covered": dates,
             "selected_for_raw_sampling": selected_here,
             "moon": {
-                "elevation_deg_min": float(np.min(moon)),
-                "elevation_deg_max": float(np.max(moon)),
+                "window_elevation_deg_min": float(min(r[0] for r in moon_ranges)),
+                "window_elevation_deg_max": float(max(r[1] for r in moon_ranges)),
                 "published_illumination_fraction_min": float(np.min(fractions)),
                 "published_illumination_fraction_max": float(np.max(fractions)),
                 "axis_source": "vendored upstream MICA lunar table",
             },
             "target_windows": side_windows,
             "aod": {
-                "queried": [f for f in weather_files if f.startswith("aeronet")
-                            and any(k in f for k in date_keys)],
+                "queried": aeronet_hits,
                 "note": "AERONET direct-sun products are daytime; any return is a far-site "
                         "column, not an in-situ twilight value",
             },
@@ -1819,14 +1910,15 @@ def build_conditions(out: Path, labels: list[str], values: np.ndarray,
 
 
 def cleanest_windows(conditions: dict) -> list[str]:
-    """The moon-free + clear side windows among the screened sessions, as
-    'session/side' keys - the single authority for 'cleanest' claims."""
+    """Moon-free + all-clear side windows among the screened sessions, as
+    'session/side' keys - rendered from the stored weather_states, which are
+    themselves the product of the single window_states() authority (context
+    fallback already applied there, so these claims cannot contradict the
+    per-window verdict strings)."""
     out = []
     for sid, entry in conditions.items():
         for side, window in entry.get("target_windows", {}).items():
-            states = [station_state(s["summary"], s["context_summary"])
-                      for s in window["weather"].values()]
-            if window["moon_free"] and all(s.startswith("CLR") for s in states) and states:
+            if window["moon_free"] and window["weather_states"]["all_clear"]:
                 out.append(f"{sid}/{side}")
     return out
 
@@ -2153,6 +2245,15 @@ def build_calibration_extract(cal: dict, integration_times_us: list[float],
     write_json(out_path, extract)
 
 
+def published_correction_factor_pi(packet: Path) -> np.ndarray:
+    """D = correction_factor * pi cropped to the published 280-840 grid -
+    the response-domain axis of the model-facing publish pipeline."""
+    extract = load_calibration_extract(packet)
+    wls = extract["wls"]
+    crop = (wls >= REPLAY_CROP_NM[0]) & (wls <= REPLAY_CROP_NM[1])
+    return extract["correction_factor"][crop] * np.pi
+
+
 def load_calibration_extract(packet: Path) -> dict:
     raw = read_json(packet / "calibration-extract.json")
     nodes = raw["dark_reduction"]["nodes"]
@@ -2185,7 +2286,8 @@ def dark_spectrum_from_extract(cal: dict, integration_time_us: float,
 
 
 def replay_record(cal: dict, mat_path: Path, published: np.ndarray,
-                  filter_span: int = REPLAY_FILTER_SPAN) -> dict:
+                  filter_span: int = REPLAY_FILTER_SPAN,
+                  return_spectrum: bool = False) -> np.ndarray | dict:
     """Python port of the upstream Preprocess.m + RawToAbsolute.m chain.
 
     Stages are recorded individually so the residual against the published
@@ -2245,6 +2347,8 @@ def replay_record(cal: dict, mat_path: Path, published: np.ndarray,
     wl_crop = cal["wls"][crop]
     if replay.size != published.size:
         raise ValueError("replay/published grid size mismatch")
+    if return_spectrum:
+        return replay
     valid = ~np.isnan(replay) & ~np.isnan(published)
     diff = replay[valid] - published[valid]
     denom = np.abs(published[valid])
@@ -2296,22 +2400,41 @@ def evaluate_replay(packet: Path) -> dict:
         col = record["source_column_zero_based"]
         member = packet / record["raw"]["packet_path"]
         published = spectra["data"][:, col_index[col]]
-        result = replay_record(cal, member, published)
-        per_record[rid] = result
-        pv = result["published_vs_replay"]
-        if pv["median_abs_relative_diff"] is None:
-            problems.append(f"{rid}: no comparable wavelengths in replay")
-            continue
-        if pv["median_abs_relative_diff"] >= REPLAY_MEDIAN_REL_TOLERANCE:
-            problems.append(f"{rid}: replay median relative diff "
-                            f"{pv['median_abs_relative_diff']:.3e} exceeds the "
-                            f"independent tolerance {REPLAY_MEDIAN_REL_TOLERANCE:.0e}")
-        if pv["replay_zero_after_clamp"] != pv["published_zero_cells"]:
-            problems.append(f"{rid}: zero-cell correspondence broken "
-                            f"(published {pv['published_zero_cells']} vs replay "
-                            f"{pv['replay_zero_after_clamp']})")
-        if pv["n_valid_wavelengths"] != int((~np.isnan(published)).sum()):
-            problems.append(f"{rid}: replay/published NaN masks differ")
+        replay = replay_record(cal, member, published, return_spectrum=True)
+        # Position-wise acceptance: NaN masks must agree cell by cell, every
+        # published zero must replay to an exact zero (the upstream clamp),
+        # and every comparable channel must sit inside the quantisation-
+        # derived tolerance. Medians are summaries, never the gate.
+        record_problems = []
+        nan_published = np.isnan(published)
+        nan_replay = np.isnan(replay)
+        if not np.array_equal(nan_published, nan_replay):
+            record_problems.append(
+                f"NaN masks differ at {int((nan_published ^ nan_replay).sum())} channels")
+        comparable = ~nan_published & ~nan_replay
+        zero_cells = comparable & (published == 0)
+        broken_zeros = zero_cells & (replay != 0)
+        if broken_zeros.any():
+            record_problems.append(
+                f"{int(broken_zeros.sum())} published-zero channels replay non-zero")
+        positive = comparable & (published > 0)
+        rel = np.abs(replay[positive] - published[positive]) / published[positive]
+        breaches = np.flatnonzero(rel >= REPLAY_MEDIAN_REL_TOLERANCE)
+        if breaches.size:
+            wl = np.arange(280.0, 841.0)[positive][breaches[:5]]
+            record_problems.append(
+                f"{breaches.size} channels exceed the per-channel tolerance "
+                f"{REPLAY_MEDIAN_REL_TOLERANCE:.0e} (worst rel "
+                f"{rel.max():.3e}; first wl {wl.tolist()})")
+        per_record[rid] = {
+            "median_abs_relative_diff":
+                float(np.median(rel)) if rel.size else None,
+            "max_abs_relative_diff": float(rel.max()) if rel.size else None,
+            "n_comparable_channels": int(positive.sum()),
+            "n_zero_channels": int(zero_cells.sum()),
+            "problems": record_problems,
+        }
+        problems += [f"{rid}: {msg}" for msg in record_problems]
     return {"ok": not problems, "problems": problems,
             "tolerance": REPLAY_MEDIAN_REL_TOLERANCE,
             "records_evaluated": len(per_record), "detail": per_record}
@@ -2409,26 +2532,37 @@ def ideal_hemispheric_irradiance(radiance: float,
     return np.pi * radiance * np.cos(np.radians(horizon_depression_deg)) ** 2
 
 
-def publish_pipeline(spectrum: np.ndarray, filter_span: int = REPLAY_FILTER_SPAN) -> np.ndarray:
+def publish_pipeline(spectrum: np.ndarray, correction_factor_pi: np.ndarray,
+                     filter_span: int = REPLAY_FILTER_SPAN) -> np.ndarray:
     """Model-facing publish steps (P_publish) on a physical 1 nm spectrum.
 
     Input and output are spectral irradiance in W m-2 nm-1 on the published
-    grid. A model spectrum expressed on that grid passes through: median
-    filter span 8 (the published smoothing) and the negative clamp; the 1 nm
-    resampling is the identity here and must be applied explicitly when the
-    model grid differs. Count-domain calibration (C_capture) is deliberately
-    absent - see operator.json.
+    grid. The published smoothing runs in the DETECTOR-RESPONSE domain, not
+    directly on physical irradiance: the replayed upstream chain filters the
+    (dark-subtracted, per-us) counts first and multiplies the wavelength-
+    dependent correction factor and pi afterwards, i.e. published =
+    D * median(E / D) with D = correction_factor * pi. Median filtering does
+    not commute with a wavelength-dependent scaling, so applying a plain
+    median to E would silently reshape spectra by up to a few percent. D is
+    the vendored calibration extract's correction_factor * pi; the negative
+    clamp follows as upstream. Count-domain calibration itself (C_capture)
+    remains absent - see operator.json.
     """
+    spectrum = np.asarray(spectrum, dtype=float)
+    d = np.asarray(correction_factor_pi, dtype=float)
+    if d.shape != spectrum.shape:
+        raise ValueError("correction_factor_pi must match the spectrum grid")
+    with np.errstate(divide="ignore", invalid="ignore"):
+        response_domain = spectrum / d
     pad = filter_span // 2
-    padded = np.pad(np.asarray(spectrum, dtype=float), pad, mode="constant",
-                    constant_values=np.nan)
+    padded = np.pad(response_domain, pad, mode="constant", constant_values=np.nan)
     windows = np.lib.stride_tricks.sliding_window_view(padded, filter_span)
     import warnings
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", RuntimeWarning)
-        filtered = np.nanmedian(windows, axis=1)
-    return np.where(filtered[:len(spectrum)] < 0, 0.0,
-                    filtered[:len(spectrum)])
+        filtered = np.nanmedian(windows, axis=1)[:len(spectrum)]
+    published = d * filtered
+    return np.where(published < 0, 0.0, published)
 
 
 def exposure_weighted_mean(values: np.ndarray, sample_seconds: list[float],

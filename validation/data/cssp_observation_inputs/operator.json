@@ -24,7 +24,7 @@
       "reason": "site horizon not characterised; H=1 is the idealisation"
     },
     "P_publish": {
-      "text": "publishing steps that apply to already-calibrated physical spectra (W m-2 nm-1 in and out): resampling onto the 1 nm published grid, median filter span 8 (published smoothing), negative-value clamp to zero. Implemented in publish_pipeline(); a model spectrum expressed in physical units passes through these and only these steps before band comparison",
+      "text": "publishing steps that apply to already-calibrated physical spectra (W m-2 nm-1 in and out): resampling onto the 1 nm published grid, the published median filter span 8 - which the upstream chain applies in the detector-response domain, i.e. E -> D*median(E/D) with D = correction_factor*pi from the vendored extract (filtering and a wavelength-dependent scaling do not commute; filtering E directly would reshape spectra by up to a few percent) - and the negative-value clamp. Implemented in publish_pipeline(); a model spectrum in physical units passes through these and only these steps before band comparison",
       "evidence": "derived-documented"
     },
     "C_capture": {

@@ -25,6 +25,7 @@ sys.path.insert(0, str(ROOT))
 from tools.cssp_observation_inputs import (  # noqa: E402
     CSSP, DRL, KN38,
     REPLAY_MEDIAN_REL_TOLERANCE,
+    acquisition_items,
     band_energy,
     check_cache_inputs,
     check_external_refs,
@@ -46,6 +47,7 @@ from tools.cssp_observation_inputs import (  # noqa: E402
     parse_edt_label,
     parse_full_csv_rows,
     publish_pipeline,
+    published_correction_factor_pi,
     quality_of_column,
     read_jpl_elevation,
     read_json,
@@ -56,7 +58,7 @@ from tools.cssp_observation_inputs import (  # noqa: E402
     session_signal_stats,
     sessions_of,
     sha256_file,
-    station_state,
+    window_states,
     summarize_weather_rows,
     unix_of,
     verify_packet,
@@ -385,7 +387,15 @@ def test_conditions_verdicts_match_frozen_evidence():
     assert "fog/low-cloud" in s04["verdict"]
     assert s11["target_windows"]["dusk"]["moon_free"] is True
     assert s11["target_windows"]["dawn"]["moon_free"] is False
-    assert "moon-free" in s11["verdict"]
+    # Single authority: the window verdict must agree with its own stored
+    # weather_states (this exact pair was contradictory in review r01/r02).
+    for entry in conditions["conditions"].values():
+        for window in entry["target_windows"].values():
+            states = window["weather_states"]
+            if states["all_clear"] and window["moon_free"]:
+                assert window["verdict"].startswith("cleanest-available")
+            if not window["moon_free"]:
+                assert window["verdict"].startswith("moonlit")
 
 
 def test_independent_axis_checks_present_and_recomputable():
@@ -414,8 +424,20 @@ def test_weather_classification_and_context_fallback():
           "wx_codes": "KBFD 030853Z 00000KT 5SM BR BKN039 OVC090 16/15 A3000"}], "KBFD")
     assert haze["other"] and not haze["fog"]
     empty = {"n_rows": 0, "fog": [], "low_opaque": [], "clear": [], "other": []}
-    assert station_state(empty, empty) == "no observation archived in window"
-    assert station_state(empty, clear) == "CLR (context rows)"
+    def summary_of(s):
+        return {"summary": s, "context_summary": s}
+    states = window_states({"weather": {
+        "KN38": summary_of(clear), "KBFD": summary_of(empty)}})
+    assert states["stations"]["KN38"]["state"] == "CLR"
+    assert states["stations"]["KBFD"]["state"] == "no-observation"
+    assert states["evidence_scope"] == "window"
+    mixed = window_states({"weather": {
+        "KN38": {"summary": empty, "context_summary": clear},
+        "KBFD": summary_of(clear)}})
+    assert mixed["stations"]["KN38"]["state"] == "CLR"
+    assert mixed["stations"]["KN38"]["evidence_scope"] == "context"
+    assert mixed["all_clear"] is True
+    assert mixed["evidence_scope"] == "mixed"
 
 
 # ---------------------------------------------------------------------------
@@ -595,20 +617,82 @@ def test_fetch_creates_parent_dirs_and_records_provenance(tmp_path, monkeypatch)
 def test_build_preflight_rejects_incomplete_cache(tmp_path):
     cache = tmp_path / "cache"
     cache.mkdir()
-    for name in ("CSSP_spectra.csv", "published-wavelengths.csv",
-                 "CSSP_SunLocalZenith.txt", "CSSP_MoonLocalZenith.txt"):
-        (cache / name).write_bytes(b"x")
-    (cache / "calibration").mkdir()
-    (cache / "calibration/OO_USB2000+a.mat").write_bytes(b"x")
-    (cache / "dataraw.tar.gz").write_bytes(b"x")
-    (cache / "jpl").mkdir()
-    for check in ("horizons-cssp-0703.json", "horizons-cssp-0719.json"):
-        (cache / "jpl" / check).write_bytes(b"x")
     with pytest.raises(ValueError, match="missing required inputs"):
-        check_cache_inputs(cache)   # no weather responses yet
-    (cache / "weather").mkdir()
-    (cache / "weather/iem-N38-obhistory-20140703.json").write_bytes(b"x")
+        check_cache_inputs(cache)   # completely empty: no directory trick passes
+    items = [i for i in acquisition_items(with_raw_archive=True)
+             if not i.get("optional") and not i["id"].startswith("code-")]
+    for item in items[:-1]:   # satisfy all but the last required file
+        target = cache / item["path"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"x")
+    with pytest.raises(ValueError, match=items[-1]["path"].split("/")[-1]):
+        check_cache_inputs(cache)
+    target = cache / items[-1]["path"]
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(b"x")
     check_cache_inputs(cache)
+    # A documented substitute covers exactly one cache path (the NOAA 7/3
+    # full-day file, whose endpoint timed out); any other missing response
+    # still fails - absence is never upgraded into coverage.
+    partial = tmp_path / "cache2"
+    partial.mkdir()
+    for item in items:
+        if item["path"] == "weather/noaa-BFD-20140703.json":
+            continue   # substitute-eligible
+        target = partial / item["path"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"x")
+    check_cache_inputs(partial)   # substitute exists in the repo tree
+    (partial / "weather/noaa-BFD-20140702.json").unlink()
+    with pytest.raises(ValueError, match="noaa-BFD-20140702.json"):
+        check_cache_inputs(partial)
+
+
+def test_window_verdicts_independent_of_raw_sample_set(tmp_path):
+    """Verdicts derive from the uniform depth-window rule, not the raw picks.
+
+    Synthetic dusk session evaluated twice - once with a raw pick subset,
+    once without - must produce identical window verdicts and moon flags.
+    """
+    from tools.cssp_observation_inputs import build_conditions
+    # Synthetic MICA table: sun descending -5 deg per 5 min across the span.
+    base = datetime(2014, 7, 12, 20, 0)
+    lines = []
+    for k in range(25):
+        # Labels are EDT wall clock; the MICA table is UTC, so shift +4 h.
+        moment = base + timedelta(minutes=5 * k) + timedelta(hours=4)
+        zenith = 90.0 + 1.0 * k          # elevation -0 .. -24 deg
+        lines.append(moment.strftime("%Y %b %d %H:%M:%S.0")
+                     + f"    {zenith:.5f}    300.0   1.016600000")
+    table_path = tmp_path / "synthetic-sun.txt"
+    table_path.write_text("\n".join(lines) + "\n", encoding="latin1")
+    sun_tab = read_mica_table(table_path)
+    moon_tab = read_mica_table(table_path)   # same shape; moon flag check only
+    out = tmp_path / "pkg"
+    (out / "raw/weather").mkdir(parents=True)
+    labels = [(base + timedelta(minutes=k)).strftime("%d-%b-%Y %H:%M:%S")
+              for k in range(21)]
+    values = np.zeros((565, 21))
+    values[3, :] = 0.3
+    inventory = [{
+        "session_id": "sX", "columns_zero_based": [0, 20], "n_columns": 21,
+        "start_label_edt": labels[0], "end_label_edt": labels[20],
+        "start_utc": label_to_utc_iso(labels[0]),
+        "end_utc": label_to_utc_iso(labels[20]),
+        "span_minutes": 20.0, "crosses_local_midnight": False,
+        "local_date_of_first_sample": "2014-07-12",
+        "signal_kind": "twilight-or-night",
+        "sequence_values": [1],
+    }]
+    with_picks = build_conditions(out, labels, values, inventory, sun_tab,
+                                  moon_tab, selected_by_session={"sX": [10, 11]})
+    without = build_conditions(out, labels, values, inventory, sun_tab,
+                               moon_tab, selected_by_session={})
+    w1 = with_picks["conditions"]["sX"]["target_windows"]["dusk"]
+    w2 = without["conditions"]["sX"]["target_windows"]["dusk"]
+    assert w1["verdict"] == w2["verdict"]
+    assert w1["moon_free"] == w2["moon_free"]
+    assert w1["columns_zero_based"] == w2["columns_zero_based"]
 
 
 def test_all_twilight_sessions_screened_and_selection_derived():
@@ -652,9 +736,33 @@ def test_signed_sensitivity_rates_and_forward_operator_domain():
     assert "P_publish" not in operator["definitions"] or \
         "correction factor" not in operator["definitions"]["P_publish"]["text"]
     assert any("double-calibrate" in f for f in operator["forbidden_comparisons"])
-    # A constant physical spectrum passes P_publish unscaled: pi L stays pi L.
-    spectrum = np.full(561, 2.5)
-    assert publish_pipeline(spectrum) == pytest.approx(spectrum)
+    # P_publish smooths in the detector-response domain (E -> D*median(E/D)):
+    # a constant spectrum passes unscaled; with a wavelength-dependent D the
+    # result equals the response-domain reference and differs from a naive
+    # physical-domain median filter (the two operations do not commute -
+    # exactly the inequality the r02 review probed numerically).
+    d = published_correction_factor_pi(PACKET)
+    assert d.shape == (561,)
+    # A constant physical sky does NOT publish to a constant spectrum: the
+    # published smoothing runs in the response domain, so D*median(c/D)
+    # carries a real (upstream-inherited) spectral distortion. The contract
+    # is the mapping itself, verified against its reference below.
+    flat = np.full(561, 2.5)
+    padded_flat = np.pad(flat / d, (4, 4), mode="constant", constant_values=np.nan)
+    assert publish_pipeline(flat, d) == pytest.approx(
+        d * np.asarray([np.nanmedian(padded_flat[k:k + 8]) for k in range(561)]),
+        nan_ok=True)
+    ramp = np.linspace(0.5, 5.0, 561)
+    padded_response = np.pad(ramp / d, (4, 4), mode="constant",
+                             constant_values=np.nan)
+    reference = d * np.asarray([np.nanmedian(padded_response[k:k + 8])
+                                for k in range(561)])
+    assert publish_pipeline(ramp, d) == pytest.approx(reference, nan_ok=True)
+    padded_physical = np.pad(ramp, (4, 4), mode="constant",
+                             constant_values=np.nan)
+    naive = np.asarray([np.nanmedian(padded_physical[k:k + 8])
+                        for k in range(561)])
+    assert not np.allclose(publish_pipeline(ramp, d), naive)
 
 
 def test_weather_source_urls_reconstruct_acquisition_requests():

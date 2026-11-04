@@ -36,8 +36,8 @@
       ],
       "selected_for_raw_sampling": false,
       "moon": {
-        "elevation_deg_min": -39.5259888,
-        "elevation_deg_max": 39.698303333333335,
+        "window_elevation_deg_min": -39.524,
+        "window_elevation_deg_max": 13.159,
         "published_illumination_fraction_min": 0.116,
         "published_illumination_fraction_max": 0.1586766666,
         "axis_source": "vendored upstream MICA lunar table"
@@ -45,17 +45,17 @@
       "target_windows": {
         "dusk": {
           "columns_zero_based": [
-            0,
+            147,
             200
           ],
           "window_utc": [
-            "2014-06-30T22:47:55+00:00",
+            "2014-07-01T01:16:09+00:00",
             "2014-07-01T02:24:39+00:00"
           ],
-          "moon_elevation_deg_at_targets": null,
+          "n_window_columns": 54,
           "moon_elevation_deg_range": [
             3.417,
-            39.698
+            13.159
           ],
           "moon_free": false,
           "weather": {
@@ -69,64 +69,15 @@
               "distance_km": 35.25,
               "elevation_diff_m": -137.12,
               "window_utc": [
-                "2014-06-30T22:47:55+00:00",
+                "2014-07-01T01:16:09+00:00",
                 "2014-07-01T02:24:39+00:00"
               ],
               "summary": {
-                "n_rows": 11,
+                "n_rows": 3,
                 "fog": [],
                 "low_opaque": [],
-                "clear": [
-                  {
-                    "utc": "2014-07-01T00:35Z",
-                    "visibility": 6.0,
-                    "cloud": "CLR",
-                    "wx": "HZ"
-                  }
-                ],
+                "clear": [],
                 "other": [
-                  {
-                    "utc": "2014-06-30T22:55Z",
-                    "visibility": 9.0,
-                    "cloud": "FEW",
-                    "wx": ""
-                  },
-                  {
-                    "utc": "2014-06-30T23:15Z",
-                    "visibility": 9.0,
-                    "cloud": "FEW",
-                    "wx": ""
-                  },
-                  {
-                    "utc": "2014-06-30T23:35Z",
-                    "visibility": 8.0,
-                    "cloud": "FEW",
-                    "wx": ""
-                  },
-                  {
-                    "utc": "2014-06-30T23:55Z",
-                    "visibility": 7.0,
-                    "cloud": "SCT",
-                    "wx": ""
-                  },
-                  {
-                    "utc": "2014-07-01T00:15Z",
-                    "visibility": 7.0,
-                    "cloud": "FEW",
-                    "wx": ""
-                  },
-                  {
-                    "utc": "2014-07-01T00:55Z",
-                    "visibility": 6.0,
-                    "cloud": "FEW",
-                    "wx": "HZ"
-                  },
-                  {
-                    "utc": "2014-07-01T01:15Z",
-                    "visibility": 8.0,
-                    "cloud": "FEW",
-                    "wx": ""
-                  },
                   {
                     "utc": "2014-07-01T01:35Z",
                     "visibility": 7.0,
@@ -148,11 +99,11 @@
                 ]
               },
               "context_window_utc": [
-                "2014-06-30T21:52:55+00:00",
+                "2014-07-01T00:21:09+00:00",
                 "2014-07-01T03:14:39+00:00"
               ],
               "context_summary": {
-                "n_rows": 16,
+                "n_rows": 8,
                 "fog": [],
                 "low_opaque": [],
                 "clear": [
@@ -170,54 +121,6 @@
                   }
                 ],
                 "other": [
-                  {
-                    "utc": "2014-06-30T21:55Z",
-                    "visibility": 9.0,
-                    "cloud": "FEW",
-                    "wx": ""
-                  },
-                  {
-                    "utc": "2014-06-30T22:15Z",
-                    "visibility": 9.0,
-                    "cloud": "FEW",
-                    "wx": ""
-                  },
-                  {
-                    "utc": "2014-06-30T22:35Z",
-                    "visibility": 9.0,
-                    "cloud": "SCT",
-                    "wx": ""
-                  },
-                  {
-                    "utc": "2014-06-30T22:55Z",
-                    "visibility": 9.0,
-                    "cloud": "FEW",
-                    "wx": ""
-                  },
-                  {
-                    "utc": "2014-06-30T23:15Z",
-                    "visibility": 9.0,
-                    "cloud": "FEW",
-                    "wx": ""
-                  },
-                  {
-                    "utc": "2014-06-30T23:35Z",
-                    "visibility": 8.0,
-                    "cloud": "FEW",
-                    "wx": ""
-                  },
-                  {
-                    "utc": "2014-06-30T23:55Z",
-                    "visibility": 7.0,
-                    "cloud": "SCT",
-                    "wx": ""
-                  },
-                  {
-                    "utc": "2014-07-01T00:15Z",
-                    "visibility": 7.0,
-                    "cloud": "FEW",
-                    "wx": ""
-                  },
                   {
                     "utc": "2014-07-01T00:55Z",
                     "visibility": 6.0,
@@ -267,26 +170,14 @@
               "distance_km": 69.89,
               "elevation_diff_m": -57.1,
               "window_utc": [
-                "2014-06-30T22:47:55+00:00",
+                "2014-07-01T01:16:09+00:00",
                 "2014-07-01T02:24:39+00:00"
               ],
               "summary": {
-                "n_rows": 4,
+                "n_rows": 1,
                 "fog": [],
                 "low_opaque": [],
                 "clear": [
-                  {
-                    "utc": "2014-06-30T23:53:00",
-                    "visibility": "016093,5,N,5",
-                    "cloud": "CLR",
-                    "wx": "MET10806/30/14 18:53:02 METAR KBFD 30235"
-                  },
-                  {
-                    "utc": "2014-07-01T00:53:00",
-                    "visibility": "016093,5,N,5",
-                    "cloud": "CLR",
-                    "wx": "MET09006/30/14 19:53:03 METAR KBFD 01005"
-                  },
                   {
                     "utc": "2014-07-01T01:53:00",
                     "visibility": "012875,5,N,5",
@@ -294,36 +185,17 @@
                     "wx": "MET08906/30/14 20:53:03 METAR KBFD 01015"
                   }
                 ],
-                "other": [
-                  {
-                    "utc": "2014-06-30T22:53:00",
-                    "visibility": "016093,5,N,5",
-                    "cloud": "FEW036",
-                    "wx": "MET09306/30/14 17:53:02 METAR KBFD 30225"
-                  }
-                ]
+                "other": []
               },
               "context_window_utc": [
-                "2014-06-30T21:52:55+00:00",
+                "2014-07-01T00:21:09+00:00",
                 "2014-07-01T03:14:39+00:00"
               ],
               "context_summary": {
-                "n_rows": 6,
+                "n_rows": 3,
                 "fog": [],
                 "low_opaque": [],
                 "clear": [
-                  {
-                    "utc": "2014-06-30T21:53:00",
-                    "visibility": "016093,5,N,5",
-                    "cloud": "CLR",
-                    "wx": "MET09006/30/14 16:53:02 METAR KBFD 30215"
-                  },
-                  {
-                    "utc": "2014-06-30T23:53:00",
-                    "visibility": "016093,5,N,5",
-                    "cloud": "CLR",
-                    "wx": "MET10806/30/14 18:53:02 METAR KBFD 30235"
-                  },
                   {
                     "utc": "2014-07-01T00:53:00",
                     "visibility": "016093,5,N,5",
@@ -343,32 +215,45 @@
                     "wx": "MET09606/30/14 21:53:03 METAR KBFD 01025"
                   }
                 ],
-                "other": [
-                  {
-                    "utc": "2014-06-30T22:53:00",
-                    "visibility": "016093,5,N,5",
-                    "cloud": "FEW036",
-                    "wx": "MET09306/30/14 17:53:02 METAR KBFD 30225"
-                  }
-                ]
+                "other": []
               }
             }
           },
-          "verdict": "moonlit: moon above the horizon at target instants (range 3.4..39.7 deg); hemispheric irradiance includes moonlight, so clean solar twilight comparisons are blocked; retained as a moonlit-sky sample"
+          "weather_states": {
+            "stations": {
+              "KN38": {
+                "state": "partial/high-cloud",
+                "evidence_scope": "window",
+                "n_rows_tight": 3,
+                "n_rows_context": 8
+              },
+              "KBFD": {
+                "state": "CLR",
+                "evidence_scope": "window",
+                "n_rows_tight": 1,
+                "n_rows_context": 3
+              }
+            },
+            "all_clear": false,
+            "any_fog": false,
+            "any_clear": true,
+            "evidence_scope": "window"
+          },
+          "verdict": "moonlit: moon above the horizon during the window"
         },
         "dawn": {
           "columns_zero_based": [
             561,
-            774
+            600
           ],
           "window_utc": [
             "2014-07-01T08:10:39+00:00",
-            "2014-07-01T12:18:23+00:00"
+            "2014-07-01T09:19:52+00:00"
           ],
-          "moon_elevation_deg_at_targets": null,
+          "n_window_columns": 40,
           "moon_elevation_deg_range": [
             -39.524,
-            -17.884
+            -38.036
           ],
           "moon_free": true,
           "weather": {
@@ -383,10 +268,10 @@
               "elevation_diff_m": -137.12,
               "window_utc": [
                 "2014-07-01T08:10:39+00:00",
-                "2014-07-01T12:18:23+00:00"
+                "2014-07-01T09:19:52+00:00"
               ],
               "summary": {
-                "n_rows": 13,
+                "n_rows": 4,
                 "fog": [],
                 "low_opaque": [],
                 "clear": [],
@@ -414,69 +299,15 @@
                     "visibility": 5.0,
                     "cloud": "OVC",
                     "wx": "BR"
-                  },
-                  {
-                    "utc": "2014-07-01T09:35Z",
-                    "visibility": 5.0,
-                    "cloud": "OVC",
-                    "wx": "BR"
-                  },
-                  {
-                    "utc": "2014-07-01T09:55Z",
-                    "visibility": 2.5,
-                    "cloud": "SCT",
-                    "wx": "BR"
-                  },
-                  {
-                    "utc": "2014-07-01T10:15Z",
-                    "visibility": 3.0,
-                    "cloud": "BKN",
-                    "wx": "BR"
-                  },
-                  {
-                    "utc": "2014-07-01T10:35Z",
-                    "visibility": 3.0,
-                    "cloud": "BKN",
-                    "wx": "BR"
-                  },
-                  {
-                    "utc": "2014-07-01T10:55Z",
-                    "visibility": 3.0,
-                    "cloud": "BKN",
-                    "wx": "BR"
-                  },
-                  {
-                    "utc": "2014-07-01T11:15Z",
-                    "visibility": 5.0,
-                    "cloud": "BKN",
-                    "wx": "BR"
-                  },
-                  {
-                    "utc": "2014-07-01T11:35Z",
-                    "visibility": 6.0,
-                    "cloud": "OVC",
-                    "wx": "BR"
-                  },
-                  {
-                    "utc": "2014-07-01T11:55Z",
-                    "visibility": 7.0,
-                    "cloud": "BKN",
-                    "wx": ""
-                  },
-                  {
-                    "utc": "2014-07-01T12:15Z",
-                    "visibility": 8.0,
-                    "cloud": "FEW",
-                    "wx": ""
                   }
                 ]
               },
               "context_window_utc": [
                 "2014-07-01T07:15:39+00:00",
-                "2014-07-01T13:08:23+00:00"
+                "2014-07-01T10:09:52+00:00"
               ],
               "context_summary": {
-                "n_rows": 17,
+                "n_rows": 8,
                 "fog": [],
                 "low_opaque": [],
                 "clear": [
@@ -529,60 +360,6 @@
                     "visibility": 2.5,
                     "cloud": "SCT",
                     "wx": "BR"
-                  },
-                  {
-                    "utc": "2014-07-01T10:15Z",
-                    "visibility": 3.0,
-                    "cloud": "BKN",
-                    "wx": "BR"
-                  },
-                  {
-                    "utc": "2014-07-01T10:35Z",
-                    "visibility": 3.0,
-                    "cloud": "BKN",
-                    "wx": "BR"
-                  },
-                  {
-                    "utc": "2014-07-01T10:55Z",
-                    "visibility": 3.0,
-                    "cloud": "BKN",
-                    "wx": "BR"
-                  },
-                  {
-                    "utc": "2014-07-01T11:15Z",
-                    "visibility": 5.0,
-                    "cloud": "BKN",
-                    "wx": "BR"
-                  },
-                  {
-                    "utc": "2014-07-01T11:35Z",
-                    "visibility": 6.0,
-                    "cloud": "OVC",
-                    "wx": "BR"
-                  },
-                  {
-                    "utc": "2014-07-01T11:55Z",
-                    "visibility": 7.0,
-                    "cloud": "BKN",
-                    "wx": ""
-                  },
-                  {
-                    "utc": "2014-07-01T12:15Z",
-                    "visibility": 8.0,
-                    "cloud": "FEW",
-                    "wx": ""
-                  },
-                  {
-                    "utc": "2014-07-01T12:35Z",
-                    "visibility": 8.0,
-                    "cloud": "FEW",
-                    "wx": ""
-                  },
-                  {
-                    "utc": "2014-07-01T12:55Z",
-                    "visibility": 9.0,
-                    "cloud": "BKN",
-                    "wx": ""
                   }
                 ]
               }
@@ -598,10 +375,10 @@
               "elevation_diff_m": -57.1,
               "window_utc": [
                 "2014-07-01T08:10:39+00:00",
-                "2014-07-01T12:18:23+00:00"
+                "2014-07-01T09:19:52+00:00"
               ],
               "summary": {
-                "n_rows": 9,
+                "n_rows": 1,
                 "fog": [],
                 "low_opaque": [],
                 "clear": [],
@@ -611,63 +388,15 @@
                     "visibility": "009656,5,N,5",
                     "cloud": "CLR",
                     "wx": "MET09807/01/14 03:53:02 METAR KBFD 01085"
-                  },
-                  {
-                    "utc": "2014-07-01T09:29:00",
-                    "visibility": "012875,5,N,5",
-                    "cloud": "BKN024",
-                    "wx": "MET08507/01/14 04:29:02 SPECI KBFD 01092"
-                  },
-                  {
-                    "utc": "2014-07-01T09:51:00",
-                    "visibility": "011265,5,N,5",
-                    "cloud": "SCT019",
-                    "wx": "MET08707/01/14 04:51:02 SPECI KBFD 01095"
-                  },
-                  {
-                    "utc": "2014-07-01T09:53:00",
-                    "visibility": "011265,5,N,5",
-                    "cloud": "SCT021",
-                    "wx": "MET09207/01/14 04:53:02 METAR KBFD 01095"
-                  },
-                  {
-                    "utc": "2014-07-01T10:01:00",
-                    "visibility": "011265,5,N,5",
-                    "cloud": "BKN021",
-                    "wx": "MET09207/01/14 05:01:02 SPECI KBFD 01100"
-                  },
-                  {
-                    "utc": "2014-07-01T10:22:00",
-                    "visibility": "011265,5,N,5",
-                    "cloud": "FEW008",
-                    "wx": "MET09907/01/14 05:22:02 SPECI KBFD 01102"
-                  },
-                  {
-                    "utc": "2014-07-01T10:53:00",
-                    "visibility": "012875,5,N,5",
-                    "cloud": "FEW008",
-                    "wx": "MET10607/01/14 05:53:02 METAR KBFD 01105"
-                  },
-                  {
-                    "utc": "2014-07-01T11:07:00",
-                    "visibility": "014484,5,N,5",
-                    "cloud": "BKN010",
-                    "wx": "MET11107/01/14 06:07:02 SPECI KBFD 01110"
-                  },
-                  {
-                    "utc": "2014-07-01T11:53:00",
-                    "visibility": "014484,5,N,5",
-                    "cloud": "OVC009",
-                    "wx": "MET11007/01/14 06:53:02 METAR KBFD 01115"
                   }
                 ]
               },
               "context_window_utc": [
                 "2014-07-01T07:15:39+00:00",
-                "2014-07-01T13:08:23+00:00"
+                "2014-07-01T10:09:52+00:00"
               ],
               "context_summary": {
-                "n_rows": 11,
+                "n_rows": 6,
                 "fog": [],
                 "low_opaque": [],
                 "clear": [
@@ -708,49 +437,39 @@
                     "visibility": "011265,5,N,5",
                     "cloud": "BKN021",
                     "wx": "MET09207/01/14 05:01:02 SPECI KBFD 01100"
-                  },
-                  {
-                    "utc": "2014-07-01T10:22:00",
-                    "visibility": "011265,5,N,5",
-                    "cloud": "FEW008",
-                    "wx": "MET09907/01/14 05:22:02 SPECI KBFD 01102"
-                  },
-                  {
-                    "utc": "2014-07-01T10:53:00",
-                    "visibility": "012875,5,N,5",
-                    "cloud": "FEW008",
-                    "wx": "MET10607/01/14 05:53:02 METAR KBFD 01105"
-                  },
-                  {
-                    "utc": "2014-07-01T11:07:00",
-                    "visibility": "014484,5,N,5",
-                    "cloud": "BKN010",
-                    "wx": "MET11107/01/14 06:07:02 SPECI KBFD 01110"
-                  },
-                  {
-                    "utc": "2014-07-01T11:53:00",
-                    "visibility": "014484,5,N,5",
-                    "cloud": "OVC009",
-                    "wx": "MET11007/01/14 06:53:02 METAR KBFD 01115"
-                  },
-                  {
-                    "utc": "2014-07-01T12:53:00",
-                    "visibility": "009656,5,N,5",
-                    "cloud": "OVC008",
-                    "wx": "MET09507/01/14 07:53:02 METAR KBFD 01125"
                   }
                 ]
               }
             }
           },
-          "verdict": "conditional: moon below horizon, but fog or low cloud is reported at neighbour stations inside the window; CSSP itself (710 m plateau) has no in-situ evidence, so absolute use is blocked and spectral/relative use carries this caveat"
+          "weather_states": {
+            "stations": {
+              "KN38": {
+                "state": "partial/high-cloud",
+                "evidence_scope": "window",
+                "n_rows_tight": 4,
+                "n_rows_context": 8
+              },
+              "KBFD": {
+                "state": "partial/high-cloud",
+                "evidence_scope": "window",
+                "n_rows_tight": 1,
+                "n_rows_context": 6
+              }
+            },
+            "all_clear": false,
+            "any_fog": false,
+            "any_clear": false,
+            "evidence_scope": "window"
+          },
+          "verdict": "mixed: neighbour reports split between clear and cloud/fog rows"
         }
       },
       "aod": {
         "queried": [],
         "note": "AERONET direct-sun products are daytime; any return is a far-site column, not an in-situ twilight value"
       },
-      "verdict": "dusk [moonlit; KN38: partial/high-cloud, KBFD: partial/high-cloud]; dawn [moon-free; KN38: partial/high-cloud, KBFD: partial/high-cloud]",
+      "verdict": "dusk [moonlit; KN38: partial/high-cloud, KBFD: CLR]; dawn [moon-free; KN38: partial/high-cloud, KBFD: partial/high-cloud]",
       "verdict_note": "derived only from these archived responses and the MICA lunar table; no sky-model residual is read anywhere"
     },
     "s02": {
@@ -764,8 +483,8 @@
       ],
       "selected_for_raw_sampling": false,
       "moon": {
-        "elevation_deg_min": 0.4767472999999991,
-        "elevation_deg_max": 34.21199083333333,
+        "window_elevation_deg_min": 9.063,
+        "window_elevation_deg_max": 18.87,
         "published_illumination_fraction_min": 0.186,
         "published_illumination_fraction_max": 0.195,
         "axis_source": "vendored upstream MICA lunar table"
@@ -773,17 +492,17 @@
       "target_windows": {
         "dusk": {
           "columns_zero_based": [
-            776,
+            860,
             913
           ],
           "window_utc": [
-            "2014-07-01T23:48:25+00:00",
+            "2014-07-02T01:15:18+00:00",
             "2014-07-02T02:23:51+00:00"
           ],
-          "moon_elevation_deg_at_targets": null,
+          "n_window_columns": 54,
           "moon_elevation_deg_range": [
             9.063,
-            34.212
+            18.87
           ],
           "moon_free": false,
           "weather": {
@@ -797,44 +516,14 @@
               "distance_km": 35.25,
               "elevation_diff_m": -137.12,
               "window_utc": [
-                "2014-07-01T23:48:25+00:00",
+                "2014-07-02T01:15:18+00:00",
                 "2014-07-02T02:23:51+00:00"
               ],
               "summary": {
-                "n_rows": 8,
+                "n_rows": 3,
                 "fog": [],
                 "low_opaque": [],
                 "clear": [
-                  {
-                    "utc": "2014-07-01T23:55Z",
-                    "visibility": 10.0,
-                    "cloud": "CLR",
-                    "wx": ""
-                  },
-                  {
-                    "utc": "2014-07-02T00:15Z",
-                    "visibility": 10.0,
-                    "cloud": "CLR",
-                    "wx": ""
-                  },
-                  {
-                    "utc": "2014-07-02T00:35Z",
-                    "visibility": 10.0,
-                    "cloud": "CLR",
-                    "wx": ""
-                  },
-                  {
-                    "utc": "2014-07-02T00:55Z",
-                    "visibility": 10.0,
-                    "cloud": "CLR",
-                    "wx": ""
-                  },
-                  {
-                    "utc": "2014-07-02T01:15Z",
-                    "visibility": 10.0,
-                    "cloud": "CLR",
-                    "wx": ""
-                  },
                   {
                     "utc": "2014-07-02T01:35Z",
                     "visibility": 10.0,
@@ -857,38 +546,14 @@
                 "other": []
               },
               "context_window_utc": [
-                "2014-07-01T22:53:25+00:00",
+                "2014-07-02T00:20:18+00:00",
                 "2014-07-02T03:13:51+00:00"
               ],
               "context_summary": {
-                "n_rows": 13,
+                "n_rows": 8,
                 "fog": [],
                 "low_opaque": [],
                 "clear": [
-                  {
-                    "utc": "2014-07-01T22:55Z",
-                    "visibility": 10.0,
-                    "cloud": "CLR",
-                    "wx": ""
-                  },
-                  {
-                    "utc": "2014-07-01T23:15Z",
-                    "visibility": 10.0,
-                    "cloud": "CLR",
-                    "wx": ""
-                  },
-                  {
-                    "utc": "2014-07-01T23:55Z",
-                    "visibility": 10.0,
-                    "cloud": "CLR",
-                    "wx": ""
-                  },
-                  {
-                    "utc": "2014-07-02T00:15Z",
-                    "visibility": 10.0,
-                    "cloud": "CLR",
-                    "wx": ""
-                  },
                   {
                     "utc": "2014-07-02T00:35Z",
                     "visibility": 10.0,
@@ -938,14 +603,7 @@
                     "wx": ""
                   }
                 ],
-                "other": [
-                  {
-                    "utc": "2014-07-01T23:35Z",
-                    "visibility": 10.0,
-                    "cloud": "FEW",
-                    "wx": ""
-                  }
-                ]
+                "other": []
               }
             },
             "KBFD": {
@@ -958,26 +616,14 @@
               "distance_km": 69.89,
               "elevation_diff_m": -57.1,
               "window_utc": [
-                "2014-07-01T23:48:25+00:00",
+                "2014-07-02T01:15:18+00:00",
                 "2014-07-02T02:23:51+00:00"
               ],
               "summary": {
-                "n_rows": 3,
+                "n_rows": 1,
                 "fog": [],
                 "low_opaque": [],
                 "clear": [
-                  {
-                    "utc": "2014-07-01T23:53:00",
-                    "visibility": "016093,5,N,5",
-                    "cloud": "CLR",
-                    "wx": "MET11407/01/14 18:53:02 METAR KBFD 01235"
-                  },
-                  {
-                    "utc": "2014-07-02T00:53:00",
-                    "visibility": "016093,5,N,5",
-                    "cloud": "CLR",
-                    "wx": "MET09007/01/14 19:53:01 METAR KBFD 02005"
-                  },
                   {
                     "utc": "2014-07-02T01:53:00",
                     "visibility": "014484,5,N,5",
@@ -988,20 +634,14 @@
                 "other": []
               },
               "context_window_utc": [
-                "2014-07-01T22:53:25+00:00",
+                "2014-07-02T00:20:18+00:00",
                 "2014-07-02T03:13:51+00:00"
               ],
               "context_summary": {
-                "n_rows": 4,
+                "n_rows": 3,
                 "fog": [],
                 "low_opaque": [],
                 "clear": [
-                  {
-                    "utc": "2014-07-01T23:53:00",
-                    "visibility": "016093,5,N,5",
-                    "cloud": "CLR",
-                    "wx": "MET11407/01/14 18:53:02 METAR KBFD 01235"
-                  },
                   {
                     "utc": "2014-07-02T00:53:00",
                     "visibility": "016093,5,N,5",
@@ -1025,7 +665,27 @@
               }
             }
           },
-          "verdict": "moonlit: moon above the horizon at target instants (range 9.1..34.2 deg); hemispheric irradiance includes moonlight, so clean solar twilight comparisons are blocked; retained as a moonlit-sky sample"
+          "weather_states": {
+            "stations": {
+              "KN38": {
+                "state": "CLR",
+                "evidence_scope": "window",
+                "n_rows_tight": 3,
+                "n_rows_context": 8
+              },
+              "KBFD": {
+                "state": "CLR",
+                "evidence_scope": "window",
+                "n_rows_tight": 1,
+                "n_rows_context": 3
+              }
+            },
+            "all_clear": true,
+            "any_fog": false,
+            "any_clear": true,
+            "evidence_scope": "window"
+          },
+          "verdict": "moonlit: moon above the horizon during the window"
         }
       },
       "aod": {
@@ -1045,8 +705,8 @@
       ],
       "selected_for_raw_sampling": false,
       "moon": {
-        "elevation_deg_min": -41.74172199999999,
-        "elevation_deg_max": -6.528257066666669,
+        "window_elevation_deg_min": -41.742,
+        "window_elevation_deg_max": -6.528,
         "published_illumination_fraction_min": 0.197,
         "published_illumination_fraction_max": 0.215,
         "axis_source": "vendored upstream MICA lunar table"
@@ -1061,7 +721,7 @@
             "2014-07-02T03:34:52+00:00",
             "2014-07-02T04:09:23+00:00"
           ],
-          "moon_elevation_deg_at_targets": null,
+          "n_window_columns": 20,
           "moon_elevation_deg_range": [
             -9.961,
             -6.528
@@ -1197,7 +857,27 @@
               }
             }
           },
-          "verdict": "conditional: moon below horizon, but fog or low cloud is reported at neighbour stations inside the window; CSSP itself (710 m plateau) has no in-situ evidence, so absolute use is blocked and spectral/relative use carries this caveat"
+          "weather_states": {
+            "stations": {
+              "KN38": {
+                "state": "CLR",
+                "evidence_scope": "context",
+                "n_rows_tight": 0,
+                "n_rows_context": 3
+              },
+              "KBFD": {
+                "state": "partial/high-cloud",
+                "evidence_scope": "window",
+                "n_rows_tight": 1,
+                "n_rows_context": 6
+              }
+            },
+            "all_clear": false,
+            "any_fog": false,
+            "any_clear": true,
+            "evidence_scope": "mixed"
+          },
+          "verdict": "mixed: neighbour reports split between clear and cloud/fog rows"
         },
         "dawn": {
           "columns_zero_based": [
@@ -1208,7 +888,7 @@
             "2014-07-02T03:55:23+00:00",
             "2014-07-02T08:14:24+00:00"
           ],
-          "moon_elevation_deg_at_targets": null,
+          "n_window_columns": 245,
           "moon_elevation_deg_range": [
             -41.742,
             -10.136
@@ -1658,7 +1338,27 @@
               }
             }
           },
-          "verdict": "conditional: moon below horizon, but fog or low cloud is reported at neighbour stations inside the window; CSSP itself (710 m plateau) has no in-situ evidence, so absolute use is blocked and spectral/relative use carries this caveat"
+          "weather_states": {
+            "stations": {
+              "KN38": {
+                "state": "partial/high-cloud",
+                "evidence_scope": "window",
+                "n_rows_tight": 12,
+                "n_rows_context": 15
+              },
+              "KBFD": {
+                "state": "partial/high-cloud",
+                "evidence_scope": "window",
+                "n_rows_tight": 15,
+                "n_rows_context": 20
+              }
+            },
+            "all_clear": false,
+            "any_fog": false,
+            "any_clear": false,
+            "evidence_scope": "window"
+          },
+          "verdict": "mixed: neighbour reports split between clear and cloud/fog rows"
         }
       },
       "aod": {
@@ -1679,8 +1379,8 @@
       ],
       "selected_for_raw_sampling": true,
       "moon": {
-        "elevation_deg_min": -46.522164866666664,
-        "elevation_deg_max": 23.7263291,
+        "window_elevation_deg_min": -46.522,
+        "window_elevation_deg_max": 23.901,
         "published_illumination_fraction_min": 0.265,
         "published_illumination_fraction_max": 0.307,
         "axis_source": "vendored upstream MICA lunar table"
@@ -1688,23 +1388,17 @@
       "target_windows": {
         "dusk": {
           "columns_zero_based": [
-            1327,
-            1331
+            1326,
+            1379
           ],
           "window_utc": [
-            "2014-07-03T01:15:57+00:00",
-            "2014-07-03T01:35:02+00:00"
+            "2014-07-03T01:14:57+00:00",
+            "2014-07-03T02:23:33+00:00"
           ],
-          "moon_elevation_deg_at_targets": [
-            23.726,
-            23.548,
-            23.37,
-            23.193,
-            23.012
-          ],
+          "n_window_columns": 54,
           "moon_elevation_deg_range": [
-            23.012,
-            23.726
+            14.336,
+            23.901
           ],
           "moon_free": false,
           "weather": {
@@ -1718,16 +1412,34 @@
               "distance_km": 35.25,
               "elevation_diff_m": -137.12,
               "window_utc": [
-                "2014-07-03T01:15:57+00:00",
-                "2014-07-03T01:35:02+00:00"
+                "2014-07-03T01:14:57+00:00",
+                "2014-07-03T02:23:33+00:00"
               ],
               "summary": {
-                "n_rows": 1,
+                "n_rows": 4,
                 "fog": [],
                 "low_opaque": [],
                 "clear": [
                   {
+                    "utc": "2014-07-03T01:15Z",
+                    "visibility": 10.0,
+                    "cloud": "CLR",
+                    "wx": ""
+                  },
+                  {
                     "utc": "2014-07-03T01:35Z",
+                    "visibility": 10.0,
+                    "cloud": "CLR",
+                    "wx": ""
+                  },
+                  {
+                    "utc": "2014-07-03T01:55Z",
+                    "visibility": 10.0,
+                    "cloud": "CLR",
+                    "wx": ""
+                  },
+                  {
+                    "utc": "2014-07-03T02:15Z",
                     "visibility": 10.0,
                     "cloud": "CLR",
                     "wx": ""
@@ -1736,11 +1448,11 @@
                 "other": []
               },
               "context_window_utc": [
-                "2014-07-03T00:20:57+00:00",
-                "2014-07-03T02:25:02+00:00"
+                "2014-07-03T00:19:57+00:00",
+                "2014-07-03T03:13:33+00:00"
               ],
               "context_summary": {
-                "n_rows": 6,
+                "n_rows": 8,
                 "fog": [],
                 "low_opaque": [],
                 "clear": [
@@ -1779,6 +1491,18 @@
                     "visibility": 10.0,
                     "cloud": "CLR",
                     "wx": ""
+                  },
+                  {
+                    "utc": "2014-07-03T02:35Z",
+                    "visibility": 10.0,
+                    "cloud": "CLR",
+                    "wx": ""
+                  },
+                  {
+                    "utc": "2014-07-03T02:55Z",
+                    "visibility": 10.0,
+                    "cloud": "CLR",
+                    "wx": ""
                   }
                 ],
                 "other": []
@@ -1794,8 +1518,8 @@
               "distance_km": 69.89,
               "elevation_diff_m": -57.1,
               "window_utc": [
-                "2014-07-03T01:15:57+00:00",
-                "2014-07-03T01:35:02+00:00"
+                "2014-07-03T01:14:57+00:00",
+                "2014-07-03T02:23:33+00:00"
               ],
               "summary": {
                 "n_rows": 0,
@@ -1805,8 +1529,8 @@
                 "other": []
               },
               "context_window_utc": [
-                "2014-07-03T00:20:57+00:00",
-                "2014-07-03T02:25:02+00:00"
+                "2014-07-03T00:19:57+00:00",
+                "2014-07-03T03:13:33+00:00"
               ],
               "context_summary": {
                 "n_rows": 0,
@@ -1817,37 +1541,41 @@
               }
             }
           },
-          "verdict": "moonlit: moon above the horizon at target instants (range 23.0..23.7 deg); hemispheric irradiance includes moonlight, so clean solar twilight comparisons are blocked; retained as a moonlit-sky sample"
+          "weather_states": {
+            "stations": {
+              "KN38": {
+                "state": "CLR",
+                "evidence_scope": "window",
+                "n_rows_tight": 4,
+                "n_rows_context": 8
+              },
+              "KBFD": {
+                "state": "no-observation",
+                "evidence_scope": "window",
+                "n_rows_tight": 0,
+                "n_rows_context": 0
+              }
+            },
+            "all_clear": false,
+            "any_fog": false,
+            "any_clear": true,
+            "evidence_scope": "window"
+          },
+          "verdict": "moonlit: moon above the horizon during the window"
         },
         "dawn": {
           "columns_zero_based": [
-            1741,
+            1735,
             1786
           ],
           "window_utc": [
-            "2014-07-03T08:17:49+00:00",
+            "2014-07-03T08:11:49+00:00",
             "2014-07-03T09:20:14+00:00"
           ],
-          "moon_elevation_deg_at_targets": [
-            -43.882,
-            -43.961,
-            -44.039,
-            -44.114,
-            -44.189,
-            -45.385,
-            -45.441,
-            -45.496,
-            -45.658,
-            -45.709,
-            -46.382,
-            -46.418,
-            -46.453,
-            -46.488,
-            -46.522
-          ],
+          "n_window_columns": 52,
           "moon_elevation_deg_range": [
             -46.522,
-            -43.882
+            -43.396
           ],
           "moon_free": true,
           "weather": {
@@ -1861,12 +1589,24 @@
               "distance_km": 35.25,
               "elevation_diff_m": -137.12,
               "window_utc": [
-                "2014-07-03T08:17:49+00:00",
+                "2014-07-03T08:11:49+00:00",
                 "2014-07-03T09:20:14+00:00"
               ],
               "summary": {
-                "n_rows": 6,
+                "n_rows": 8,
                 "fog": [
+                  {
+                    "utc": "2014-07-03 08:15",
+                    "visibility": "0.25",
+                    "cloud": "VV",
+                    "wx": "FG"
+                  },
+                  {
+                    "utc": "2014-07-03T08:15Z",
+                    "visibility": 0.25,
+                    "cloud": "VV",
+                    "wx": "FG"
+                  },
                   {
                     "utc": "2014-07-03 08:35",
                     "visibility": "0.25",
@@ -1909,7 +1649,7 @@
                 "other": []
               },
               "context_window_utc": [
-                "2014-07-03T07:22:49+00:00",
+                "2014-07-03T07:16:49+00:00",
                 "2014-07-03T10:10:14+00:00"
               ],
               "context_summary": {
@@ -2004,7 +1744,7 @@
               "distance_km": 69.89,
               "elevation_diff_m": -57.1,
               "window_utc": [
-                "2014-07-03T08:17:49+00:00",
+                "2014-07-03T08:11:49+00:00",
                 "2014-07-03T09:20:14+00:00"
               ],
               "summary": {
@@ -2022,7 +1762,7 @@
                 ]
               },
               "context_window_utc": [
-                "2014-07-03T07:22:49+00:00",
+                "2014-07-03T07:16:49+00:00",
                 "2014-07-03T10:10:14+00:00"
               ],
               "context_summary": {
@@ -2041,6 +1781,26 @@
               }
             }
           },
+          "weather_states": {
+            "stations": {
+              "KN38": {
+                "state": "fog/low-cloud",
+                "evidence_scope": "window",
+                "n_rows_tight": 8,
+                "n_rows_context": 12
+              },
+              "KBFD": {
+                "state": "partial/high-cloud",
+                "evidence_scope": "window",
+                "n_rows_tight": 1,
+                "n_rows_context": 1
+              }
+            },
+            "all_clear": false,
+            "any_fog": true,
+            "any_clear": false,
+            "evidence_scope": "window"
+          },
           "verdict": "conditional: moon below horizon, but fog or low cloud is reported at neighbour stations inside the window; CSSP itself (710 m plateau) has no in-situ evidence, so absolute use is blocked and spectral/relative use carries this caveat"
         }
       },
@@ -2048,7 +1808,7 @@
         "queried": [],
         "note": "AERONET direct-sun products are daytime; any return is a far-site column, not an in-situ twilight value"
       },
-      "verdict": "dusk [moonlit; KN38: CLR, KBFD: no observation archived in window]; dawn [moon-free; KN38: fog/low-cloud, KBFD: partial/high-cloud]",
+      "verdict": "dusk [moonlit; KN38: CLR, KBFD: no-observation]; dawn [moon-free; KN38: fog/low-cloud, KBFD: partial/high-cloud]",
       "verdict_note": "derived only from these archived responses and the MICA lunar table; no sky-model residual is read anywhere",
       "frozen_feasibility_refs": [
         {
@@ -2084,8 +1844,8 @@
       ],
       "selected_for_raw_sampling": false,
       "moon": {
-        "elevation_deg_min": -17.486275100000004,
-        "elevation_deg_max": 25.473332866666667,
+        "window_elevation_deg_min": 4.417,
+        "window_elevation_deg_max": 12.459,
         "published_illumination_fraction_min": 0.991,
         "published_illumination_fraction_max": 0.994,
         "axis_source": "vendored upstream MICA lunar table"
@@ -2093,16 +1853,16 @@
       "target_windows": {
         "dusk": {
           "columns_zero_based": [
-            1844,
+            1969,
             2020
           ],
           "window_utc": [
-            "2014-07-12T23:04:09+00:00",
+            "2014-07-13T01:11:23+00:00",
             "2014-07-13T02:18:00+00:00"
           ],
-          "moon_elevation_deg_at_targets": null,
+          "n_window_columns": 52,
           "moon_elevation_deg_range": [
-            -17.486,
+            4.417,
             12.459
           ],
           "moon_free": false,
@@ -2117,26 +1877,14 @@
               "distance_km": 35.25,
               "elevation_diff_m": -137.12,
               "window_utc": [
-                "2014-07-12T23:04:09+00:00",
+                "2014-07-13T01:11:23+00:00",
                 "2014-07-13T02:18:00+00:00"
               ],
               "summary": {
-                "n_rows": 5,
+                "n_rows": 3,
                 "fog": [],
                 "low_opaque": [],
                 "clear": [
-                  {
-                    "utc": "2014-07-12T23:15Z",
-                    "visibility": 10.0,
-                    "cloud": "CLR",
-                    "wx": ""
-                  },
-                  {
-                    "utc": "2014-07-13T00:35Z",
-                    "visibility": 10.0,
-                    "cloud": "CLR",
-                    "wx": ""
-                  },
                   {
                     "utc": "2014-07-13T01:15Z",
                     "visibility": 10.0,
@@ -2159,20 +1907,14 @@
                 "other": []
               },
               "context_window_utc": [
-                "2014-07-12T22:09:09+00:00",
+                "2014-07-13T00:16:23+00:00",
                 "2014-07-13T03:08:00+00:00"
               ],
               "context_summary": {
-                "n_rows": 5,
+                "n_rows": 4,
                 "fog": [],
                 "low_opaque": [],
                 "clear": [
-                  {
-                    "utc": "2014-07-12T23:15Z",
-                    "visibility": 10.0,
-                    "cloud": "CLR",
-                    "wx": ""
-                  },
                   {
                     "utc": "2014-07-13T00:35Z",
                     "visibility": 10.0,
@@ -2211,26 +1953,14 @@
               "distance_km": 69.89,
               "elevation_diff_m": -57.1,
               "window_utc": [
-                "2014-07-12T23:04:09+00:00",
+                "2014-07-13T01:11:23+00:00",
                 "2014-07-13T02:18:00+00:00"
               ],
               "summary": {
-                "n_rows": 3,
+                "n_rows": 1,
                 "fog": [],
                 "low_opaque": [],
                 "clear": [
-                  {
-                    "utc": "2014-07-12T23:53:00",
-                    "visibility": "016093,5,N,5",
-                    "cloud": "CLR",
-                    "wx": "MET10807/12/14 18:53:02 METAR KBFD 12235"
-                  },
-                  {
-                    "utc": "2014-07-13T00:53:00",
-                    "visibility": "016093,5,N,5",
-                    "cloud": "CLR",
-                    "wx": "MET09007/12/14 19:53:01 METAR KBFD 13005"
-                  },
                   {
                     "utc": "2014-07-13T01:53:00",
                     "visibility": "016093,5,N,5",
@@ -2241,20 +1971,14 @@
                 "other": []
               },
               "context_window_utc": [
-                "2014-07-12T22:09:09+00:00",
+                "2014-07-13T00:16:23+00:00",
                 "2014-07-13T03:08:00+00:00"
               ],
               "context_summary": {
-                "n_rows": 5,
+                "n_rows": 3,
                 "fog": [],
                 "low_opaque": [],
                 "clear": [
-                  {
-                    "utc": "2014-07-12T23:53:00",
-                    "visibility": "016093,5,N,5",
-                    "cloud": "CLR",
-                    "wx": "MET10807/12/14 18:53:02 METAR KBFD 12235"
-                  },
                   {
                     "utc": "2014-07-13T00:53:00",
                     "visibility": "016093,5,N,5",
@@ -2274,18 +1998,31 @@
                     "wx": "MET09507/12/14 21:53:01 METAR KBFD 13025"
                   }
                 ],
-                "other": [
-                  {
-                    "utc": "2014-07-12T22:53:00",
-                    "visibility": "016093,5,N,5",
-                    "cloud": "FEW060",
-                    "wx": "MET09307/12/14 17:53:02 METAR KBFD 12225"
-                  }
-                ]
+                "other": []
               }
             }
           },
-          "verdict": "moonlit: moon above the horizon at target instants (range -17.5..12.5 deg); hemispheric irradiance includes moonlight, so clean solar twilight comparisons are blocked; retained as a moonlit-sky sample"
+          "weather_states": {
+            "stations": {
+              "KN38": {
+                "state": "CLR",
+                "evidence_scope": "window",
+                "n_rows_tight": 3,
+                "n_rows_context": 4
+              },
+              "KBFD": {
+                "state": "CLR",
+                "evidence_scope": "window",
+                "n_rows_tight": 1,
+                "n_rows_context": 3
+              }
+            },
+            "all_clear": true,
+            "any_fog": false,
+            "any_clear": true,
+            "evidence_scope": "window"
+          },
+          "verdict": "moonlit: moon above the horizon during the window"
         }
       },
       "aod": {
@@ -2309,8 +2046,8 @@
       ],
       "selected_for_raw_sampling": true,
       "moon": {
-        "elevation_deg_min": -30.933813333333326,
-        "elevation_deg_max": 49.767997666666666,
+        "window_elevation_deg_min": -31.165,
+        "window_elevation_deg_max": 50.055,
         "published_illumination_fraction_min": 0.466,
         "published_illumination_fraction_max": 0.523,
         "axis_source": "vendored upstream MICA lunar table"
@@ -2318,21 +2055,17 @@
       "target_windows": {
         "dusk": {
           "columns_zero_based": [
-            2629,
-            2631
+            2627,
+            2677
           ],
           "window_utc": [
-            "2014-07-19T01:08:44+00:00",
-            "2014-07-19T01:25:46+00:00"
+            "2014-07-19T01:06:42+00:00",
+            "2014-07-19T02:12:16+00:00"
           ],
-          "moon_elevation_deg_at_targets": [
-            -30.934,
-            -30.82,
-            -30.701
-          ],
+          "n_window_columns": 51,
           "moon_elevation_deg_range": [
-            -30.934,
-            -30.701
+            -31.165,
+            -24.76
           ],
           "moon_free": true,
           "weather": {
@@ -2346,11 +2079,11 @@
               "distance_km": 35.25,
               "elevation_diff_m": -137.12,
               "window_utc": [
-                "2014-07-19T01:08:44+00:00",
-                "2014-07-19T01:25:46+00:00"
+                "2014-07-19T01:06:42+00:00",
+                "2014-07-19T02:12:16+00:00"
               ],
               "summary": {
-                "n_rows": 1,
+                "n_rows": 3,
                 "fog": [],
                 "low_opaque": [],
                 "clear": [
@@ -2359,16 +2092,28 @@
                     "visibility": 10.0,
                     "cloud": "CLR",
                     "wx": ""
+                  },
+                  {
+                    "utc": "2014-07-19T01:35Z",
+                    "visibility": 10.0,
+                    "cloud": "CLR",
+                    "wx": ""
+                  },
+                  {
+                    "utc": "2014-07-19T01:55Z",
+                    "visibility": 10.0,
+                    "cloud": "CLR",
+                    "wx": ""
                   }
                 ],
                 "other": []
               },
               "context_window_utc": [
-                "2014-07-19T00:13:44+00:00",
-                "2014-07-19T02:15:46+00:00"
+                "2014-07-19T00:11:42+00:00",
+                "2014-07-19T03:02:16+00:00"
               ],
               "context_summary": {
-                "n_rows": 7,
+                "n_rows": 9,
                 "fog": [],
                 "low_opaque": [],
                 "clear": [
@@ -2413,6 +2158,18 @@
                     "visibility": 10.0,
                     "cloud": "CLR",
                     "wx": ""
+                  },
+                  {
+                    "utc": "2014-07-19T02:35Z",
+                    "visibility": 10.0,
+                    "cloud": "CLR",
+                    "wx": ""
+                  },
+                  {
+                    "utc": "2014-07-19T02:55Z",
+                    "visibility": 10.0,
+                    "cloud": "CLR",
+                    "wx": ""
                   }
                 ],
                 "other": []
@@ -2428,22 +2185,29 @@
               "distance_km": 69.89,
               "elevation_diff_m": -57.1,
               "window_utc": [
-                "2014-07-19T01:08:44+00:00",
-                "2014-07-19T01:25:46+00:00"
+                "2014-07-19T01:06:42+00:00",
+                "2014-07-19T02:12:16+00:00"
               ],
               "summary": {
-                "n_rows": 0,
+                "n_rows": 1,
                 "fog": [],
                 "low_opaque": [],
-                "clear": [],
+                "clear": [
+                  {
+                    "utc": "2014-07-19T01:53:00",
+                    "visibility": "016093,5,N,5",
+                    "cloud": "CLR",
+                    "wx": "MET09007/18/14 20:53:01 METAR KBFD 19015"
+                  }
+                ],
                 "other": []
               },
               "context_window_utc": [
-                "2014-07-19T00:13:44+00:00",
-                "2014-07-19T02:15:46+00:00"
+                "2014-07-19T00:11:42+00:00",
+                "2014-07-19T03:02:16+00:00"
               ],
               "context_summary": {
-                "n_rows": 2,
+                "n_rows": 3,
                 "fog": [],
                 "low_opaque": [],
                 "clear": [
@@ -2458,37 +2222,53 @@
                     "visibility": "016093,5,N,5",
                     "cloud": "CLR",
                     "wx": "MET09007/18/14 20:53:01 METAR KBFD 19015"
+                  },
+                  {
+                    "utc": "2014-07-19T02:53:00",
+                    "visibility": "016093,5,N,5",
+                    "cloud": "CLR",
+                    "wx": "MET09607/18/14 21:53:02 METAR KBFD 19025"
                   }
                 ],
                 "other": []
               }
             }
           },
-          "verdict": "mixed: neighbour reports split between clear and cloud/fog rows"
+          "weather_states": {
+            "stations": {
+              "KN38": {
+                "state": "CLR",
+                "evidence_scope": "window",
+                "n_rows_tight": 3,
+                "n_rows_context": 9
+              },
+              "KBFD": {
+                "state": "CLR",
+                "evidence_scope": "window",
+                "n_rows_tight": 1,
+                "n_rows_context": 3
+              }
+            },
+            "all_clear": true,
+            "any_fog": false,
+            "any_clear": true,
+            "evidence_scope": "window"
+          },
+          "verdict": "cleanest-available: moon below horizon at all target instants and both neighbour stations report CLR through the window"
         },
         "dawn": {
           "columns_zero_based": [
-            3073,
-            3116
+            3067,
+            3118
           ],
           "window_utc": [
-            "2014-07-19T08:33:17+00:00",
-            "2014-07-19T09:31:50+00:00"
+            "2014-07-19T08:27:17+00:00",
+            "2014-07-19T09:33:56+00:00"
           ],
-          "moon_elevation_deg_at_targets": [
-            43.265,
-            43.425,
-            43.584,
-            46.521,
-            46.671,
-            46.82,
-            49.484,
-            49.622,
-            49.768
-          ],
+          "n_window_columns": 52,
           "moon_elevation_deg_range": [
-            43.265,
-            49.768
+            42.301,
+            50.055
           ],
           "moon_free": false,
           "weather": {
@@ -2502,8 +2282,8 @@
               "distance_km": 35.25,
               "elevation_diff_m": -137.12,
               "window_utc": [
-                "2014-07-19T08:33:17+00:00",
-                "2014-07-19T09:31:50+00:00"
+                "2014-07-19T08:27:17+00:00",
+                "2014-07-19T09:33:56+00:00"
               ],
               "summary": {
                 "n_rows": 3,
@@ -2533,11 +2313,11 @@
                 ]
               },
               "context_window_utc": [
-                "2014-07-19T07:38:17+00:00",
-                "2014-07-19T10:21:50+00:00"
+                "2014-07-19T07:32:17+00:00",
+                "2014-07-19T10:23:56+00:00"
               ],
               "context_summary": {
-                "n_rows": 8,
+                "n_rows": 9,
                 "fog": [],
                 "low_opaque": [],
                 "clear": [
@@ -2567,6 +2347,12 @@
                   }
                 ],
                 "other": [
+                  {
+                    "utc": "2014-07-19T07:35Z",
+                    "visibility": 10.0,
+                    "cloud": "FEW",
+                    "wx": ""
+                  },
                   {
                     "utc": "2014-07-19T09:15Z",
                     "visibility": 6.0,
@@ -2604,8 +2390,8 @@
               "distance_km": 69.89,
               "elevation_diff_m": -57.1,
               "window_utc": [
-                "2014-07-19T08:33:17+00:00",
-                "2014-07-19T09:31:50+00:00"
+                "2014-07-19T08:27:17+00:00",
+                "2014-07-19T09:33:56+00:00"
               ],
               "summary": {
                 "n_rows": 1,
@@ -2622,8 +2408,8 @@
                 ]
               },
               "context_window_utc": [
-                "2014-07-19T07:38:17+00:00",
-                "2014-07-19T10:21:50+00:00"
+                "2014-07-19T07:32:17+00:00",
+                "2014-07-19T10:23:56+00:00"
               ],
               "context_summary": {
                 "n_rows": 4,
@@ -2659,7 +2445,27 @@
               }
             }
           },
-          "verdict": "moonlit: moon above the horizon at target instants (range 43.3..49.8 deg); hemispheric irradiance includes moonlight, so clean solar twilight comparisons are blocked; retained as a moonlit-sky sample"
+          "weather_states": {
+            "stations": {
+              "KN38": {
+                "state": "partial/high-cloud",
+                "evidence_scope": "window",
+                "n_rows_tight": 3,
+                "n_rows_context": 9
+              },
+              "KBFD": {
+                "state": "partial/high-cloud",
+                "evidence_scope": "window",
+                "n_rows_tight": 1,
+                "n_rows_context": 4
+              }
+            },
+            "all_clear": false,
+            "any_fog": false,
+            "any_clear": false,
+            "evidence_scope": "window"
+          },
+          "verdict": "moonlit: moon above the horizon during the window"
         }
       },
       "aod": {
@@ -2669,7 +2475,7 @@
         ],
         "note": "AERONET direct-sun products are daytime; any return is a far-site column, not an in-situ twilight value"
       },
-      "verdict": "dusk [moon-free; KN38: CLR, KBFD: CLR (context rows)]; dawn [moonlit; KN38: partial/high-cloud, KBFD: partial/high-cloud]",
+      "verdict": "dusk [moon-free; KN38: CLR, KBFD: CLR]; dawn [moonlit; KN38: partial/high-cloud, KBFD: partial/high-cloud]",
       "verdict_note": "derived only from these archived responses and the MICA lunar table; no sky-model residual is read anywhere"
     }
   },

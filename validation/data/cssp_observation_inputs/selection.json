@@ -324,7 +324,7 @@
     {
       "session_id": "s00",
       "decision": "not-selected",
-      "reason": "conditions verdict: dusk [moonlit; KN38: partial/high-cloud, KBFD: partial/high-cloud]; dawn [moon-free; KN38: partial/high-cloud, KBFD: partial/high-cloud]; raw sampling bounded to the two best-supported nights (s04, s11); inventory retained for audit"
+      "reason": "conditions verdict: dusk [moonlit; KN38: partial/high-cloud, KBFD: CLR]; dawn [moon-free; KN38: partial/high-cloud, KBFD: partial/high-cloud]; raw sampling bounded to the two best-supported nights (s04, s11); inventory retained for audit"
     },
     {
       "session_id": "s01",
@@ -345,7 +345,7 @@
       "session_id": "s04",
       "decision": "selected",
       "role": "primary",
-      "reason": "selected for raw sampling (primary); conditions verdict: dusk [moonlit; KN38: CLR, KBFD: no observation archived in window]; dawn [moon-free; KN38: fog/low-cloud, KBFD: partial/high-cloud]; the only night with all three target twilight depths (-6/-9/-12 deg)"
+      "reason": "selected for raw sampling (primary); conditions verdict: dusk [moonlit; KN38: CLR, KBFD: no-observation]; dawn [moon-free; KN38: fog/low-cloud, KBFD: partial/high-cloud]; the only night with all three target twilight depths (-6/-9/-12 deg)"
     },
     {
       "session_id": "s05",
@@ -381,7 +381,7 @@
       "session_id": "s11",
       "decision": "selected",
       "role": "secondary",
-      "reason": "selected for raw sampling (secondary); conditions verdict: dusk [moon-free; KN38: CLR, KBFD: CLR (context rows)]; dawn [moonlit; KN38: partial/high-cloud, KBFD: partial/high-cloud]; its window is among the dataset's cleanest screened windows (s11/dusk)"
+      "reason": "selected for raw sampling (secondary); conditions verdict: dusk [moon-free; KN38: CLR, KBFD: CLR]; dawn [moonlit; KN38: partial/high-cloud, KBFD: partial/high-cloud]; its window is among the dataset's cleanest screened windows (s11/dusk)"
     },
     {
       "session_id": "s12",

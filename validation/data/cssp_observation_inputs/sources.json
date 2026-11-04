@@ -290,25 +290,25 @@
         "packet_path": "raw/weather/aeronet-Penn_State_Univ-20140712-14-AOD20.txt",
         "bytes": 45,
         "sha256": "3a33c751dcdbb73ffe8d88d23bd7eea9d40dec747937d2a5bf45cdc96c2bd786",
-        "request_url": "https://aeronet.gsfc.nasa.gov/cgi-bin/print_web_data_v3?site=Penn_State_Univ&year=2014&month=7&day=20&year2=2014&month2=7&day2=40&AOD20=1&AVG=10&if_no_html=1"
+        "request_url": "https://aeronet.gsfc.nasa.gov/cgi-bin/print_web_data_v3?site=Penn_State_Univ&year=2014&month=7&day=12&year2=2014&month2=7&day2=14&AOD20=1&AVG=10&if_no_html=1"
       },
       {
         "packet_path": "raw/weather/aeronet-Penn_State_Univ-20140718-19-AOD20.txt",
         "bytes": 45,
         "sha256": "3a33c751dcdbb73ffe8d88d23bd7eea9d40dec747937d2a5bf45cdc96c2bd786",
-        "request_url": "https://aeronet.gsfc.nasa.gov/cgi-bin/print_web_data_v3?site=Penn_State_Univ&year=2014&month=7&day=20&year2=2014&month2=7&day2=40&AOD20=1&AVG=10&if_no_html=1"
+        "request_url": "https://aeronet.gsfc.nasa.gov/cgi-bin/print_web_data_v3?site=Penn_State_Univ&year=2014&month=7&day=18&year2=2014&month2=7&day2=19&AOD20=1&AVG=10&if_no_html=1"
       },
       {
         "packet_path": "raw/weather/aeronet-Toronto-20140712-14-AOD20.txt",
         "bytes": 200992,
         "sha256": "bc40cbf00b7307039887590c29ab70bdc7d2f6b304e9725c6bd54dfb09c4fe53",
-        "request_url": "https://aeronet.gsfc.nasa.gov/cgi-bin/print_web_data_v3?site=Toronto&year=2014&month=7&day=20&year2=2014&month2=7&day2=40&AOD20=1&AVG=10&if_no_html=1"
+        "request_url": "https://aeronet.gsfc.nasa.gov/cgi-bin/print_web_data_v3?site=Toronto&year=2014&month=7&day=12&year2=2014&month2=7&day2=14&AOD20=1&AVG=10&if_no_html=1"
       },
       {
         "packet_path": "raw/weather/aeronet-Toronto-20140718-19-AOD20.txt",
         "bytes": 237984,
         "sha256": "a0b9d7d942ff41cc937e254e09173dc0c10beb4fe8954ea68c182a05acdd224f",
-        "request_url": "https://aeronet.gsfc.nasa.gov/cgi-bin/print_web_data_v3?site=Toronto&year=2014&month=7&day=20&year2=2014&month2=7&day2=40&AOD20=1&AVG=10&if_no_html=1"
+        "request_url": "https://aeronet.gsfc.nasa.gov/cgi-bin/print_web_data_v3?site=Toronto&year=2014&month=7&day=18&year2=2014&month2=7&day2=19&AOD20=1&AVG=10&if_no_html=1"
       },
       {
         "packet_path": "raw/weather/frozen-iem-N38-window.json",
