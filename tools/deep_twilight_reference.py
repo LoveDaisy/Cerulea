@@ -830,14 +830,18 @@ def stage_sensitivity(protocol, atmo, table, data_dir, state, *, protocol_path,
     def run_mc(item, sun_elev, seed):
         """One MC record under a sensitivity configuration.
 
-        Refinement items patch the module constants for the duration of the
-        call (restored in ``finally``); the disk-node item only changes the
-        source evaluation, so the traced paths -- and the fingerprint --
-        stay identical to the baseline.
+        Every item runs inside the finite-source clone (``mc_solar_source``)
+        so the solar NEE uses the SAME source contract as the formal stages;
+        the disk-node item changes only the source angular quadrature, so
+        the traced paths -- and the fingerprint -- stay identical to the
+        baseline while the NEE values change.  Module-constant patches are
+        applied *before* the clone is built so the cloned namespace sees
+        them, and are restored afterwards.
         """
         source = FiniteSolarSource(
             atmo3, table3,
-            n_radial=4, n_azimuth=16 if item == "disk4x16" else 2,
+            n_radial=4 if item == "disk4x16" else 2,
+            n_azimuth=16 if item == "disk4x16" else 8,
             radius_deg=16.0 / 60.0)
         patches = {}
         if item == "rr_conservative":
@@ -852,10 +856,11 @@ def stage_sensitivity(protocol, atmo, table, data_dir, state, *, protocol_path,
         try:
             for k, v in patches.items():
                 setattr(mc, k, v)
-            result = mc.mc_radiance_split(
-                atmo3, 90.0 - sun_elev, [0.0], [0.0],
-                n_photons=photons, seed=seed, max_scatter=max_scatter,
-                diagnostics=False)
+            with mc_solar_source(source):
+                result = mc.mc_radiance_split(
+                    atmo3, 90.0 - sun_elev, [0.0], [0.0],
+                    n_photons=photons, seed=seed, max_scatter=max_scatter,
+                    diagnostics=False)
         finally:
             for k, v in saved.items():
                 setattr(mc, k, v)
