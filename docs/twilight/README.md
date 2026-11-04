@@ -25,6 +25,7 @@ repository's `tools/` and `validation/data/` trees, linked from each report.
 | [AEROSOL_GRID_AUDIT.md](AEROSOL_GRID_AUDIT.md) | AOD550 slicing defect fixed; golden and physical-check changes independently attributed |
 | [TWILIGHT_REFERENCE_AUDIT.md](TWILIGHT_REFERENCE_AUDIT.md) | Primary observations, solar-axis uncertainty and limited synthetic V response |
 | [CURVED_TRANSPORT_AUDIT.md](CURVED_TRANSPORT_AUDIT.md) | Continuous diffuse refraction, independent checks and final exploration limits |
+| [DEEP_TWILIGHT_REFERENCE.md](DEEP_TWILIGHT_REFERENCE.md) | −9°/−12° zenith reference: pre-registered budgets/gates, paired finite-disk correction, two-scatter candidate and tail diagnostics |
 
 ## Matched-observation follow-up
 
