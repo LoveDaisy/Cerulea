@@ -122,14 +122,33 @@ def cie110_diffuse_illuminance(solar_elevation_deg, turbidity, n_zen=181, n_az=1
 def model_case(elevation_deg, aod550=0.05, ozone_du=300.0, wl=C.WL_COARSE,
                n_zen=73, n_az=144):
     atmo = C.atmosphere("clear", wl, aod=aod550, ozone_du=ozone_du)
-    trans = direct_sun_transmittance(atmo, 90.0 - elevation_deg)
-    e_dni = spectra.solar_irradiance(wl) * trans
+    # DNI: the unified source's flux on the plane normal to the apparent sun
+    # centre; GHI: the source's flux on the horizontal plane (plan 6.4).
+    # Both are exact disk integrals -- the legacy F*T*sin(true elevation)
+    # decomposition ignored the disk geometry and the refraction shift.
+    from skycolor.solar_source import SolarSource
+    import skycolor.geometry as _g
+
+    source = SolarSource(atmo, 90.0 - float(elevation_deg), 0.0)
+    xg = np.array([[0.0, 0.0, atmo.r_bounds[0]]])
+    lower = float(source.geometry.field.grazing_apparent_elevation(
+        np.array([0.0]))[0])
+    crit = float(source.geometry.field.forward(np.array([0.0]),
+                                               np.array([lower + 1e-6]))[0])
+    elev_true = float(elevation_deg)
+    e_dni = np.zeros(len(wl))
+    if elev_true >= crit:
+        app_c = float(source.geometry.field.apparent_of_true(
+            np.array([0.0]), np.array([elev_true]))[0])
+        n_plane = _g.sun_vector(0.0, app_c)
+        e_dni = source.direct_irradiance(xg, n_plane)[0]
+    e_ghi = source.direct_irradiance(xg, np.array([0.0, 0.0, 1.0]))[0]
     dni_il = float(C.illuminance(e_dni, wl))
     z, a = C.sky_grid(n_zen, n_az)
     rad = C.sky_radiance(atmo, 90.0 - elevation_deg, z.ravel(), a.ravel())
     rad = rad.reshape(z.shape + (len(wl),))
     dhi_il = C.horizontal_illuminance(rad, z, a, wl)
-    ghi_il = dni_il * np.sin(np.radians(elevation_deg)) + dhi_il
+    ghi_il = float(C.illuminance(e_ghi, wl)) + dhi_il
     return dict(dni=dni_il, dhi=dhi_il, ghi=ghi_il, e_dni=e_dni, atmo=atmo)
 
 

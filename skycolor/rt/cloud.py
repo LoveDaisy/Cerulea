@@ -531,91 +531,57 @@ def illuminate_cloud(atmo, cloud: CloudLayer, sun_zenith_deg: float,
 
     source = SolarSource(atmo, float(sun_zenith_deg), 0.0)
     geometry = source.geometry
-    field = geometry.field
     directions, weights = source.disk()
     n_beam = directions.shape[0]
     up = np.array([0.0, 0.0, 1.0])
     true_e = np.degrees(np.arcsin(np.clip(directions @ up, -1.0, 1.0)))
 
-    # per-beam geometry at the deck top
+    # Per-beam classification from the source's own geometry at the deck top:
+    # a beam illuminates the slab iff its ray reaches the deck (the table's
+    # lit flag); descending beams enter through the top, ascending beams (sun
+    # below this deck's horizon) enter through the base -- the underlit case.
+    # The slab is laterally infinite, so nothing "below the entry" attenuates
+    # the local column: tau_below is structurally zero per beam.
     app_top, t_top, gain_top, lit_top = source.vertex(
         np.full(n_beam, z_top), true_e)
-    # perigee radius of each *ascending lit* beam (descending beams are top
-    # entries and reach the deck before any turning point could matter)
-    n_top = field.refractive_index(np.full(n_beam, z_top))
-    invariant = n_top * (R_EARTH + z_top * 1e3) * np.cos(np.radians(app_top))
-    ascending = lit_top & (np.asarray(app_top) <= 1e-8)
-    r_perigee = np.full(n_beam, field.r_ground)
-    if np.any(ascending):
-        r_perigee[ascending] = field.turning_radius(
-            np.asarray(invariant)[ascending])
-    h_perigee = (r_perigee - R_EARTH) / 1e3
-
+    n_obs = float(source.observer_n)
+    n_top = float(source.geometry.field.refractive_index(np.array([z_top]))[0])
     beams = []
     for b in range(n_beam):
         if not lit_top[b]:
             continue
-        e_app_b = float(app_top[b])
-        h_p = float(h_perigee[b])
         tau = optics.tau
-        if e_app_b > 1e-8:
-            # descending at the deck top: top entry through the whole deck
-            kind, z_entry = "top", z_top
-            mu0 = float(np.sin(np.radians(e_app_b)))
-            t_entry = t_top[b]
-            gain_entry = gain_top[b]
-            tau_deck = tau
-            tau_below = np.zeros_like(tau)
-            inc = weights[b] * f_inf * t_entry * gain_entry
-            ts = delta_eddington(tau_deck, optics.omega, optics.g, mu0,
-                                 f=optics.f, ground_albedo=ag, incident=inc)
-        elif h_p < z_base:
-            # ascends through the whole deck from below the base
-            kind, z_entry = "base", z_base
+        inc = weights[b] * f_inf * t_top[b] * gain_top[b] * (n_obs / n_top) ** 2
+        if float(app_top[b]) > 1e-8:
+            mu0 = float(np.sin(np.radians(float(app_top[b]))))
+            beams.append(BeamIllumination(
+                kind="top", weight=float(weights[b]), mu0=mu0,
+                transmittance_entry=np.asarray(t_top[b], dtype=float),
+                gain_entry=np.asarray(gain_top[b], dtype=float),
+                incident=np.asarray(inc, dtype=float),
+                tau_deck=np.asarray(tau, dtype=float),
+                tau_below=np.zeros_like(tau),
+                two_stream=delta_eddington(tau, optics.omega, optics.g, mu0,
+                                           f=optics.f, ground_albedo=ag,
+                                           incident=inc),
+                z_entry_km=z_top))
+        else:
             e_base = float(source.vertex(np.array([z_base]),
                                          np.array([true_e[b]]))[0][0])
             mu0 = max(float(abs(np.sin(np.radians(e_base)))), 1e-8)
-            t_entry = source.vertex(np.array([z_base]),
-                                    np.array([true_e[b]]))[1][0]
-            gain_entry = source.vertex(np.array([z_base]),
-                                       np.array([true_e[b]]))[2][0]
-            tau_deck = tau
-            tau_below = np.zeros_like(tau)
-            inc = weights[b] * f_inf * t_entry * gain_entry
-            ts = delta_eddington(tau_deck, optics.omega, optics.g, -mu0,
-                                 f=optics.f, ground_albedo=0.0, incident=inc)
-        elif h_p < z_top:
-            # perigee inside the deck: grazes into the sunlit part
-            kind = "base"
-            z_entry = h_p
-            mu0 = max(float(abs(np.sin(np.radians(e_app_b)))), 1e-8)
-            v = source.vertex(np.array([h_p]), np.array([true_e[b]]))
-            t_entry, gain_entry = v[1][0], v[2][0]
-            tau_deck = tau * (z_top - h_p) / z_range
-            tau_below = tau * (h_p - z_base) / z_range
-            inc = weights[b] * f_inf * t_entry * gain_entry
-            ts = delta_eddington(tau_deck, optics.omega, optics.g, -mu0,
-                                 f=optics.f, ground_albedo=0.0, incident=inc)
-        else:
-            # perigee above the deck top: ascends into the base (underlit)
-            kind, z_entry = "base", z_base
             v = source.vertex(np.array([z_base]), np.array([true_e[b]]))
-            e_base = float(v[0][0])
-            mu0 = max(float(abs(np.sin(np.radians(e_base)))), 1e-8)
-            t_entry, gain_entry = v[1][0], v[2][0]
-            tau_deck = tau
-            tau_below = np.zeros_like(tau)
-            inc = weights[b] * f_inf * t_entry * gain_entry
-            ts = delta_eddington(tau_deck, optics.omega, optics.g, -mu0,
-                                 f=optics.f, ground_albedo=0.0, incident=inc)
-        beams.append(BeamIllumination(
-            kind=kind, weight=float(weights[b]), mu0=mu0,
-            transmittance_entry=np.asarray(t_entry, dtype=float),
-            gain_entry=np.asarray(gain_entry, dtype=float),
-            incident=np.asarray(inc, dtype=float),
-            tau_deck=np.asarray(tau_deck, dtype=float),
-            tau_below=np.asarray(tau_below, dtype=float),
-            two_stream=ts, z_entry_km=float(z_entry)))
+            inc_b = weights[b] * f_inf * v[1][0] * v[2][0] * (n_obs / n_top) ** 2
+            beams.append(BeamIllumination(
+                kind="base", weight=float(weights[b]), mu0=mu0,
+                transmittance_entry=np.asarray(v[1][0], dtype=float),
+                gain_entry=np.asarray(v[2][0], dtype=float),
+                incident=np.asarray(inc_b, dtype=float),
+                tau_deck=np.asarray(tau, dtype=float),
+                tau_below=np.zeros_like(tau),
+                two_stream=delta_eddington(tau, optics.omega, optics.g, -mu0,
+                                           f=optics.f, ground_albedo=0.0,
+                                           incident=inc_b),
+                z_entry_km=z_base))
 
     kinds = {b.kind for b in beams}
     if not beams:
@@ -632,7 +598,8 @@ def illuminate_cloud(atmo, cloud: CloudLayer, sun_zenith_deg: float,
     if theta <= np.pi / 2:
         z_shadow = float(atmo.z_bounds[0])
     else:
-        z_shadow = float((field.q_ground / max(np.sin(theta), 1e-9) - R_EARTH) / 1000.0)
+        z_shadow = float((geometry.field.q_ground / max(np.sin(theta), 1e-9)
+                          - R_EARTH) / 1000.0)
 
     return CloudIllumination(geometry=geometry_name, beams=tuple(beams),
                              sun_zenith_deg=float(sun_zenith_deg),

@@ -45,14 +45,40 @@ def _cloud_field(atmo, cloud_layer, sun_zenith_deg):
     return field
 
 
-def _cloud_direct_transmittance(atmo, cloud_layer, sun_zenith_deg):
-    """Clear-sky direct beam attenuated by the deck (for the ground display)."""
-    T = direct_sun_transmittance(atmo, float(sun_zenith_deg))
+def _cloud_direct_irradiance(atmo, cloud_layer, sun_zenith_deg):
+    """Deck-attenuated direct irradiance on the ground (unified source).
+
+    Per disk beam: the source's own occultation and apparent direction give
+    the horizontal incidence; the deck attenuates each beam by its own
+    entry inclination.  With no deck this is the plain unified ground
+    irradiance.
+    """
+    from skycolor.solar_source import SolarSource
+    from skycolor import spectra
+
+    source = SolarSource(atmo, float(sun_zenith_deg), 0.0)
+    xg = np.array([[0.0, 0.0, atmo.r_bounds[0]]])
+    normal = np.array([0.0, 0.0, 1.0])
     if cloud_layer is None:
-        return T
-    cosz = max(np.cos(np.radians(float(sun_zenith_deg))), 0.0)
+        return source.direct_irradiance(xg, normal)[0]
+    directions, weights = source.disk()
+    n_beam = directions.shape[0]
+    up = np.array([0.0, 0.0, 1.0])
+    true_e = np.degrees(np.arcsin(np.clip(directions @ up, -1.0, 1.0)))
+    z_top = float(cloud_layer.top_km)
+    app, t_top, gain, lit = source.vertex(np.full(n_beam, z_top), true_e)
     optics = cloud_layer.optics(atmo.wl)
-    return T * np.exp(-optics.tau / cosz) if cosz > 0 else np.zeros_like(T)
+    radial = xg[0] / np.linalg.norm(xg[0])
+    mu_beam = np.clip(directions @ radial, -1.0, 1.0)
+    deck_trans = np.exp(-optics.tau[None, :]
+                        / np.maximum(np.abs(mu_beam)[:, None], 1e-3))
+    # for the ground normal (= radial) the beam cosine is sin(app elev)
+    n_dot_beam = np.abs(mu_beam)[None, :]
+    weighted = (lit[:, None, None] * t_top[:, None, :] * gain[:, None, None]
+                * n_dot_beam.T[:, :, None] * deck_trans[:, None, :])
+    total = np.sum(weights[:, None, None] * weighted, axis=0)
+    f_inf = spectra.solar_irradiance(atmo.wl)
+    return total * f_inf
 
 
 def _cloud_panorama(atmo, cloud_layer, sun_elevation_deg, size=(420, 170),
@@ -68,7 +94,7 @@ def _cloud_panorama(atmo, cloud_layer, sun_elevation_deg, size=(420, 170),
         size=size, exposure=exposure, tonemap="aces", adaptation=None,
         sun_disk=sun_disk, ground=True,
         radiance_field=_cloud_field(atmo, cloud_layer, sza) if has_deck else None,
-        ground_direct_transmittance=_cloud_direct_transmittance(atmo, cloud_layer, sza)
+        ground_direct_irradiance=_cloud_direct_irradiance(atmo, cloud_layer, sza)
         if has_deck else None)
 
 

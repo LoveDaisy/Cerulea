@@ -137,8 +137,8 @@ def perspective_grid(width: int, height: int, hfov_deg: float = 90.0,
 # ---------------------------------------------------------------------------
 # high level renderer
 # ---------------------------------------------------------------------------
-def ground_radiance(atmo, dome, sun_zenith_deg, ground_albedo=None, *,
-                    direct_irradiance=None, direct_transmittance=None):
+def ground_radiance(atmo, dome, sun_zenith_deg, ground_albedo=None,
+                    direct_transmittance=None, *, direct_irradiance=None):
     """Spectral radiance of a Lambertian ground illuminated by sun + sky.
 
     The default direct term is the unified source's horizontal direct
@@ -191,8 +191,8 @@ def render_scene(atmo, sun_elevation_deg: float, sun_azimuth_deg: float = 0.0,
                  ground: bool = True, n_zenith: int = 50, n_azimuth: int = 91,
                  hfov_deg: float = 90.0, pitch_deg: float = 0.0, yaw_deg: float = 0.0,
                  white_xy=None, preserve_chromaticity: bool = True,
-                 radiance_field=None, ground_direct_irradiance=None,
-                 ground_direct_transmittance=None):
+                 radiance_field=None, ground_direct_transmittance=None,
+                 *, ground_direct_irradiance=None):
     """Render a complete scene (sky + ground + sun disk) to an RGB image.
 
     ``radiance_field`` / ``ground_direct_irradiance`` have the same meaning
@@ -225,8 +225,8 @@ def render_scene(atmo, sun_elevation_deg: float, sun_azimuth_deg: float = 0.0,
     rad = sample_dome(dome, 90.0 - np.clip(el, 0.0, 90.0), rel)
     if ground:
         Lg, _ = ground_radiance(atmo, dome, sun_zen,
-                                direct_irradiance=ground_direct_irradiance,
-                                direct_transmittance=ground_direct_transmittance)
+                                direct_transmittance=ground_direct_transmittance,
+                                direct_irradiance=ground_direct_irradiance)
         rad = np.where(above[..., None], rad, Lg[None, None, :])
 
     if white_xy is None:

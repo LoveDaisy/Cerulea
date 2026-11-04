@@ -506,7 +506,10 @@ class SolarSpeciesColumns:
                  chunk: int = 256):
         if n_quad < 2 or chunk < 1:
             raise ValueError("n_quad>=2 and chunk>=1 are required")
-        self.medium = medium
+        # weak on purpose: this object lives in the geometry cache, whose key
+        # is the medium's own token -- a strong back-reference here would pin
+        # the medium (and with it the cache entry) forever
+        self._medium_ref = weakref.ref(medium)
         self.field = field
         self.n_quad = int(n_quad)
         self.chunk = int(chunk)
@@ -531,11 +534,20 @@ class SolarSpeciesColumns:
         self._edges = R_EARTH + levels * 1e3
         self._gx, self._gw = np.polynomial.legendre.leggauss(self.n_quad)
 
+    @property
+    def medium(self):
+        medium = self._medium_ref()
+        if medium is None:
+            raise RuntimeError(
+                "the owning medium of this solar geometry has been collected")
+        return medium
+
     def _density_columns(self, height):
-        yield self.medium.n_air(height)
-        yield self.medium.n_o3(height)
-        yield self.medium.n_no2(height)
-        for layer in self.medium.aerosols:
+        medium = self.medium
+        yield medium.n_air(height)
+        yield medium.n_o3(height)
+        yield medium.n_no2(height)
+        for layer in medium.aerosols:
             yield layer.aod550 * layer.profile(height) / 1000.0
 
     def columns(self, height_km, apparent_elevation_deg) -> np.ndarray:
@@ -1051,7 +1063,7 @@ class SolarSource:
 
     def __init__(self, atmo, sun_zenith_deg: float, sun_azimuth_deg: float = 0.0, *,
                  radius_deg: float = SUN_RADIUS_DEG,
-                 n_radial: int = 2, n_azimuth: int = 8, chunk: int = 65536):
+                 n_radial: int = 4, n_azimuth: int = 16, chunk: int = 65536):
         medium = atmo._medium
         self._atmo_ref = weakref.ref(atmo)
         self._medium = medium
@@ -1071,6 +1083,7 @@ class SolarSource:
         self.observer_n = float(self.geometry.field.refractive_index(
             np.array([atmo.elevation_km]))[0])
         self._disk_cache: dict[bytes, tuple] = {}
+        self._crit_cache: dict[float, float] = {}
         self.n_calls = 0
         self.n_points = 0
 
@@ -1093,25 +1106,114 @@ class SolarSource:
             self._disk_cache[key] = cached
         return cached
 
+    def _flux_disk_for_points(self, x):
+        """Refined flux disk when every point shares one occultation band."""
+        heights = np.clip((np.linalg.norm(x, axis=1) - R_EARTH) / 1e3,
+                          self._medium.z_bounds[0], self._medium.z_bounds[-1])
+        if float(heights.max()) - float(heights.min()) < 1e-6:
+            return self._flux_disk(float(heights[0]))
+        return self.disk()
+
+    def _critical_true(self, height_km: float) -> float:
+        """True elevation of the ground-grazing ray at ``height_km``."""
+        cache = self._crit_cache
+        if height_km in cache:
+            return cache[height_km]
+        field = self.geometry.field
+        lower = float(field.grazing_apparent_elevation(np.array([height_km]))[0])
+        crit = float(field.forward(np.array([height_km]),
+                                   np.array([lower + 1e-6]))[0])
+        cache[height_km] = crit
+        return crit
+
+    def _flux_disk(self, height_km):
+        """Disk for single-height flux kernels, refined near the occultation band.
+
+        When the shadow boundary cuts through the disk at this height, the
+        coarse product quadrature integrates the partially lit cap poorly
+        (tens of per cent of the tiny signal).  Densify the radial nodes
+        around the boundary ring and widen the azimuth grid; the weights keep
+        the same centre-normal normalisation, so this is pure refinement.
+        """
+        crit = self._critical_true(float(height_km))
+        elev = 90.0 - self.sun_zenith_deg
+        if abs(elev - crit) >= 3.0 * self.radius_deg:
+            return self.disk()
+        key = (self.sun_hat.tobytes(), "refined", round(float(height_km), 3))
+        cached = self._disk_cache.get(key)
+        if cached is None:
+            # the horizontal-flux integrand steps across the horizon line, so
+            # the azimuth resolution dominates the error: a fine azimuth grid
+            # (single-point flux calls can afford thousands of beams) with a
+            # boundary-split radial rule
+            n_r, n_a = 32, 768
+            cos_crit = np.cos(np.radians(min(abs(elev - crit), self.radius_deg)))
+            lo_nodes, lo_w = np.polynomial.legendre.leggauss(max(2, n_r // 2))
+            hi_nodes, hi_w = np.polynomial.legendre.leggauss(max(2, n_r // 2))
+            # inner segment [0, rho_crit] and outer [rho_crit, radius], in
+            # cos(rho) where the cap area measure is linear
+            c_in = cos_crit + (1.0 - cos_crit) * (0.5 * (lo_nodes + 1.0))
+            w_in = (1.0 - cos_crit) * 0.5 * lo_w
+            c_out = cos_crit + (np.cos(np.radians(self.radius_deg)) - cos_crit) \
+                * (0.5 * (hi_nodes + 1.0))
+            w_out = (np.cos(np.radians(self.radius_deg)) - cos_crit) * 0.5 * hi_w
+            cos_r = np.concatenate([c_in, c_out])
+            # the same convention as the plain disk: raw leggauss weights
+            # (the segment spans live in the node mapping), divided by
+            # (1 + cos(alpha)) * n_azimuth
+            w_r = np.concatenate([lo_w, hi_w]) \
+                / ((1.0 + np.cos(np.radians(self.radius_deg))) * n_a)
+            alpha = np.radians(self.radius_deg)
+            sin_rho = np.sqrt(np.maximum(1 - np.asarray(cos_r) ** 2, 0))
+            reference = (np.array([0.0, 0.0, 1.0])
+                         if abs(self.sun_hat[2]) < 0.9 else np.array([1.0, 0.0, 0.0]))
+            e1 = reference - np.dot(reference, self.sun_hat) * self.sun_hat
+            e1 /= np.linalg.norm(e1)
+            e2 = np.cross(self.sun_hat, e1)
+            phi = 2 * np.pi * (np.arange(n_a) + 0.5) / n_a
+            transverse = np.cos(phi)[:, None] * e1 + np.sin(phi)[:, None] * e2
+            directions = (np.asarray(cos_r)[:, None, None] * self.sun_hat
+                          + sin_rho[:, None, None] * transverse).reshape(-1, 3)
+            weights = np.repeat(np.asarray(w_r), n_a)
+            cached = (directions, weights)
+            self._disk_cache[key] = cached
+        return cached
+
     # -- kernels --------------------------------------------------------------
     def vertex(self, height_km, true_elevation_deg, *, iw=None):
         """Table query for arbitrary (height, true elevation) points.
 
         Returns ``(app_deg, T, gain_local, lit)``; builds the table on first
-        use.  ``T`` has a final wavelength axis unless ``iw`` is given.
+        use.  ``T`` has a final wavelength axis unless ``iw`` is given.  The
+        attenuation is evaluated with THIS atmosphere's cross sections -- the
+        geometry (and its table) is shared across wavelength subsets, so the
+        table's own stored extinction belongs to whichever construction built
+        it and must never leak into another medium's query.
         """
         self.n_calls += 1
-        return self.geometry.ensure_table().query(height_km, true_elevation_deg, iw=iw)
+        table = self.geometry.ensure_table()
+        app, columns, gain, lit = table.query_fields(height_km, true_elevation_deg)
+        ext = species_extinction_weights(self._medium)
+        if iw is None:
+            tau = columns @ ext
+            transmittance = np.where(lit[..., None], np.exp(-tau), 0.0)
+        else:
+            if not 0 <= int(iw) < ext.shape[1]:
+                raise IndexError("wavelength index outside the source table")
+            tau = columns @ ext[:, int(iw)]
+            transmittance = np.where(lit, np.exp(-tau), 0.0)
+        return app, transmittance, gain, lit
 
-    def _geometry_arrays(self, x, iw):
+    def _geometry_arrays(self, x, iw, disk=None):
         """Per-point per-beam geometry: true elevations, app, T, weighted gain.
 
         ``x`` is ``(n, 3)`` in the Earth-centred frame with the observer on
-        the +z axis.  The gain carries the disk weights and the single
+        the +z axis.  ``disk`` overrides the beam set (contact-band refined
+        flux kernels); the gain carries the disk weights and the single
         observer transfer ``(n_obs / n_point)^2``; nothing else in the
         chain may apply an ``n^2`` factor.
         """
-        directions, weights = self.disk()
+        directions, weights = disk if disk is not None else self.disk()
         medium = self._medium
         radius = np.linalg.norm(x, axis=1)
         radial = x / radius[:, None]
@@ -1119,8 +1221,15 @@ class SolarSource:
                          medium.z_bounds[0], medium.z_bounds[-1])
         true_mu = np.clip(radial @ directions.T, -1.0, 1.0)
         true_e = np.degrees(np.arcsin(true_mu))
-        app, transmission, gain, lit = self.geometry.ensure_table().query(
-            height[:, None], true_e, iw=iw)
+        app, columns, gain, lit = self.geometry.ensure_table().query_fields(
+            height[:, None], true_e)
+        ext = species_extinction_weights(medium)
+        if iw is None:
+            tau = columns @ ext
+            transmission = np.where(lit[..., None], np.exp(-tau), 0.0)
+        else:
+            tau = columns @ ext[:, int(iw)]
+            transmission = np.where(lit, np.exp(-tau), 0.0)
         app_rad = np.radians(app)
         local_n = self.geometry.field.refractive_index(height)
         gain = gain * (self.observer_n / local_n[:, None]) ** 2
@@ -1201,7 +1310,8 @@ class SolarSource:
         out = np.zeros(len(x)) if iw is not None else np.zeros((len(x), len(atmo.wl)))
         for start in range(0, len(x), self.chunk):
             sl = slice(start, min(start + self.chunk, len(x)))
-            _, _, _, app, transmission, gain, _ = self._geometry_arrays(x[sl], iw)
+            _, _, _, app, transmission, gain, _ = self._geometry_arrays(
+                x[sl], iw, disk=self._flux_disk_for_points(x[sl]))
             if iw is None:
                 gain = gain[..., None]     # gain is wavelength independent
                 app = app[..., None]

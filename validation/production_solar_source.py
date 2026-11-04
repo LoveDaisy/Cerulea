@@ -60,6 +60,7 @@ from skycolor.solar_source import (  # noqa: E402
 class _Checks:
     def __init__(self):
         self.rows = []
+        self.deviations = []
 
     def add(self, name, value, threshold, *, ok=None, detail=""):
         passed = (value <= threshold) if ok is None else ok
@@ -67,6 +68,17 @@ class _Checks:
                               threshold=float(threshold) if threshold is not None else None,
                               passed=bool(passed), detail=detail))
         return passed
+
+    def deviation(self, name, value, plan_threshold, detail=""):
+        """A measured departure from a plan budget, recorded but NOT gating.
+
+        Deviations leave the suite exit non-zero by design: recording a
+        departure is not approval (plan 6.4 -- recorded deviations require
+        owner adjudication, which is exactly what the review loop is for).
+        """
+        self.deviations.append(dict(name=name, value=float(value),
+                                    plan_threshold=float(plan_threshold),
+                                    detail=detail))
 
     @property
     def all_passed(self):
@@ -128,8 +140,13 @@ def suite_source(out: Path) -> int:
         value = cols.columns(heights, apps)
         rel = np.abs(value[:, 0] / (path * 2.0e20) - 1.0)
         checks.add(f"constant-n[{index}] uniform column rel err", float(rel.max()),
-                   2e-8, detail="plan budget 1e-8; measured 1.7e-8 at n_quad=8 "
-                                "(documented deviation, T-impact <1e-6)")
+                   1e-8)
+        if index == 1.0 or True:
+            checks.deviation("uniform column 1e-8 budget at production quad",
+                             1.7e-8, 1e-8,
+                             detail="measured 1.7e-8 at n_quad=8; meeting 1e-8 "
+                                    "costs a higher build quad for no physical "
+                                    "payoff (T shift <1e-6 relative at tau=25)")
         blocked = cols.columns(np.array([30.0, 0.0]), np.array([-6.0, -1.0]))
         checks.add("blocked rays exactly NaN", 0.0, 0.0,
                    ok=bool(np.all(np.isnan(blocked))))
@@ -151,9 +168,12 @@ def suite_source(out: Path) -> int:
             errs_ang.append(abs(mine - (90.0 - r["true_zenith_deg"])))
         checks.add(f"RK anchor ground={gnd}: max |dT/T| (T>=1e-4)", max(errs_t), 1e-3)
         checks.add(f"RK anchor ground={gnd}: max angle error [deg]", max(errs_ang),
-                   2e-4, ok=max(errs_ang) <= 5e-4,
-                   detail="plan budget 2e-4; measured 2.7e-4 (worst single "
-                          "anchor, documented deviation)")
+                   2e-4)
+        checks.deviation(f"RK anchor angle budget ground={gnd}", max(errs_ang),
+                         2e-4,
+                         detail="measured 2.7e-4 at one of 8 anchors with the "
+                                "coarsened segment scheme; needs either finer "
+                                "segments near that anchor or owner approval")
 
     # -- table holdout against direct evaluation ----------------------------
     atmo = presets.clear(np.array([450.0, 550.0, 650.0]))
@@ -187,11 +207,13 @@ def suite_source(out: Path) -> int:
             worst_tg = max(worst_tg, float(np.max(np.abs(w_new / w_ref - 1.0))))
         worst_tab = max(worst_tab, float(np.max(np.abs(t_q[i] - refv["transmittance"]))))
     checks.add("holdout: shadow disagreements", float(disagreement), 0.0)
-    checks.add("holdout: max |app| error [deg]", worst_app, 5e-3,
-               detail="plan budget 2e-4; production table measured worst "
-                      "1.4e-3 at mid-height/mid-elevation (documented)")
+    checks.add("holdout: max |app| error [deg]", worst_app, 2e-4)
     checks.add("holdout: max |TG| rel err (TG>=1e-4)", worst_tg, 0.01)
     checks.add("holdout: max |T| abs err", worst_tab, 0.002)
+    checks.deviation("holdout direction budget (measured worst point class)",
+                     worst_app, 2e-4,
+                     detail="worst 1.4e-3 deg at mid-height/mid-elevation; "
+                            "needs owner adjudication or table rework")
 
     # -- disk quadrature normalisation --------------------------------------
     sun = np.array([0.0, np.sin(np.radians(30.0)), np.cos(np.radians(30.0))])
@@ -223,10 +245,7 @@ def suite_source(out: Path) -> int:
         f_inf = spectra.solar_irradiance(src_atmo.wl)
         t_c = np.asarray(s.central_transmittance(), dtype=float)
         rel = float(np.max(np.abs(dni / (f_inf * t_c) - 1.0)))
-        checks.add(f"DNI(sza={sza}) vs centre beam max rel", rel, 0.012,
-                   detail="disk-plane flux must reproduce the centre-beam "
-                          "attenuation within the disk's own T variation; "
-                          "at sza=80 the measured disk curvature is 0.8%")
+        checks.add(f"DNI(sza={sza}) vs centre beam max rel", rel, 0.012)
 
     # -- wavelength slices share one geometry --------------------------------
     wl_full = np.arange(400.0, 701.0, 50.0)
@@ -286,11 +305,13 @@ def suite_source(out: Path) -> int:
         suite="source", git_head=subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
         seconds=time.perf_counter() - started,
-        passed=checks.all_passed, checks=checks.rows)
+        passed=checks.all_passed, checks=checks.rows,
+        deviations=checks.deviations)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(record, indent=2) + "\n")
     print(json.dumps(dict(passed=record["passed"], seconds=record["seconds"],
-                          failed=[r["name"] for r in checks.rows if not r["passed"]]),
+                          failed=[r["name"] for r in checks.rows if not r["passed"]],
+                          deviations=[d["name"] for d in checks.deviations]),
                       indent=2))
     return 0 if record["passed"] else 1
 
@@ -342,13 +363,7 @@ def suite_closure(out: Path) -> int:
             snr = 0.0
         signable = snr <= 0.05
         checks.add(f"SS/MC single sza={sza}: signability SE/|SS|",
-                   snr, 0.05, ok=True,
-                   detail=("SIGNABLE" if signable else
-                           "NOT SIGNABLE at this budget: the closure agrees "
-                           "within statistics but SE/|SS| exceeds the 5% "
-                           "signing threshold; escalate photons or report "
-                           "the point as statistically unaccepted "
-                           "(plan 6.3)"))
+                   snr, 0.05)
 
     # -- SOS per-beam Fourier source vs direct disk sum ----------------------
     # reconstruct the first-order source at one view through the Fourier
@@ -384,11 +399,13 @@ def suite_closure(out: Path) -> int:
         suite="closure", git_head=subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
         seconds=time.perf_counter() - started,
-        passed=checks.all_passed, checks=checks.rows)
+        passed=checks.all_passed, checks=checks.rows,
+        deviations=checks.deviations)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(record, indent=2) + "\n")
     print(json.dumps(dict(passed=record["passed"], seconds=record["seconds"],
-                          failed=[r["name"] for r in checks.rows if not r["passed"]]),
+                          failed=[r["name"] for r in checks.rows if not r["passed"]],
+                          deviations=[d["name"] for d in checks.deviations]),
                       indent=2))
     return 0 if record["passed"] else 1
 

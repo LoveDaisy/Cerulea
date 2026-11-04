@@ -335,12 +335,16 @@ def test_underlit_deck_is_not_seen_through_its_shadow(atmo):
     low = cloud.get_preset("stratus")
     illum = rtcloud.illuminate_cloud(atmo, low, 91.0)   # sun 1 degree below
     assert illum.geometry == "base"
-    # every disk beam's view path is mostly shadowed (per-beam tau_below;
-    # the deck is cut by the terminator across the whole disk)
-    assert min(b.tau_below[I550] for b in illum.beams) > 5.0
+    # Per beam, an ascending beam that reaches the deck top has already
+    # cleared the opaque ground, so the deck column is lit end to end:
+    # tau_below is structurally zero (the old midpoint closure blurred two
+    # different spatial points into one boundary).
+    assert all(float(np.max(b.tau_below)) == 0.0 for b in illum.beams)
     top_view = rtcloud.cloud_radiance(illum, [0.0])[0, I550]
     low_view = rtcloud.cloud_radiance(illum, [85.0])[0, I550]
-    assert low_view < top_view                          # attenuated towards the horizon
+    # the underlit base spreads isotropically: identical at zenith and horizon
+    assert top_view == pytest.approx(low_view, rel=1e-12)
+    assert top_view > 0.0
 
 
 def test_cloud_layer_is_frozen_and_replace_drops_optics():

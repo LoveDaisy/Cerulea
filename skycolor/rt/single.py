@@ -190,10 +190,13 @@ def sky_radiance(
         safe_sca = np.maximum(beta_sca, 1e-300)
         ray_fraction = (beta_ray / safe_sca).reshape(n_pts * n_ray, n_wl)
         if atmo.aerosols:
+            # stack on axis=-2 so the layout is (point, ray, aerosol, wl):
+            # each layer array is (point, ray, wl) and the kernel expects
+            # (n, n_aerosol, n_wl) after flattening the leading axes
             aerosol_fractions = np.stack(
                 [(w[..., None] * aer_optics[j][1]) / safe_sca
                  for j, w in enumerate(aer_w)],
-                axis=-1).reshape(n_pts * n_ray, len(atmo.aerosols), n_wl)
+                axis=-2).reshape(n_pts * n_ray, len(atmo.aerosols), n_wl)
         else:
             aerosol_fractions = np.empty((n_pts * n_ray, 0, n_wl))
         illumination = source.scatter(
