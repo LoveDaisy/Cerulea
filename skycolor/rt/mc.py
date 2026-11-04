@@ -141,6 +141,121 @@ _MAX_STEPS = 200_000
 
 
 # ---------------------------------------------------------------------------
+# opt-in per-wavelength diagnostics (read-only observer, default off)
+# ---------------------------------------------------------------------------
+class _DiagSink:
+    """Contribution/order/tail diagnostics for one wavelength's tracer.
+
+    This is a *read-only observer* in the sense of the deep-twilight
+    reference protocol: it consumes contributions and kill events that the
+    tracer has already computed, never draws random numbers and never
+    modifies transport, weights or path bookkeeping.  It exists so the
+    deep-twilight reference benchmark can decompose the higher-order
+    estimate into (a) exactly-two-scattering paths that never touched the
+    ground and (b) the remainder, accumulate the NEE by scattering order
+    and pre-existing ground bounces at *contribution time* (the final path
+    order cannot classify contributions made earlier on the path), and
+    record per-batch tail concentration statistics (largest single path,
+    top 0.1 % of paths, effective contributor count ``sum^2/sum(c^2)``).
+
+    Allocation happens only when the caller explicitly enables
+    diagnostics; with the default ``diagnostics=False`` no instance is
+    created and the tracer is bit-for-bit unchanged.
+    """
+
+    #: number of top-contributing paths recorded per view direction
+    TOP_K = 64
+
+    def __init__(self, n_view, n_tot, max_scatter, keep_per_path=False,
+                 top_k=None):
+        self.n_view = n_view
+        self.keep_per_path = keep_per_path
+        self.top_k = int(top_k) if top_k else self.TOP_K
+        # Atmospheric NEE histogram, indexed [order, touched_ground_before];
+        # orders run 2..max_scatter+1 for the multiple-scattering part.
+        self.nee_order = np.zeros((max_scatter + 2, 2))
+        # Ground-bounce NEE histogram, same indexing convention
+        # (order = scatterings before the bounce).
+        self.ground_order = np.zeros((max_scatter + 2, 2))
+        self.c2nt = np.zeros(n_tot)  # exactly 2 scatterings, no ground touch
+        self.kills = {"escaped": 0, "ground_absorbed": 0, "absorbed": 0,
+                      "rr_weight": 0, "rr_length": 0, "order_cap": 0}
+        self.max_scatter = int(max_scatter)
+
+    def _hist(self, table, orders, touched, values):
+        flat = np.bincount(orders * 2 + touched, weights=values,
+                           minlength=table.size)
+        table += flat.reshape(table.shape)
+
+    def record_atmospheric(self, paths, values, orders, touched):
+        """Accumulate the higher-order atmospheric NEE of one event chunk."""
+        self._hist(self.nee_order, orders, touched, values)
+        keep = (orders == 2) & (~touched)
+        self.c2nt[paths[keep]] += values[keep]
+
+    def record_ground(self, paths, values, orders, touched):
+        """Accumulate the ground-bounce direct-beam NEE of one event chunk."""
+        self._hist(self.ground_order, orders, touched, values)
+
+    def record_kills(self, **counts):
+        """Count termination events (not disjoint: one path may hit two)."""
+        for key, value in counts.items():
+            self.kills[key] += int(value)
+
+    def finalize(self, vid, c_mult, n_scat, n_ground, w):
+        """Aggregate per-view moments, tail concentration and top paths.
+
+        All paths enter the moments and tail statistics; recording the top
+        paths never removes any contribution from the sums.
+        """
+        c_rest = c_mult - self.c2nt
+        comps = (c_mult, self.c2nt, c_rest)
+        per_view = []
+        for v in range(self.n_view):
+            sel = vid == v
+            n = int(sel.sum())
+            vals = c_mult[sel]
+            total = float(vals.sum())
+            sq = float(np.dot(vals, vals))
+            entry = dict(
+                n_paths=n,
+                nonzero=int(np.count_nonzero(vals)),
+                max_fraction=(float(vals.max() / total) if total > 0 else None),
+                effective_contributors=(total * total / sq if sq > 0 else None),
+                s1=[float(c[sel].sum()) for c in comps],
+            )
+            k01 = max(1, int(np.ceil(n * 0.001)))
+            if total > 0:
+                ktop = min(self.top_k, n)
+                top_idx = np.argpartition(vals, n - ktop)[n - ktop:]
+                top01 = np.partition(vals, n - k01)[n - k01:]
+                s2 = [[float((cj[sel] * ck[sel]).sum())
+                       for ck in comps] for cj in comps]
+                entry.update(
+                    top001_fraction=float(top01.sum() / total),
+                    s2=s2,
+                    top=dict(indices=top_idx.tolist(),
+                             values=vals[top_idx].tolist(),
+                             order=n_scat[sel][top_idx].tolist(),
+                             ground=n_ground[sel][top_idx].tolist()))
+            else:
+                entry.update(top001_fraction=None, s2=None, top=None)
+            if self.keep_per_path:
+                entry["per_path"] = {name: c[sel].tolist()
+                                     for name, c in zip(("multiple", "second_no_touch",
+                                                         "rest"), comps)}
+            per_view.append(entry)
+        return dict(
+            nee_order_hist=self.nee_order.tolist(),
+            ground_order_hist=self.ground_order.tolist(),
+            per_view=per_view,
+            kills=dict(self.kills),
+            capped_paths=int(np.count_nonzero(n_scat >= self.max_scatter)),
+            final_weight_max=float(w.max()) if w.size else None,
+        )
+
+
+# ---------------------------------------------------------------------------
 # geometry / atmosphere tables
 # ---------------------------------------------------------------------------
 def _layer_bounds(atmo) -> np.ndarray:
@@ -287,11 +402,14 @@ def _interp_log(z, z_grid, log_values):
 # the tracer
 # ---------------------------------------------------------------------------
 def _trace_wavelength(atmo, iw, dirs, counts, sun_hat, max_scatter, rng,
-                      split, dens, rel):
+                      split, dens, rel, diag=None):
     """Trace all paths of one wavelength.
 
     Returns a dict of ``(n_view,)`` arrays: ``total``, ``total_var`` and, when
     ``split`` is true, ``single``, ``single_var``, ``multiple``, ``multiple_var``.
+    ``diag`` (optional :class:`_DiagSink`) only *reads* already-computed
+    contributions and kill events; when it is ``None`` the tracer is
+    bit-for-bit identical to the pre-diagnostics implementation.
     """
     n_view = dirs.shape[0]
     n_tot = int(counts.sum())
@@ -405,6 +523,8 @@ def _trace_wavelength(atmo, iw, dirs, counts, sun_hat, max_scatter, rng,
         escaped = (((r >= rt - 1e-9) & (b >= 0.0))
                    | ((~trial) & (~ground) & (rn >= rt - 1e-9)))
         kill |= escaped
+        if diag is not None:
+            diag.record_kills(escaped=int(np.count_nonzero(escaped)))
 
         # --- ground events --------------------------------------------------
         gi = np.nonzero(ground)[0]
@@ -420,6 +540,9 @@ def _trace_wavelength(atmo, iw, dirs, counts, sun_hat, max_scatter, rng,
             contrib[alive[gi]] += g_contrib
             if split:
                 c_mult[alive[gi]] += g_contrib
+            if diag is not None:
+                # order = scatterings before the bounce, touched = earlier bounces
+                diag.record_ground(alive[gi], g_contrib, sc_new[gi], gd_new[gi] > 0)
             # continuation: multiply by the albedo, sample cosine-weighted
             w_new[gi] = w_new[gi] * rho
             mu_r = np.sqrt(np.maximum(rng.random(gi.size), 0.0))
@@ -430,6 +553,8 @@ def _trace_wavelength(atmo, iw, dirs, counts, sun_hat, max_scatter, rng,
             xn[gi] = normal * (rg + 1e-6)[:, None]
             if rho <= 0.0:  # black surface: nothing can be reflected
                 kill[gi] = True
+                if diag is not None:
+                    diag.record_kills(ground_absorbed=gi.size)
 
         # --- trial steps (real collision or null collision) ------------------
         ti = np.nonzero(trial & ~escaped)[0]
@@ -464,6 +589,10 @@ def _trace_wavelength(atmo, iw, dirs, counts, sun_hat, max_scatter, rng,
                     first = (sc_new[ci] + 1 == 1) & (gd_new[ci] == 0)
                     c_single[alive[ci[first]]] += nee[first]
                     c_mult[alive[ci[~first]]] += nee[~first]
+                if diag is not None:
+                    m = ~first
+                    diag.record_atmospheric(alive[ci[m]], nee[m],
+                                            sc_new[ci][m] + 1, gd_new[ci][m] > 0)
 
                 sc_new[ci] += 1
 
@@ -471,6 +600,8 @@ def _trace_wavelength(atmo, iw, dirs, counts, sun_hat, max_scatter, rng,
                 surv = rng.random(ci.size) < albedo
                 si = ci[surv]
                 kill[ci[~surv]] = True
+                if diag is not None:
+                    diag.record_kills(absorbed=int(np.count_nonzero(~surv)))
 
                 if si.size:
                     # choose the scattering species
@@ -497,6 +628,8 @@ def _trace_wavelength(atmo, iw, dirs, counts, sun_hat, max_scatter, rng,
                     # termination: order cap
                     over = sc_new[si] >= max_scatter
                     kill[si[over]] = True
+                    if diag is not None:
+                        diag.record_kills(order_cap=int(np.count_nonzero(over)))
 
                     # Russian roulette on the weight
                     wk = w_new[si]
@@ -506,6 +639,8 @@ def _trace_wavelength(atmo, iw, dirs, counts, sun_hat, max_scatter, rng,
                         dead = rng.random(idx.size) >= wk[idx] / _RR_WEIGHT
                         kill[si[idx[dead]]] = True
                         w_new[si[idx]] = _RR_WEIGHT
+                        if diag is not None:
+                            diag.record_kills(rr_weight=int(np.count_nonzero(dead)))
 
                     # Russian roulette on the path length
                     long = sc_new[si] >= _RR_START
@@ -514,6 +649,8 @@ def _trace_wavelength(atmo, iw, dirs, counts, sun_hat, max_scatter, rng,
                         alive_rr = rng.random(idx.size) < _RR_SURVIVE
                         kill[si[idx[~alive_rr]]] = True
                         w_new[si[idx]] /= _RR_SURVIVE
+                        if diag is not None:
+                            diag.record_kills(rr_length=int(np.count_nonzero(~alive_rr)))
 
         # --- commit ---------------------------------------------------------
         x[alive] = xn
@@ -522,6 +659,11 @@ def _trace_wavelength(atmo, iw, dirs, counts, sun_hat, max_scatter, rng,
         n_scat[alive] = sc_new
         n_ground[alive] = gd_new
         alive = alive[~kill]
+
+    if diag is not None:
+        # final path state is still in x/d/w/n_scat/n_ground; the sink only
+        # aggregates what the tracer already computed
+        out["diagnostics"] = diag.finalize(vid, c_mult, n_scat, n_ground, w)
 
     # --- statistics per direction ------------------------------------------
     cnt = np.bincount(vid, minlength=n_view).astype(float)
@@ -567,7 +709,8 @@ def _prepare(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
 
 
 def _run(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
-         sun_azimuth_deg, n_photons, seed, max_scatter, split):
+         sun_azimuth_deg, n_photons, seed, max_scatter, split,
+         diagnostics=False):
     max_scatter = max(1, int(max_scatter))
     dirs, counts, sun_hat = _prepare(atmo, sun_zenith_deg, view_zenith_deg,
                                      view_azimuth_deg, sun_azimuth_deg, n_photons)
@@ -576,16 +719,28 @@ def _run(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
     keys = ["total", "total_var"] + (["single", "single_var", "multiple", "multiple_var"]
                                      if split else [])
     acc = {k: np.zeros((n_view, n_wl)) for k in keys}
+    diag_out = [] if (diagnostics and split) else None
 
     dens = _shell_species_density(atmo)
     rel = _aerosol_spectral(atmo)
     rngs = np.random.SeedSequence(int(seed)).spawn(n_wl)
 
     for iw in range(n_wl):
+        sink = None
+        if diag_out is not None:
+            opts = diagnostics if isinstance(diagnostics, dict) else {}
+            sink = _DiagSink(n_view, int(counts.sum()), max_scatter,
+                             keep_per_path=bool(opts.get("keep_per_path")),
+                             top_k=int(opts.get("top_k", _DiagSink.TOP_K)))
         res = _trace_wavelength(atmo, iw, dirs, counts, sun_hat, int(max_scatter),
-                                np.random.default_rng(rngs[iw]), split, dens, rel)
+                                np.random.default_rng(rngs[iw]), split, dens, rel,
+                                diag=sink)
         for k in keys:
             acc[k][:, iw] = res[k]
+        if diag_out is not None:
+            diag_out.append(res.get("diagnostics"))
+    if diag_out is not None:
+        acc["diagnostics"] = diag_out
     for k in acc:
         if k.endswith("_var"):
             acc[k] = np.sqrt(np.maximum(acc[k], 0.0))
@@ -631,7 +786,7 @@ def mc_radiance(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
 
 def mc_radiance_split(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
                       sun_azimuth_deg=0.0, n_photons=200_000, seed=0,
-                      max_scatter=50):
+                      max_scatter=50, diagnostics=False):
     """Total, single-scattered and multiple-scattered radiance separately.
 
     The single-scattered part is defined exactly as in
@@ -640,16 +795,24 @@ def mc_radiance_split(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
     Everything else (orders >= 2, and any path that has bounced off the
     ground) is returned as ``multiple``.
 
+    ``diagnostics`` enables the opt-in read-only sink of :class:`_DiagSink`
+    (``False`` -- default -- keeps the run bit-identical to the plain call;
+    ``True`` or a dict ``{"keep_per_path": ..., "top_k": ...}`` collects
+    per-wavelength contribution diagnostics).  Diagnostics never change the
+    physics or the random numbers; they additionally require ``split``.
+
     Returns
     -------
     dict
         Keys ``total``, ``single``, ``multiple`` and ``total_err``,
         ``single_err``, ``multiple_err``, each an ``(n_view, n_wl)`` array in
-        W m^-2 sr^-1 nm^-1.
+        W m^-2 sr^-1 nm^-1.  With ``diagnostics`` enabled a further key
+        ``diagnostics`` holds one entry per wavelength.
     """
     acc = _run(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
-               sun_azimuth_deg, n_photons, seed, max_scatter, split=True)
-    return {
+               sun_azimuth_deg, n_photons, seed, max_scatter, split=True,
+               diagnostics=diagnostics)
+    out = {
         "total": acc["total"],
         "single": acc["single"],
         "multiple": acc["multiple"],
@@ -657,6 +820,9 @@ def mc_radiance_split(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
         "single_err": acc["single_var"],
         "multiple_err": acc["multiple_var"],
     }
+    if diagnostics:
+        out["diagnostics"] = acc["diagnostics"]
+    return out
 
 
 def mc_flux(atmo, sun_zenith_deg, sun_azimuth_deg=0.0, up=True,
