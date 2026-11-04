@@ -1061,12 +1061,21 @@ def stage_sensitivity(protocol, atmo, table, data_dir, state, *, protocol_path,
             payload = json.loads(singles_path.read_text())
         except json.JSONDecodeError:
             payload = None
-        # a completed prior run's evidence: non-empty depths AND pinned to
-        # the current protocol (anything else is not reusable evidence)
-        if isinstance(payload, dict) and payload.get("by_sun") \
-                and payload.get("protocol_sha256") \
-                == sha256_file(protocol_path):
-            existing_singles = payload
+        if isinstance(payload, dict):
+            # THE shared evidence contract (summarizer is the single
+            # authority): only evidence that passes the full protocol /
+            # depth / item / anchor-vector validation counts as
+            # reusable -- 'present' is not 'complete', and a partial
+            # file must surface as an incomplete stage, never as
+            # reusable evidence
+            from tools.summarize_deep_twilight_reference import \
+                validated_singles
+            try:
+                validated_singles(payload, protocol,
+                                  protocol_sha_now=sha256_file(protocol_path))
+                existing_singles = payload
+            except ValueError:
+                existing_singles = None
     singles_sourced = "missing"
     if budget_left > 0.0 and table3 is not None:
         single_ref = _sensitivity_singles(protocol, atmo3, table3, suns)

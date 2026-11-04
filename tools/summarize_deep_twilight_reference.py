@@ -159,6 +159,11 @@ KNOWN_PROTOCOL_GENERATIONS = {
         # the historical protocol carried no candidate/sensitivity
         # sections, so this entry must never authorize those stages
         "stages": ("direct", "source-pairs"),
+        # the exact target protocol whose stage-relevant sections this
+        # compatibility was human-verified against; any other target
+        # protocol must be re-verified, never auto-inherited
+        "verified_target_sha256":
+            "23b46bd6784b91181c34cd5ff05656ce86f9aeecfa2bbe29c0728f1b432c87a1",
     },
 }
 #: the PHYSICS anchor files whose hashes define the traced physics of
@@ -364,6 +369,14 @@ def require_protocol_generation(meta_protocol, protocol_sha_now, context,
                 f"is only verified for stages {list(allowed)}, not "
                 f"{stage!r} -- a historical compatibility entry must not "
                 "authorize a stage it was never verified against")
+        target = entry.get("verified_target_sha256")
+        if target is not None and protocol_sha_now != target:
+            raise ValueError(
+                f"{context}: protocol generation {meta_protocol[:12]}... "
+                "was verified against target protocol "
+                f"{target[:12]}..., not the current {protocol_sha_now[:12]}"
+                "... -- a changed target physical/analysis contract must "
+                "be re-verified, never auto-inherited from a known hash")
         notes.append(
             f"{context}: executed under known protocol generation "
             f"{meta_protocol[:12]}... ({entry['statement']})")
@@ -1014,6 +1027,63 @@ def _require_anchor_vector(name, values, n_anchor, context):
     return arr
 
 
+def validated_singles(payload, protocol, *, protocol_sha_now=None,
+                      notes=None) -> dict:
+    """THE singles-evidence contract, shared by the summarizer and the
+    executor's recovery path (one authoritative implementation).
+
+    Validates a singles-refinement payload against the protocol: the
+    protocol generation identity, the exact protocol depth set, the exact
+    protocol item metadata set, and the anchor-vector contract (exact
+    anchor count, finite values, positive baseline) for the baseline and
+    every protocol-required refinement.  Returns the validated by_sun
+    mapping; raises ValueError with the refusing reason otherwise.
+
+    'already present' must never be mistaken for 'complete': partial
+    evidence (a dropped depth, a dropped item, a truncated vector) fails
+    here, so both tools refuse it from the same rule.
+    """
+    notes = notes if notes is not None else []
+    sens = protocol.get("sensitivity", {})
+    proto_single_items = [d.split(" (")[0].strip()
+                          for d in sens.get("single_items", [])]
+    require_protocol_generation(payload.get("protocol_sha256"),
+                                protocol_sha_now, "sensitivity singles",
+                                notes, stage="sensitivity")
+    got_items = set(payload.get("items", {}))
+    if got_items != set(proto_single_items):
+        raise ValueError(
+            f"sensitivity singles: refinement-file items {sorted(got_items)} "
+            f"!= protocol single_items {sorted(proto_single_items)} -- the "
+            "payload metadata must match the protocol, not decide the "
+            "reported comparison set")
+    want_suns = {str(s) for s in protocol["scenario"]["sun_elevations_deg"]}
+    want_single_items = {_slug(d) for d in proto_single_items}
+    n_anchor = len(protocol["scenario"]["anchor_wavelengths_nm"])
+    got_suns = set(payload.get("by_sun", {}))
+    if got_suns != want_suns:
+        raise ValueError(
+            f"sensitivity singles: depths {sorted(got_suns)} != protocol "
+            f"{sorted(want_suns)}")
+    for sun, entries in payload["by_sun"].items():
+        missing_items = want_single_items - set(entries)
+        if missing_items:
+            raise ValueError(
+                f"sensitivity singles {sun}: missing protocol-required "
+                f"items {sorted(missing_items)}")
+        base = _require_anchor_vector("baseline", entries["baseline"],
+                                      n_anchor, f"sensitivity singles {sun}")
+        if not np.any(base > 0):
+            raise ValueError(
+                f"sensitivity singles {sun}: baseline must be positive on "
+                f"the {n_anchor}-anchor grid")
+        for item in proto_single_items:
+            _require_anchor_vector(f"refinement {item!r}",
+                                   entries[_slug(item)], n_anchor,
+                                   f"sensitivity singles {sun}")
+    return payload["by_sun"]
+
+
 def _sensitivity_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
                        anchor_idx, *, protocol_sha_now=None,
                        contract_notes=None) -> dict:
@@ -1041,14 +1111,10 @@ def _sensitivity_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
             "deterministic refinement evidence is required for a complete "
             "sensitivity summary")
     payload = json.loads(singles_path.read_text())
-    # round-7: the deterministic evidence file passes the SAME protocol
-    # generation gate as the JSONL batches -- a refinement computed under
-    # a different (or unknown) protocol must not be reported as this
-    # experiment's discretisation sensitivity
-    require_protocol_generation(payload.get("protocol_sha256"),
-                                protocol_sha_now,
-                                "sensitivity singles", contract_notes,
-                                stage="sensitivity")
+    # THE shared evidence contract (also consumed by the executor's
+    # recovery path): protocol identity, depth/item sets, anchor vectors
+    validated_singles(payload, protocol, protocol_sha_now=protocol_sha_now,
+                      notes=contract_notes)
     want_suns = {str(s) for s in protocol["scenario"]["sun_elevations_deg"]}
     want_single_items = {_slug(d) for d in proto_single_items}
     got_items = set(payload.get("items", {}))

@@ -322,7 +322,11 @@ def _synthetic_record81(seed, zero=False):
 
 
 def _populate(data: Path, *, zero_one_record=False, point=True,
-              protocol_sha256=KNOWN_SHA):
+              protocol_sha256=None):
+    import hashlib as _hashlib
+    if protocol_sha256 is None:
+        protocol_sha256 = _hashlib.sha256(
+            (data / "protocol.json").read_bytes()).hexdigest()
     from tools.deep_twilight_reference import contract_view
     meta = contract_view(dict(stage="direct", table_sha256="t",
                               protocol_sha256=protocol_sha256, mode="disk",
@@ -641,6 +645,39 @@ def test_candidate_and_sensitivity_sections(tmp_path):
     sens3 = _sensitivity_stats(data, proto, wl, [14, 34, 54])
     assert sens3["by_sun"]["-9.0"]["mc"]["disk4x16"]["550.0"][
         "paired_delta_mean"] == 0.0
+
+
+def test_validated_singles_shared_contract(tmp_path):
+    """THE shared singles-evidence contract: partial evidence (a dropped
+    depth, a dropped item, a truncated vector) fails from the same rule
+    the summarizer enforces, so the executor's recovery can never accept
+    'present' as 'complete' (round-9 review)."""
+    from tools.summarize_deep_twilight_reference import validated_singles
+    data = _write_mini_dataset(tmp_path)
+    proto = json.loads((data / "protocol.json").read_text())
+    proto["sensitivity"] = {"repeats": 4, "mc_items": ["baseline"],
+                            "single_items": ["ss_gauss16 (x)"]}
+    proto["scenario"]["sun_elevations_deg"] = [-9.0, -12.0]
+    good = dict(schema="s/1", items={"ss_gauss16": "d"},
+                protocol_sha256=KNOWN_SHA,
+                by_sun={"-9.0": dict(baseline=[1e-8] * 3,
+                                     ss_gauss16=[1e-8] * 3),
+                        "-12.0": dict(baseline=[1e-8] * 3,
+                                      ss_gauss16=[1e-8] * 3)})
+    assert validated_singles(json.loads(json.dumps(good)), proto,
+                             protocol_sha_now=KNOWN_SHA) \
+        == good["by_sun"]
+    mutations = {
+        "dropped depth": lambda p: p["by_sun"].pop("-12.0"),
+        "dropped item": lambda p: p["by_sun"]["-9.0"].pop("ss_gauss16"),
+        "truncated vector": lambda p: p["by_sun"]["-9.0"].__setitem__(
+            "ss_gauss16", [1e-8]),
+    }
+    for name, mutate in mutations.items():
+        payload_mut = json.loads(json.dumps(good))
+        mutate(payload_mut)
+        with pytest.raises(ValueError):
+            validated_singles(payload_mut, proto, protocol_sha_now=KNOWN_SHA)
 
 
 def test_singles_file_protocol_identity_gate(tmp_path):
@@ -1039,14 +1076,27 @@ def test_check_batch_contract_rejects_tampered_record():
                                   mode="disk", table_sha256="t"),
                              stage="direct", batch_id="b",
                              protocol_sha_now=KNOWN_SHA)
-    # a known historical generation is accepted with an auditable note
+    # a known historical generation is accepted with an auditable note --
+    # but ONLY against the exact target protocol this compatibility entry
+    # was verified against (round-9: the compatibility triple is
+    # executed-protocol, verified-target-protocol, stage)
+    target = "23b46bd6784b91181c34cd5ff05656ce86f9aeecfa2bbe29c0728f1b432c87a1"
     _, drifted = check_batch_contract(good, meta,
                                       dict(sun_elevation_deg=-9.0,
                                            photons_per_wavelength=400,
                                            mode="disk", table_sha256="t"),
                                       stage="direct", batch_id="b",
-                                      protocol_sha_now="current")
+                                      protocol_sha_now=target)
     assert len(drifted) == 1 and "known protocol generation" in drifted[0]
+    # the same historical batch against ANY other target protocol must
+    # refuse: a changed physical/analysis contract needs re-verification
+    with pytest.raises(ValueError, match="verified against target protocol"):
+        check_batch_contract(good, meta,
+                             dict(sun_elevation_deg=-9.0,
+                                  photons_per_wavelength=400,
+                                  mode="disk", table_sha256="t"),
+                             stage="direct", batch_id="b",
+                             protocol_sha_now="a-different-target-sha")
     # an UNKNOWN generation must be rejected, not silently merged
     meta_unknown = dict(meta, protocol_sha256="p-unknown")
     records_unknown = [dict(good[0], protocol_sha256="p-unknown")]
