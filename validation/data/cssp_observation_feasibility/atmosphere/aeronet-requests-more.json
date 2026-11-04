@@ -1,0 +1,26 @@
+[
+  {
+    "site": "Toronto",
+    "level": "AOD20",
+    "url": "https://aeronet.gsfc.nasa.gov/cgi-bin/print_web_data_v3?site=Toronto&year=2014&month=7&day=2&year2=2014&month2=7&day2=4&AOD20=1&AVG=10&if_no_html=1",
+    "status": 200,
+    "bytes": 252520,
+    "local": "Toronto-20140702-04-AOD20.txt"
+  },
+  {
+    "site": "Penn_State_Univ",
+    "level": "AOD15",
+    "url": "https://aeronet.gsfc.nasa.gov/cgi-bin/print_web_data_v3?site=Penn_State_Univ&year=2014&month=7&day=2&year2=2014&month2=7&day2=4&AOD15=1&AVG=10&if_no_html=1",
+    "status": 200,
+    "bytes": 45,
+    "local": "Penn_State_Univ-20140702-04-AOD15.txt"
+  },
+  {
+    "site": "Penn_State_Univ",
+    "level": "AOD10",
+    "url": "https://aeronet.gsfc.nasa.gov/cgi-bin/print_web_data_v3?site=Penn_State_Univ&year=2014&month=7&day=2&year2=2014&month2=7&day2=4&AOD10=1&AVG=10&if_no_html=1",
+    "status": 200,
+    "bytes": 45,
+    "local": "Penn_State_Univ-20140702-04-AOD10.txt"
+  }
+]

@@ -1,0 +1,77 @@
+{
+  "note": "Different site/date control sample only; not any selected CSSP spectrum",
+  "archive_member": "dataraw/DRL/20140717/20140717T184659_sOO_USB2000+_pDRL.mat",
+  "bytes": 119618,
+  "sha256": "00f7c379d505ca19d9496045d94814eec7c10cdfdce561bc7abdc2b4e74a16ff",
+  "top_level_fields": [
+    "describe",
+    "integrationTime",
+    "integrationTimeSet",
+    "setCorrectForDetectorNonlinearityFlag",
+    "setCorrectForElectricalDarkFlag",
+    "boardTempInCelsius",
+    "wls",
+    "spd"
+  ],
+  "describe": {
+    "low_level": {
+      "PROMPT_FOR_COMMENTS": 0,
+      "SAVE_ASCII": 1,
+      "ASCII_FILE_EXT": ".csv",
+      "SAVE_CAL_STRUCT": 1
+    },
+    "spectrometerIndex": 0,
+    "channelIndex": 0,
+    "darkFlag": 0,
+    "sampleID": "1K",
+    "filter": [],
+    "userID": "Manuel Spitschan / University of Pennsylvania",
+    "scriptPath": "/home/spitschan/Documents/MATLAB/Experiments/SpectralCircadianVariation",
+    "scriptFileName": "OO_MeasureAndSave",
+    "outPath": "/home/spitschan/Documents/MATLAB/Experiments/SpectralCircadianVariation/measurements",
+    "date": "20140717",
+    "invokeTime": "20140717T184659",
+    "comment": [],
+    "position": {
+      "name": {
+        "full": "David Rittenhouse Laboratory",
+        "abbrev": "DRL"
+      },
+      "latDecimalDegrees": [],
+      "lonDecimalDegrees": [],
+      "elevationMeters": []
+    },
+    "spectrometerInfo": {
+      "name": {
+        "full": "OceanOptics USB2000+",
+        "abbrev": "OO_USB2000+"
+      },
+      "serialNumber": "USB2+F00926",
+      "modelType": "USB2000+",
+      "numOfSpectrometers": 1,
+      "calibrationDate": []
+    },
+    "machineInfo": {
+      "ver": "Linux wyszecki 3.13.0-30-generic #54-Ubuntu SMP Mon Jun 9 22:45:01 UTC 2014 x86_64 x86_64 x86_64 GNU/Linux\n",
+      "computerStr": "GLNXA64",
+      "archStr": "glnxa64"
+    },
+    "commentPreMeas": [],
+    "commentPostMeas": [],
+    "saveFileNameASCII": []
+  },
+  "integrationTime": 32000,
+  "integrationTimeSet": 32000,
+  "boardTempInCelsius": [
+    36.622656,
+    36.622656
+  ],
+  "spd_shape": [
+    2048,
+    10
+  ],
+  "wls_min_max_nm": [
+    339.2332689,
+    1025.45717385384
+  ]
+}
