@@ -61,17 +61,22 @@ partially visible region near the horizon is never lost even though the
 disk centre is below the horizon).  The full weight of one sample is
 
     w = [T_v(z1) b_sca(x1) / q(z1)]
-      * [a(x1) p_mix(mu1; x1) / q(omega2)]
-      * [T12 b_sca(x2) a(x2) illum(x2, d2) s2^2 S_max]
+      * [p_mix(mu1; x1) / q(omega2)]
+      * [T12 b_sca(x2) illum(x2, dir) S_max]
       * f0
 
 where ``S_max`` inverts the uniform s2 proposal (``S_max`` is the distance
 from x1 to leave the atmospheric shell: top exit or ground entry, whichever
-comes first, so x2 always lies inside the model).
-``illum`` and ``p_mix`` are normalised to 4 pi exactly as in the MC, so L2
-is directly comparable to the MC's per-path second-scatter component
-(the diagnostics sink's ``second_no_touch`` sums): the reference estimator
-is ``MC_rest = MC_multiple - MC_second_no_touch`` *per path*, and the
+comes first, so x2 always lies inside the model).  There are no albedo
+factors and no s2^2 Jacobian: the albedos are analog survival
+probabilities already folded into the scattering densities, and the x2
+integral is per direction per unit path (see the measure note above).
+``p_mix`` is a probability density per steradian (the MC's 4 pi-normalised
+phase divided by 4 pi); ``illum`` keeps the source kernel's own
+convention, identical to the MC NEE call.  L2 is therefore directly
+comparable to the MC's per-path second-scatter component (the diagnostics
+sink's ``second_no_touch`` sums): the reference estimator is
+``MC_rest = MC_multiple - MC_second_no_touch`` *per path*, and the
 combined total is ``single_det + L2 + mean(MC_rest)``.
 
 Optical fields are injected (:class:`SecondOrderFields`) so the correctness

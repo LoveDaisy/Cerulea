@@ -278,13 +278,16 @@ def _diagnostics_payload(diag_list, wl, *, keep_per_path):
 # ---------------------------------------------------------------------------
 # batch bookkeeping (append-only attempts)
 # ---------------------------------------------------------------------------
-#: fields that define a batch's computational contract; a resumed batch
-#: whose stored contract differs from the incoming one is refused instead
-#: of silently mixing heterogeneous results under one identity
+#: fields that define a batch's computational contract, INCLUDING the
+#: implementation identity (code_sha256): a resumed batch whose stored
+#: contract differs -- budget, source, protocol OR implementation -- is
+#: refused instead of silently mixing heterogeneous results under one
+#: identity.  Compatible-with-history exceptions are explicit, auditable
+#: meta edits, never silent appends.
 CONTRACT_FIELDS = ("stage", "sun_index", "budget_index",
                    "photons_per_wavelength", "mode", "expected_seeds",
-                   "table_sha256", "protocol_sha256", "candidate_samples",
-                   "rest_photons")
+                   "table_sha256", "protocol_sha256", "code_sha256",
+                   "candidate_samples", "rest_photons")
 
 
 def contract_view(meta: dict) -> dict:
@@ -301,15 +304,16 @@ class Batch:
     write), the attempt is marked invalid and ``next_attempt`` starts a new
     file -- a batch then has exactly one *valid* complete attempt.
 
-    On reopen the stored computational contract is compared against the
-    incoming ``meta_base``; a mismatch raises instead of appending records
-    computed under a different budget/source/protocol into the old
-    identity.  ``allow_recontract`` reopens with the new contract recorded
-    explicitly (new attempt lineage), never by overwriting history.
+    On reopen the stored computational contract (budget, source, protocol
+    AND implementation hashes) is compared against the incoming
+    ``meta_base``; a mismatch raises instead of appending records computed
+    under a different identity into the old batch.  The only sanctioned way
+    to run a different contract is a new run root (or an explicit, auditable
+    meta edit that supersedes the old attempt before reopening) -- there is
+    no in-place bypass.
     """
 
-    def __init__(self, root: Path, batch_id: str, expected_seeds, meta_base: dict,
-                 *, allow_recontract=False):
+    def __init__(self, root: Path, batch_id: str, expected_seeds, meta_base: dict):
         self.dir = root / batch_id
         self.dir.mkdir(parents=True, exist_ok=True)
         self.batch_id = batch_id
@@ -321,21 +325,12 @@ class Batch:
                                           expected_seeds=self.expected_seeds))
             stored = contract_view(self.meta)
             if incoming != stored:
-                if not allow_recontract:
-                    raise ValueError(
-                        f"{root.name}/{batch_id}: stored contract differs from "
-                        f"this invocation; refusing to append. stored="
-                        f"{json.dumps(stored, sort_keys=True)} incoming="
-                        f"{json.dumps(incoming, sort_keys=True)}; use a new run "
-                        "root or an explicit re-contract decision")
-                changed = {k for k in set(incoming) | set(stored)
-                           if incoming.get(k) != stored.get(k)}
-                self.meta.setdefault("recontracts", []).append(dict(
-                    changed=sorted(changed), stored={k: stored.get(k) for k in changed},
-                    incoming={k: incoming.get(k) for k in changed},
-                    at=time.strftime("%Y-%m-%dT%H:%M:%S%z")))
-                for k, v in incoming.items():
-                    self.meta[k] = v
+                raise ValueError(
+                    f"{root.name}/{batch_id}: stored contract differs from "
+                    f"this invocation; refusing to append. stored="
+                    f"{json.dumps(stored, sort_keys=True)} incoming="
+                    f"{json.dumps(incoming, sort_keys=True)}; use a new run "
+                    "root for a different contract")
         else:
             self.meta = dict(meta_base, batch_id=batch_id, attempts=[],
                              expected_seeds=self.expected_seeds)
@@ -794,7 +789,7 @@ def stage_candidate(protocol, atmo, table, data_dir, state, *, protocol_path,
                         top001_fraction=mc_res["diagnostics"][pos]["per_view"][0]["top001_fraction"],
                         effective_contributors=mc_res["diagnostics"][pos]["per_view"][0]["effective_contributors"])
                 record = dict(seed=int(seed), sun_elevation_deg=sun_elev,
-                              tier_index=tier_index,
+                              tier_index=tier_index, mode="disk",
                               candidate_samples=tier["candidate_samples"],
                               rest_photons=tier["rest_photons"],
                               per_lambda=per_lambda,

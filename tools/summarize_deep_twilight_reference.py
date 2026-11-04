@@ -153,18 +153,31 @@ def check_batch_contract(records, meta, expect, *, stage, batch_id,
     """
     notes = []
     meta_protocol = meta.get("protocol_sha256")
+    missing_fields = set()
     for row in records:
         for key, want in expect.items():
             got = row.get(key)
-            if got != want:
+            if got is None:
+                # pre-fix instrumentation: field absent from the record.
+                # Tolerated with an auditable note; a WRONG value is refused
+                missing_fields.add(key)
+            elif got != want:
                 raise ValueError(
                     f"{stage}/{batch_id} seed {row['seed']}: contract field "
                     f"{key} is {got!r}, protocol requires {want!r}")
         for key in ("protocol_sha256", "table_sha256"):
-            if meta.get(key) is not None and row.get(key) != meta[key]:
+            if meta.get(key) is None:
+                continue
+            got = row.get(key)
+            if got is None:
+                missing_fields.add(key)
+            elif got != meta[key]:
                 raise ValueError(
                     f"{stage}/{batch_id} seed {row['seed']}: record {key} "
                     "differs from the batch meta provenance")
+    if missing_fields:
+        notes.append(f"{stage}/{batch_id}: records lack {sorted(missing_fields)} "
+                     "(pre-fix instrumentation); batch-meta provenance applies")
     if (protocol_sha_now is not None and meta_protocol is not None
             and meta_protocol != protocol_sha_now):
         notes.append(
@@ -200,7 +213,22 @@ def photopic(radiance_row: np.ndarray, v_curve: np.ndarray, wl: np.ndarray) -> f
 # ---------------------------------------------------------------------------
 # summary computation
 # ---------------------------------------------------------------------------
-def compute_summary(data_dir: Path, protocol: dict) -> dict:
+def resolve_protocol_path(data_dir: Path) -> Path:
+    """The run directory's protocol file: protocol.json, or the validated
+    snapshot a fresh --out run root received."""
+    path = data_dir / "protocol.json"
+    if path.exists():
+        return path
+    snapshot = data_dir / "protocol.snapshot.json"
+    if snapshot.exists():
+        return snapshot
+    raise FileNotFoundError(
+        f"{data_dir}: neither protocol.json nor protocol.snapshot.json -- "
+        "a run root must carry a protocol snapshot to be summarizable")
+
+
+def compute_summary(data_dir: Path, protocol: dict, *,
+                    protocol_path: Path | None = None) -> dict:
     scenario = protocol["scenario"]
     direct_cfg = protocol["direct"]
     precision = protocol["precision"]
@@ -213,11 +241,13 @@ def compute_summary(data_dir: Path, protocol: dict) -> dict:
     suns = list(scenario["sun_elevations_deg"])
 
     raw_dir = data_dir / "raw"
-    protocol_sha_now = sha256_file(data_dir / "protocol.json")
+    resolved_protocol = protocol_path or resolve_protocol_path(data_dir)
+    protocol_sha_now = sha256_file(resolved_protocol)
     contract_notes = []
     out = dict(schema="deep-twilight-reference/summary/1",
                generated=time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-               protocol_sha256=sha256_file(data_dir / "protocol.json"),
+               protocol_sha256=protocol_sha_now,
+               protocol_file=resolved_protocol.name,
                grid=wl.tolist(), anchors_nm=anchors)
 
     # ---- direct batches --------------------------------------------------
@@ -301,11 +331,15 @@ def compute_summary(data_dir: Path, protocol: dict) -> dict:
     # ---- candidate experiment (plan Step 3; may be absent/incomplete) -----
     if (data_dir / "raw" / "candidate").exists():
         out["candidate"] = _candidate_stats(data_dir, protocol, wl, anchor_idx,
-                                            out["direct"])
+                                            out["direct"],
+                                            protocol_sha_now=protocol_sha_now,
+                                            contract_notes=contract_notes)
     # ---- sensitivity (plan Step 4; may be absent/incomplete) --------------
     if (data_dir / "raw" / "sensitivity").exists():
         out["sensitivity"] = _sensitivity_stats(data_dir, protocol, wl,
-                                                anchor_idx)
+                                                anchor_idx,
+                                                protocol_sha_now=protocol_sha_now,
+                                                contract_notes=contract_notes)
     out["cost"] = _cost_stats(data_dir, disk_meta)
     out["unknowns"] = [
         "diffuse-transport curvature: straight diffuse lines are a fixed "
@@ -446,7 +480,8 @@ def _budget_stats(records, wl, v_curve, anchor_idx, sun, budget, protocol,
 
 
 def _candidate_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
-                     anchor_idx, direct_section) -> dict:
+                     anchor_idx, direct_section, *, protocol_sha_now=None,
+                     contract_notes=None) -> dict:
     """Candidate vs analog comparison at identical work units.
 
     The candidate experiment is self-contained on the 3-wavelength planning
@@ -465,6 +500,8 @@ def _candidate_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
     repeats = int(cand_cfg["repeats"])
     suns = protocol["scenario"]["sun_elevations_deg"]
     raw_dir = data_dir / "raw" / "candidate"
+    if contract_notes is None:
+        contract_notes = []
     out = {}
     for sun_index, sun in enumerate(suns):
         tiers = {}
@@ -472,9 +509,18 @@ def _candidate_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
             batch_id = f"s{sun_index}t{tier_index}"
             seeds = [80000 + 10000 * sun_index + 1000 * tier_index + r
                      for r in range(repeats)]
-            records, _meta = load_batch(raw_dir / batch_id, seeds,
-                                        stage="candidate", batch_id=batch_id)
+            records, meta = load_batch(raw_dir / batch_id, seeds,
+                                       stage="candidate", batch_id=batch_id)
             records = sorted(records, key=lambda r: int(r["seed"]))
+            contract_notes.extend(check_batch_contract(
+                records, meta,
+                dict(sun_elevation_deg=sun,
+                     candidate_samples=tier["candidate_samples"],
+                     rest_photons=tier["rest_photons"],
+                     mode="disk",
+                     table_sha256=cand_cfg["table"]["sha256"]),
+                stage="candidate", batch_id=batch_id,
+                protocol_sha_now=protocol_sha_now))
             per_anchor = {}
             for a_nm in anchors_nm:
                 cand_total = np.array([r["per_lambda"][str(a_nm)]["total_cand"]
@@ -494,8 +540,8 @@ def _candidate_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
                                            for r in records]) \
                     if all("mc_seconds" in r for r in records) \
                     else np.array([float(r["seconds"]) for r in records])
-                cand_var_mean = cand_total.var(axis=0, ddof=1) / len(records)
-                analog_var_mean = analog_total.var(axis=0, ddof=1) / len(records)
+                cand_var = float(cand_total.var(axis=0, ddof=1))
+                analog_var = float(analog_total.var(axis=0, ddof=1))
                 per_anchor[str(a_nm)] = dict(
                     candidate_mean=float(cand_total.mean()),
                     candidate_sd=float(cand_total.std(axis=0, ddof=1)),
@@ -507,12 +553,14 @@ def _candidate_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
                         analog_total.reshape(-1, 1), confidence)[0]),
                     rest_second_moment_mean=float(rest_moments.mean()),
                     zero_rest_records=n_zero_rest,
-                    # variance of the mean per second of true repeat cost:
-                    # the same-work-unit efficiency metric
-                    candidate_var_of_mean_per_second=float(
-                        cand_var_mean / repeat_seconds.mean()),
-                    analog_var_of_mean_per_second=float(
-                        analog_var_mean / max(analog_seconds.mean(), 1e-9)),
+                    # fixed-wall-clock efficiency: with T seconds of budget
+                    # the mean's variance is Var_repeat * t / T, so the
+                    # comparable quantity is variance x time -- a slower
+                    # estimator with the same variance must NOT score better
+                    candidate_var_x_time=float(
+                        cand_var * repeat_seconds.mean()),
+                    analog_var_x_time=float(
+                        analog_var * max(analog_seconds.mean(), 1e-9)),
                     candidate_seconds_per_repeat=float(repeat_seconds.mean()),
                     analog_mc_seconds_per_repeat=float(analog_seconds.mean()))
             tiers[str(tier_index)] = dict(
@@ -531,11 +579,12 @@ def _candidate_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
         efficiency = {}
         for a_nm in anchors_nm:
             hi_anchor = tiers[hi_tier]["anchors"][str(a_nm)]
-            c = hi_anchor["candidate_var_of_mean_per_second"]
-            a = hi_anchor["analog_var_of_mean_per_second"]
+            c = hi_anchor["candidate_var_x_time"]
+            a = hi_anchor["analog_var_x_time"]
             efficiency[str(a_nm)] = dict(
-                candidate_var_of_mean_per_second=c,
-                analog_var_of_mean_per_second=a,
+                candidate_var_x_time=c,
+                analog_var_x_time=a,
+                ratio=c / a if a else None,
                 verdict=("candidate-more-efficient" if c < a
                          else "candidate-not-more-efficient"))
         # full81 direct baseline: distribution reference only
@@ -560,7 +609,8 @@ def _candidate_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
 
 
 def _sensitivity_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
-                       anchor_idx) -> dict:
+                       anchor_idx, *, protocol_sha_now=None,
+                       contract_notes=None) -> dict:
     """Paired same-seed drift of every refinement against its baseline."""
     sens = protocol.get("sensitivity", {})
     anchors_nm = [float(wl[i]) for i in anchor_idx]
@@ -568,12 +618,22 @@ def _sensitivity_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
     repeats = int(sens.get("repeats", 16))
     suns = protocol["scenario"]["sun_elevations_deg"]
     raw_dir = data_dir / "raw" / "sensitivity"
+    if contract_notes is None:
+        contract_notes = []
     out = dict(mc_items=list(sens.get("mc_items", [])), by_sun={})
     for sun_index, sun in enumerate(suns):
         batch_id = f"s{sun_index}mc"
         seeds = [110000 + 1000 * sun_index + r for r in range(repeats)]
-        records, _meta = load_batch(raw_dir / batch_id, seeds,
-                                    stage="sensitivity", batch_id=batch_id)
+        records, meta = load_batch(raw_dir / batch_id, seeds,
+                                   stage="sensitivity", batch_id=batch_id)
+        sens_budget = int(sens.get("photons_per_wavelength", 100_000))
+        contract_notes.extend(check_batch_contract(
+            records, meta,
+            dict(sun_elevation_deg=sun,
+                 photons_per_wavelength=sens_budget, mode="disk",
+                 table_sha256=protocol["candidate"]["table"]["sha256"]),
+            stage="sensitivity", batch_id=batch_id,
+            protocol_sha_now=protocol_sha_now))
         per_item = {}
         items = [k for k in records[0]["items"] if k != "baseline"]
         for item in items:
@@ -753,9 +813,7 @@ def main(argv=None) -> int:
                              "summary; write nothing")
     args = parser.parse_args(argv)
     data_dir = args.directory
-    protocol_path = data_dir / "protocol.json"
-    if not protocol_path.exists():
-        protocol_path = data_dir / "protocol.snapshot.json"
+    protocol_path = resolve_protocol_path(data_dir)
     protocol = json.loads(protocol_path.read_text())
 
     summary = compute_summary(data_dir, protocol)
@@ -774,8 +832,11 @@ def main(argv=None) -> int:
         if not manifest_path.exists():
             problems.append("manifest.json missing")
         else:
-            problems.extend(verify_manifest(
-                data_dir, json.loads(manifest_path.read_text())))
+            stored_manifest = json.loads(manifest_path.read_text())
+            if stored_manifest["files"].get(protocol_path.name) is None:
+                problems.append(
+                    f"manifest does not pin {protocol_path.name}")
+            problems.extend(verify_manifest(data_dir, stored_manifest))
         if problems:
             print(f"VERIFY FAIL: {len(problems)} problem(s):", flush=True)
             for p in problems[:50]:

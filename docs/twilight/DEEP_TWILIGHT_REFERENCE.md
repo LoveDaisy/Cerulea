@@ -96,15 +96,18 @@ Effect (16 seeds × 2 tiers × 2 depths on the frozen 3-wavelength planning
 table, seeds 80000+; one rest MC per repeat, cost bookkeeping corrected in
 review round 1): the comparison anchor is `total_analog` — the same-table,
 same-seed analog estimator in the same records — with the full
-three-wavelength repeat as the shared cost unit. At −9° the candidate is
-the more efficient estimator at the 1.6M tier (lower variance of the mean
-per second of true repeat wall-clock at 550/650 nm) and its conditional
-interval is narrower (550 nm half-width ratio 0.55 against the analog
-comparator); the L2 component is quasi-deterministic (tier-to-tier drift
+three-wavelength repeat as the shared cost unit, judged by
+**variance × repeat wall-clock** (fixed-budget efficiency: a slower
+estimator with equal variance must not score better). The measured result
+is *mixed and marginal*: variance×time ratios (candidate/analog, 1.6M
+tier) are 0.94/0.93/1.07 at −9° (450/550/650 nm) and 0.89/1.04/1.15 at
+−12° — the candidate wins 450 nm at both depths and 550 nm at −9° by
+6–11 %, loses 650 nm at both depths and 550 nm at −12° by 4–15 %, and no
+ratio approaches the order-of-magnitude gain a tail-dominated regime would
+need. The L2 component itself is quasi-deterministic (tier-to-tier drift
 ≈ 1 %). At −12° neither estimator resolves anything (both intervals remain
 tail-dominated; the rest-component second moment *grows* with budget as
-more tail mass is seen), so the candidate mitigates but does not cure the
-deep regime. The full81 direct baseline is reported only as a
+more tail mass is seen). The full81 direct baseline is reported only as a
 *distribution reference* across the table/stream boundary — it is not a
 cost comparison, and no equal-wall-clock claim is made against it.
 Per-path subtraction (candidate L2 + rest = analog total − second-scatter

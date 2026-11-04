@@ -12,6 +12,7 @@ Three layers are covered separately:
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -421,14 +422,16 @@ def test_candidate_and_sensitivity_sections(tmp_path):
     (data / "protocol.json").write_text(json.dumps(proto))
     rng = np.random.default_rng(0)
     wl_anchor = {450.0: 14, 550.0: 34, 650.0: 54}
+    tiers = [(100, 400), (200, 800)]
     for sun_index in (0,):
-        for tier_index in (0, 1):
+        for tier_index, (cs, rp) in enumerate(tiers):
             batch = Batch(data / "raw" / "candidate", f"s{sun_index}t{tier_index}",
                           [80000 + 10000 * sun_index + 1000 * tier_index + r
                            for r in range(4)],
                           dict(stage="candidate", table_sha256="c",
                                protocol_sha256="p", mode="disk",
-                               candidate_samples=100, rest_photons=400))
+                               candidate_samples=cs, rest_photons=rp,
+                               code_sha256={"x.py": "1"}))
             for r in range(4):
                 seed = 80000 + 10000 * sun_index + 1000 * tier_index + r
                 per_lambda = {}
@@ -436,7 +439,7 @@ def test_candidate_and_sensitivity_sections(tmp_path):
                     per_lambda[str(a)] = dict(
                         L2=1e-9 * (1 + tier_index), L2_second_moment=2e-18,
                         L2_max_abs=1e-8, candidate_seconds=0.2,
-                        candidate_samples=100, c2nt_mean=5e-10, rest_mean=2e-10,
+                        candidate_samples=cs, c2nt_mean=5e-10, rest_mean=2e-10,
                         rest_second_moment=(0.0 if r == 3 else 5e-12),
                         mc_multiple=7e-10, deterministic_single=1e-8,
                         total_cand=1e-8 + 1e-9 * (1 + tier_index) + 2e-10,
@@ -444,16 +447,17 @@ def test_candidate_and_sensitivity_sections(tmp_path):
                         top001_fraction=0.2, effective_contributors=50.0)
                 batch.record_seed(seed, dict(
                     seed=seed, sun_elevation_deg=-9.0, tier_index=tier_index,
-                    candidate_samples=100, rest_photons=400,
+                    candidate_samples=cs, rest_photons=rp, mode="disk",
                     per_lambda=per_lambda, mc_seconds=0.1,
                     seconds=0.3 + 0.1 * (1 + tier_index),
                     table_sha256="c", protocol_sha256="p",
-                    code_sha256={}, batch_id="x", attempt=0))
+                    code_sha256={"x.py": "1"}, batch_id="x", attempt=0))
             batch.close("complete")
     batch = Batch(data / "raw" / "sensitivity", "s0mc",
                   [110000 + r for r in range(4)],
                   dict(stage="sensitivity", table_sha256="c",
-                       protocol_sha256="p", mode="disk"))
+                       protocol_sha256="p", mode="disk",
+                       photons_per_wavelength=300))
     for r in range(4):
         seed = 110000 + r
         items = {}
@@ -464,9 +468,10 @@ def test_candidate_and_sensitivity_sections(tmp_path):
                                          multiple=5e-10, total=1.05e-8)
                             for a in wl_anchor}, seconds=0.1)
         batch.record_seed(seed, dict(seed=seed, sun_elevation_deg=-9.0,
-                                     photons_per_wavelength=300, items=items,
+                                     photons_per_wavelength=300, mode="disk",
+                                     table_sha256="c", items=items,
                                      batch_id="s0mc", attempt=0,
-                                     code_sha256={}, table_sha256="c"))
+                                     code_sha256={"x.py": "1"}))
     batch.close("complete")
     (data / "raw" / "sensitivity" / "singles-refinement.json").write_text(
         json.dumps(dict(schema="s/1", items={"ss_gauss16": "d"},
@@ -536,21 +541,32 @@ def test_disk_point_fingerprint_paired_real():
 # review-response: contract identity, units and fresh-run-root mechanics
 # ---------------------------------------------------------------------------
 def test_batch_contract_mismatch_refused(tmp_path):
+    code_a = {"a.py": "1"}
+    code_b = {"a.py": "2"}
     batch = Batch(tmp_path, "c0", [1], dict(stage="direct", mode="disk",
                                             photons_per_wavelength=400,
-                                            protocol_sha256="p1"))
+                                            protocol_sha256="p1",
+                                            code_sha256=code_a))
     batch.record_seed(1, {"seed": 1})
     batch.close("complete")
+    # implementation change must not append into the old identity
+    with pytest.raises(ValueError, match="stored contract differs"):
+        Batch(tmp_path, "c0", [1], dict(stage="direct", mode="disk",
+                                        photons_per_wavelength=400,
+                                        protocol_sha256="p1",
+                                        code_sha256=code_b))
+    # budget change likewise
     with pytest.raises(ValueError, match="stored contract differs"):
         Batch(tmp_path, "c0", [1], dict(stage="direct", mode="disk",
                                         photons_per_wavelength=1600000,
-                                        protocol_sha256="p1"))
-    # an explicit re-contract decision records the change instead of mixing
-    rc = Batch(tmp_path, "c0", [1], dict(stage="direct", mode="disk",
-                                         photons_per_wavelength=1600000,
-                                         protocol_sha256="p1"),
-               allow_recontract=True)
-    assert rc.meta["recontracts"][-1]["changed"] == ["photons_per_wavelength"]
+                                        protocol_sha256="p1",
+                                        code_sha256=code_a))
+    # unchanged contract resumes and adopts the completed attempt
+    reopened = Batch(tmp_path, "c0", [1], dict(stage="direct", mode="disk",
+                                               photons_per_wavelength=400,
+                                               protocol_sha256="p1",
+                                               code_sha256=code_a))
+    assert reopened.done == {1} and reopened.attempt == 0
 
 
 def test_check_batch_contract_rejects_tampered_record():
@@ -647,3 +663,90 @@ def test_fresh_run_root_direct_resume(tmp_path):
         main(["--protocol", str(input_dir / "protocol.json"),
               "--stage", "direct", "--out", str(run_root),
               "--max-stage-hours", "0.01"])
+
+
+def test_efficiency_metric_direction(tmp_path):
+    """Variance x time: a slower estimator must never score better."""
+    from tools.summarize_deep_twilight_reference import _candidate_stats
+    data = _write_mini_dataset(tmp_path)
+    proto = json.loads((data / "protocol.json").read_text())
+    proto["candidate"] = {
+        "table": {"path": "probe/x.npz", "label": "x", "sha256": "c"},
+        "wavelengths_nm": [450.0, 550.0, 650.0], "repeats": 4,
+        "seed_rule": "t", "tiers": [{"candidate_samples": 1, "rest_photons": 4},
+                                    {"candidate_samples": 2, "rest_photons": 8}]}
+    (data / "protocol.json").write_text(json.dumps(proto))
+    from tools.deep_twilight_reference import Batch
+    wl_anchor = {450.0: 14, 550.0: 34, 650.0: 54}
+    for tier_index, (cs, rp, t_cand, t_mc) in enumerate(
+            [(1, 4, 2.0, 1.0), (2, 8, 2.0, 1.0)]):
+        batch = Batch(data / "raw" / "candidate", f"s0t{tier_index}",
+                      [80000 + 1000 * tier_index + r for r in range(4)],
+                      dict(stage="candidate", table_sha256="c",
+                           protocol_sha256="p", mode="disk",
+                           candidate_samples=cs, rest_photons=rp,
+                           code_sha256={"x.py": "1"}))
+        for r in range(4):
+            seed = 80000 + 1000 * tier_index + r
+            # identical distributions and equal candidate/analog variances;
+            # only the candidate is SLOWER (seconds 2.0 vs mc 1.0)
+            per_lambda = {str(a): dict(
+                L2=1e-9, L2_second_moment=2e-18, L2_max_abs=1e-8,
+                candidate_seconds=t_cand, candidate_samples=cs, c2nt_mean=5e-10,
+                rest_mean=2e-10, rest_second_moment=5e-12, mc_multiple=7e-10,
+                deterministic_single=1e-8, total_cand=1.12e-8, total_analog=1.12e-8,
+                max_fraction=0.004, top001_fraction=0.2,
+                effective_contributors=50.0) for a in wl_anchor}
+            batch.record_seed(seed, dict(
+                seed=seed, sun_elevation_deg=-9.0, tier_index=tier_index,
+                candidate_samples=cs, rest_photons=rp, mode="disk",
+                per_lambda=per_lambda, mc_seconds=t_mc, seconds=t_cand + t_mc,
+                table_sha256="c", protocol_sha256="p",
+                code_sha256={"x.py": "1"}, batch_id="x", attempt=0))
+        batch.close("complete")
+    wl = np.arange(380.0, 781.0, 5.0)
+    out = _candidate_stats(data, proto, wl, [14, 34, 54], {})
+    eff = out["-9.0"]["efficiency"]["550.0"]
+    assert eff["candidate_var_x_time"] >= eff["analog_var_x_time"]
+    assert eff["verdict"] == "candidate-not-more-efficient", (
+        "a slower estimator with equal variance must not win")
+
+
+def test_fresh_run_root_full_chain(tmp_path):
+    """fresh --out: direct + pairs + summary + verify-only, no manual copies."""
+    from tools.deep_twilight_reference import main
+    from tools.summarize_deep_twilight_reference import (resolve_protocol_path,
+                                                         compute_summary)
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    protocol = json.loads(DEFAULT_PROTOCOL.read_text())
+    # n=2: the statistical minimum with a defined Student interval
+    protocol["direct"]["repeats"] = 2
+    protocol["direct"]["budgets_photons"] = [400, 800]
+    (input_dir / "protocol.json").write_text(json.dumps(protocol))
+    run_root = tmp_path / "run"
+    base = ["--protocol", str(input_dir / "protocol.json"),
+            "--out", str(run_root)]
+    assert main(base + ["--stage", "direct", "--max-stage-hours", "0.05"]) == 0
+    assert main(base + ["--stage", "source-pairs",
+                        "--max-stage-hours", "0.03"]) == 0
+    # summary CLI on the run root alone
+    import subprocess
+    proc = subprocess.run(
+        [sys.executable, "-m", "tools.summarize_deep_twilight_reference",
+         "--directory", str(run_root)],
+        capture_output=True, text=True, cwd=str(ROOT))
+    assert proc.returncode == 0, proc.stdout[-500:] + proc.stderr[-1500:]
+    resolved = resolve_protocol_path(run_root)
+    assert resolved.name == "protocol.snapshot.json"
+    summary = compute_summary(run_root, protocol)
+    assert summary["protocol_file"] == "protocol.snapshot.json"
+    assert summary["direct"]["-9.0"]["budgets"]["800"]["n"] == 2
+    assert "source_pairs" in summary
+    # verify-only on the run root
+    proc = subprocess.run(
+        [sys.executable, "-m", "tools.summarize_deep_twilight_reference",
+         "--directory", str(run_root), "--verify-only"],
+        capture_output=True, text=True, cwd=str(ROOT))
+    assert proc.returncode == 0, proc.stdout[-500:] + proc.stderr[-1500:]
+    assert "VERIFY OK" in proc.stdout

@@ -1,7 +1,8 @@
 {
  "schema": "deep-twilight-reference/summary/1",
- "generated": "2026-11-04T19:45:03+0800",
+ "generated": "2026-11-04T20:05:45+0800",
  "protocol_sha256": "23b46bd6784b91181c34cd5ff05656ce86f9aeecfa2bbe29c0728f1b432c87a1",
+ "protocol_file": "protocol.json",
  "grid": [
   380.0,
   385.0,
@@ -2056,7 +2057,13 @@
  "contract_notes": [
   "direct/s0b0: executed under protocol sha f6da541115da... (current file 23b46bd6784b...); stage-relevant sections validated semantically above",
   "direct/s0b1: executed under protocol sha f6da541115da... (current file 23b46bd6784b...); stage-relevant sections validated semantically above",
-  "direct/s1b0: executed under protocol sha f6da541115da... (current file 23b46bd6784b...); stage-relevant sections validated semantically above"
+  "direct/s1b0: executed under protocol sha f6da541115da... (current file 23b46bd6784b...); stage-relevant sections validated semantically above",
+  "candidate/s0t0: records lack ['mode'] (pre-fix instrumentation); batch-meta provenance applies",
+  "candidate/s0t1: records lack ['mode'] (pre-fix instrumentation); batch-meta provenance applies",
+  "candidate/s1t0: records lack ['mode'] (pre-fix instrumentation); batch-meta provenance applies",
+  "candidate/s1t1: records lack ['mode'] (pre-fix instrumentation); batch-meta provenance applies",
+  "sensitivity/s0mc: records lack ['mode', 'protocol_sha256'] (pre-fix instrumentation); batch-meta provenance applies",
+  "sensitivity/s1mc: records lack ['mode', 'protocol_sha256'] (pre-fix instrumentation); batch-meta provenance applies"
  ],
  "candidate": {
   "-9.0": {
@@ -2074,8 +2081,8 @@
        "analog_t95_halfwidth": 1.4141476363787567e-07,
        "rest_second_moment_mean": 4.1120379131382194e-08,
        "zero_rest_records": 0,
-       "candidate_var_of_mean_per_second": 4.62847134959915e-16,
-       "analog_var_of_mean_per_second": 2.797956608403072e-15,
+       "candidate_var_x_time": 1.5339172750063924e-13,
+       "analog_var_x_time": 1.1080459956332746e-13,
        "candidate_seconds_per_repeat": 4.551160883012926,
        "analog_mc_seconds_per_repeat": 1.5732524453196675
       },
@@ -2088,8 +2095,8 @@
        "analog_t95_halfwidth": 3.2472150182246487e-08,
        "rest_second_moment_mean": 5.874494987183562e-10,
        "zero_rest_records": 0,
-       "candidate_var_of_mean_per_second": 2.3424618794245816e-17,
-       "analog_var_of_mean_per_second": 1.4752769769095014e-16,
+       "candidate_var_x_time": 7.763130570538138e-15,
+       "analog_var_x_time": 5.8423877690066224e-15,
        "candidate_seconds_per_repeat": 4.551160883012926,
        "analog_mc_seconds_per_repeat": 1.5732524453196675
       },
@@ -2102,8 +2109,8 @@
        "analog_t95_halfwidth": 3.4691964233865696e-08,
        "rest_second_moment_mean": 7.857514517382156e-10,
        "zero_rest_records": 0,
-       "candidate_var_of_mean_per_second": 2.110255061075493e-17,
-       "analog_var_of_mean_per_second": 1.6838726809623358e-16,
+       "candidate_var_x_time": 6.993576168800756e-15,
+       "analog_var_x_time": 6.6684678943662714e-15,
        "candidate_seconds_per_repeat": 4.551160883012926,
        "analog_mc_seconds_per_repeat": 1.5732524453196675
       }
@@ -2123,8 +2130,8 @@
        "analog_t95_halfwidth": 9.625673742703394e-08,
        "rest_second_moment_mean": 2.0130924305288223e-08,
        "zero_rest_records": 0,
-       "candidate_var_of_mean_per_second": 3.8103588122573593e-17,
-       "analog_var_of_mean_per_second": 2.839708401103231e-16,
+       "candidate_var_x_time": 2.212145064499342e-13,
+       "analog_var_x_time": 2.3435302247341866e-13,
        "candidate_seconds_per_repeat": 19.04863557020144,
        "analog_mc_seconds_per_repeat": 7.1818844765221
       },
@@ -2137,8 +2144,8 @@
        "analog_t95_halfwidth": 1.6534508609055968e-08,
        "rest_second_moment_mean": 5.747730828052326e-10,
        "zero_rest_records": 0,
-       "candidate_var_of_mean_per_second": 1.1081789608899032e-18,
-       "analog_var_of_mean_per_second": 8.379036006263555e-18,
+       "candidate_var_x_time": 6.433652943729732e-15,
+       "analog_var_x_time": 6.914979061647968e-15,
        "candidate_seconds_per_repeat": 19.04863557020144,
        "analog_mc_seconds_per_repeat": 7.1818844765221
       },
@@ -2151,8 +2158,8 @@
        "analog_t95_halfwidth": 1.2431716483489401e-08,
        "rest_second_moment_mean": 2.9424482956660236e-10,
        "zero_rest_records": 0,
-       "candidate_var_of_mean_per_second": 7.179530147029728e-19,
-       "analog_var_of_mean_per_second": 4.736675854990487e-18,
+       "candidate_var_x_time": 4.1681539620587666e-15,
+       "analog_var_x_time": 3.909043275931527e-15,
        "candidate_seconds_per_repeat": 19.04863557020144,
        "analog_mc_seconds_per_repeat": 7.1818844765221
       }
@@ -2179,19 +2186,22 @@
    },
    "efficiency": {
     "450.0": {
-     "candidate_var_of_mean_per_second": 3.8103588122573593e-17,
-     "analog_var_of_mean_per_second": 2.839708401103231e-16,
+     "candidate_var_x_time": 2.212145064499342e-13,
+     "analog_var_x_time": 2.3435302247341866e-13,
+     "ratio": 0.9439370745688818,
      "verdict": "candidate-more-efficient"
     },
     "550.0": {
-     "candidate_var_of_mean_per_second": 1.1081789608899032e-18,
-     "analog_var_of_mean_per_second": 8.379036006263555e-18,
+     "candidate_var_x_time": 6.433652943729732e-15,
+     "analog_var_x_time": 6.914979061647968e-15,
+     "ratio": 0.9303936984295761,
      "verdict": "candidate-more-efficient"
     },
     "650.0": {
-     "candidate_var_of_mean_per_second": 7.179530147029728e-19,
-     "analog_var_of_mean_per_second": 4.736675854990487e-18,
-     "verdict": "candidate-more-efficient"
+     "candidate_var_x_time": 4.1681539620587666e-15,
+     "analog_var_x_time": 3.909043275931527e-15,
+     "ratio": 1.0662849367062823,
+     "verdict": "candidate-not-more-efficient"
     }
    },
    "reference": {
@@ -2246,8 +2256,8 @@
        "analog_t95_halfwidth": 6.154691207147325e-08,
        "rest_second_moment_mean": 5.8979844087005075e-09,
        "zero_rest_records": 0,
-       "candidate_var_of_mean_per_second": 1.7988641255542927e-16,
-       "analog_var_of_mean_per_second": 4.459727979191422e-16,
+       "candidate_var_x_time": 6.527985147054434e-14,
+       "analog_var_x_time": 2.4942297765470525e-14,
        "candidate_seconds_per_repeat": 4.7624497579890885,
        "analog_mc_seconds_per_repeat": 1.86962304955523
       },
@@ -2260,8 +2270,8 @@
        "analog_t95_halfwidth": 2.996524390705142e-09,
        "rest_second_moment_mean": 4.35175664224206e-12,
        "zero_rest_records": 0,
-       "candidate_var_of_mean_per_second": 2.02616382524482e-19,
-       "analog_var_of_mean_per_second": 1.057137471162771e-18,
+       "candidate_var_x_time": 7.352844035744808e-17,
+       "analog_var_x_time": 5.912342122166594e-17,
        "candidate_seconds_per_repeat": 4.7624497579890885,
        "analog_mc_seconds_per_repeat": 1.86962304955523
       },
@@ -2274,8 +2284,8 @@
        "analog_t95_halfwidth": 8.04311582786514e-09,
        "rest_second_moment_mean": 2.3482629201621825e-11,
        "zero_rest_records": 0,
-       "candidate_var_of_mean_per_second": 7.50903605007886e-19,
-       "analog_var_of_mean_per_second": 7.616307657345498e-18,
+       "candidate_var_x_time": 2.724990459660574e-16,
+       "analog_var_x_time": 4.2596367838871453e-16,
        "candidate_seconds_per_repeat": 4.7624497579890885,
        "analog_mc_seconds_per_repeat": 1.86962304955523
       }
@@ -2295,8 +2305,8 @@
        "analog_t95_halfwidth": 3.9138466037553635e-08,
        "rest_second_moment_mean": 3.3256260327932654e-09,
        "zero_rest_records": 0,
-       "candidate_var_of_mean_per_second": 7.692116686739093e-18,
-       "analog_var_of_mean_per_second": 5.0344705872013574e-17,
+       "candidate_var_x_time": 3.2054094339717983e-14,
+       "analog_var_x_time": 3.6131097094650325e-14,
        "candidate_seconds_per_repeat": 16.138338934739295,
        "analog_mc_seconds_per_repeat": 6.697360541635135
       },
@@ -2309,8 +2319,8 @@
        "analog_t95_halfwidth": 5.616995904690563e-09,
        "rest_second_moment_mean": 9.631996149935093e-11,
        "zero_rest_records": 0,
-       "candidate_var_of_mean_per_second": 1.8535344895597478e-19,
-       "analog_var_of_mean_per_second": 1.036941896169997e-18,
+       "candidate_var_x_time": 7.723929811503704e-16,
+       "analog_var_x_time": 7.441864578030257e-16,
        "candidate_seconds_per_repeat": 16.138338934739295,
        "analog_mc_seconds_per_repeat": 6.697360541635135
       },
@@ -2323,8 +2333,8 @@
        "analog_t95_halfwidth": 3.530987182407024e-09,
        "rest_second_moment_mean": 2.709211366431928e-11,
        "zero_rest_records": 0,
-       "candidate_var_of_mean_per_second": 8.095806870054859e-20,
-       "analog_var_of_mean_per_second": 4.097684241136624e-19,
+       "candidate_var_x_time": 3.373632612935393e-16,
+       "analog_var_x_time": 2.9408023071206066e-16,
        "candidate_seconds_per_repeat": 16.138338934739295,
        "analog_mc_seconds_per_repeat": 6.697360541635135
       }
@@ -2351,19 +2361,22 @@
    },
    "efficiency": {
     "450.0": {
-     "candidate_var_of_mean_per_second": 7.692116686739093e-18,
-     "analog_var_of_mean_per_second": 5.0344705872013574e-17,
+     "candidate_var_x_time": 3.2054094339717983e-14,
+     "analog_var_x_time": 3.6131097094650325e-14,
+     "ratio": 0.8871608369861541,
      "verdict": "candidate-more-efficient"
     },
     "550.0": {
-     "candidate_var_of_mean_per_second": 1.8535344895597478e-19,
-     "analog_var_of_mean_per_second": 1.036941896169997e-18,
-     "verdict": "candidate-more-efficient"
+     "candidate_var_x_time": 7.723929811503704e-16,
+     "analog_var_x_time": 7.441864578030257e-16,
+     "ratio": 1.037902494800316,
+     "verdict": "candidate-not-more-efficient"
     },
     "650.0": {
-     "candidate_var_of_mean_per_second": 8.095806870054859e-20,
-     "analog_var_of_mean_per_second": 4.097684241136624e-19,
-     "verdict": "candidate-more-efficient"
+     "candidate_var_x_time": 3.373632612935393e-16,
+     "analog_var_x_time": 2.9408023071206066e-16,
+     "ratio": 1.1471810276966827,
+     "verdict": "candidate-not-more-efficient"
     }
    },
    "reference": {
