@@ -1,0 +1,54 @@
+{
+  "wavelengths": [
+    450.0,
+    550.0,
+    650.0
+  ],
+  "suns": [
+    -9.0,
+    -12.0
+  ],
+  "photons_per_wavelength": [
+    1000,
+    4000,
+    16000
+  ],
+  "replicates": 8,
+  "seed_rule": "10000 + sun_index*1000 + budget_index*100 + repeat_index",
+  "n_height": 33,
+  "derivative_tolerance": 0.005,
+  "disk_radial": 2,
+  "disk_azimuth": 8,
+  "max_scatter": 50,
+  "transport": "native straight diffuse / refracted finite sun",
+  "scenario": "clear AOD550 .05 O3 300DU ground=observer=0 default albedo .1",
+  "purpose": "Cost and conditional seed/budget variability, NOT photopic integral or tail certification",
+  "timeout_table_seconds": 1800,
+  "timeout_all_mc_seconds": 1800,
+  "python": "3.12.11 (main, Jun  3 2025, 15:41:47) [Clang 16.0.0 (clang-1600.0.26.6)]",
+  "numpy": "2.5.4",
+  "scipy": "1.18.1",
+  "platform": "macOS-14.7-arm64-arm-64bit",
+  "machine": "arm64",
+  "cpu_count": 12,
+  "hardware": [
+    "Apple M2 Max",
+    "34359738368"
+  ],
+  "thread_env": {
+    "OMP_NUM_THREADS": null,
+    "OPENBLAS_NUM_THREADS": null,
+    "MKL_NUM_THREADS": null
+  },
+  "import_path": "/Users/zhangjiajie/Codes/sky-color-sim-wt-7/skycolor/__init__.py",
+  "head": "b8ed6424d3b7dfd708569d44a692dafd0aa55ec1",
+  "git_status": "",
+  "source_sha256": {
+    "skycolor/rt/mc.py": "30db2a561fd3428074774bb6096148f21dc40de139d8199335761db3676a6f03",
+    "tools/point_solar_table.py": "c189f8c043a2da0b234b57c36d3e1b5f5c6ed459a7c7a45e3b7048f4bf51d084",
+    "tools/unified_solar_transport.py": "6ed1b03c3c49ad748540064d90ce8306b8855f08d2409ba9a1cc51e1a654dea2",
+    "tools/continuous_solar_columns.py": "6a933e842fd42f8281f268f9c952dd1432762e397ddaacf849b0fea9d142ffce",
+    "tools/radial_solar_mapping.py": "130b0de8926ac2cf70d47ba2f0dd0f830216e4bf696d54a704cf5c2c1fd9ba60"
+  },
+  "probe_sha256": "96c8c36fbaccbc8644848392da00fe17962adf1097718afa5aaa2d637436a6f2"
+}

@@ -1,0 +1,77 @@
+{
+  "schema": "deep-twilight-reference/1",
+  "created": "2026-11-04",
+  "task": "task-deep-twilight-reference",
+  "scenario": {
+    "preset": "clear",
+    "aod550": 0.05,
+    "ozone_du": 300.0,
+    "ground_albedo": 0.1,
+    "elevation_km": 0.0,
+    "ground_km": 0.0,
+    "spectrum": {"grid": [380.0, 780.0, 5.0], "n_wavelengths": 81},
+    "anchor_wavelengths_nm": [450.0, 550.0, 650.0],
+    "view_zenith_deg": 0.0,
+    "view_azimuth_deg": 0.0,
+    "sun_azimuth_deg": 0.0,
+    "sun_elevations_deg": [-9.0, -12.0],
+    "transport": {
+      "solar_source": "finite solar disk radius 16 arcmin, continuous refraction, archived full81 table",
+      "diffuse_transport": "native straight-line MC diffuse; solar refraction retained",
+      "max_scatter": 50,
+      "russian_roulette": "skycolor.rt.mc module defaults"
+    }
+  },
+  "source": {
+    "full81_table": {
+      "path": "validation/data/unified_solar_source_audit/tables/point-source-clear81-ground0-refined.npz",
+      "label": "phase3-clear-81-ground0-refined",
+      "sha256": "1e6bef75ad5d17d66e3c6ed73f9979c53fb8727f657a02d6ac272b443d16b313",
+      "note": "archived unified-solar-source audit table; loaded by explicit label + hash; a hash mismatch stops the run, it is never rebuilt silently. The planning-probe table (450/550/650 nm) is NOT a full81 table."
+    },
+    "point_pairing": {
+      "radius_deg": 0.0,
+      "note": "point-source limit at the 1.6M budget with the same pre-registered seeds as the disk batch; same native paths are verified by the per-record source fingerprint"
+    }
+  },
+  "direct": {
+    "budgets_photons": [400000, 1600000],
+    "repeats": 16,
+    "seed_rule": "40000 + 10000*sun_index + 1000*budget_index + repeat",
+    "sun_index_order": [-9.0, -12.0],
+    "budget_index_order": [400000, 1600000],
+    "analysis": {
+      "student": {"confidence": 0.95, "df": 15},
+      "bootstrap": {"resamples": 5000, "seed": 90000, "unit": "complete repeat"},
+      "unit": "independent complete spectrum; luminance integrates each spectrum before any statistics"
+    }
+  },
+  "precision": {
+    "anchor_scales": {
+      "-9.0": [4.0e-9, 1.0e-9, 1.0e-9],
+      "-12.0": [3.0e-10, 7.0e-11, 1.0e-10]
+    },
+    "anchor_scale_order": [450.0, 550.0, 650.0],
+    "anchor_halfwidth_factor": 0.5,
+    "luminance_relative_halfwidth": 0.005,
+    "drift_factor": 0.5,
+    "max_path_fraction": 0.01,
+    "top001_fraction": 0.5,
+    "note": "conservative one-significant-digit anchor scales from the planning probes (verified-probe-summary.json); these are pre-registered test targets, not claims about the physical finite-disk effect at all depths or wavelengths"
+  },
+  "luminance": {
+    "constant": 683.0,
+    "method": "683 * trapezoid(L * V, wl) per independent complete spectrum; V = column 1 of spectra.cie_xyz on the 380-780/5 nm grid"
+  },
+  "wall_clock_caps_hours": {
+    "direct_and_source_pairs": 4.0,
+    "candidate": 2.0,
+    "sensitivity": 2.0
+  },
+  "verdict_policy": {
+    "sampling_stable": "at both budgets: anchor half-widths <= scale/2, luminance half-width <= 0.5%, drift between budgets <= half of each target half-scale, bootstrap does not flip any gate, per-batch max path fraction <= 1%, top 0.1% <= 50%, and no all-zero anchor record; otherwise 'budget-limited: unresolved'",
+    "zero_batch": "a record with an all-zero multiple spectrum is a detection limit of the photon budget; it marks the batch 'no-tail-evidence' and fails the precision gate",
+    "source_correction": "identified only if the paired (disk - point) interval at an anchor excludes zero; a stable reference alone never implies the correction is resolved",
+    "final": "'stable under this protocol' additionally requires the Step-4 refinement sensitivity to expose no same-magnitude bias; until then the summary reports sampling and refinement verdicts separately"
+  }
+}

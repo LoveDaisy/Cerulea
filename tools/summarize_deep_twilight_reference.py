@@ -1,0 +1,561 @@
+"""Recompute the deep-twilight reference summary from raw records.
+
+This is the analysis authority for ``validation/data/deep_twilight_reference/``:
+it never trusts a previous summary.  Every number in ``summary.json`` is
+recomputed from the append-only raw records (statistics, precision gates,
+budget drift, bootstrap sensitivity, source-pair deltas, tail diagnostics,
+cost), and a SHA256 manifest pins every input.  ``--verify-only`` repeats the
+whole recomputation and compares against the stored summary; any mismatch,
+missing batch, duplicate "valid" attempt, or altered hash exits non-zero
+instead of being merged silently.
+
+Statistical contract (from ``protocol.json``):
+
+* the sampling unit is one independent complete spectrum; luminance
+  ``683 * trapezoid(L * V, wl)`` integrates each spectrum *before* any
+  statistics, so no cross-wavelength independence is assumed;
+* per budget: mean, sample SD, Student-t 95 % conditional half-width
+  (df = 15); the bootstrap (5000 resamples of complete repeats, analysis
+  seed 90000) is a sensitivity check and must not flip the verdict;
+* source correction: paired (disk - point) differences on identical seeds,
+  analysed per repeat; "identified" requires the anchor interval to exclude
+  zero -- a stable reference alone never implies a resolved correction;
+* an all-zero multiple spectrum is a detection limit of the photon budget
+  ("no-tail-evidence") and fails the precision gate by construction.
+
+Run from the repository root::
+
+    uv run python -m tools.summarize_deep_twilight_reference \\
+        --directory validation/data/deep_twilight_reference            # write
+    uv run python -m tools.summarize_deep_twilight_reference \\
+        --directory validation/data/deep_twilight_reference --verify-only
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import math
+import sys
+import time
+from pathlib import Path
+
+import numpy as np
+from scipy.stats import t as student_t
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from skycolor.constants import WL_COARSE  # noqa: E402  (contract anchor)
+
+#: record-level recombination tolerance (float64 add/subtract exactness)
+CLOSURE_RTOL = 2e-13
+
+
+def sha256_file(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+# ---------------------------------------------------------------------------
+# raw ingestion and validation
+# ---------------------------------------------------------------------------
+def read_attempt(path: Path):
+    """Parse one attempt file; returns (records, corrupt_tail)."""
+    records, corrupt = [], False
+    for line in path.read_text().splitlines():
+        if not line.strip():
+            continue
+        try:
+            records.append(json.loads(line))
+        except json.JSONDecodeError:
+            corrupt = True
+            break
+    return records, corrupt
+
+
+def load_batch(batch_dir: Path, expected_seeds, *, stage, batch_id):
+    """Return the records of the unique valid complete attempt.
+
+    Refuses to merge when: no attempt is complete, more than one attempt is
+    complete (duplicated recomputation must never count as extra seeds), the
+    chosen attempt's seeds deviate from the pre-registered set, or it has a
+    corrupt trailing line or duplicate seeds.
+    """
+    meta_path = batch_dir / "meta.json"
+    if not meta_path.exists():
+        raise ValueError(f"{stage}/{batch_id}: missing batch meta")
+    meta = json.loads(meta_path.read_text())
+    candidates = []
+    for attempt in meta.get("attempts", []):
+        path = batch_dir / f"attempt-{attempt['index']:02d}.jsonl"
+        if not path.exists() or attempt.get("status") != "complete":
+            continue
+        records, corrupt = read_attempt(path)
+        if corrupt:
+            raise ValueError(f"{stage}/{batch_id}: attempt "
+                             f"{attempt['index']} is marked complete but has "
+                             "a corrupt line")
+        seeds = [int(r["seed"]) for r in records]
+        if len(seeds) != len(set(seeds)):
+            raise ValueError(f"{stage}/{batch_id}: attempt "
+                             f"{attempt['index']} repeats seeds -- duplicated "
+                             "recomputation must not be merged")
+        candidates.append((attempt["index"], records))
+    if not candidates:
+        raise ValueError(
+            f"{stage}/{batch_id}: no valid complete attempt "
+            f"(attempts: {[(a.get('index'), a.get('status')) for a in meta.get('attempts', [])]})")
+    if len(candidates) > 1:
+        raise ValueError(
+            f"{stage}/{batch_id}: {len(candidates)} complete attempts "
+            f"{[i for i, _ in candidates]} -- duplicated recomputation must not "
+            "be merged; mark all but one attempt superseded in meta.json")
+    index, records = candidates[0]
+    seeds = [int(r["seed"]) for r in records]
+    if sorted(seeds) != sorted(int(s) for s in expected_seeds):
+        raise ValueError(f"{stage}/{batch_id}: seeds {sorted(seeds)} deviate "
+                         f"from the pre-registered {sorted(expected_seeds)}")
+    return records, meta
+
+
+def check_record_invariants(records, *, stage, batch_id):
+    """Physical/statistical invariants every record must satisfy."""
+    for row in records:
+        fields = row["fields"]
+        total = np.asarray(fields["total"])
+        single = np.asarray(fields["single"])
+        multiple = np.asarray(fields["multiple"])
+        # MC split identity: total = single + multiple
+        if not np.allclose(total, single + multiple, rtol=CLOSURE_RTOL, atol=0):
+            raise ValueError(f"{stage}/{batch_id} seed {row['seed']}: "
+                             "MC split closure violated")
+        # reference identity: split_total = deterministic single + MC multiple
+        if not np.array_equal(np.asarray(row["split_total"]),
+                              np.asarray(row["deterministic_single"]) + multiple):
+            raise ValueError(f"{stage}/{batch_id} seed {row['seed']}: "
+                             "split_total is not deterministic_single + multiple")
+        if row["photons_per_wavelength"] <= 0 or row["seed"] < 0:
+            raise ValueError(f"{stage}/{batch_id} seed {row['seed']}: "
+                             "bad budget/seed fields")
+        if len(np.asarray(row["split_total"])) != len(WL_COARSE):
+            raise ValueError(f"{stage}/{batch_id} seed {row['seed']}: "
+                             "spectrum does not span the 81-wavelength grid")
+
+
+# ---------------------------------------------------------------------------
+# statistics
+# ---------------------------------------------------------------------------
+def student_halfwidth(values: np.ndarray, confidence=0.95) -> np.ndarray:
+    n = values.shape[0]
+    se = values.std(axis=0, ddof=1) / math.sqrt(n)
+    return student_t.ppf(0.5 + confidence / 2.0, n - 1) * se
+
+
+def bootstrap_halfwidth(values: np.ndarray, resamples: int, seed: int):
+    """Percentile half-width of resampled means (complete repeats only)."""
+    n = values.shape[0]
+    rng = np.random.default_rng(seed)
+    idx = rng.integers(0, n, size=(resamples, n))
+    means = values[idx].mean(axis=1)              # (resamples, m)
+    lo, hi = np.percentile(means, [2.5, 97.5], axis=0)
+    return (hi - lo) / 2.0
+
+
+def photopic(radiance_row: np.ndarray, v_curve: np.ndarray, wl: np.ndarray) -> float:
+    return float(683.0 * np.trapezoid(radiance_row * v_curve, wl))
+
+
+# ---------------------------------------------------------------------------
+# summary computation
+# ---------------------------------------------------------------------------
+def compute_summary(data_dir: Path, protocol: dict) -> dict:
+    scenario = protocol["scenario"]
+    direct_cfg = protocol["direct"]
+    precision = protocol["precision"]
+    wl = WL_COARSE.copy()
+    v_curve = _v_curve(wl)
+    anchors = list(scenario["anchor_wavelengths_nm"])
+    anchor_idx = [int(np.argmin(np.abs(wl - a))) for a in anchors]
+    budgets = list(direct_cfg["budgets_photons"])
+    repeats = int(direct_cfg["repeats"])
+    suns = list(scenario["sun_elevations_deg"])
+
+    raw_dir = data_dir / "raw"
+    out = dict(schema="deep-twilight-reference/summary/1",
+               generated=time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+               protocol_sha256=sha256_file(data_dir / "protocol.json"),
+               grid=wl.tolist(), anchors_nm=anchors)
+
+    # ---- direct batches --------------------------------------------------
+    disk_records = {}
+    disk_meta = {}
+    for sun_index, sun in enumerate(suns):
+        per_budget = {}
+        for budget_index, photons in enumerate(budgets):
+            batch_id = f"s{sun_index}b{budget_index}"
+            records, meta = load_batch(
+                raw_dir / "direct" / batch_id,
+                [40000 + 10000 * sun_index + 1000 * budget_index + r
+                 for r in range(repeats)],
+                stage="direct", batch_id=batch_id)
+            check_record_invariants(records, stage="direct", batch_id=batch_id)
+            fingerprints = {r["fingerprint"] for r in records}
+            if len(fingerprints) != 1:
+                raise ValueError(f"direct/{batch_id}: native paths differ "
+                                 "between repeats (fingerprint not uniform)")
+            disk_records[(sun, photons)] = records
+            disk_meta[batch_id] = meta
+            per_budget[str(photons)] = _budget_stats(
+                records, wl, v_curve, anchor_idx, sun, str(photons), protocol,
+                stage="direct")
+        out.setdefault("direct", {})[str(sun)] = dict(
+            budgets=per_budget, drift=_drift_stats(per_budget, anchor_idx,
+                                                   wl, v_curve, sun, precision))
+    # per-depth verdict: stable requires every budget gate (Student and
+    # bootstrap agree) plus budget drift inside half of each target half-scale
+    for sun_index, sun in enumerate(suns):
+        stats = out["direct"][str(sun)]
+        gates_ok = all(b["gates"]["pass_"] for b in stats["budgets"].values())
+        drift_ok = stats["drift"]["anchors_pass"] and stats["drift"]["luminance_pass"]
+        if gates_ok and drift_ok:
+            stats["verdict"] = "sampling-stable-under-protocol"
+            stats["verdict_failures"] = []
+        else:
+            stats["verdict"] = "budget-limited-unresolved"
+            failures = [f"budget {b}: {f}"
+                        for key, b in stats["budgets"].items()
+                        for f in b["gates"]["student_failures"]
+                        + b["gates"]["bootstrap_failures"]]
+            if not stats["drift"]["anchors_pass"]:
+                failures.append("anchor drift between budgets exceeds half of "
+                                "the target half-scale")
+            if not stats["drift"]["luminance_pass"]:
+                failures.append("luminance drift between budgets exceeds a "
+                                "quarter of the luminance gate")
+            stats["verdict_failures"] = failures
+    # ---- source pairs ----------------------------------------------------
+    pair_cfg = protocol["source"]["point_pairing"]
+    pairs = {}
+    for sun_index, sun in enumerate(suns):
+        top_budget_index = len(budgets) - 1
+        photons = budgets[top_budget_index]
+        batch_id = f"s{sun_index}b{top_budget_index}-point"
+        records, meta = load_batch(
+            raw_dir / "source-pairs" / batch_id,
+            [40000 + 10000 * sun_index + 1000 * top_budget_index + r
+             for r in range(repeats)],
+            stage="source-pairs", batch_id=batch_id)
+        check_record_invariants(records, stage="source-pairs", batch_id=batch_id)
+        disk_rows = disk_records[(sun, photons)]
+        pairs[str(sun)] = _pair_stats(disk_rows, records, wl, v_curve,
+                                      anchor_idx, sun, protocol, pair_cfg)
+    out["source_pairs"] = pairs
+    out["cost"] = _cost_stats(data_dir, disk_meta)
+    out["unknowns"] = [
+        "diffuse-transport curvature: straight diffuse lines are a fixed "
+        "transport approximation of this reference (curved backends exist as "
+        "experiments; their correction is not quantified here)",
+        "continuous-wavelength integral: the 380-780 nm / 5 nm grid is a "
+        "discrete contract; trapezoidal truncation/quadrature error of the "
+        "continuum is not certified (angular smoothing and spectral anchors "
+        "are not applicable by construction, not zero)",
+        "solar-source discretisation: table quadrature and disk-node "
+        "refinement sensitivities are Step-4 items and may remain unquantified",
+        "tail coverage: conditional intervals do not certify that unsampled "
+        "heavy tails are exhausted; all-zero records are detection limits",
+    ]
+    return out
+
+
+def _v_curve(wl: np.ndarray) -> np.ndarray:
+    from skycolor import spectra
+    return spectra.cie_xyz(wl)[:, 1]
+
+
+def _budget_stats(records, wl, v_curve, anchor_idx, sun, budget, protocol,
+                  *, stage):
+    """Per-budget statistics, gates and tail concentration for one batch."""
+    precision = protocol["precision"]
+    spectra_rows = np.array([r["split_total"] for r in records])  # (n, 81)
+    multiple_rows = np.array([r["fields"]["multiple"] for r in records])
+    n = spectra_rows.shape[0]
+    mean = spectra_rows.mean(axis=0)
+    half = student_halfwidth(spectra_rows,
+                             protocol["direct"]["analysis"]["student"]["confidence"])
+    luminance = np.array([photopic(row, v_curve, wl) for row in spectra_rows])
+    y_mean = float(luminance.mean())
+    y_half = float(student_halfwidth(luminance.reshape(-1, 1),
+                                     protocol["direct"]["analysis"]["student"]["confidence"])[0])
+
+    boot_cfg = protocol["direct"]["analysis"]["bootstrap"]
+    boot_half_spec = bootstrap_halfwidth(spectra_rows, int(boot_cfg["resamples"]),
+                                         int(boot_cfg["seed"]))
+    boot_half_y = float(bootstrap_halfwidth(luminance.reshape(-1, 1),
+                                            int(boot_cfg["resamples"]),
+                                            int(boot_cfg["seed"]))[0])
+
+    # all-zero record = detection limit ("no-tail-evidence")
+    zero_records = [int(r["seed"]) for r, m in zip(records, multiple_rows)
+                    if not np.any(m > 0.0)]
+    anchor_all_zero = {float(wl[i]): bool(any(
+        not (np.asarray(r["fields"]["multiple"])[i] > 0.0) for r in records))
+        for i in anchor_idx}
+
+    # tail concentration per anchor (max over records), plus global worst
+    def _tail(key, index=None):
+        values = []
+        for r in records:
+            if index is None:
+                per = [d[key] for d in r["diagnostics"]["per_wl"]
+                       if d[key] is not None]
+            else:
+                d = r["diagnostics"]["anchors"][str(float(wl[index]))]
+                per = [d[key]] if d[key] is not None else []
+            values.extend(per)
+        return max(values) if values else None
+
+    tail = {float(wl[i]): {"max_path_fraction": _tail("max_fraction", i),
+                           "top001_fraction": _tail("top001_fraction", i),
+                           "effective_contributors_min": min(
+                               d["effective_contributors"]
+                               for r in records
+                               for d in [r["diagnostics"]["anchors"][str(float(wl[i]))]]
+                               if d["effective_contributors"] is not None)
+                           if any(r["diagnostics"]["anchors"][str(float(wl[i]))]["effective_contributors"]
+                                  is not None for r in records) else None}
+            for i in anchor_idx}
+    tail["worst_any_wavelength"] = {"max_path_fraction": _tail("max_fraction"),
+                                    "top001_fraction": _tail("top001_fraction")}
+
+    # gates
+    scale_key = str(sun)
+    scales = precision["anchor_scales"][scale_key]
+    anchor_hw = {float(wl[i]): float(half[i]) for i in anchor_idx}
+    anchor_boot_hw = {float(wl[i]): float(boot_half_spec[i]) for i in anchor_idx}
+    anchor_factor = float(precision["anchor_halfwidth_factor"])
+    y_rel_half = y_half / y_mean if y_mean else math.inf
+    y_rel_boot = boot_half_y / y_mean if y_mean else math.inf
+    y_limit = float(precision["luminance_relative_halfwidth"])
+    anchors = [float(a) for a in protocol["scenario"]["anchor_wavelengths_nm"]]
+
+    def _verdict(hw_map, y_rel):
+        failed = []
+        if zero_records:
+            failed.append(f"no-tail-evidence (all-zero records: {zero_records})")
+        for a, s, i in zip(anchors, scales, anchor_idx):
+            if anchor_all_zero[float(wl[i])]:
+                failed.append(f"anchor {a} nm has all-zero records")
+            elif hw_map[float(wl[i])] > float(s) * anchor_factor:
+                failed.append(
+                    f"anchor {a} nm half-width {hw_map[float(wl[i])]:.4e} "
+                    f"> {float(s) * anchor_factor:.4e}")
+        if y_rel > y_limit:
+            failed.append(f"luminance relative half-width {y_rel:.5f} > {y_limit}")
+        tail_max = tail["worst_any_wavelength"]["max_path_fraction"]
+        if tail_max is not None and tail_max > float(precision["max_path_fraction"]):
+            failed.append(f"max path fraction {tail_max:.4f} > "
+                          f"{precision['max_path_fraction']}")
+        top01 = tail["worst_any_wavelength"]["top001_fraction"]
+        if top01 is not None and top01 > float(precision["top001_fraction"]):
+            failed.append(f"top-0.1% fraction {top01:.4f} > "
+                          f"{precision['top001_fraction']}")
+        return (len(failed) == 0), failed
+
+    verdict_student, failures_student = _verdict(anchor_hw, y_rel_half)
+    verdict_boot, failures_boot = _verdict(anchor_boot_hw, y_rel_boot)
+
+    seconds = float(sum(r["seconds"] for r in records))
+    return dict(
+        n=n, seeds=sorted(int(r["seed"]) for r in records),
+        mean=mean.tolist(), sd=spectra_rows.std(axis=0, ddof=1).tolist(),
+        student_halfwidth=half.tolist(),
+        anchors={float(wl[i]): {"mean": float(mean[i]),
+                                "student_halfwidth": float(half[i]),
+                                "bootstrap_halfwidth": float(boot_half_spec[i]),
+                                "scale": float(s),
+                                "gate_limit": float(s) * anchor_factor}
+                 for s, i in zip(scales, anchor_idx)},
+        luminance=dict(mean=y_mean, student_halfwidth=y_half,
+                       relative_halfwidth=y_rel_half,
+                       bootstrap_relative_halfwidth=y_rel_boot,
+                       limit=y_limit),
+        all_zero_record_seeds=zero_records,
+        anchor_all_zero=anchor_all_zero,
+        tail=tail,
+        gates=dict(student_pass=verdict_student, student_failures=failures_student,
+                   bootstrap_pass=verdict_boot, bootstrap_failures=failures_boot,
+                   pass_=bool(verdict_student and verdict_boot)),
+        seconds=seconds,
+        fingerprints_uniform=True,
+        stage=stage)
+
+
+def _drift_stats(per_budget, anchor_idx, wl, v_curve, sun, precision):
+    hi_key, lo_key = sorted(per_budget, key=int, reverse=True)[:2]
+    hi, lo = per_budget[hi_key], per_budget[lo_key]
+    hi_mean = np.asarray(hi["mean"])
+    lo_mean = np.asarray(lo["mean"])
+    scales = precision["anchor_scales"][str(sun)]
+    factor = float(precision["drift_factor"]) * float(precision["anchor_halfwidth_factor"])
+    anchor_drift = {float(wl[i]): {"abs_drift": float(abs(hi_mean[i] - lo_mean[i])),
+                                   "limit": float(s) * factor}
+                    for s, i in zip(scales, anchor_idx)}
+    anchors_ok = all(v["abs_drift"] <= v["limit"] for v in anchor_drift.values())
+    y_hi = hi["luminance"]["mean"]
+    y_lo = lo["luminance"]["mean"]
+    y_limit = float(precision["luminance_relative_halfwidth"]) * float(precision["drift_factor"])
+    y_drift = abs(y_hi - y_lo) / y_hi if y_hi else math.inf
+    return dict(budgets=[lo_key, hi_key], anchors=anchor_drift,
+                anchors_pass=anchors_ok,
+                luminance=dict(relative_drift=float(y_drift), limit=y_limit),
+                luminance_pass=bool(y_drift <= y_limit))
+
+
+def _pair_stats(disk_rows, point_rows, wl, v_curve, anchor_idx, sun, protocol,
+                pair_cfg):
+    disk = sorted(disk_rows, key=lambda r: int(r["seed"]))
+    point = sorted(point_rows, key=lambda r: int(r["seed"]))
+    if [int(r["seed"]) for r in disk] != [int(r["seed"]) for r in point]:
+        raise ValueError(f"source-pairs/{sun}: seed sets do not match the disk batch")
+    mismatched = [int(d["seed"]) for d, p in zip(disk, point)
+                  if d["fingerprint"] != p["fingerprint"]]
+    if mismatched:
+        raise ValueError(f"source-pairs/{sun}: fingerprints differ for seeds "
+                         f"{mismatched} -- native paths changed between modes")
+    delta = (np.array([r["split_total"] for r in disk])
+             - np.array([r["split_total"] for r in point]))
+    disk_mean = np.array([r["split_total"] for r in disk]).mean(axis=0)
+    confidence = protocol["direct"]["analysis"]["student"]["confidence"]
+    mean = delta.mean(axis=0)
+    half = student_halfwidth(delta, confidence)
+    anchors = {}
+    for i in anchor_idx:
+        lo, hi_ = mean[i] - half[i], mean[i] + half[i]
+        anchors[float(wl[i])] = dict(
+            delta_mean=float(mean[i]), delta_halfwidth=float(half[i]),
+            interval=[float(lo), float(hi_)],
+            relative_to_disk_mean=float(mean[i] / disk_mean[i])
+            if disk_mean[i] else None,
+            verdict="identified" if (lo > 0 or hi_ < 0) else "contains-zero")
+    return dict(n=len(delta),
+                seeds=[int(r["seed"]) for r in disk],
+                delta_mean=mean.tolist(),
+                delta_student_halfwidth=half.tolist(),
+                anchors=anchors,
+                fingerprints_paired=len(mismatched) == 0,
+                seconds=float(sum(r["seconds"] for r in point)))
+
+
+def _cost_stats(data_dir, disk_meta):
+    state_path = data_dir / "state.json"
+    state = json.loads(state_path.read_text()) if state_path.exists() else {}
+    return dict(stage_state=state.get("stages", {}),
+                batches={bid: {"created": meta.get("created"),
+                               "photons": meta.get("photons_per_wavelength"),
+                               "mode": meta.get("mode"),
+                               "hardware": meta.get("hardware")}
+                         for bid, meta in disk_meta.items()})
+
+
+# ---------------------------------------------------------------------------
+# manifest
+# ---------------------------------------------------------------------------
+def build_manifest(data_dir: Path) -> dict:
+    files = {}
+    for path in sorted(data_dir.rglob("*")):
+        if path.is_file() and path.name not in ("manifest.json", "summary.json"):
+            files[str(path.relative_to(data_dir))] = sha256_file(path)
+    return dict(schema="deep-twilight-reference/manifest/1",
+                generated=time.strftime("%Y-%m-%dT%H:%M:%S%z"), files=files)
+
+
+def verify_manifest(data_dir: Path, stored: dict) -> list:
+    current = build_manifest(data_dir)
+    problems = []
+    for name, digest in current["files"].items():
+        if name not in stored["files"]:
+            problems.append(f"new file not in manifest: {name}")
+        elif stored["files"][name] != digest:
+            problems.append(f"hash mismatch: {name}")
+    for name in stored["files"]:
+        if name not in current["files"]:
+            problems.append(f"manifest lists missing file: {name}")
+    return problems
+
+
+def _deep_equal(a, b, path="$", problems=None):
+    if problems is None:
+        problems = []
+    if isinstance(a, dict) and isinstance(b, dict):
+        for key in set(a) | set(b):
+            if key not in a or key not in b:
+                problems.append(f"{path}.{key}: present in only one summary")
+            else:
+                _deep_equal(a[key], b[key], f"{path}.{key}", problems)
+    elif isinstance(a, list) and isinstance(b, list):
+        if len(a) != len(b):
+            problems.append(f"{path}: length {len(a)} vs {len(b)}")
+        else:
+            for i, (x, y) in enumerate(zip(a, b)):
+                _deep_equal(x, y, f"{path}[{i}]", problems)
+    elif isinstance(a, float) and isinstance(b, float):
+        if not math.isclose(a, b, rel_tol=1e-12, abs_tol=0.0):
+            problems.append(f"{path}: {a!r} vs {b!r}")
+    elif a != b:
+        problems.append(f"{path}: {a!r} vs {b!r}")
+    return problems
+
+
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--directory", type=Path, required=True,
+                        help="deep_twilight_reference data directory")
+    parser.add_argument("--verify-only", action="store_true",
+                        help="recompute and compare against the stored "
+                             "summary; write nothing")
+    args = parser.parse_args(argv)
+    data_dir = args.directory
+    protocol = json.loads((data_dir / "protocol.json").read_text())
+
+    summary = compute_summary(data_dir, protocol)
+
+    if args.verify_only:
+        summary_path = data_dir / "summary.json"
+        if not summary_path.exists():
+            print("VERIFY FAIL: no summary.json to verify against", flush=True)
+            return 1
+        stored = json.loads(summary_path.read_text())
+        stored.pop("generated", None)
+        current = dict(summary)
+        current.pop("generated", None)
+        problems = _deep_equal(current, stored)
+        manifest_path = data_dir / "manifest.json"
+        if not manifest_path.exists():
+            problems.append("manifest.json missing")
+        else:
+            problems.extend(verify_manifest(
+                data_dir, json.loads(manifest_path.read_text())))
+        if problems:
+            print(f"VERIFY FAIL: {len(problems)} problem(s):", flush=True)
+            for p in problems[:50]:
+                print(f"  - {p}", flush=True)
+            return 1
+        print("VERIFY OK: summary recomputed from raw matches; "
+              "manifest hashes intact", flush=True)
+        return 0
+
+    manifest = build_manifest(data_dir)
+    (data_dir / "manifest.json").write_text(json.dumps(manifest, indent=1) + "\n")
+    (data_dir / "summary.json").write_text(json.dumps(summary, indent=1,
+                                                      allow_nan=False) + "\n")
+    print(json.dumps(dict(wrote=["manifest.json", "summary.json"],
+                          verdicts={sun: stats.get("verdict", "n/a")
+                                    for sun, stats in summary.get("direct", {}).items()},
+                          pairs={sun: {a["verdict"] for a in p["anchors"].values()}
+                                 for sun, p in summary.get("source_pairs", {}).items()}),
+                    indent=1))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
