@@ -1,0 +1,37 @@
+[
+  {
+    "name": "aeronet-sites",
+    "url": "https://aeronet.gsfc.nasa.gov/aeronet_locations_v3.txt",
+    "status": 200,
+    "bytes": 73933,
+    "elapsed_s": 3.11
+  },
+  {
+    "name": "aeronet-sites2014",
+    "url": "https://aeronet.gsfc.nasa.gov/Site_Lists_V3/aeronet_locations_v3_2014_lev20.txt",
+    "status": 200,
+    "bytes": 26114,
+    "elapsed_s": 2.79
+  },
+  {
+    "name": "noaa-BFD-daily",
+    "url": "https://www.ncei.noaa.gov/access/services/data/v1?dataset=global-hourly&stations=72526604751&startDate=2014-07-03&endDate=2014-07-03&format=json&includeAttributes=true",
+    "status": 200,
+    "bytes": 30280,
+    "elapsed_s": 2.79
+  },
+  {
+    "name": "iem-N38",
+    "url": "https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py?station=N38&data=all&year1=2014&month1=7&day1=3&year2=2014&month2=7&day2=4&tz=Etc%2FUTC&format=onlycomma&latlon=yes&elev=yes&missing=M&trace=T&direct=no&report_type=3&report_type=4",
+    "status": 200,
+    "bytes": 16200,
+    "elapsed_s": 2.26
+  },
+  {
+    "name": "iem-PA-stations",
+    "url": "https://mesonet.agron.iastate.edu/geojson/network/PA_ASOS.geojson",
+    "status": 200,
+    "bytes": 34454,
+    "elapsed_s": 2.26
+  }
+]

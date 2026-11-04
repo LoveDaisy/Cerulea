@@ -1,0 +1,23 @@
+[
+  {
+    "site": "Penn_State_Univ",
+    "url": "https://aeronet.gsfc.nasa.gov/cgi-bin/print_web_data_v3?site=Penn_State_Univ&year=2014&month=7&day=2&year2=2014&month2=7&day2=4&AOD20=1&AVG=10&if_no_html=1",
+    "status": 200,
+    "bytes": 45,
+    "begin": "AERONET Data Download (Version 3 Direct Sun)\n"
+  },
+  {
+    "site": "Cornell",
+    "url": "https://aeronet.gsfc.nasa.gov/cgi-bin/print_web_data_v3?site=Cornell&year=2014&month=7&day=2&year2=2014&month2=7&day2=4&AOD20=1&AVG=10&if_no_html=1",
+    "status": 200,
+    "bytes": 500000,
+    "begin": "AERONET Data Download (Version 3 Direct Sun)\nAERONET Version 3\nVersion 3: AOD Level 2.0\nThe following data are automatically cloud"
+  },
+  {
+    "site": "Rochester",
+    "url": "https://aeronet.gsfc.nasa.gov/cgi-bin/print_web_data_v3?site=Rochester&year=2014&month=7&day=2&year2=2014&month2=7&day2=4&AOD20=1&AVG=10&if_no_html=1",
+    "status": 200,
+    "bytes": 45,
+    "begin": "AERONET Data Download (Version 3 Direct Sun)\n"
+  }
+]

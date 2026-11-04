@@ -1,0 +1,56 @@
+[
+  {
+    "path": "scratchpad/explore-matched-twilight-observations/spectral-evidence/cssp-followup-timing/OO_IntervalMeasurements.m",
+    "url": "https://raw.githubusercontent.com/spitschan/IlluminationSpectraDataset/1d2ecc69cb15885b147d2831cae89fbd15d471fa/code/measurements/OO_IntervalMeasurements.m",
+    "bytes": 5617,
+    "sha256": "45bec802ad6908f8361bac6300352e7382347d175b7fc96a78c02b74f48eabdd"
+  },
+  {
+    "path": "scratchpad/explore-matched-twilight-observations/spectral-evidence/cssp-followup-timing/OO_MeasureAndSave.m",
+    "url": "https://raw.githubusercontent.com/spitschan/IlluminationSpectraDataset/1d2ecc69cb15885b147d2831cae89fbd15d471fa/code/measurements/OO_MeasureAndSave.m",
+    "bytes": 5458,
+    "sha256": "a8bd4c4eead62c101c826858dd37b7c0c58e8a9577fbd52d81911ab9125e4cdf"
+  },
+  {
+    "path": "scratchpad/explore-matched-twilight-observations/spectral-evidence/cssp-followup-timing/OO_GetSpectrum.m",
+    "url": "https://raw.githubusercontent.com/spitschan/IlluminationSpectraDataset/1d2ecc69cb15885b147d2831cae89fbd15d471fa/code/measurements/OO_GetSpectrum.m",
+    "bytes": 443,
+    "sha256": "4c65bc693a636506cf97d597c5195c4826b4ef9b2ebe29ca57c874612096a557"
+  },
+  {
+    "path": "scratchpad/explore-matched-twilight-observations/spectral-evidence/cssp-followup-timing/OO_SaveMeasMATLAB.m",
+    "url": "https://raw.githubusercontent.com/spitschan/IlluminationSpectraDataset/1d2ecc69cb15885b147d2831cae89fbd15d471fa/code/measurements/OO_SaveMeasMATLAB.m",
+    "bytes": 847,
+    "sha256": "b4d4f269e9544340727f4e534a460a457ff9b73ba315e1c7da5a893d740fd9aa"
+  },
+  {
+    "path": "scratchpad/explore-matched-twilight-observations/spectral-evidence/cssp-followup-timing/OO_GetInfo.m",
+    "url": "https://raw.githubusercontent.com/spitschan/IlluminationSpectraDataset/1d2ecc69cb15885b147d2831cae89fbd15d471fa/code/measurements/OO_GetInfo.m",
+    "bytes": 889,
+    "sha256": "30abc4d8c4fc08eabb8c7e247c3e4abde863405e7e9d8c8c2d9202d6bd52c85e"
+  },
+  {
+    "path": "scratchpad/explore-matched-twilight-observations/spectral-evidence/cssp-followup-timing/OO_Init.m",
+    "url": "https://raw.githubusercontent.com/spitschan/IlluminationSpectraDataset/1d2ecc69cb15885b147d2831cae89fbd15d471fa/code/measurements/OO_Init.m",
+    "bytes": 734,
+    "sha256": "9b9ffef686470430f6dd9ee73e5da671c45222146f2e88630cc42badf63bb880"
+  },
+  {
+    "path": "scratchpad/explore-matched-twilight-observations/spectral-evidence/cssp-followup-timing/OO_SaveMeasAscii.m",
+    "url": "https://raw.githubusercontent.com/spitschan/IlluminationSpectraDataset/1d2ecc69cb15885b147d2831cae89fbd15d471fa/code/measurements/OO_SaveMeasAscii.m",
+    "bytes": 3985,
+    "sha256": "b3f8ca16cbcdf72ac26fa1ceb8dfe490cc9ef9084d68b4846357aae8ab0b9b14"
+  },
+  {
+    "path": "scratchpad/explore-matched-twilight-observations/spectral-evidence/cssp-followup-timing/IlluminationSpectraDataset_SpecCal_GetWhichMeterFromWls.m",
+    "url": "https://raw.githubusercontent.com/spitschan/IlluminationSpectraDataset/1d2ecc69cb15885b147d2831cae89fbd15d471fa/calibration/IlluminationSpectraDataset_SpecCal_GetWhichMeterFromWls.m",
+    "bytes": 333,
+    "sha256": "127c2b2bd4f7b8d3d9014e5c1d22739734e3689027e226f7739341d6aaeab1cb"
+  },
+  {
+    "path": "scratchpad/explore-matched-twilight-observations/spectral-evidence/cssp-followup-timing/IlluminationSpectraDataset_SpecCal_GetDarkSpectrum.m",
+    "url": "https://raw.githubusercontent.com/spitschan/IlluminationSpectraDataset/1d2ecc69cb15885b147d2831cae89fbd15d471fa/calibration/IlluminationSpectraDataset_SpecCal_GetDarkSpectrum.m",
+    "bytes": 879,
+    "sha256": "dbf0cbd36e5efa4d5790de8e062884b5148a097f4d1c70712588e022c90c6b1f"
+  }
+]

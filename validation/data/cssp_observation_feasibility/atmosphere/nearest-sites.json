@@ -1,0 +1,198 @@
+{
+  "aeronet-sites": [
+    {
+      "km": 105.00606195201699,
+      "site": "Penn_State_Univ",
+      "lat": 40.7421,
+      "lon": -78.0809,
+      "elevation_m": 401.0,
+      "july_available": null
+    },
+    {
+      "km": 166.33255433527626,
+      "site": "ROCX2025",
+      "lat": 43.143069,
+      "lon": -77.504423,
+      "elevation_m": 44.909,
+      "july_available": null
+    },
+    {
+      "km": 175.45919019176338,
+      "site": "Rochester",
+      "lat": 43.2337,
+      "lon": -77.5864,
+      "elevation_m": 107.0,
+      "july_available": null
+    },
+    {
+      "km": 191.89603120418235,
+      "site": "Calipso_Loudon_Rd",
+      "lat": 39.938933,
+      "lon": -77.788517,
+      "elevation_m": 201.0,
+      "july_available": null
+    },
+    {
+      "km": 191.99076873008846,
+      "site": "Calipso_Peckman_Frm",
+      "lat": 39.938633,
+      "lon": -77.750033,
+      "elevation_m": 189.0,
+      "july_available": null
+    },
+    {
+      "km": 217.65212302428384,
+      "site": "Hagerstown",
+      "lat": 39.708332,
+      "lon": -77.724998,
+      "elevation_m": 200.0,
+      "july_available": null
+    },
+    {
+      "km": 232.82303454424692,
+      "site": "Calipso_W_Strasburg",
+      "lat": 39.94655,
+      "lon": -76.231117,
+      "elevation_m": 113.0,
+      "july_available": null
+    },
+    {
+      "km": 234.50075286463832,
+      "site": "Calipso_Strasburg",
+      "lat": 39.934467,
+      "lon": -76.2193,
+      "elevation_m": 131.0,
+      "july_available": null
+    },
+    {
+      "km": 235.67184320701293,
+      "site": "Calipso_Zion",
+      "lat": 39.932389,
+      "lon": -76.199,
+      "elevation_m": 120.0,
+      "july_available": null
+    },
+    {
+      "km": 242.37764566925284,
+      "site": "DRAGON_WileyFord",
+      "lat": 39.610446,
+      "lon": -78.773648,
+      "elevation_m": 217.0,
+      "july_available": null
+    },
+    {
+      "km": 251.03054014920133,
+      "site": "DRAGON_Pylesville",
+      "lat": 39.67515,
+      "lon": -76.405349,
+      "elevation_m": 158.0,
+      "july_available": null
+    },
+    {
+      "km": 252.35000440083033,
+      "site": "DRAGON_MNKTN",
+      "lat": 39.572926,
+      "lon": -76.652318,
+      "elevation_m": 182.0,
+      "july_available": null
+    }
+  ],
+  "aeronet-sites2014": [
+    {
+      "km": 272.352359728404,
+      "site": "Toronto",
+      "lat": 43.79,
+      "lon": -79.47,
+      "elevation_m": 186.0,
+      "july_available": "1"
+    },
+    {
+      "km": 283.7568222135047,
+      "site": "UMBC",
+      "lat": 39.254628,
+      "lon": -76.709353,
+      "elevation_m": 79.0,
+      "july_available": "1"
+    },
+    {
+      "km": 283.7973413710754,
+      "site": "MD_Science_Center",
+      "lat": 39.28123,
+      "lon": -76.612052,
+      "elevation_m": 15.0,
+      "july_available": "1"
+    },
+    {
+      "km": 308.34561545484337,
+      "site": "GSFC",
+      "lat": 38.9925,
+      "lon": -76.839833,
+      "elevation_m": 87.0,
+      "july_available": "1"
+    },
+    {
+      "km": 309.441974796499,
+      "site": "NEON_SCBI",
+      "lat": 38.892919,
+      "lon": -78.1395,
+      "elevation_m": 354.0,
+      "july_available": "0"
+    },
+    {
+      "km": 312.66162538184363,
+      "site": "Sigma_Space_Corp",
+      "lat": 38.953,
+      "lon": -76.836472,
+      "elevation_m": 44.8,
+      "july_available": "1"
+    },
+    {
+      "km": 326.52668587554086,
+      "site": "SERC",
+      "lat": 38.888901,
+      "lon": -76.555795,
+      "elevation_m": 36.5,
+      "july_available": "0"
+    },
+    {
+      "km": 327.3151903628747,
+      "site": "Egbert",
+      "lat": 44.231543,
+      "lon": -79.781414,
+      "elevation_m": 264.0,
+      "july_available": "1"
+    },
+    {
+      "km": 327.3151903628747,
+      "site": "Egbert_X",
+      "lat": 44.231543,
+      "lon": -79.781414,
+      "elevation_m": 264.0,
+      "july_available": "0"
+    },
+    {
+      "km": 336.32330854281435,
+      "site": "CCNY",
+      "lat": 40.821313,
+      "lon": -73.949036,
+      "elevation_m": 100.0,
+      "july_available": "1"
+    },
+    {
+      "km": 350.33168149208456,
+      "site": "Easton_Airport",
+      "lat": 38.80745,
+      "lon": -76.07257,
+      "elevation_m": 15.0,
+      "july_available": "1"
+    },
+    {
+      "km": 351.1808604126378,
+      "site": "Easton-MDE",
+      "lat": 38.794972,
+      "lon": -76.08425,
+      "elevation_m": 4.5,
+      "july_available": "0"
+    }
+  ]
+}

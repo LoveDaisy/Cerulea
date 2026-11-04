@@ -1,0 +1,124 @@
+{
+  "url": "https://ndownloader.figshare.com/files/4862119",
+  "final_url": "https://s3-eu-west-1.amazonaws.com/pfigshare-u-files/4862119/dataraw.tar.gz",
+  "status": 206,
+  "content_range": "bytes 0-1048575/701893601",
+  "content_length": "1048576",
+  "accept_ranges": "bytes",
+  "bytes_downloaded": 1048576,
+  "sha256": "9bd6202b80a3c4612121a701519fae774d250a78a73bf6a26d578a617f0a0ea9",
+  "decompressed_prefix_bytes": 1072713,
+  "tar_prefix_end": "unexpected end of data",
+  "members": [
+    {
+      "name": "dataraw",
+      "size": 0,
+      "offset_data": 512
+    },
+    {
+      "name": "dataraw/._.DS_Store",
+      "size": 120,
+      "offset_data": 1024
+    },
+    {
+      "name": "dataraw/.DS_Store",
+      "size": 6148,
+      "offset_data": 2048
+    },
+    {
+      "name": "dataraw/CSSP",
+      "size": 0,
+      "offset_data": 9216
+    },
+    {
+      "name": "dataraw/DRL",
+      "size": 0,
+      "offset_data": 9728
+    },
+    {
+      "name": "dataraw/DRL/._.DS_Store",
+      "size": 120,
+      "offset_data": 10240
+    },
+    {
+      "name": "dataraw/DRL/.DS_Store",
+      "size": 6148,
+      "offset_data": 11264
+    },
+    {
+      "name": "dataraw/DRL/20140705",
+      "size": 0,
+      "offset_data": 18432
+    },
+    {
+      "name": "dataraw/DRL/20140706",
+      "size": 0,
+      "offset_data": 18944
+    },
+    {
+      "name": "dataraw/DRL/20140710",
+      "size": 0,
+      "offset_data": 19456
+    },
+    {
+      "name": "dataraw/DRL/20140711",
+      "size": 0,
+      "offset_data": 19968
+    },
+    {
+      "name": "dataraw/DRL/20140716",
+      "size": 0,
+      "offset_data": 20480
+    },
+    {
+      "name": "dataraw/DRL/20140717",
+      "size": 0,
+      "offset_data": 20992
+    },
+    {
+      "name": "dataraw/DRL/20140717/20140717T184659_sOO_USB2000+_pDRL.mat",
+      "size": 119618,
+      "offset_data": 21504
+    },
+    {
+      "name": "dataraw/DRL/20140717/20140717T184759_sOO_USB2000+_pDRL.mat",
+      "size": 119598,
+      "offset_data": 141824
+    },
+    {
+      "name": "dataraw/DRL/20140717/20140717T184859_sOO_USB2000+_pDRL.mat",
+      "size": 119282,
+      "offset_data": 262144
+    },
+    {
+      "name": "dataraw/DRL/20140717/20140717T184959_sOO_USB2000+_pDRL.mat",
+      "size": 119207,
+      "offset_data": 381952
+    },
+    {
+      "name": "dataraw/DRL/20140717/20140717T185059_sOO_USB2000+_pDRL.mat",
+      "size": 126868,
+      "offset_data": 501760
+    },
+    {
+      "name": "dataraw/DRL/20140717/20140717T185159_sOO_USB2000+_pDRL.mat",
+      "size": 126890,
+      "offset_data": 629248
+    },
+    {
+      "name": "dataraw/DRL/20140717/20140717T185259_sOO_USB2000+_pDRL.mat",
+      "size": 127028,
+      "offset_data": 756736
+    },
+    {
+      "name": "dataraw/DRL/20140717/20140717T185359_sOO_USB2000+_pDRL.mat",
+      "size": 127395,
+      "offset_data": 884736
+    },
+    {
+      "name": "dataraw/DRL/20140717/20140717T185459_sOO_USB2000+_pDRL.mat",
+      "size": 127188,
+      "offset_data": 1012736
+    }
+  ]
+}

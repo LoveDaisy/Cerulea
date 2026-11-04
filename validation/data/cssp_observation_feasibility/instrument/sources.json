@@ -1,0 +1,26 @@
+[
+  {
+    "url": "https://raw.githubusercontent.com/spitschan/IlluminationSpectraDataset/1d2ecc69cb15885b147d2831cae89fbd15d471fa/calibration/IlluminationSpectraDataset_SpecCal_SensitivityCalibration.m",
+    "file": "IlluminationSpectraDataset_SpecCal_SensitivityCalibration.m",
+    "bytes": 10857,
+    "sha256": "2ba80b59196a45451482f71897c2c33e85b0609e4f0a500615806322ccc75857"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/spitschan/IlluminationSpectraDataset/1d2ecc69cb15885b147d2831cae89fbd15d471fa/calibration/IlluminationSpectraDataset_SpecCal_InitCalFile.m",
+    "file": "IlluminationSpectraDataset_SpecCal_InitCalFile.m",
+    "bytes": 1200,
+    "sha256": "db1d31975eecd0e3bd4597215cfbb285ec798c8fe0ddc41bc3364267276c04bb"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/spitschan/IlluminationSpectraDataset/1d2ecc69cb15885b147d2831cae89fbd15d471fa/calibration/IlluminationSpectraDataset_SpecCal_GetCalStruct.m",
+    "file": "IlluminationSpectraDataset_SpecCal_GetCalStruct.m",
+    "bytes": 1021,
+    "sha256": "1783101c199736cf2fb17a27f983b21cbe5fbac066146c52e861ad74fdc0a4e3"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/spitschan/IlluminationSpectraDataset/1d2ecc69cb15885b147d2831cae89fbd15d471fa/calibration/IlluminationSpectraDataset_SpecCal_GetWhichMeterFromWls.m",
+    "file": "IlluminationSpectraDataset_SpecCal_GetWhichMeterFromWls.m",
+    "bytes": 333,
+    "sha256": "127c2b2bd4f7b8d3d9014e5c1d22739734e3689027e226f7739341d6aaeab1cb"
+  }
+]
