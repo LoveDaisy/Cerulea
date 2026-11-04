@@ -508,8 +508,10 @@ class SolarSpeciesColumns:
             raise ValueError("n_quad>=2 and chunk>=1 are required")
         # weak on purpose: this object lives in the geometry cache, whose key
         # is the medium's own token -- a strong back-reference here would pin
-        # the medium (and with it the cache entry) forever
-        self._medium_ref = weakref.ref(medium)
+        # the medium (and with it the cache entry) forever.  Wavelength slices
+        # share the token, so every sharing medium is registered and density
+        # queries resolve against the first live one.
+        self._medium_refs = [weakref.ref(medium)]
         self.field = field
         self.n_quad = int(n_quad)
         self.chunk = int(chunk)
@@ -534,13 +536,18 @@ class SolarSpeciesColumns:
         self._edges = R_EARTH + levels * 1e3
         self._gx, self._gw = np.polynomial.legendre.leggauss(self.n_quad)
 
+    def register_medium(self, medium) -> None:
+        if all(ref() is not medium for ref in self._medium_refs):
+            self._medium_refs.append(weakref.ref(medium))
+
     @property
     def medium(self):
-        medium = self._medium_ref()
-        if medium is None:
+        live = [ref for ref in self._medium_refs if ref() is not None]
+        self._medium_refs = live
+        if not live:
             raise RuntimeError(
                 "the owning medium of this solar geometry has been collected")
-        return medium
+        return live[0]()
 
     def _density_columns(self, height):
         medium = self.medium
@@ -887,17 +894,26 @@ class PointSourceTable:
             raise ValueError("true solar elevation must be within [-90, 90]")
         zz = np.clip(zz, self.ground_km, self.top_km)
         et = np.clip(et, -90.0, 90.0)
-        u = np.sqrt(zz - self.ground_km)
-        i = np.clip(np.searchsorted(self.height_axis, u, side="right") - 1,
-                    0, len(self.height_axis) - 2)
-        w = (u - self.height_axis[i]) / (self.height_axis[i + 1] - self.height_axis[i])
-        critical = (1 - w) * self.critical[i] + w * self.critical[i + 1]
-        lower = self.field.grazing_apparent_elevation(zz) + 1e-6
+        # height-axis quantities (spline evals, row selection) are computed
+        # per UNIQUE height: consumers query (height x beam) grids where the
+        # height repeats once per beam, so this dedupes ~n_beam-fold
+        zz_unique, inverse = np.unique(zz, return_inverse=True)
+        u_u = np.sqrt(zz_unique - self.ground_km)
+        i_u = np.clip(np.searchsorted(self.height_axis, u_u, side="right") - 1,
+                      0, len(self.height_axis) - 2)
+        w_u = ((u_u - self.height_axis[i_u])
+               / (self.height_axis[i_u + 1] - self.height_axis[i_u]))
+        critical_u = (1 - w_u) * self.critical[i_u] + w_u * self.critical[i_u + 1]
+        lower_u = self.field.grazing_apparent_elevation(zz_unique) + 1e-6
         if self.constant_index:
             # The identity angular map and the Cartesian ground shadow are
             # analytic in a uniform index (including a non-vacuum far field);
             # do not contaminate that limit with height interpolation.
-            critical = lower - 1e-6
+            critical_u = lower_u - 1e-6
+        i = i_u[inverse]
+        w = w_u[inverse]
+        critical = critical_u[inverse]
+        lower = lower_u[inverse]
         t = (et - critical) / (90.0 - critical)
         lit = t >= 0
         app = lower.copy()
@@ -929,7 +945,8 @@ class PointSourceTable:
             app[ind] = lower[ind] + (90.0 - lower[ind]) * value
             # d(app)/d(true) from the same interpolant that produced app.
             slope = (90.0 - lower[ind]) / (90.0 - critical[ind]) * derivative
-            n = self.field.refractive_index(zz[ind])
+            n_u = self.field.refractive_index(zz_unique)
+            n = n_u[inverse[ind]]
             near_vertical = np.abs(et[ind] - 90.0) < 1e-6
             ratio = np.divide(np.cos(np.radians(app[ind])),
                               np.cos(np.radians(et[ind])),
@@ -968,15 +985,16 @@ class SolarGeometry:
     """Ray field, columns and (lazily) the point-source table of one medium.
 
     Cached per medium-construction token and refraction mode in a weak
-    dictionary: entries live exactly as long as some living medium holds the
-    token, and this object holds no strong reference to the medium (only a
-    weakref for binding validation), so a dead medium's geometry is reclaimed
-    instead of pinning it.
+    dictionary: the entry lives exactly as long as ANY living medium sharing
+    the token (wavelength slices share the token with their parent).  The
+    geometry keeps weak references to every medium that ever resolved it and
+    resolves density queries against the first live one -- the entry and its
+    table are reclaimed when the last sharing medium dies.
     """
 
     def __init__(self, medium, *, refracted: bool = True,
                  build_table: bool | None = None):
-        self.medium_ref = weakref.ref(medium)
+        self.medium_refs = [weakref.ref(medium)]
         self.refracted = bool(refracted)
         self.field = SolarRayField(medium, refracted=refracted)
         self.columns_tool = SolarSpeciesColumns(medium, self.field)
@@ -984,9 +1002,20 @@ class SolarGeometry:
         self.top_km = float(medium.z_bounds[-1])
         self.n_species = self.columns_tool.n_species
         self._table: PointSourceTable | None = None
-        self._table_build_lock = False
         if build_table:
             self.ensure_table()
+
+    def register_medium(self, medium) -> None:
+        """Track another medium sharing this geometry's construction token."""
+        if all(ref() is not medium for ref in self.medium_refs):
+            self.medium_refs.append(weakref.ref(medium))
+        self.columns_tool.register_medium(medium)
+
+    def resolve_medium(self):
+        """The first live medium sharing this geometry, or None."""
+        live = [ref for ref in self.medium_refs if ref() is not None]
+        self.medium_refs = live
+        return live[0]() if live else None
 
     @property
     def table(self) -> PointSourceTable:
@@ -997,14 +1026,14 @@ class SolarGeometry:
 
     def ensure_table(self, **kw) -> PointSourceTable:
         if self._table is None:
-            medium = self.medium_ref()
+            medium = self.resolve_medium()
             if medium is None:
                 raise RuntimeError("the owning medium is gone; rebuild the source")
             self._table = PointSourceTable(medium, self.field, self.columns_tool, **kw)
         return self._table
 
     def validate_medium(self, medium) -> None:
-        if self.medium_ref() is not medium:
+        if all(ref() is not medium for ref in self.medium_refs):
             raise ValueError(
                 "solar source bound to a different medium construction; "
                 "build a source from the current atmosphere")
@@ -1029,6 +1058,8 @@ def get_solar_geometry(medium, *, refracted: bool = True) -> SolarGeometry:
     if geom is None:
         geom = SolarGeometry(medium, refracted=bool(refracted))
         per_mode[bool(refracted)] = geom
+    else:
+        geom.register_medium(medium)
     return geom
 
 
@@ -1063,12 +1094,13 @@ class SolarSource:
 
     def __init__(self, atmo, sun_zenith_deg: float, sun_azimuth_deg: float = 0.0, *,
                  radius_deg: float = SUN_RADIUS_DEG,
-                 n_radial: int = 4, n_azimuth: int = 16, chunk: int = 65536):
+                 n_radial: int = 2, n_azimuth: int = 8, chunk: int = 65536):
         medium = atmo._medium
         self._atmo_ref = weakref.ref(atmo)
         self._medium = medium
         self._scene = atmo._scene
         self.geometry = get_solar_geometry(medium, refracted=bool(atmo.refraction))
+        self.geometry.register_medium(medium)
         self.radius_deg = float(radius_deg)
         self.n_radial = int(n_radial)
         self.n_azimuth = int(n_azimuth)
@@ -1107,12 +1139,25 @@ class SolarSource:
         return cached
 
     def _flux_disk_for_points(self, x):
-        """Refined flux disk when every point shares one occultation band."""
+        """Refined flux disk for single-point seam calls (DNI/GHI ground).
+
+        The contact-band refined disk carries 24576 beams: exact for the
+        one-point flux seams, prohibitively expensive inside batch kernels
+        (MC ground illumination, which must stay on the production scatter
+        convention anyway) — those keep the plain disk.
+        """
+        if len(x) > 4:
+            return self.disk()
         heights = np.clip((np.linalg.norm(x, axis=1) - R_EARTH) / 1e3,
                           self._medium.z_bounds[0], self._medium.z_bounds[-1])
         if float(heights.max()) - float(heights.min()) < 1e-6:
             return self._flux_disk(float(heights[0]))
         return self.disk()
+
+    def _chunk_for_disk(self, disk) -> int:
+        """Point chunk bounded so points*beams temporaries stay bounded."""
+        n_beam = disk[0].shape[0]
+        return max(64, min(self.chunk, 2_000_000 // max(n_beam, 1)))
 
     def _critical_true(self, height_km: float) -> float:
         """True elevation of the ground-grazing ray at ``height_km``."""
@@ -1158,10 +1203,16 @@ class SolarSource:
                 * (0.5 * (hi_nodes + 1.0))
             w_out = (np.cos(np.radians(self.radius_deg)) - cos_crit) * 0.5 * hi_w
             cos_r = np.concatenate([c_in, c_out])
-            # the same convention as the plain disk: raw leggauss weights
-            # (the segment spans live in the node mapping), divided by
-            # (1 + cos(alpha)) * n_azimuth
-            w_r = np.concatenate([lo_w, hi_w]) \
+            # per-node weight = w_gauss * segment_dc_span / 2, normalized by
+            # (1 + cos(alpha)) * n_azimuth -- the plain disk's convention with
+            # the segment Jacobian restored (the dc spans live per segment)
+            # dc-span weights rescaled to the full cap (2/(1-cos(alpha)) is
+            # the plain disk's implicit x-space factor): a degenerate segment
+            # gets zero weight, the surviving segment carries the whole disk
+            dc_total = 1.0 - np.cos(np.radians(self.radius_deg))
+            w_r = np.concatenate([(1.0 - cos_crit) / dc_total * lo_w,
+                                  (cos_crit - np.cos(np.radians(self.radius_deg)))
+                                  / dc_total * hi_w]) \
                 / ((1.0 + np.cos(np.radians(self.radius_deg))) * n_a)
             alpha = np.radians(self.radius_deg)
             sin_rho = np.sqrt(np.maximum(1 - np.asarray(cos_r) ** 2, 0))
@@ -1308,8 +1359,10 @@ class SolarSource:
             raise RuntimeError("the owning atmosphere is gone; rebuild the source")
         self._validate(atmo)
         out = np.zeros(len(x)) if iw is not None else np.zeros((len(x), len(atmo.wl)))
-        for start in range(0, len(x), self.chunk):
-            sl = slice(start, min(start + self.chunk, len(x)))
+        for start in range(0, len(x), self._chunk_for_disk(
+                self._flux_disk_for_points(x[:1] if len(x) else x))):
+            sl = slice(start, min(start + self._chunk_for_disk(
+                self._flux_disk_for_points(x[:1] if len(x) else x)), len(x)))
             _, _, _, app, transmission, gain, _ = self._geometry_arrays(
                 x[sl], iw, disk=self._flux_disk_for_points(x[sl]))
             if iw is None:
@@ -1332,13 +1385,16 @@ class SolarSource:
         self._validate(atmo)
         normal = np.asarray(normal, dtype=float)
         normal = normal / np.linalg.norm(normal)
-        directions, _ = self.disk()
         f_inf = spectra.solar_irradiance(atmo.wl)
         n_pts = len(x)
         out = np.zeros((n_pts, len(atmo.wl))) if iw is None else np.zeros(n_pts)
-        for start in range(0, n_pts, self.chunk):
-            sl = slice(start, min(start + self.chunk, n_pts))
-            _, _, _, app, transmission, gain, _ = self._geometry_arrays(x[sl], iw)
+        step = self._chunk_for_disk(self._flux_disk_for_points(
+            x[:1] if len(x) else x))
+        for start in range(0, n_pts, step):
+            sl = slice(start, min(start + step, n_pts))
+            directions, _ = disk_used = self._flux_disk_for_points(x[sl])
+            _, _, _, app, transmission, gain, _ = self._geometry_arrays(
+                x[sl], iw, disk=disk_used)
             # The apparent direction stays in the vertical plane of the true
             # direction (radial refraction preserves azimuth), so its unit
             # vector is the true beam direction tilted from the radial by
@@ -1350,7 +1406,7 @@ class SolarSource:
             # (app = apparent *elevation*, radians); resolve the unit normal
             # against that basis:
             n_dot_radial = np.einsum("ij,j->i", radial, normal)[:, None]
-            n_dot_beam = normal @ directions.T                   # (n, n_beam)
+            n_dot_beam = (normal[None, :] @ directions.T)[0]     # (n_beam,)
             horizontal = (n_dot_beam - n_dot_radial * sin_true) / cos_true
             app_dot_normal = (np.sin(app) * n_dot_radial
                               + np.cos(app) * horizontal)

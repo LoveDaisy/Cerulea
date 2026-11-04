@@ -48,37 +48,36 @@ def _cloud_field(atmo, cloud_layer, sun_zenith_deg):
 def _cloud_direct_irradiance(atmo, cloud_layer, sun_zenith_deg):
     """Deck-attenuated direct irradiance on the ground (unified source).
 
-    Per disk beam: the source's own occultation and apparent direction give
-    the horizontal incidence; the deck attenuates each beam by its own
-    entry inclination.  With no deck this is the plain unified ground
-    irradiance.
+    Plain-disk beam sum: each beam contributes the source's own ground
+    incidence (occultation, apparent direction, full-column extinction via
+    the ground vertex) attenuated by the deck at that beam's entry
+    inclination.  Zero cloud optical depth reproduces the clear ground
+    irradiance exactly; with no deck this is the plain unified ground
+    irradiance from the same beam set.
     """
     from skycolor.solar_source import SolarSource
     from skycolor import spectra
 
     source = SolarSource(atmo, float(sun_zenith_deg), 0.0)
     xg = np.array([[0.0, 0.0, atmo.r_bounds[0]]])
-    normal = np.array([0.0, 0.0, 1.0])
-    if cloud_layer is None:
-        return source.direct_irradiance(xg, normal)[0]
     directions, weights = source.disk()
     n_beam = directions.shape[0]
     up = np.array([0.0, 0.0, 1.0])
     true_e = np.degrees(np.arcsin(np.clip(directions @ up, -1.0, 1.0)))
-    z_top = float(cloud_layer.top_km)
-    app, t_top, gain, lit = source.vertex(np.full(n_beam, z_top), true_e)
-    optics = cloud_layer.optics(atmo.wl)
-    radial = xg[0] / np.linalg.norm(xg[0])
-    mu_beam = np.clip(directions @ radial, -1.0, 1.0)
-    deck_trans = np.exp(-optics.tau[None, :]
-                        / np.maximum(np.abs(mu_beam)[:, None], 1e-3))
-    # for the ground normal (= radial) the beam cosine is sin(app elev)
-    n_dot_beam = np.abs(mu_beam)[None, :]
-    weighted = (lit[:, None, None] * t_top[:, None, :] * gain[:, None, None]
-                * n_dot_beam.T[:, :, None] * deck_trans[:, None, :])
-    total = np.sum(weights[:, None, None] * weighted, axis=0)
+    app_g, t_g, gain_g, lit_g = source.vertex(np.zeros(n_beam), true_e)
+    optics = cloud_layer.optics(atmo.wl) if cloud_layer is not None else None
+    if optics is not None:
+        app_t, _, _, _ = source.vertex(np.full(n_beam, float(cloud_layer.top_km)),
+                                       true_e)
+        mu_entry = np.maximum(np.abs(np.sin(np.radians(app_t))), 1e-3)
+        deck_trans = np.exp(-optics.tau[None, :] / mu_entry[:, None])
+    else:
+        deck_trans = np.ones((n_beam, 1))
+    sin_app = np.maximum(np.sin(np.radians(app_g)), 0.0)
+    per_beam = (lit_g[:, None] * t_g * gain_g[:, None] * sin_app[:, None]
+                * deck_trans)                                    # (nb, n_wl)
     f_inf = spectra.solar_irradiance(atmo.wl)
-    return total * f_inf
+    return (weights[:, None] * per_beam).sum(axis=0) * f_inf
 
 
 def _cloud_panorama(atmo, cloud_layer, sun_elevation_deg, size=(420, 170),

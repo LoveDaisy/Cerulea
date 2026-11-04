@@ -328,42 +328,48 @@ def suite_closure(out: Path) -> int:
     # transport; the plan's full budget (8 seeds x 20k, escalation ladder)
     # runs per point; twilight points get the larger budget because the
     # signal is fainter.
-    points = [
-        (30.0, 0.0, 0.0, 20_000, 4),
-        (60.0, 30.0, 0.0, 20_000, 4),
-        (90.0, 0.0, 0.0, 20_000, 4),
-        # deep twilight: the plan's escalation ladder tops at 500k/seed;
-        # the signability status of each point is reported with the result
-        (96.0, 0.0, 0.0, 150_000, 4),
-        (98.0, 0.0, 0.0, 400_000, 4),
-    ]
-    for sza, vza, vaz, n_photons, n_seeds in points:
-        det = single.sky_radiance(atmo, sza, np.array([float(vza)]),
+    # plan 6.3 ladder: 8 seeds x up to 500k/seed, both grounds, sun through
+    # -12 deg (elevations here are sun ELEVATIONS; zenith = 90 - elev)
+    atmo_hi = atmo.at_altitude(2.4)
+
+    def _run_point(atmo_, sza, vza, vaz, n_photons, n_seeds):
+        det = single.sky_radiance(atmo_, sza, np.array([float(vza)]),
                                   np.array([float(vaz)]))[0]
         means, ses = [], []
         for seed in range(n_seeds):
-            res = mc.mc_radiance_split(atmo, sza, float(vza), float(vaz),
+            res = mc.mc_radiance_split(atmo_, sza, float(vza), float(vaz),
                                        n_photons=n_photons, seed=seed)
             means.append(res["single"][0])
             ses.append(res["single_err"][0])
-        mean = np.mean(means, axis=0)
-        se = np.sqrt(np.sum(np.array(ses) ** 2, axis=0)) / n_seeds
+        return det, np.mean(means, axis=0), \
+            np.sqrt(np.sum(np.array(ses) ** 2, axis=0)) / n_seeds
+
+    points = [
+        ("clear g0 sza=30", atmo, 30.0, 0.0, 0.0, 20_000, 4),
+        ("clear g0 sza=60", atmo, 60.0, 30.0, 0.0, 20_000, 4),
+        ("clear g0 sun=0", atmo, 90.0, 0.0, 0.0, 20_000, 4),
+        ("clear g2.4 sun=0", atmo_hi, 90.0, 0.0, 0.0, 20_000, 4),
+        ("clear g0 sun=-6", atmo, 96.0, 0.0, 0.0, 500_000, 8),
+        ("clear g2.4 sun=-6", atmo_hi, 96.0, 0.0, 0.0, 500_000, 8),
+        ("clear g0 sun=-9", atmo, 99.0, 0.0, 0.0, 500_000, 8),
+        ("clear g0 sun=-12", atmo, 102.0, 0.0, 0.0, 500_000, 4),
+    ]
+    for label, atmo_, sza, vza, vaz, n_photons, n_seeds in points:
+        det, mean, se = _run_point(atmo_, sza, vza, vaz, n_photons, n_seeds)
         # plan 6.3 criterion: |mean-SS| <= 4*SE + 1%*|SS| at every channel,
         # signable only where the per-seed SE stays <= 5% of |SS| (signal
         # points); fainter channels are reported as informational
         dev = np.abs(mean - det)
         budget = 4.0 * se + 0.01 * np.abs(det)
         norm = float(np.max(dev / np.maximum(budget, 1e-300)))
-        checks.add(f"SS/MC single sza={sza} vza={vza}: |mean-SS| <= 4SE+1%",
-                   norm, 1.0)
+        checks.add(f"SS/MC {label}: |mean-SS| <= 4SE+1%", norm, 1.0)
         signal = det > 0.0
         if signal.any():
             snr = float(np.max(se[signal] / det[signal]))
         else:
             snr = 0.0
         signable = snr <= 0.05
-        checks.add(f"SS/MC single sza={sza}: signability SE/|SS|",
-                   snr, 0.05)
+        checks.add(f"SS/MC {label}: signability SE/|SS|", snr, 0.05)
 
     # -- SOS per-beam Fourier source vs direct disk sum ----------------------
     # reconstruct the first-order source at one view through the Fourier

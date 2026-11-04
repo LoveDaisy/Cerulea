@@ -338,16 +338,16 @@ def solve(
     #   C_m[k,l,w] = sum_b beam_w·T·G · P_l^m(mu_s[b,k]) · cos(m*phi_b)
     # kept (nz,L,n_wl) transient so nothing materialises the full
     # (nz,L,M,n_wl) tensor
-    # the diffuse field is read at the domain bottom, so each layer's beam
-    # amplitude carries the detector transfer (n_obs / n_layer)^2 -- the same
-    # single n^2 factor the scatter kernels apply
-    from ..constants import R_EARTH as _R
-    n_obs = float(source.observer_n)
-    z_mid = 0.5 * (atmo.z_bounds[:-1] + atmo.z_bounds[1:])
-    n_layer = source.geometry.field.refractive_index(z_mid)
-    transfer = (n_obs / n_layer) ** 2
-    beam_wg = (beam_w[None, :, None] * t_mid_b * gain_mid_b[..., None]
-               * transfer[:, None, None])               # (nz, nb, n_wl)
+    # Plain local radiance bookkeeping: this backend's diffuse paths are the
+    # retained straight-transport approximation, along which plain radiance
+    # (not L/n^2) is the invariant, so layer sources consume G_local directly
+    # and no reference-face conversion is applied anywhere — fluxes are
+    # local/BOA/TOA quantities as swept.  The single/MC kernels carry the
+    # audit's detector transfer (n_obs/n_pt)^2 instead; the ~1e-4 convention
+    # difference between the two is part of the declared SOS-vs-SS
+    # propagation error (plan 6.3) and is documented in
+    # docs/physics/SOLAR_SOURCE.md.
+    beam_wg = beam_w[None, :, None] * t_mid_b * gain_mid_b[..., None]  # (nz, nb, n_wl)
     source_factor = omega * f_sun[None, :]                     # (nz, n_wl)
 
     def _direct_coeff(m):

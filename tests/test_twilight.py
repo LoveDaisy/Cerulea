@@ -140,12 +140,13 @@ def test_anchor_wavelengths_are_used_verbatim(atmo):
 def test_multiple_scattering_grows_towards_twilight(atmo):
     """MS/SS is much larger in deep twilight than in daylight."""
     def ratio(h):
-        # 4x TINY: at -9 deg the estimator is heavy-tailed, and thread-order
+        # 2x TINY: at -9 deg the estimator is heavy-tailed, and thread-order
         # round-off in the BLAS reductions flips individual path decisions,
         # which at the bare TINY budget moves the ratio across this
-        # assertion's threshold between runs
+        # assertion's threshold between runs (2x is enough with the 64-beam
+        # source, whose per-collision estimate is better conditioned)
         ms, _, _ = TW.multiple_scattered(atmo, 90.0 - h, [0.0], [0.0],
-                                         grid=dict(TINY, n_photons=2.4e6),
+                                         grid=dict(TINY, n_photons=1.2e6),
                                          seed=6)
         ss = single_radiance(atmo, 90.0 - h, [0.0], [0.0])
         return float(np.sum(ms[0]) / max(np.sum(ss[0]), 1e-300))

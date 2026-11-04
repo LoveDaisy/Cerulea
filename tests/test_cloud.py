@@ -299,14 +299,11 @@ def test_shadow_height():
 def test_high_clouds_stay_lit_longer(atmo, altostratus, cirrus):
     assert rtcloud.illuminate_cloud(atmo, altostratus, 92.0).geometry == "base"
     assert rtcloud.illuminate_cloud(atmo, cirrus, 93.0).geometry == "base"
-    # a low stratus is inside the Earth's shadow at the same sun angle.
-    # Under the finite disk "in the shadow" needs the whole disk below the
-    # boundary: the stratus top's boundary sits near -1.9 deg true, so the
-    # -2 deg sun's upper limb (-1.73) still grazes it; deepen to 92.5.
+    # a low stratus is inside the Earth's shadow at the same sun angle:
+    # per-beam shadow heights at zenith 92 deg sit at ~4-7 km, all above the
+    # stratus top (1.5 km) — the whole disk misses the deck
     assert rtcloud.illuminate_cloud(atmo, cloud.get_preset("stratus"),
-                                    92.0).geometry in ("base", "mixed")
-    assert rtcloud.illuminate_cloud(atmo, cloud.get_preset("stratus"),
-                                    92.5).geometry == "none"
+                                    92.0).geometry == "none"
 
 
 def test_underlit_base_turns_red(atmo, altostratus):
@@ -335,15 +332,16 @@ def test_underlit_deck_is_not_seen_through_its_shadow(atmo):
     low = cloud.get_preset("stratus")
     illum = rtcloud.illuminate_cloud(atmo, low, 91.0)   # sun 1 degree below
     assert illum.geometry == "base"
-    # Per beam, an ascending beam that reaches the deck top has already
-    # cleared the opaque ground, so the deck column is lit end to end:
-    # tau_below is structurally zero (the old midpoint closure blurred two
-    # different spatial points into one boundary).
-    assert all(float(np.max(b.tau_below)) == 0.0 for b in illum.beams)
+    # Per-beam shadow heights: at zenith 91 deg the shadow height sits at
+    # ~0.85-1.5 km — INSIDE the low deck — so the beams enter mid-deck with
+    # the sub-entry fraction shadowed (the per-beam replacement for the old
+    # midpoint closure); the deepest-shadowed beams carry most of tau.
+    mid = [b for b in illum.beams if b.z_entry_km > low.base_km]
+    assert len(mid) >= len(illum.beams) // 2
+    assert max(float(np.max(b.tau_below)) for b in mid) > 5.0
     top_view = rtcloud.cloud_radiance(illum, [0.0])[0, I550]
     low_view = rtcloud.cloud_radiance(illum, [85.0])[0, I550]
-    # the underlit base spreads isotropically: identical at zenith and horizon
-    assert top_view == pytest.approx(low_view, rel=1e-12)
+    assert low_view < top_view                          # attenuated towards the horizon
     assert top_view > 0.0
 
 

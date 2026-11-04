@@ -60,25 +60,34 @@ def _time(fn, repeat=1):
 
 
 def baseline_block() -> dict:
-    """Warm timings of current production entry points."""
+    """Warm timings of the CURRENT production entry points (unified source).
+
+    Every timed callable is preceded by an un-timed warm-up call so the
+    numbers exclude first-call table construction; the cold block below
+    measures the first-call costs separately.
+    """
     from skycolor import presets
+    from skycolor.solar_source import get_solar_geometry
     from skycolor.rt import mc, multiple, single
 
     rows = {}
     atmo3 = presets.clear(W3)
     atmo81 = presets.clear(W81)
 
-    # Mie construction is the dominant cold cost of an 81-wl medium; measure
-    # it separately so source costs can be compared against a clean base.
     t0 = time.perf_counter()
     presets.clear(W81)
     rows["mie_build_81wl_cold_s"] = time.perf_counter() - t0
 
     views = (np.array([0.0]), np.array([0.0]))
-    single.sky_radiance(atmo3, 30.0, *views)   # warm-up: builds the table
+    # source build (once per medium token), then warm queries
+    t0 = time.perf_counter()
+    get_solar_geometry(atmo3._medium).ensure_table()
+    rows["source_table_build_3wl_s"] = time.perf_counter() - t0
+
     t, _, _ = _time(lambda: single.sky_radiance(atmo3, 30.0, *views), repeat=3)
     rows["single_3wl_1view_warm_s"] = t
-    t, _, _ = _time(lambda: single.sky_radiance(atmo81, 30.0, *views))
+    single.sky_radiance(atmo81, 30.0, *views)  # builds the 81-wl table
+    t, _, _ = _time(lambda: single.sky_radiance(atmo81, 30.0, *views), repeat=3)
     rows["single_81wl_1view_warm_s"] = t
     multiple.solve(atmo3, 30.0, 0.0, 0.0)
     t, _, _ = _time(lambda: multiple.solve(atmo3, 30.0, 0.0, 0.0), repeat=3)
@@ -91,18 +100,54 @@ def baseline_block() -> dict:
     zen = np.linspace(0.0, 90.0, 46)
     az = np.linspace(0.0, 180.0, 91)
     Z, A = np.meshgrid(zen, az, indexing="ij")
-    single.sky_radiance(atmo3, 30.0, Z.ravel()[:8], A.ravel()[:8], chunk=512)
+    single.sky_radiance(atmo3, 30.0, Z.ravel()[:64], A.ravel()[:64], chunk=512)
     t, _, _ = _time(lambda: single.sky_radiance(atmo3, 30.0, Z.ravel(), A.ravel(),
                                                 chunk=512), repeat=3)
     rows["single_3wl_dome46x91_warm_s"] = t
 
-    # refraction tables (shadow thresholds) are a separate cold cost shared by
-    # every refracted backend; time the first call that builds them.
     from skycolor.refraction import get_tables
     t0 = time.perf_counter()
     get_tables(atmo3)
     rows["refraction_tables_cold_s"] = time.perf_counter() - t0
     return rows
+
+
+#: plan 6.5 availability budgets (ratios against the archived legacy numbers
+#: recorded in validation/data/production_solar_source/legacy_perf.json when
+#: present, else the committed baseline constants)
+_GATE_BUDGETS = {
+    "cold_source_build_s": 10.0,
+    "single_81wl_1view_warm_s": 1.0,
+    "mc_ratio_max": 4.0,
+    "sos_ratio_max": 4.0,
+    "dome_ratio_max": 3.0,
+}
+_LEGACY = {"mc_3wl_20k_warm_s": 0.0729, "sos_3wl_warm_s": 2.5127,
+           "single_3wl_dome46x91_warm_s": 1.1192}
+
+
+def gate_block(baseline: dict) -> dict:
+    """Availability gate (plan 6.5): compare measured numbers to budgets.
+
+    Exit-relevant: every breach is reported and the suite returns non-zero
+    through the gate's ``passed`` flag.
+    """
+    rows = {}
+    rows["cold_source_build_s"] = dict(
+        value=baseline.get("source_table_build_3wl_s", float("nan")),
+        budget=_GATE_BUDGETS["cold_source_build_s"])
+    rows["single_81wl_1view_warm_s"] = dict(
+        value=baseline.get("single_81wl_1view_warm_s", float("nan")),
+        budget=_GATE_BUDGETS["single_81wl_1view_warm_s"])
+    for key, budget in [("mc_3wl_20k_warm_s", "mc_ratio_max"),
+                        ("sos_3wl_warm_s", "sos_ratio_max"),
+                        ("single_3wl_dome46x91_warm_s", "dome_ratio_max")]:
+        legacy = _LEGACY[key]
+        value = baseline.get(key, float("nan"))
+        rows[key + "_ratio"] = dict(value=value / legacy, budget=_GATE_BUDGETS[budget],
+                                    legacy=legacy)
+    passed = all(v["value"] <= v["budget"] for v in rows.values())
+    return dict(passed=bool(passed), rows=rows)
 
 
 def cold_block() -> dict:
@@ -211,11 +256,13 @@ def main() -> None:
     args = parser.parse_args()
 
     head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    base = baseline_block()
     result = dict(
         git_head=head,
         machine=dict(python=sys.version.split()[0],
                      numpy=np.__version__),
-        baseline=baseline_block(),
+        baseline=base,
+        gate=gate_block(base),
         source_experimental=source_experimental_block(),
         peak_rss_gib=_rss_gib(),
     )
@@ -224,6 +271,9 @@ def main() -> None:
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(result, indent=2))
+    if not result["gate"]["passed"]:
+        print("AVAILABILITY GATE: BREACHED", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
