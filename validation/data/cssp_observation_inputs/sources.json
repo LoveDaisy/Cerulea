@@ -1,0 +1,550 @@
+{
+  "site": {
+    "name_full": "Cherry Springs State Park",
+    "name_short": "CSSP",
+    "lat_deg": 41.6646,
+    "lon_deg": -77.8125,
+    "elevation_m": 710.0,
+    "coordinate_validation": "independent JPL AIRLESS sample and full MICA replay live in validation/data/matched_twilight_observations (see external_refs)"
+  },
+  "author_repo_commit": "1d2ecc69cb15885b147d2831cae89fbd15d471fa",
+  "sources": [
+    {
+      "id": "full-csv",
+      "kind": "whole-file",
+      "role": "published spectra + published (wrong-site) axes + sequence + moon fraction",
+      "url": "https://static-content.springer.com/esm/art%3A10.1038%2Fsrep26756/MediaObjects/41598_2016_BFsrep26756_MOESM104_ESM.csv",
+      "sha256": "e0e3e895b3a66fc83d9f63bd02e92899a11a44b1d1707f8a6d7a05279cbe6bab",
+      "bytes": 25481368,
+      "evidence": "published-upstream"
+    },
+    {
+      "id": "published-wavelengths",
+      "kind": "whole-file",
+      "role": "published 1 nm wavelength grid",
+      "url": "https://static-content.springer.com/esm/art%3A10.1038%2Fsrep26756/MediaObjects/41598_2016_BFsrep26756_MOESM103_ESM.csv",
+      "sha256": "479dad2965c373b73052b518d33621385b80dead1d64964e19b610b363a8200e",
+      "bytes": 2244,
+      "evidence": "published-upstream"
+    },
+    {
+      "id": "mica-cssp-sun",
+      "kind": "whole-file",
+      "role": "corrected CSSP solar axis",
+      "url": "https://raw.githubusercontent.com/spitschan/IlluminationSpectraDataset/1d2ecc69cb15885b147d2831cae89fbd15d471fa/analysis/data/ephemeris/CSSP_SunLocalZenith.txt",
+      "sha256": "12b3f2c55c936d9d5e275765b5b8c7e99d24c19e5ae0ae9a324440bb38becea6",
+      "bytes": 720617,
+      "evidence": "published-upstream"
+    },
+    {
+      "id": "mica-cssp-moon",
+      "kind": "whole-file",
+      "role": "corrected CSSP lunar axis",
+      "url": "https://raw.githubusercontent.com/spitschan/IlluminationSpectraDataset/1d2ecc69cb15885b147d2831cae89fbd15d471fa/analysis/data/ephemeris/CSSP_MoonLocalZenith.txt",
+      "sha256": "4fdf4c2b2792fab0042aefb1f855fc3e92d4a89be8151ce3603f6c647ebd6578",
+      "bytes": 720617,
+      "evidence": "published-upstream"
+    },
+    {
+      "id": "raw-archive",
+      "kind": "whole-archive",
+      "url": "https://ndownloader.figshare.com/files/4862119",
+      "final_url": "https://s3-eu-west-1.amazonaws.com/pfigshare-u-files/4862119/dataraw.tar.gz",
+      "total_bytes": 701893601,
+      "sha256_full_archive": "e6f7a5c716a12a9f4dfb935c383321fe2270958df909d38edd0970d359c711ec",
+      "note": "single sequential read; full-archive sha256 recorded once, from the complete file. The historical 1 MiB prefix hash (9bd6202b80a3c4612121a701519fae774d250a78a73bf6a26d578a617f0a0ea9) in the feasibility packet remains prefix-only evidence",
+      "evidence": "published-upstream"
+    }
+  ],
+  "vendored_raw_members": {
+    "kind": "member",
+    "count": 42,
+    "items": [
+      {
+        "packet_path": "raw/mat/20140702T212057_sOO_USB2000+_pCSSP.mat",
+        "bytes": 91257,
+        "sha256": "fa4eedaed6586281ad0eeb2a960f293033ca1ebe52e9ed62a1779578c9583bdf"
+      },
+      {
+        "packet_path": "raw/mat/20140702T212158_sOO_USB2000+_pCSSP.mat",
+        "bytes": 95941,
+        "sha256": "e3f8b6fd02c68c3d1d14d798551843c0df5cf8b22285c29331f902b61a257159"
+      },
+      {
+        "packet_path": "raw/mat/20140702T212259_sOO_USB2000+_pCSSP.mat",
+        "bytes": 94616,
+        "sha256": "56cafaa48817f5788d7778d18095f28824ad1e26733e4053d82ae432b3ec580b"
+      },
+      {
+        "packet_path": "raw/mat/20140702T212400_sOO_USB2000+_pCSSP.mat",
+        "bytes": 93083,
+        "sha256": "2f4006a035789825e5d09448f198a369b050c947b51c2131839b2e85576a152f"
+      },
+      {
+        "packet_path": "raw/mat/20140702T212502_sOO_USB2000+_pCSSP.mat",
+        "bytes": 98529,
+        "sha256": "04aa283ac1728f93719b10c575659e49f4080ca62c8f17d4a65f637bc41fb45f"
+      },
+      {
+        "packet_path": "raw/mat/20140703T010448_sOO_USB2000+_pCSSP.mat",
+        "bytes": 25797,
+        "sha256": "cbfafa7ab57cf56d7f2b5195e426a64cc0b1b013a7256090b294ae10b25a7c83"
+      },
+      {
+        "packet_path": "raw/mat/20140703T010548_sOO_USB2000+_pCSSP.mat",
+        "bytes": 25771,
+        "sha256": "0dc653eca674114919bb5f08d0666015909877c99b0f907e09e575cede70ab12"
+      },
+      {
+        "packet_path": "raw/mat/20140703T020049_sOO_USB2000+_pCSSP.mat",
+        "bytes": 25782,
+        "sha256": "03784d69b287ac022dcb362f904d72dc3acf4288447b9a9628daf5157e97596e"
+      },
+      {
+        "packet_path": "raw/mat/20140703T030049_sOO_USB2000+_pCSSP.mat",
+        "bytes": 25805,
+        "sha256": "bce91406b27568c313e965e6a72e1de1f6424064dee4cb3442b9dfde991f9191"
+      },
+      {
+        "packet_path": "raw/mat/20140703T040049_sOO_USB2000+_pCSSP.mat",
+        "bytes": 25878,
+        "sha256": "a78ed77fa4e50f67316aba3515d313a7a605d0c0968f818ba4529a1abbc79e35"
+      },
+      {
+        "packet_path": "raw/mat/20140703T042249_sOO_USB2000+_pCSSP.mat",
+        "bytes": 25865,
+        "sha256": "9f52011912787b414b6c24f9854cb15e42bd99dfed480a253b6e86a60e54bf00"
+      },
+      {
+        "packet_path": "raw/mat/20140703T042349_sOO_USB2000+_pCSSP.mat",
+        "bytes": 25864,
+        "sha256": "819ee94ad95db0a2c033ca3539e09c4db178d6e073907608b0101b68989dea76"
+      },
+      {
+        "packet_path": "raw/mat/20140703T042449_sOO_USB2000+_pCSSP.mat",
+        "bytes": 25933,
+        "sha256": "8614fd24f4469db1b4d4a5956aed593d710ababced80f7865384d0739f992b80"
+      },
+      {
+        "packet_path": "raw/mat/20140703T042549_sOO_USB2000+_pCSSP.mat",
+        "bytes": 25911,
+        "sha256": "770f4e75854b8970e2d763dda445f47d73a3fe5500d53346d28a6f718fc65836"
+      },
+      {
+        "packet_path": "raw/mat/20140703T042649_sOO_USB2000+_pCSSP.mat",
+        "bytes": 25915,
+        "sha256": "1fd1e6d85be2868d746023db4927546c5fea3462e25b4c21a63ff7f272c3dd91"
+      },
+      {
+        "packet_path": "raw/mat/20140703T044449_sOO_USB2000+_pCSSP.mat",
+        "bytes": 26303,
+        "sha256": "abc253bb0020bce45f424313e243e0a7719045588fff47bbe1f0c9ccf7615bed"
+      },
+      {
+        "packet_path": "raw/mat/20140703T044549_sOO_USB2000+_pCSSP.mat",
+        "bytes": 26330,
+        "sha256": "7debd4fda2e3e4d3de12e7af29b121a81b9d9d25ae4e15ca0dfdfeace23ef042"
+      },
+      {
+        "packet_path": "raw/mat/20140703T044649_sOO_USB2000+_pCSSP.mat",
+        "bytes": 26393,
+        "sha256": "044aad72014b84e5fd655b152f4e98e83bf4a8d3c7f296935440c4a67aaed953"
+      },
+      {
+        "packet_path": "raw/mat/20140703T044946_sOO_USB2000+_pCSSP.mat",
+        "bytes": 54598,
+        "sha256": "542a3025a52fe640a5ea372efa4a1d05e875dd2352ab919ab43f4bc3b710142e"
+      },
+      {
+        "packet_path": "raw/mat/20140703T045046_sOO_USB2000+_pCSSP.mat",
+        "bytes": 26035,
+        "sha256": "3818ca2f423b22c4ef0eaeeb63755a37baafbf6bbfcac5ecc191145fa3a53016"
+      },
+      {
+        "packet_path": "raw/mat/20140703T050608_sOO_USB2000+_pCSSP.mat",
+        "bytes": 95887,
+        "sha256": "525dd191c9bed3b95141f36b007239ae87447d5ac4e47073da53cb1258b795e0"
+      },
+      {
+        "packet_path": "raw/mat/20140703T050710_sOO_USB2000+_pCSSP.mat",
+        "bytes": 97191,
+        "sha256": "d5150dd1f14816ea27462ac94d4457a19883f3c52fb5b1d99dafb3e979215388"
+      },
+      {
+        "packet_path": "raw/mat/20140703T050812_sOO_USB2000+_pCSSP.mat",
+        "bytes": 98703,
+        "sha256": "10eef42eaa3c989f646380b8073874efb9cf53769521738a113d64d8222d2eb5"
+      },
+      {
+        "packet_path": "raw/mat/20140703T050913_sOO_USB2000+_pCSSP.mat",
+        "bytes": 92838,
+        "sha256": "13b001144d5f7cb6d2510a484f297c2760b9e7b9c48a2dd4c21e4108fc4d93fa"
+      },
+      {
+        "packet_path": "raw/mat/20140703T051014_sOO_USB2000+_pCSSP.mat",
+        "bytes": 93993,
+        "sha256": "eefa80d8c40dc6700f1946e61c82d22a59c7013909fc2fbb02922771b4e36d90"
+      },
+      {
+        "packet_path": "raw/mat/20140718T211344_sOO_USB2000+_pCSSP.mat",
+        "bytes": 91425,
+        "sha256": "5689c0667f83074ca27313efe27eacdf7a16d42161c6e1428f3b5fab5713e08c"
+      },
+      {
+        "packet_path": "raw/mat/20140718T211444_sOO_USB2000+_pCSSP.mat",
+        "bytes": 95900,
+        "sha256": "00cc4952a778e141e8d78a689e0a7dbe5562913bbc8acf4557f28eb11ad6f76e"
+      },
+      {
+        "packet_path": "raw/mat/20140718T211546_sOO_USB2000+_pCSSP.mat",
+        "bytes": 94349,
+        "sha256": "c2ba64f700089395946b04d06908bfafb2120650c6ff387c50ae24feac546c71"
+      },
+      {
+        "packet_path": "raw/mat/20140719T010516_sOO_USB2000+_pCSSP.mat",
+        "bytes": 25660,
+        "sha256": "2d678a753ea6c4d20f22d2c18a4c01633b492babdb20c90316968b2a36d47d2a"
+      },
+      {
+        "packet_path": "raw/mat/20140719T010616_sOO_USB2000+_pCSSP.mat",
+        "bytes": 25697,
+        "sha256": "c44dac6203bf09a75158e38ab7d7e3dc35cbad0c02a17481c56a4a6e753371be"
+      },
+      {
+        "packet_path": "raw/mat/20140719T020016_sOO_USB2000+_pCSSP.mat",
+        "bytes": 25709,
+        "sha256": "edcfbd69c8713c2e7a3a76f411eb8617b5b08035a653539c69cae99f2c7dacd0"
+      },
+      {
+        "packet_path": "raw/mat/20140719T030016_sOO_USB2000+_pCSSP.mat",
+        "bytes": 25644,
+        "sha256": "1f605797e51960b7a8759f8467689f69372d6bf397627691a8c895a4795e48a4"
+      },
+      {
+        "packet_path": "raw/mat/20140719T040017_sOO_USB2000+_pCSSP.mat",
+        "bytes": 25706,
+        "sha256": "a72eb93c72ac46c6c708dcfa1eb1809f73bbc493a61477b8f90bef0700c1595f"
+      },
+      {
+        "packet_path": "raw/mat/20140719T043817_sOO_USB2000+_pCSSP.mat",
+        "bytes": 25808,
+        "sha256": "5dd68a34b1194138d2b19b0e85cda30409d09c924e91a5094682a4dc874c2b8b"
+      },
+      {
+        "packet_path": "raw/mat/20140719T043917_sOO_USB2000+_pCSSP.mat",
+        "bytes": 25750,
+        "sha256": "7a13b5155b604d604a34aedd31aa5b50c0acee1185551f7bdcdfd7b100134b13"
+      },
+      {
+        "packet_path": "raw/mat/20140719T044017_sOO_USB2000+_pCSSP.mat",
+        "bytes": 25824,
+        "sha256": "b0be0d8aa5137007117cfe56fa6fb4870f94bb9edcd4642c6ac46f12de061b2f"
+      },
+      {
+        "packet_path": "raw/mat/20140719T045917_sOO_USB2000+_pCSSP.mat",
+        "bytes": 26039,
+        "sha256": "a619f4178d525cd7df06476f5b51b201369ef6344f136d3ccb70bd6785130df6"
+      },
+      {
+        "packet_path": "raw/mat/20140719T050017_sOO_USB2000+_pCSSP.mat",
+        "bytes": 26094,
+        "sha256": "b353918b101a122d4d726c34850ee9ff6226dcf5ceccac773237f8f26708db8d"
+      },
+      {
+        "packet_path": "raw/mat/20140719T050117_sOO_USB2000+_pCSSP.mat",
+        "bytes": 26132,
+        "sha256": "d23d125c4aed3c0feddd7df3d70841af4db3e8eb6a96f4530593b45ec8440ab4"
+      },
+      {
+        "packet_path": "raw/mat/20140719T051946_sOO_USB2000+_pCSSP.mat",
+        "bytes": 59415,
+        "sha256": "6cf2380a98e1966a21e9310bfbb99ca54297d6ffeb1238417fe8943c331067ea"
+      },
+      {
+        "packet_path": "raw/mat/20140719T052046_sOO_USB2000+_pCSSP.mat",
+        "bytes": 96247,
+        "sha256": "71b8d8bb935e6b746d1b44c46e881d7dced3a47b1a468776df5b435f398cadb4"
+      },
+      {
+        "packet_path": "raw/mat/20140719T052150_sOO_USB2000+_pCSSP.mat",
+        "bytes": 97336,
+        "sha256": "41f65ef0c2e02eae0d4d516155d9b2239d5c669947b15b5ebe530e706906c3b8"
+      }
+    ],
+    "note": "byte-identical members of the raw archive; member hashes do not certify the whole archive"
+  },
+  "vendored_weather": {
+    "kind": "response",
+    "items": [
+      {
+        "packet_path": "raw/weather/aeronet-Penn_State_Univ-20140712-14-AOD20.txt",
+        "bytes": 45,
+        "sha256": "3a33c751dcdbb73ffe8d88d23bd7eea9d40dec747937d2a5bf45cdc96c2bd786"
+      },
+      {
+        "packet_path": "raw/weather/aeronet-Penn_State_Univ-20140718-19-AOD20.txt",
+        "bytes": 45,
+        "sha256": "3a33c751dcdbb73ffe8d88d23bd7eea9d40dec747937d2a5bf45cdc96c2bd786"
+      },
+      {
+        "packet_path": "raw/weather/aeronet-Toronto-20140712-14-AOD20.txt",
+        "bytes": 200992,
+        "sha256": "bc40cbf00b7307039887590c29ab70bdc7d2f6b304e9725c6bd54dfb09c4fe53"
+      },
+      {
+        "packet_path": "raw/weather/aeronet-Toronto-20140718-19-AOD20.txt",
+        "bytes": 237984,
+        "sha256": "a0b9d7d942ff41cc937e254e09173dc0c10beb4fe8954ea68c182a05acdd224f"
+      },
+      {
+        "packet_path": "raw/weather/iem-N38-daily-20140712-month.json",
+        "bytes": 22,
+        "sha256": "37ec4665a8102d115ffd1ac20dae94c98b4dac64b0c1a68228aa2a531caeb35d"
+      },
+      {
+        "packet_path": "raw/weather/iem-N38-daily-20140714-month.json",
+        "bytes": 22,
+        "sha256": "37ec4665a8102d115ffd1ac20dae94c98b4dac64b0c1a68228aa2a531caeb35d"
+      },
+      {
+        "packet_path": "raw/weather/iem-N38-daily-20140718-month.json",
+        "bytes": 22,
+        "sha256": "37ec4665a8102d115ffd1ac20dae94c98b4dac64b0c1a68228aa2a531caeb35d"
+      },
+      {
+        "packet_path": "raw/weather/iem-N38-obhistory-20140630.json",
+        "bytes": 44840,
+        "sha256": "cb75fa924f82420965ae198d452d5ae7c8a73d396a00d7e9a1e1d38a50365500"
+      },
+      {
+        "packet_path": "raw/weather/iem-N38-obhistory-20140701.json",
+        "bytes": 44855,
+        "sha256": "b81ec82a8fe563cf3cae99deccd0937d5ec881bf6ecda5975bd4ab409af175d3"
+      },
+      {
+        "packet_path": "raw/weather/iem-N38-obhistory-20140702.json",
+        "bytes": 44696,
+        "sha256": "e6466972728855fceb1f85446eb4d875a0fcd14f62e4a28f61be18f5b2630c30"
+      },
+      {
+        "packet_path": "raw/weather/iem-N38-obhistory-20140703.json",
+        "bytes": 44958,
+        "sha256": "cddda0ee6af4613dd0905e31b701f781155d8245749cc1b724f461bcc4bf7c2a"
+      },
+      {
+        "packet_path": "raw/weather/iem-N38-obhistory-20140712.json",
+        "bytes": 20859,
+        "sha256": "a47a73704732d8178997bd50c50e0913cbe160da0926eacce046960ac46a2f5a"
+      },
+      {
+        "packet_path": "raw/weather/iem-N38-obhistory-20140713.json",
+        "bytes": 42638,
+        "sha256": "1fdb7e10558c294e215e6aca0282ac94f823b06ee5674ebe394f5d850c34f382"
+      },
+      {
+        "packet_path": "raw/weather/iem-N38-obhistory-20140714.json",
+        "bytes": 44131,
+        "sha256": "72eabe2028a933fdc1d2d1210d0704704905fa8d22a31b75cdfced90d39bab22"
+      },
+      {
+        "packet_path": "raw/weather/iem-N38-obhistory-20140718.json",
+        "bytes": 44148,
+        "sha256": "5909507721f47c5fc6147af8dabd65a06ea1cb52c19863e1f3fbd18599e83977"
+      },
+      {
+        "packet_path": "raw/weather/iem-N38-obhistory-20140719.json",
+        "bytes": 44718,
+        "sha256": "bf1b882722dde5226d32fd26df58c3b7e1d550c875b2bcf7525a97483c2a6ddf"
+      },
+      {
+        "packet_path": "raw/weather/noaa-BFD-20140630.json",
+        "bytes": 40066,
+        "sha256": "e27f314d426961a75f8d97a3f608f8cf3b4b9849af4038277a8917cbcb526dc1"
+      },
+      {
+        "packet_path": "raw/weather/noaa-BFD-20140701.json",
+        "bytes": 33321,
+        "sha256": "7f406c471f727d6c7be99fdc3a8c07b1154ecca546b8877d3ed37671803a9503"
+      },
+      {
+        "packet_path": "raw/weather/noaa-BFD-20140702.json",
+        "bytes": 35877,
+        "sha256": "f6e5d9eb7dd93472f4529b7ad567a90cafa8abce82545b5bec1170b74cf3cd77"
+      },
+      {
+        "packet_path": "raw/weather/noaa-BFD-20140712.json",
+        "bytes": 16322,
+        "sha256": "35490852be1278a90425c76c35520d6e75e8b86a4867f34c1819380f4cad2828"
+      },
+      {
+        "packet_path": "raw/weather/noaa-BFD-20140713.json",
+        "bytes": 35769,
+        "sha256": "9e604efc462587400693e25aa7c6772d4a3c1dfebfc060e884bd80d14c116464"
+      },
+      {
+        "packet_path": "raw/weather/noaa-BFD-20140714.json",
+        "bytes": 36598,
+        "sha256": "84789f9ae66701e684bc41335aab7b1d6ce79127b87079cb135089000e2b1ec6"
+      },
+      {
+        "packet_path": "raw/weather/noaa-BFD-20140718.json",
+        "bytes": 17654,
+        "sha256": "16871a6fd55886c0d7651a0af898d776fcc0d77367b377f2ce0b7c624d1a272c"
+      },
+      {
+        "packet_path": "raw/weather/noaa-BFD-20140719.json",
+        "bytes": 30915,
+        "sha256": "51708a667b35b3eee502b9aceeb26bab0a5d9c93e979b629850070aa26e57866"
+      }
+    ],
+    "note": "verbatim public responses (IEM representation of GHCNh, NOAA Global Hourly, AERONET); failed probes kept as evidence"
+  },
+  "external_refs": [
+    {
+      "path": "validation/data/matched_twilight_observations/verify.py",
+      "sha256": "5f3624ccbb8444b845effcb0bfc4aacc80a5fa04eb0dbe34d549e0f1486f0eaa",
+      "bytes": 7529
+    },
+    {
+      "path": "validation/data/matched_twilight_observations/spectral/CSSP-sample-probe.json",
+      "sha256": "a936c906d85bd0f8eb808c178c9fd278b999ee57e58f4eb17cef3e0fe8dcf958",
+      "bytes": 27209
+    },
+    {
+      "path": "validation/data/matched_twilight_observations/spectral/knot-extractions.json",
+      "sha256": "8ed4cf45029ee4fcc394654db2186848f996f919f1dea0efb23ac57f01f1feb3",
+      "bytes": 3163
+    },
+    {
+      "path": "validation/data/matched_twilight_observations/spectral/selected-spectra.csv",
+      "sha256": "eaf50104bb6ade4b3a6d9cd85b06cbffebc12a325e8079aa665adb37cad573fb",
+      "bytes": 312047
+    },
+    {
+      "path": "validation/data/cssp_observation_feasibility/timing/OO_MeasureAndSave.m",
+      "sha256": "a8bd4c4eead62c101c826858dd37b7c0c58e8a9577fbd52d81911ab9125e4cdf",
+      "bytes": 5458
+    },
+    {
+      "path": "validation/data/cssp_observation_feasibility/timing/OO_IntervalMeasurements.m",
+      "sha256": "45bec802ad6908f8361bac6300352e7382347d175b7fc96a78c02b74f48eabdd",
+      "bytes": 5617
+    },
+    {
+      "path": "validation/data/cssp_observation_feasibility/timing/control-raw-metadata.json",
+      "sha256": "6d362638cfd868926e6acab8e5df7857c7d687a98a0d2b07a3c8893534ea8ac8",
+      "bytes": 2132
+    },
+    {
+      "path": "validation/data/cssp_observation_feasibility/atmosphere/noaa-BFD-window.json",
+      "sha256": "152cdb7bd46242714395906b5845da41570e54433879ffb838b4a2ee01b53808",
+      "bytes": 940
+    },
+    {
+      "path": "validation/data/cssp_observation_feasibility/atmosphere/iem-N38-window.json",
+      "sha256": "bde40a98bd3c6ed9bdb06c430a8df132fa8ee041eb8fb57bcc587f22933adf4f",
+      "bytes": 3244
+    },
+    {
+      "path": "validation/data/cssp_observation_feasibility/atmosphere/nearest-sites.json",
+      "sha256": "7658e4b2e9106f4c1577e8b492d6a6244189e1748619864fb328e5db64183481",
+      "bytes": 4325
+    },
+    {
+      "path": "docs/twilight/MATCHED_OBSERVATIONS.md",
+      "sha256": "a990fd45e868ee1750cc69c0faa35a5fbeecdce7ce9844ff38b90a0551154fbd",
+      "bytes": 13680
+    }
+  ],
+  "columns_in_packet": [
+    1327,
+    1328,
+    1329,
+    1330,
+    1331,
+    1544,
+    1545,
+    1600,
+    1660,
+    1719,
+    1741,
+    1742,
+    1743,
+    1744,
+    1745,
+    1763,
+    1764,
+    1765,
+    1766,
+    1767,
+    1782,
+    1783,
+    1784,
+    1785,
+    1786,
+    2629,
+    2630,
+    2631,
+    2860,
+    2861,
+    2915,
+    2975,
+    3035,
+    3073,
+    3074,
+    3075,
+    3094,
+    3095,
+    3096,
+    3114,
+    3115,
+    3116
+  ],
+  "fetch_provenance": [
+    {
+      "id": "full-csv",
+      "url": "https://static-content.springer.com/esm/art%3A10.1038%2Fsrep26756/MediaObjects/41598_2016_BFsrep26756_MOESM104_ESM.csv",
+      "path": "CSSP_spectra.csv",
+      "sha256": "e0e3e895b3a66fc83d9f63bd02e92899a11a44b1d1707f8a6d7a05279cbe6bab",
+      "bytes": 25481368,
+      "cached": true,
+      "identity": "verified"
+    },
+    {
+      "id": "published-wavelengths",
+      "url": "https://static-content.springer.com/esm/art%3A10.1038%2Fsrep26756/MediaObjects/41598_2016_BFsrep26756_MOESM103_ESM.csv",
+      "path": "published-wavelengths.csv",
+      "sha256": "479dad2965c373b73052b518d33621385b80dead1d64964e19b610b363a8200e",
+      "bytes": 2244,
+      "cached": true,
+      "identity": "verified"
+    },
+    {
+      "id": "mica-cssp-sun",
+      "url": "https://raw.githubusercontent.com/spitschan/IlluminationSpectraDataset/1d2ecc69cb15885b147d2831cae89fbd15d471fa/analysis/data/ephemeris/CSSP_SunLocalZenith.txt",
+      "path": "CSSP_SunLocalZenith.txt",
+      "cached": true,
+      "bytes": 720617,
+      "sha256": "12b3f2c55c936d9d5e275765b5b8c7e99d24c19e5ae0ae9a324440bb38becea6",
+      "identity": "verified"
+    },
+    {
+      "id": "mica-cssp-moon",
+      "url": "https://raw.githubusercontent.com/spitschan/IlluminationSpectraDataset/1d2ecc69cb15885b147d2831cae89fbd15d471fa/analysis/data/ephemeris/CSSP_MoonLocalZenith.txt",
+      "path": "CSSP_MoonLocalZenith.txt",
+      "cached": true,
+      "bytes": 720617,
+      "sha256": "4fdf4c2b2792fab0042aefb1f855fc3e92d4a89be8151ce3603f6c647ebd6578",
+      "identity": "verified"
+    },
+    {
+      "id": "raw-archive",
+      "url": "https://ndownloader.figshare.com/files/4862119",
+      "path": "dataraw.tar.gz",
+      "bytes": 701893601,
+      "sha256": "e6f7a5c716a12a9f4dfb935c383321fe2270958df909d38edd0970d359c711ec",
+      "cached": true,
+      "identity": "verified"
+    }
+  ]
+}

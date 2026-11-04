@@ -1,0 +1,140 @@
+{
+  "note": "independent conditions only; geometry from vendored MICA, weather verbatim public responses, AOD availability as returned",
+  "conditions": {
+    "s04": {
+      "utc_window": {
+        "start": "2014-07-02T23:38:19+00:00",
+        "end": "2014-07-03T10:07:19+00:00"
+      },
+      "local_dates_utc_covered": [
+        "2014-07-02",
+        "2014-07-03"
+      ],
+      "moon": {
+        "elevation_deg_min": -46.97916539999999,
+        "elevation_deg_max": 40.1900841,
+        "published_illumination_fraction_min": 0.265,
+        "published_illumination_fraction_max": 0.307,
+        "axis_source": "vendored upstream MICA lunar table"
+      },
+      "weather": {
+        "KN38": {
+          "station": {
+            "name": "Wellsboro/KN38 (AWOS, via IEM)",
+            "lat_deg": 41.7279,
+            "lon_deg": -77.3965,
+            "elevation_m": 572.88
+          },
+          "distance_km": 35.25,
+          "elevation_diff_m": -137.12,
+          "responses": [
+            "iem-N38-obhistory-20140702.json",
+            "iem-N38-obhistory-20140703.json"
+          ],
+          "note": "neighbour station, not an in-situ CSSP measurement; IEM rows are a structured representation of GHCNh, not a second sensor"
+        },
+        "KBFD": {
+          "station": {
+            "name": "Bradford/KBFD (NOAA Global Hourly)",
+            "lat_deg": 41.79835,
+            "lon_deg": -78.6355,
+            "elevation_m": 652.9
+          },
+          "distance_km": 69.89,
+          "elevation_diff_m": -57.1,
+          "responses": [
+            "noaa-BFD-20140702.json"
+          ],
+          "note": "neighbour station, not an in-situ CSSP measurement; IEM rows are a structured representation of GHCNh, not a second sensor"
+        }
+      },
+      "aod": {
+        "queried": [],
+        "note": "AERONET direct-sun products are daytime; any return is a far-site column, not an in-situ twilight value"
+      },
+      "verdict": "pending-independent-screening",
+      "verdict_note": "finalised with the selection review; must reference these same files and must not use model residuals",
+      "frozen_feasibility_refs": [
+        {
+          "path": "validation/data/cssp_observation_feasibility/atmosphere/noaa-BFD-window.json",
+          "sha256": "152cdb7bd46242714395906b5845da41570e54433879ffb838b4a2ee01b53808",
+          "bytes": 940
+        },
+        {
+          "path": "validation/data/cssp_observation_feasibility/atmosphere/iem-N38-window.json",
+          "sha256": "bde40a98bd3c6ed9bdb06c430a8df132fa8ee041eb8fb57bcc587f22933adf4f",
+          "bytes": 3244
+        },
+        {
+          "path": "validation/data/cssp_observation_feasibility/atmosphere/aeronet-requests.json",
+          "sha256": "6eace1d05e6f459b37dec5443e7e7d58c68a67c09bb6853df95ee4d1bcc1a351",
+          "bytes": 990
+        },
+        {
+          "path": "validation/data/cssp_observation_feasibility/atmosphere/nearest-sites.json",
+          "sha256": "7658e4b2e9106f4c1577e8b492d6a6244189e1748619864fb328e5db64183481",
+          "bytes": 4325
+        }
+      ]
+    },
+    "s11": {
+      "utc_window": {
+        "start": "2014-07-18T22:00:36+00:00",
+        "end": "2014-07-19T09:58:09+00:00"
+      },
+      "local_dates_utc_covered": [
+        "2014-07-18",
+        "2014-07-19"
+      ],
+      "moon": {
+        "elevation_deg_min": -39.63128233333333,
+        "elevation_deg_max": 54.265298099999995,
+        "published_illumination_fraction_min": 0.466,
+        "published_illumination_fraction_max": 0.523,
+        "axis_source": "vendored upstream MICA lunar table"
+      },
+      "weather": {
+        "KN38": {
+          "station": {
+            "name": "Wellsboro/KN38 (AWOS, via IEM)",
+            "lat_deg": 41.7279,
+            "lon_deg": -77.3965,
+            "elevation_m": 572.88
+          },
+          "distance_km": 35.25,
+          "elevation_diff_m": -137.12,
+          "responses": [
+            "iem-N38-daily-20140718-month.json",
+            "iem-N38-obhistory-20140718.json",
+            "iem-N38-obhistory-20140719.json"
+          ],
+          "note": "neighbour station, not an in-situ CSSP measurement; IEM rows are a structured representation of GHCNh, not a second sensor"
+        },
+        "KBFD": {
+          "station": {
+            "name": "Bradford/KBFD (NOAA Global Hourly)",
+            "lat_deg": 41.79835,
+            "lon_deg": -78.6355,
+            "elevation_m": 652.9
+          },
+          "distance_km": 69.89,
+          "elevation_diff_m": -57.1,
+          "responses": [
+            "noaa-BFD-20140718.json",
+            "noaa-BFD-20140719.json"
+          ],
+          "note": "neighbour station, not an in-situ CSSP measurement; IEM rows are a structured representation of GHCNh, not a second sensor"
+        }
+      },
+      "aod": {
+        "queried": [
+          "aeronet-Penn_State_Univ-20140718-19-AOD20.txt",
+          "aeronet-Toronto-20140718-19-AOD20.txt"
+        ],
+        "note": "AERONET direct-sun products are daytime; any return is a far-site column, not an in-situ twilight value"
+      },
+      "verdict": "pending-independent-screening",
+      "verdict_note": "finalised with the selection review; must reference these same files and must not use model residuals"
+    }
+  }
+}
