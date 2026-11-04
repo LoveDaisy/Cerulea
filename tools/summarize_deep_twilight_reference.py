@@ -1112,43 +1112,13 @@ def _sensitivity_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
             "sensitivity summary")
     payload = json.loads(singles_path.read_text())
     # THE shared evidence contract (also consumed by the executor's
-    # recovery path): protocol identity, depth/item sets, anchor vectors
-    validated_singles(payload, protocol, protocol_sha_now=protocol_sha_now,
-                      notes=contract_notes)
-    want_suns = {str(s) for s in protocol["scenario"]["sun_elevations_deg"]}
-    want_single_items = {_slug(d) for d in proto_single_items}
-    got_items = set(payload.get("items", {}))
-    if got_items != set(proto_single_items):
-        raise ValueError(
-            f"sensitivity singles: refinement-file items {sorted(got_items)} "
-            f"!= protocol single_items {sorted(proto_single_items)} -- the "
-            "payload metadata must match the protocol, not decide the "
-            "reported comparison set")
-    got_suns = set(payload.get("by_sun", {}))
-    if got_suns != want_suns:
-        raise ValueError(
-            f"sensitivity singles: depths {sorted(got_suns)} != protocol "
-            f"{sorted(want_suns)}")
-    n_anchor = len(protocol["scenario"]["anchor_wavelengths_nm"])
-    for sun, entries in payload["by_sun"].items():
-        missing_items = want_single_items - set(entries)
-        if missing_items:
-            raise ValueError(
-                f"sensitivity singles {sun}: missing protocol-required "
-                f"items {sorted(missing_items)}")
-        # the anchor-grid contract applies to the baseline AND to every
-        # protocol-required refinement: a truncated vector would otherwise
-        # broadcast against the baseline and fabricate a physical drift
-        base = _require_anchor_vector("baseline", entries["baseline"],
-                                      n_anchor, f"sensitivity singles {sun}")
-        if not np.any(base > 0):
-            raise ValueError(
-                f"sensitivity singles {sun}: baseline must be positive on "
-                f"the {n_anchor}-anchor grid")
-        for item in proto_single_items:
-            _require_anchor_vector(f"refinement {item!r}",
-                                   entries[_slug(item)], n_anchor,
-                                   f"sensitivity singles {sun}")
+    # recovery path): protocol identity, depth/item sets, anchor vectors.
+    # validated_singles is the only implementation of this contract -- the
+    # duplicate checks that used to live here were removed so the two
+    # entry points can never drift apart again.
+    validated_by_sun = validated_singles(payload, protocol,
+                                         protocol_sha_now=protocol_sha_now,
+                                         notes=contract_notes)
     out = dict(mc_items=required_items, by_sun={})
     for sun_index, sun in enumerate(suns):
         batch_id = f"s{sun_index}mc"
@@ -1214,7 +1184,7 @@ def _sensitivity_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
             per_item[item] = per_anchor
         out["by_sun"][str(sun)] = dict(mc=per_item)
     singles = {}
-    for sun, by in payload["by_sun"].items():
+    for sun, by in validated_by_sun.items():
         base = np.array(by["baseline"])
         entries = {}
         for item in proto_single_items:

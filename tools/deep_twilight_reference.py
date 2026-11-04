@@ -947,6 +947,27 @@ def stage_sensitivity(protocol, atmo, table, data_dir, state, *, protocol_path,
     repeats = int(sens.get("repeats", 16))
     photons = int(sens.get("photons_per_wavelength", 100_000))
     suns = protocol["scenario"]["sun_elevations_deg"]
+    # the sensitivity wave is a fixed-full-set experiment: the protocol
+    # must declare exactly the supported item sets, checked BEFORE any
+    # compute -- running a subset, or writing metadata for items the
+    # protocol never declared, would execute a different experiment than
+    # the protocol declares and produce output the summarizer must refuse
+    proto_mc = {d.split(" (")[0].strip() for d in sens.get("mc_items", [])}
+    proto_single = {d.split(" (")[0].strip()
+                    for d in sens.get("single_items", [])}
+    tool_mc = {name for name, _desc in SENSITIVITY_MC_ITEMS}
+    tool_single = {name for name, _desc in SENSITIVITY_SINGLE_ITEMS}
+    if proto_mc != tool_mc:
+        raise ValueError(
+            f"sensitivity: protocol mc_items {sorted(proto_mc)} != the "
+            f"fixed supported set {sorted(tool_mc)} -- this stage runs "
+            "the full declared experiment or refuses; it never silently "
+            "executes another experiment than the protocol declares")
+    if proto_single != tool_single:
+        raise ValueError(
+            f"sensitivity: protocol single_items {sorted(proto_single)} "
+            f"!= the fixed supported set {sorted(tool_single)} -- this "
+            "stage runs the full declared experiment or refuses")
     spent, budget_left = stage_budget(data_dir, "sensitivity", protocol, max_stage_hours)
     started = time.perf_counter()
     billed = started
@@ -1069,24 +1090,29 @@ def stage_sensitivity(protocol, atmo, table, data_dir, state, *, protocol_path,
             # file must surface as an incomplete stage, never as
             # reusable evidence
             from tools.summarize_deep_twilight_reference import \
-                validated_singles
+                validated_singles as _validated_singles
             try:
-                validated_singles(payload, protocol,
-                                  protocol_sha_now=sha256_file(protocol_path))
+                _validated_singles(payload, protocol,
+                                   protocol_sha_now=sha256_file(protocol_path))
                 existing_singles = payload
             except ValueError:
                 existing_singles = None
     singles_sourced = "missing"
     if budget_left > 0.0 and table3 is not None:
+        from tools.summarize_deep_twilight_reference import \
+            validated_singles
         single_ref = _sensitivity_singles(protocol, atmo3, table3, suns)
-        # only a fresh, complete computation may replace the evidence
-        # file -- a budget-exhausted recovery must never overwrite
-        # finished evidence with an empty placeholder
-        singles_path.write_text(json.dumps(dict(
+        payload = dict(
             schema="deep-twilight-reference/sensitivity-singles/1",
             protocol_sha256=sha256_file(protocol_path),
-            items={k: d for k, d in SENSITIVITY_SINGLE_ITEMS}, by_sun=single_ref),
-            indent=1) + "\n")
+            items={k: d for k, d in SENSITIVITY_SINGLE_ITEMS},
+            by_sun=single_ref)
+        # the shared evidence contract gates fresh results too: only
+        # output the summarizer will accept may replace the evidence file
+        # and count toward "complete"
+        validated_singles(payload, protocol,
+                          protocol_sha_now=sha256_file(protocol_path))
+        singles_path.write_text(json.dumps(payload, indent=1) + "\n")
         singles_sourced = "computed"
     elif existing_singles is not None:
         singles_sourced = "reused-existing"
