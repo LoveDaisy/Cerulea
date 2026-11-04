@@ -617,6 +617,32 @@ def test_candidate_and_sensitivity_sections(tmp_path):
         _sensitivity_stats(data, proto, wl, [14, 34, 54])
 
 
+    # round-8: a consumed derived total must close against its components
+    # (same contract as direct/candidate) -- a tampered total must not be
+    # certified into a physical sensitivity
+    rows = [json.loads(l) for l in
+            (data / "raw" / "sensitivity" / "s0mc" / "attempt-00.jsonl").read_text().splitlines()]
+    for r in rows:
+        r["items"].pop("ss_extra", None)  # clear the previous mutation
+    rows[0]["items"]["disk4x16"]["per_lambda"]["550.0"]["total"] = 1.0
+    (data / "raw" / "sensitivity" / "s0mc" / "attempt-00.jsonl").write_text(
+        "\n".join(json.dumps(r) for r in rows) + "\n")
+    singles_json.write_text(json.dumps(good_singles))
+    with pytest.raises(ValueError,
+                       match="total != deterministic_single \\+ multiple"):
+        _sensitivity_stats(data, proto, wl, [14, 34, 54])
+    # restore for the stage-participation assertions below
+    rows[0]["items"]["disk4x16"]["per_lambda"]["550.0"]["total"] = \
+        rows[0]["items"]["disk4x16"]["per_lambda"]["550.0"][
+            "deterministic_single"] + \
+        rows[0]["items"]["disk4x16"]["per_lambda"]["550.0"]["multiple"]
+    (data / "raw" / "sensitivity" / "s0mc" / "attempt-00.jsonl").write_text(
+        "\n".join(json.dumps(r) for r in rows) + "\n")
+    sens3 = _sensitivity_stats(data, proto, wl, [14, 34, 54])
+    assert sens3["by_sun"]["-9.0"]["mc"]["disk4x16"]["550.0"][
+        "paired_delta_mean"] == 0.0
+
+
 def test_singles_file_protocol_identity_gate(tmp_path):
     """The deterministic evidence file passes the SAME protocol generation
     gate as the JSONL batches -- a refinement computed under another (or
@@ -653,14 +679,15 @@ def test_singles_file_protocol_identity_gate(tmp_path):
                                  "|no protocol_sha256 recorded"):
             _sensitivity_stats(data, proto, wl, [14, 34, 54],
                                protocol_sha_now=KNOWN_SHA)
-    # a bound historical generation passes with an auditable note
-    payload_mut = json.loads(json.dumps(good))
-    payload_mut["protocol_sha256"] = KNOWN_SHA
-    singles.write_text(json.dumps(payload_mut))
+    # round-8: even a KNOWN historical generation must not authorize the
+    # sensitivity stage -- the f6da5411 protocol predates the
+    # candidate/sensitivity sections entirely
     from tools.summarize_deep_twilight_reference import KNOWN_PROTOCOL_GENERATIONS
+    payload_mut = json.loads(json.dumps(good))
     payload_mut["protocol_sha256"] = next(iter(KNOWN_PROTOCOL_GENERATIONS))
     singles.write_text(json.dumps(payload_mut))
-    with pytest.raises(ValueError, match="missing batch meta"):
+    with pytest.raises(ValueError,
+                       match="only verified for stages.*not 'sensitivity'"):
         _sensitivity_stats(data, proto, wl, [14, 34, 54],
                            protocol_sha_now="current-protocol")
 

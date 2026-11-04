@@ -149,12 +149,17 @@ def check_record_invariants(records, *, stage, batch_id):
 #: silently accepted; the mapping is the auditable witness for the archived
 #: pre-candidate-section wave.
 KNOWN_PROTOCOL_GENERATIONS = {
-    "f6da541115dadeb612f7f9ec8eaf9449858f780b33c700fa0a039f1f37274f1e":
-        "direct/source-pairs wave (2026-11-04): identical scenario/source/"
-        "direct/precision/luminance sections; candidate+sensitivity "
-        "sections and the candidate wall-clock entry were appended later. "
-        "Verified against the current contract for every stage-relevant "
-        "field checked here.",
+    "f6da541115dadeb612f7f9ec8eaf9449858f780b33c700fa0a039f1f37274f1e": {
+        "statement":
+            "direct/source-pairs wave (2026-11-04): identical scenario/"
+            "source/direct/precision/luminance sections; candidate+"
+            "sensitivity sections and the candidate wall-clock entry were "
+            "appended later. Verified against the current contract for "
+            "every stage-relevant field checked here.",
+        # the historical protocol carried no candidate/sensitivity
+        # sections, so this entry must never authorize those stages
+        "stages": ("direct", "source-pairs"),
+    },
 }
 #: the PHYSICS anchor files whose hashes define the traced physics of
 #: every comparison.  A difference in any of these refuses the comparison
@@ -334,12 +339,14 @@ def verified_identity(stage, code_sha256, context) -> str:
 
 
 def require_protocol_generation(meta_protocol, protocol_sha_now, context,
-                                notes) -> None:
+                                notes, *, stage=None) -> None:
     """The single protocol-generation gate: the executed protocol must
     equal the current one or be bound by a KNOWN_PROTOCOL_GENERATIONS
-    entry; anything else (including an absent identity) refuses.  All
-    inputs -- JSONL batches and JSON evidence files alike -- pass through
-    this one rule."""
+    entry whose verified STAGE set covers this stage; anything else
+    (including an absent identity) refuses.  All inputs -- JSONL batches
+    and JSON evidence files alike -- pass through this one rule, and a
+    historical entry never authorizes a stage it was not verified
+    against."""
     if protocol_sha_now is None:
         return  # no current-protocol context to compare against
     if meta_protocol is None:
@@ -348,11 +355,18 @@ def require_protocol_generation(meta_protocol, protocol_sha_now, context,
             "protocol identity is required")
     if meta_protocol == protocol_sha_now:
         return
-    if meta_protocol in KNOWN_PROTOCOL_GENERATIONS:
+    entry = KNOWN_PROTOCOL_GENERATIONS.get(meta_protocol)
+    if entry is not None:
+        allowed = entry["stages"]
+        if stage is not None and stage not in allowed:
+            raise ValueError(
+                f"{context}: protocol generation {meta_protocol[:12]}... "
+                f"is only verified for stages {list(allowed)}, not "
+                f"{stage!r} -- a historical compatibility entry must not "
+                "authorize a stage it was never verified against")
         notes.append(
             f"{context}: executed under known protocol generation "
-            f"{meta_protocol[:12]}... "
-            f"({KNOWN_PROTOCOL_GENERATIONS[meta_protocol]})")
+            f"{meta_protocol[:12]}... ({entry['statement']})")
         return
     raise ValueError(
         f"{context}: executed under unknown protocol generation "
@@ -460,7 +474,7 @@ def check_batch_contract(records, meta, expect, *, stage, batch_id,
                      "values taken from the batch meta provenance and "
                      "validated against the protocol")
     require_protocol_generation(meta_protocol, protocol_sha_now,
-                                f"{stage}/{batch_id}", notes)
+                                f"{stage}/{batch_id}", notes, stage=stage)
     return verified_fp, notes
 
 
@@ -1033,7 +1047,8 @@ def _sensitivity_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
     # experiment's discretisation sensitivity
     require_protocol_generation(payload.get("protocol_sha256"),
                                 protocol_sha_now,
-                                "sensitivity singles", contract_notes)
+                                "sensitivity singles", contract_notes,
+                                stage="sensitivity")
     want_suns = {str(s) for s in protocol["scenario"]["sun_elevations_deg"]}
     want_single_items = {_slug(d) for d in proto_single_items}
     got_items = set(payload.get("items", {}))
@@ -1086,6 +1101,22 @@ def _sensitivity_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
                     f"unexpected {sorted(got_mc_items - want_mc_items)}) "
                     "-- the sensitivity summary must cover every "
                     "protocol-declared experiment and nothing else")
+            # stage-result contract: every consumed quantity closes --
+            # total is a derived value (as in the direct/candidate
+            # checks) and a tampered total must not become a certified
+            # solar-source discretisation sensitivity
+            for item_name, item in row["items"].items():
+                for a_key, v in item["per_lambda"].items():
+                    recomposed = (v["deterministic_single"]
+                                  + v["multiple"])
+                    if not math.isclose(v["total"], recomposed,
+                                        rel_tol=1e-12, abs_tol=0.0):
+                        raise ValueError(
+                            f"sensitivity/{batch_id} seed {row['seed']} "
+                            f"{item_name} {a_key}: total != "
+                            "deterministic_single + multiple -- the "
+                            "sensitivity comparison consumes derived "
+                            "quantities that must close")
         _sens_fp, batch_notes = check_batch_contract(
             records, meta,
             dict(sun_elevation_deg=sun,

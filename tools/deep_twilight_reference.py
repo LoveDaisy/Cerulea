@@ -1054,18 +1054,41 @@ def stage_sensitivity(protocol, atmo, table, data_dir, state, *, protocol_path,
     # deterministic single-scattering refinements (no MC, no seeds) --
     # inside the billed window and skipped when the budget is gone
     single_ref = {}
+    singles_path = data_dir / "raw" / "sensitivity" / "singles-refinement.json"
+    existing_singles = None
+    if singles_path.exists():
+        try:
+            payload = json.loads(singles_path.read_text())
+        except json.JSONDecodeError:
+            payload = None
+        # a completed prior run's evidence: non-empty depths AND pinned to
+        # the current protocol (anything else is not reusable evidence)
+        if isinstance(payload, dict) and payload.get("by_sun") \
+                and payload.get("protocol_sha256") \
+                == sha256_file(protocol_path):
+            existing_singles = payload
+    singles_sourced = "missing"
     if budget_left > 0.0 and table3 is not None:
         single_ref = _sensitivity_singles(protocol, atmo3, table3, suns)
-    out = data_dir / "raw" / "sensitivity" / "singles-refinement.json"
-    out.write_text(json.dumps(dict(
-        schema="deep-twilight-reference/sensitivity-singles/1",
-        protocol_sha256=sha256_file(protocol_path),
-        items={k: d for k, d in SENSITIVITY_SINGLE_ITEMS}, by_sun=single_ref),
-        indent=1) + "\n")
+        # only a fresh, complete computation may replace the evidence
+        # file -- a budget-exhausted recovery must never overwrite
+        # finished evidence with an empty placeholder
+        singles_path.write_text(json.dumps(dict(
+            schema="deep-twilight-reference/sensitivity-singles/1",
+            protocol_sha256=sha256_file(protocol_path),
+            items={k: d for k, d in SENSITIVITY_SINGLE_ITEMS}, by_sun=single_ref),
+            indent=1) + "\n")
+        singles_sourced = "computed"
+    elif existing_singles is not None:
+        singles_sourced = "reused-existing"
     bill(computed)  # final bill includes the deterministic refinements
+    singles_ok = bool(single_ref) or existing_singles is not None
+    if not stopped and not singles_ok:
+        stopped = "no-singles-evidence"
     print(json.dumps(dict(
         stage_status="complete" if not stopped else f"incomplete-{stopped}",
         stage="sensitivity", computed=computed,
+        singles=singles_sourced,
         stage_seconds_here=time.perf_counter() - started,
         cumulative_seconds=spent_total(data_dir, "sensitivity"))), flush=True)
     return computed
