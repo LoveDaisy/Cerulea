@@ -92,10 +92,12 @@ from .single import sky_radiance as _single
 #: standing approximations of this backend
 CAPABILITIES = {
     "scattering": "split estimator: exact spherical first order + MC higher orders",
+    "solar_source": "unified finite disk for both terms; full and anchor "
+                    "wavelength subsets share one geometry per medium token",
     "horizontal_field": "first-order term only",
     "ms_geometry": "Monte Carlo assumes a horizontally uniform atmosphere",
     "mc_refraction": "none (straight-line photon transport)",
-    "ss_refraction": "solar chord when atmo.refraction",
+    "ss_refraction": "unified refracted solar source in the first-order term",
 }
 
 __all__ = ["twilight_radiance", "multiple_scattered", "QUALITY"]

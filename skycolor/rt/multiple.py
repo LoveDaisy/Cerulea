@@ -16,18 +16,17 @@ Method
   spirit as DISORT.  The phase function's Legendre moments come from
   :meth:`Atmosphere.phase_moments`.  The azimuthal expansion is exact (up to
   the moment truncation) -- no m = 0 approximation.
-* The **direct beam** is treated pseudo-spherically: for the point of the
-  vertical column at radius ``r`` the solar ray has impact parameter
-  ``p = r sin(sza)`` and local direction cosine ``mu = cos(sza)``.  Its
-  transmittance is computed with the spherical helpers of
-  :mod:`skycolor.rt.single` and :mod:`skycolor.geometry`, so rays that graze
-  the Earth (twilight) are handled correctly, and layers inside the Earth's
-  shadow receive no beam.
-* The beam source is the physical beam radiance ``F_sun T(z)`` at the layer
-  mid-point.  (An alternative normalisation by the actual transmittance
-  difference between layer boundaries would close the column energy budget
-  exactly, but it over-weights grazing twilight rays by a large factor, so it
-  is deliberately not used.  See ``docs/physics/MULTIPLE_SCATTERING.md``.)
+* The **direct beam** is the unified finite-disk solar source of
+  :mod:`skycolor.solar_source`, projected per disk beam: at each layer the
+  beam keeps its own apparent elevation, continuous-column transmittance,
+  occultation and local gain, and the Fourier source sums the beams with
+  their disk weights and azimuth factors ``cos(m*phi_b)``.  The solar
+  transmittance is always the raw physical extinction -- delta-M scales only
+  the diffuse moments, never the sun.  (The alternative normalisation by the
+  transmittance *difference* between layer boundaries would close the column
+  energy budget exactly, but it over-weights grazing twilight rays by a
+  large factor, so the physical amplitude is kept; see
+  ``docs/physics/MULTIPLE_SCATTERING.md``.)
 * The recursion is
   ``L^(1) = transfer(source = J_direct)``,
   ``L^(n) = transfer(source = scattering(L^(n-1)))`` with a Lambertian
@@ -65,20 +64,17 @@ from scipy.special import assoc_legendre_p_all
 
 from .. import spectra
 from ..constants import R_EARTH
-from ..geometry import is_sunlit, path_lengths_sun
-from ..optics import (
-    shell_species_columns,
-    shell_species_weights,
-    species_extinction_weights,
-    tau_from_columns,
-)
 
 #: standing approximations of this backend
 CAPABILITIES = {
     "scattering": "orders >= 2, plane-parallel discrete ordinates (delta-M)",
     "domain": "ground fixed at z_bounds[0]; atmosphere.elevation_km is not read",
     "horizontal_field": "not applied",
-    "refraction": "shadow threshold only; direct-beam optical depth is geometric",
+    "solar_source": "unified finite disk, per-beam apparent direction and "
+                    "amplitude projected onto the Fourier source; raw-extinction "
+                    "sun T with delta-M reserved for the diffuse moments",
+    "refraction": "solar side fully refracted; plane-parallel diffuse "
+                  "transport stays straight (retained approximation)",
 }
 
 __all__ = ["SOSResult", "solve", "multiple_scattering"]
@@ -159,32 +155,46 @@ def _log_factorial_ratio(l_max: int, m: int) -> np.ndarray:
     return out
 
 
-def _sun_transmittance_boundaries(atmo, sun_zenith_deg: float) -> np.ndarray:
-    """Direct-beam transmittance at every layer boundary, shape ``(nz+1, n_wl)``.
+def _direct_beam_tables(atmo, source):
+    """Per-beam direct-beam tables on the pseudo-spherical column.
 
-    For the point of the vertical column at radius ``r`` the solar ray has
-    impact parameter ``p = r sin(sza)`` and direction cosine
-    ``cos(sza)``.  The optical depth is integrated along the true spherical
-    ray with the shared column algebra of :mod:`skycolor.optics`, and rays
-    that intersect the Earth are masked to zero transmittance.
+    Returns ``(t_mid, gain_mid, mu_s, app_mid, t_ground, gain_ground,
+    app_ground, cos_m, weights)`` where ``t_mid``/``gain_mid`` have shape
+    ``(nz, n_beam, n_wl)`` (layer mid-points), ``mu_s``/``app_mid`` shape
+    ``(nz, n_beam)`` and the ground triplets ``(n_beam, n_wl)`` /
+    ``(n_beam,)``.  ``mu_s`` is the beam's *apparent* propagation cosine at
+    the layer (negative above the horizon) and ``cos_m[m, b]`` the disk
+    azimuth factor ``cos(m * phi_b)`` used by the Fourier projection.
     """
+    medium = atmo._medium
     rb = atmo.r_bounds
-    sza = np.radians(float(sun_zenith_deg))
-    mu0 = np.cos(sza)
-    p = rb * np.sin(sza)
-    c = np.full_like(rb, mu0)
-    lengths = path_lengths_sun(p, c, rb, rb)  # (n_shell, n_boundary)
-    cols = shell_species_columns(lengths, shell_species_weights(atmo, rb))
-    tau = tau_from_columns(cols, species_extinction_weights(atmo))
-    if getattr(atmo, "refraction", False):
-        from ..refraction import get_tables
-
-        z_b = (rb - R_EARTH) / 1e3
-        crit = get_tables(atmo).shadow_zenith_true(z_b)
-        lit = c > np.cos(np.radians(crit))
-    else:
-        lit = is_sunlit(p, c, r_earth=rb[0])
-    return np.where(lit[:, None], np.exp(-tau), 0.0)
+    z_b = (rb - R_EARTH) / 1e3
+    z_mid = 0.5 * (z_b[1:] + z_b[:-1])
+    directions, weights = source.disk()
+    n_beam = directions.shape[0]
+    up = np.array([0.0, 0.0, 1.0])
+    # each beam's true elevation is constant along the column (the local up
+    # of the pseudo-spherical column is z-hat everywhere)
+    true_e = np.degrees(np.arcsin(np.clip(directions @ up, -1.0, 1.0)))
+    zq = np.concatenate([z_mid, z_b[:1]])                     # mids + ground
+    heights = np.broadcast_to(zq[:, None], (zq.size, n_beam))
+    true_grid = np.broadcast_to(true_e[None, :], heights.shape)
+    app, t_all, gain_all, _lit = source.vertex(heights, true_grid)
+    t_mid, gain_mid, app_mid = t_all[:-1], gain_all[:-1], app[:-1]
+    t_ground, gain_ground, app_ground = t_all[-1], gain_all[-1], app[-1]
+    mu_s = -np.sin(np.radians(app_mid))                       # propagation cosine
+    # Fourier azimuth factors: each beam's LOCAL azimuth offset from the sun
+    # meridian (the whole disk spans only ~16 arcmin / sin(zenith) of local
+    # azimuth, so cos(m*d_az) ~ 1 for every mode -- the disk is azimuthally
+    # delta-like even though it wraps the full circle *around the sun*)
+    a_rad = np.radians(float(source.sun_azimuth_deg))
+    m_hat = np.array([np.sin(a_rad), np.cos(a_rad), 0.0])
+    p_hat = np.array([np.cos(a_rad), -np.sin(a_rad), 0.0])
+    d_h = directions - np.outer(directions @ up, up)
+    az_rel = np.arctan2(d_h @ p_hat, d_h @ m_hat)
+    cos_m = np.cos(np.outer(np.arange(64), az_rel))
+    return (t_mid, gain_mid, mu_s, app_mid, t_ground, gain_ground, app_ground,
+            cos_m, weights)
 
 
 # ---------------------------------------------------------------------------
@@ -243,23 +253,29 @@ def solve(
     omega = np.where(beta_ext > 1e-300, beta_sca / safe_ext, 0.0)
     f_sun = spectra.solar_irradiance(wl)                # (n_wl,)
 
-    mu0 = float(np.cos(np.radians(float(sun_zenith_deg))))
-    mu_s = -mu0                                          # propagation cosine
+    # -- unified finite-disk direct beam, per disk beam ---------------------
+    from ..solar_source import SolarSource
 
-    # -- pseudo-spherical direct beam ---------------------------------------
-    t_bounds = _sun_transmittance_boundaries(atmo, sun_zenith_deg)  # (nz+1,n_wl)
-    # Physical beam radiance at the layer mid-points.  The direct beam is a
-    # delta function in angle with amplitude F_sun * T; this is the source
-    # that enters the scattering integral.  (Normalising by the vertical
-    # transmittance difference instead would close the column energy budget
-    # exactly, but it over-weights grazing twilight rays by a large factor,
-    # so the physical amplitude is used.)
-    t_mid = 0.5 * (t_bounds[1:] + t_bounds[:-1])
-    b_beam = f_sun[None, :] * t_mid
-    # direct irradiance incident on the ground
-    e_direct = f_sun * max(-mu_s, 0.0) * t_bounds[0]
-    incident = f_sun * max(-mu_s, 0.0)
+    source = SolarSource(atmo, float(sun_zenith_deg), float(sun_azimuth_deg))
+    (t_mid_b, gain_mid_b, mu_s_b, app_mid_b, t_ground_b, gain_ground_b,
+     app_ground_b, cos_m_all, beam_w) = _direct_beam_tables(atmo, source)
+    n_beam = beam_w.size
+    # physical amplitude: F_sun * T * G per beam at the layer mid-points.
+    # (Normalising by the vertical transmittance difference instead would
+    # close the column energy budget exactly, but it over-weights grazing
+    # twilight rays by a large factor, so the physical amplitude is used.)
+    b_beam = f_sun[None, None, :] * t_mid_b * gain_mid_b[..., None]  # (nz,nb,n_wl)
+    # direct irradiance incident on the ground: the unified ground kernel
+    # (disk-weighted, occultation-aware, detector-referred at the ground,
+    # where the observer of the SOS domain stands)
+    r_ground = atmo.r_bounds[0]
+    x_ground = np.array([[0.0, 0.0, r_ground]])
+    e_direct = f_sun * source.ground(x_ground)[0]
+    up_hat = np.array([0.0, 0.0, 1.0])
+    directions, _ = source.disk()
+    incident = f_sun * np.sum(beam_w * np.maximum(directions @ up_hat, 0.0))
     direct_down = e_direct.copy()
+    mu_s = -float(np.cos(np.radians(float(sun_zenith_deg))))  # view-frame mu0 (diagnostics)
 
     zeros_flux = np.zeros(n_wl)
     empty_rad = np.zeros((n_view, n_wl))
@@ -300,23 +316,35 @@ def solve(
         beta = np.asarray(atmo.phase_moments(n_moments), dtype=float)
     beta = beta[:, :n_moments, :]
 
-    # associated Legendre functions at the Gauss nodes and at mu_s
+    # associated Legendre functions at the Gauss nodes and at each beam's
+    # apparent propagation cosine per layer (scipy appends the x axis last
+    # for array input)
     p_nodes = assoc_legendre_p_all(l_max, m_max, x)      # (1,L+1,2M+1,n_mu)
-    p_sun = assoc_legendre_p_all(l_max, m_max, float(mu_s))
-    if p_sun.ndim == 3:                                  # scalar input
-        p_sun = p_sun[:, :, :, None]
+    mu_flat = np.ascontiguousarray(mu_s_b.T.reshape(-1))  # (nb*nz,), b-major
+    p_beams = assoc_legendre_p_all(l_max, m_max, mu_flat)[0]   # (L+1,2M+1,nb*nz)
+    p_beams = p_beams[:, :n_modes, :].reshape(l_max + 1, n_modes, n_beam, nz)
 
     # Fourier weights W_l^m = (2l+1) beta_l (l-m)!/(l+m)!
     lfac = (2.0 * np.arange(l_max + 1) + 1.0)
     w_modes = []
     q_nodes = []
-    q_sun = []
     for m in range(n_modes):
         c_lm = _log_factorial_ratio(l_max, m)
         wm = beta * (lfac * c_lm)[None, :, None]         # (nz,L,n_wl)
         w_modes.append(wm)
         q_nodes.append(p_nodes[0, :, m, :])              # (L,n_mu)
-        q_sun.append(p_sun[0, :, m, 0])                  # (L,)
+
+    # per-beam Fourier projection of the direct source, one mode at a time:
+    #   C_m[k,l,w] = sum_b beam_w·T·G · P_l^m(mu_s[b,k]) · cos(m*phi_b)
+    # kept (nz,L,n_wl) transient so nothing materialises the full
+    # (nz,L,M,n_wl) tensor
+    beam_wg = beam_w[None, :, None] * t_mid_b * gain_mid_b[..., None]  # (nz, nb, n_wl)
+    source_factor = omega * f_sun[None, :]                     # (nz, n_wl)
+
+    def _direct_coeff(m):
+        pm = p_beams[:, m, :, :]                               # (L+1, nb, nz)
+        return np.einsum("kbw,lbk->klw", beam_wg,
+                         pm * cos_m_all[m][None, :, None])
 
     # -- transmission factors (wavelength dependent) -------------------------
     trans_down = np.exp(-dtau[:, None, :] / (-x_down)[None, :, None])
@@ -327,12 +355,12 @@ def solve(
     flux_w_up = w_up * x_up
 
     # -- first-order (direct beam) source ------------------------------------
-    # S_dir,m = (omega/4pi) * B * (2-delta_m0) * sum_l W_l^m P_l^m(mu)P_l^m(mu_s)
+    # S_dir,m = (omega F /4pi)(2-delta_m0) sum_l W_l^m C_m[k,l,w] P_l^m(mu)
     j_direct = np.zeros((nz, n_modes, x.size, n_wl))
     for m in range(n_modes):
-        a = w_modes[m] * q_sun[m][None, :, None]
+        a = w_modes[m] * _direct_coeff(m)
         jm = np.einsum("klw,li->kiw", a, q_nodes[m])     # (nz,n_mu,n_wl)
-        factor = omega * b_beam * (2.0 if m > 0 else 1.0) / (4.0 * np.pi)
+        factor = source_factor * (2.0 if m > 0 else 1.0) / (4.0 * np.pi)
         j_direct[:, m] = jm * factor[:, None, :]
 
     # -- iterate successive orders ------------------------------------------
@@ -454,10 +482,10 @@ def solve(
                 j_ms += jv.transpose(0, 2, 1)
 
                 if single_view:
-                    a0 = (w_modes[m] * q_sun[m][None, :, None]).transpose(
+                    a0 = (w_modes[m] * _direct_coeff(m)).transpose(
                         0, 2, 1).reshape(nz * n_wl, l_max + 1)
                     jv0 = (a0 @ qv).reshape(nz, n_wl, nc)
-                    jv0 *= (omega * b_beam
+                    jv0 *= (source_factor
                             * (2.0 if m > 0 else 1.0) / (4.0 * np.pi)
                             )[:, :, None]
                     jv0 *= cos_m[None, None, :]

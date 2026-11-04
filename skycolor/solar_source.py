@@ -676,9 +676,14 @@ class PointSourceTable:
         # of certifying angles only (the historical heldout lesson).
         low = np.arange(0.0, min(1.0, u[-1]) + 1e-10, 0.05)
         middle = np.arange(1.0, min(np.sqrt(5.0), u[-1]) + 1e-10, 0.1)
-        self.heights = np.unique(np.concatenate([
+        heights = np.unique(np.concatenate([
             self.ground_km + u * u, self.ground_km + low * low,
             self.ground_km + middle * middle, special]))
+        # the u^2 lattice can land within one ulp of a z_bounds special (e.g.
+        # the model top); a zero-width height cell would divide 0/0 in the
+        # row interpolation below
+        keep = np.concatenate([[True], np.diff(heights) > 1e-9])
+        self.heights = heights[keep]
         self.height_axis = np.sqrt(self.heights - self.ground_km)
 
         started = time.perf_counter()
@@ -1118,8 +1123,11 @@ class SolarSource:
         n_wl = len(atmo.wl)
         out = np.zeros((len(x), n_wl)) if iw is None else np.zeros(len(x))
         wavelengths = atmo.wl if iw is None else np.array([atmo.wl[iw]])
-        for start in range(0, len(x), self.chunk):
-            sl = slice(start, min(start + self.chunk, len(x)))
+        # full-spectrum batches materialise (points, beams, n_wl) arrays;
+        # shrink the step so the peak transient stays bounded
+        step = self.chunk if iw is not None else max(2048, self.chunk // 8)
+        for start in range(0, len(x), step):
+            sl = slice(start, min(start + step, len(x)))
             radial, directions, mu, app, transmission, gain, lit = \
                 self._geometry_arrays(x[sl], iw)
             active = np.flatnonzero(np.any(lit, axis=1))
@@ -1144,8 +1152,15 @@ class SolarSource:
             for j, layer in enumerate(atmo.aerosols):
                 aerosol_phase = np.asarray(
                     layer.aerosol.phase(phase_mu.ravel(), wavelengths))
-                aerosol_phase = aerosol_phase.reshape(
-                    phase_mu.shape + (len(wavelengths),))
+                if aerosol_phase.ndim == 1:
+                    # wavelength-independent phase functions return one value
+                    # per direction; broadcast across the band
+                    aerosol_phase = np.broadcast_to(
+                        aerosol_phase.reshape(phase_mu.shape + (1,)),
+                        phase_mu.shape + (len(wavelengths),))
+                else:
+                    aerosol_phase = aerosol_phase.reshape(
+                        phase_mu.shape + (len(wavelengths),))
                 if iw is None:
                     phase = phase + aerosol_phase * aerosol_fractions[positions, j, None, :]
                 else:
@@ -1167,6 +1182,9 @@ class SolarSource:
         for start in range(0, len(x), self.chunk):
             sl = slice(start, min(start + self.chunk, len(x)))
             _, _, _, app, transmission, gain, _ = self._geometry_arrays(x[sl], iw)
+            if iw is None:
+                gain = gain[..., None]     # gain is wavelength independent
+                app = app[..., None]
             out[sl] = np.sum(transmission * gain * np.maximum(np.sin(app), 0.0),
                              axis=1)
         return out
@@ -1205,6 +1223,8 @@ class SolarSource:
                 np.maximum(1.0 - np.cos(true_e) ** 2, 1e-30))
             app_dot_normal = (np.cos(np.radians(app)) * n_dot_radial
                               + np.sin(np.radians(app)) * horizontal)
+            if iw is None:
+                gain = gain[..., None]
             weighted = transmission * gain * np.maximum(app_dot_normal, 0.0)
             if iw is None:
                 out[sl] = weighted.sum(axis=1) * f_inf[None, :]

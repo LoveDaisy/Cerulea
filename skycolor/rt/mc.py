@@ -209,12 +209,12 @@ def _species_tau_weights(atmo, iw: int, rel) -> np.ndarray:
 
 
 def _sun_transmittance(atmo, x, sun_hat, dens, tau_w) -> np.ndarray:
-    """Direct solar transmittance from points ``x`` to space.
+    """Legacy geometric-chord solar transmittance (retired from production).
 
-    ``x`` has shape ``(n, 3)``; returns shape ``(n,)``.  The per-shell path
-    lengths are the exact spherical-shell chord lengths; the density inside a
-    shell is evaluated at the geometric mean radius (the same quadrature the
-    deterministic solver uses).
+    The production tracer now consumes the unified solar source
+    (:mod:`skycolor.solar_source`); this shell-chord prescription is kept
+    only for the archived experimental drivers that wrap it explicitly.
+    ``x`` has shape ``(n, 3)``; returns shape ``(n,)``.
     """
     r = np.sqrt(np.einsum("ij,ij->i", x, x))
     mu = np.clip(x @ sun_hat / r, -1.0, 1.0)
@@ -287,8 +287,15 @@ def _interp_log(z, z_grid, log_values):
 # the tracer
 # ---------------------------------------------------------------------------
 def _trace_wavelength(atmo, iw, dirs, counts, sun_hat, max_scatter, rng,
-                      split, dens, rel):
+                      split, dens, rel, source=None):
     """Trace all paths of one wavelength.
+
+    ``source`` is the bound :class:`~skycolor.solar_source.SolarSource`;
+    when given, every next-event estimate and ground illumination defers to
+    it in batched evaluations (no RNG is consumed there, so the sampled
+    paths, event classification and random-number stream are identical to
+    the legacy run).  Without a source the retired shell-chord prescription
+    is used, which only the archived experimental drivers still request.
 
     Returns a dict of ``(n_view,)`` arrays: ``total``, ``total_var`` and, when
     ``split`` is true, ``single``, ``single_var``, ``multiple``, ``multiple_var``.
@@ -345,9 +352,57 @@ def _trace_wavelength(atmo, iw, dirs, counts, sun_hat, max_scatter, rng,
     w = np.ones(n_tot)
     n_scat = np.zeros(n_tot, dtype=np.int64)
     n_ground = np.zeros(n_tot, dtype=np.int64)
-    contrib = np.zeros(n_tot)
-    c_single = np.zeros(n_tot) if split else None
-    c_mult = np.zeros(n_tot) if split else None
+    acc = {"contrib": np.zeros(n_tot),
+           "single": np.zeros(n_tot) if split else None,
+           "multiple": np.zeros(n_tot) if split else None}
+    # aliases used by the legacy inline branches (source=None fallback) and
+    # the statistics below
+    contrib = acc["contrib"]
+    c_single = acc["single"]
+    c_mult = acc["multiple"]
+
+    # Deferred solar-source evaluations: vertex data is collected while the
+    # paths advance and the unified source is queried in large vectorised
+    # batches.  Nothing here draws random numbers or changes any sampled
+    # quantity -- batching is purely an evaluation-order change.
+    _FLUSH_AT = 200_000
+    nee = {"idx": [], "x": [], "d": [], "w": [], "alb": [], "first": [],
+           "ray_f": [], "ae_f": []}
+    grd = {"idx": [], "x": [], "w": []}
+    n_ae = len(atmo.aerosols)
+
+    def _flush():
+        # bincount accumulation: a path contributes once per event, so the
+        # deferred index lists contain duplicates that buffered fancy
+        # indexing would silently drop
+        if nee["idx"]:
+            idx = np.concatenate(nee["idx"])
+            illum = source.scatter(np.concatenate(nee["x"]),
+                                   np.concatenate(nee["d"]), iw=iw,
+                                   ray_fraction=np.concatenate(nee["ray_f"]),
+                                   aerosol_fractions=np.concatenate(nee["ae_f"], axis=0)
+                                   if nee["ae_f"] and n_ae else
+                                   np.empty((idx.size, 0)))
+            value = (np.concatenate(nee["w"]) * np.concatenate(nee["alb"])
+                     * illum * f0)
+            acc["contrib"] += np.bincount(idx, weights=value, minlength=n_tot)
+            if split:
+                first = np.concatenate(nee["first"])
+                acc["single"] += np.bincount(idx[first], weights=value[first],
+                                             minlength=n_tot)
+                acc["multiple"] += np.bincount(idx[~first], weights=value[~first],
+                                               minlength=n_tot)
+            nee["idx"].clear(); nee["x"].clear(); nee["d"].clear()
+            nee["w"].clear(); nee["alb"].clear(); nee["first"].clear()
+            nee["ray_f"].clear(); nee["ae_f"].clear()
+        if grd["idx"]:
+            idx = np.concatenate(grd["idx"])
+            illum = source.ground(np.concatenate(grd["x"]), iw=iw)
+            value = (np.concatenate(grd["w"]) * (rho / np.pi) * solar * illum)
+            acc["contrib"] += np.bincount(idx, weights=value, minlength=n_tot)
+            if split:
+                acc["multiple"] += np.bincount(idx, weights=value, minlength=n_tot)
+            grd["idx"].clear(); grd["x"].clear(); grd["w"].clear()
 
     solar = float(spectra.solar_irradiance(np.array([atmo.wl[iw]]))[0])
     f0 = solar / (4.0 * np.pi)
@@ -412,14 +467,20 @@ def _trace_wavelength(atmo, iw, dirs, counts, sun_hat, max_scatter, rng,
             xg = xn[gi]
             rg = rn[gi]
             normal = xg / rg[:, None]
-            mu_sun = normal @ sun_hat
-            mu_pos = np.maximum(mu_sun, 0.0)
-            t_sun = _sun_transmittance(atmo, xg, sun_hat, dens, tau_w)
-            # direct beam reflected by the Lambertian surface (rho/pi * S * mu * T)
-            g_contrib = wa[gi] * (rho / np.pi) * solar * mu_pos * t_sun
-            contrib[alive[gi]] += g_contrib
-            if split:
-                c_mult[alive[gi]] += g_contrib
+            if source is not None:
+                grd["idx"].append(alive[gi])
+                grd["x"].append(xg)
+                grd["w"].append(wa[gi])
+                if len(grd["idx"]) * max(len(a) for a in grd["idx"]) > _FLUSH_AT:
+                    _flush()
+            else:
+                mu_sun = normal @ sun_hat
+                mu_pos = np.maximum(mu_sun, 0.0)
+                t_sun = _sun_transmittance(atmo, xg, sun_hat, dens, tau_w)
+                g_contrib = wa[gi] * (rho / np.pi) * solar * mu_pos * t_sun
+                contrib[alive[gi]] += g_contrib
+                if split:
+                    c_mult[alive[gi]] += g_contrib
             # continuation: multiply by the albedo, sample cosine-weighted
             w_new[gi] = w_new[gi] * rho
             mu_r = np.sqrt(np.maximum(rng.random(gi.size), 0.0))
@@ -449,21 +510,36 @@ def _trace_wavelength(atmo, iw, dirs, counts, sun_hat, max_scatter, rng,
                 b_as_c = [_interp_log(zc, z_grid, lb) for lb in log_b_as]
                 albedo = np.clip(b_sca_c / np.maximum(b_ext_c, tiny), 0.0, 1.0)
 
-                # next-event estimate towards the sun
-                mu_v = np.clip(np.einsum("ij,j->i", da[ci], sun_hat), -1.0, 1.0)
-                t_sun = _sun_transmittance(atmo, xn[ci], sun_hat, dens, tau_w)
-                p_mix = spectra.rayleigh_phase(mu_v) * (b_ray_c / np.maximum(b_sca_c, tiny))
-                for j, lb in enumerate(b_as_c):
-                    f_j = lb / np.maximum(b_sca_c, tiny)
-                    p_j = np.asarray(atmo.aerosols[j].aerosol.phase(
-                        mu_v, np.array([atmo.wl[iw]]))).reshape(-1)
-                    p_mix = p_mix + p_j * f_j
-                nee = wa[ci] * albedo * p_mix * t_sun * f0
-                contrib[alive[ci]] += nee
-                if split:
-                    first = (sc_new[ci] + 1 == 1) & (gd_new[ci] == 0)
-                    c_single[alive[ci[first]]] += nee[first]
-                    c_mult[alive[ci[~first]]] += nee[~first]
+                # next-event estimate towards the sun (deferred to a batched
+                # unified-source evaluation; no RNG consumed here)
+                if source is not None:
+                    nee["idx"].append(alive[ci])
+                    nee["x"].append(xn[ci])
+                    nee["d"].append(da[ci])
+                    nee["w"].append(wa[ci])
+                    nee["alb"].append(albedo)
+                    nee["first"].append((sc_new[ci] + 1 == 1) & (gd_new[ci] == 0))
+                    nee["ray_f"].append(b_ray_c / np.maximum(b_sca_c, tiny))
+                    if n_ae:
+                        nee["ae_f"].append(np.column_stack(
+                            [lb / np.maximum(b_sca_c, tiny) for lb in b_as_c]))
+                    if len(nee["idx"]) * max(len(a) for a in nee["idx"]) > _FLUSH_AT:
+                        _flush()
+                else:
+                    mu_v = np.clip(np.einsum("ij,j->i", da[ci], sun_hat), -1.0, 1.0)
+                    t_sun = _sun_transmittance(atmo, xn[ci], sun_hat, dens, tau_w)
+                    p_mix = spectra.rayleigh_phase(mu_v) * (b_ray_c / np.maximum(b_sca_c, tiny))
+                    for j, lb in enumerate(b_as_c):
+                        f_j = lb / np.maximum(b_sca_c, tiny)
+                        p_j = np.asarray(atmo.aerosols[j].aerosol.phase(
+                            mu_v, np.array([atmo.wl[iw]]))).reshape(-1)
+                        p_mix = p_mix + p_j * f_j
+                    nee_val = wa[ci] * albedo * p_mix * t_sun * f0
+                    contrib[alive[ci]] += nee_val
+                    if split:
+                        first = (sc_new[ci] + 1 == 1) & (gd_new[ci] == 0)
+                        c_single[alive[ci[first]]] += nee_val[first]
+                        c_mult[alive[ci[~first]]] += nee_val[~first]
 
                 sc_new[ci] += 1
 
@@ -523,9 +599,14 @@ def _trace_wavelength(atmo, iw, dirs, counts, sun_hat, max_scatter, rng,
         n_ground[alive] = gd_new
         alive = alive[~kill]
 
+    # --- flush deferred solar evaluations, then statistics -----------------
+    if source is not None:
+        _flush()
+
     # --- statistics per direction ------------------------------------------
     cnt = np.bincount(vid, minlength=n_view).astype(float)
-    for name, arr in (("total", contrib), ("single", c_single), ("multiple", c_mult)):
+    for name, arr in (("total", acc["contrib"]), ("single", acc["single"]),
+                      ("multiple", acc["multiple"])):
         if arr is None:
             continue
         s1 = np.bincount(vid, weights=arr, minlength=n_view)
@@ -580,10 +661,14 @@ def _run(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
     dens = _shell_species_density(atmo)
     rel = _aerosol_spectral(atmo)
     rngs = np.random.SeedSequence(int(seed)).spawn(n_wl)
+    from ..solar_source import SolarSource
+
+    source = SolarSource(atmo, float(sun_zenith_deg), float(sun_azimuth_deg))
 
     for iw in range(n_wl):
         res = _trace_wavelength(atmo, iw, dirs, counts, sun_hat, int(max_scatter),
-                                np.random.default_rng(rngs[iw]), split, dens, rel)
+                                np.random.default_rng(rngs[iw]), split, dens, rel,
+                                source=source)
         for k in keys:
             acc[k][:, iw] = res[k]
     for k in acc:
