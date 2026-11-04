@@ -33,6 +33,12 @@ raw-data checks: recoverable FORS metadata and same-twilight candidates, an
 independently identified station-ephemeris mismatch in published CSSP spectra,
 and original photometric time series. These are candidate validation inputs;
 instrument, background and atmospheric matching are still incomplete.
+The CSSP completion is carried by
+[CSSP_OBSERVATION_INPUTS.md](CSSP_OBSERVATION_INPUTS.md) and its frozen
+packet (`validation/data/cssp_observation_inputs/`): source identity, the raw
+acquisition contract (42 records, byte-exact pipeline replay), per-side
+weather/moon screening and the three-use verdict matrix (spectral shape and
+same-night decay conditional; absolute irradiance not certified).
 
 General scattering/refraction methods are in [physics/](../physics/README.md).
 Reference transcription is in [SECOND_DATASET.md](../../validation/SECOND_DATASET.md).

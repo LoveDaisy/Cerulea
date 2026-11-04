@@ -1,0 +1,392 @@
+{
+  "rule": "sessions are gap-split (900 s); twilight-level candidates are all independently screened (moon geometry + archived neighbour weather); raw sampling is bounded to the two best-supported nights and the decision reasons quote the conditions verdicts; no sky-model residual is read at any point",
+  "cleanest_screened_windows": [
+    "s11/dusk"
+  ],
+  "sessions": [
+    {
+      "session_id": "s00",
+      "columns_zero_based": [
+        0,
+        774
+      ],
+      "n_columns": 775,
+      "start_label_edt": "30-Jun-2014 18:52:55",
+      "end_label_edt": "01-Jul-2014 08:08:23",
+      "start_utc": "2014-06-30T22:52:55+00:00",
+      "end_utc": "2014-07-01T12:08:23+00:00",
+      "span_minutes": 795.467,
+      "crosses_local_midnight": true,
+      "local_date_of_first_sample": "2014-06-30",
+      "nan_fraction": 0.030361,
+      "no_uv_columns": 165,
+      "zero_cells": 23680,
+      "negative_cells": 0,
+      "median_positive_w_m2_nm": 2.764013548e-07,
+      "sequence_values": [
+        1,
+        2
+      ],
+      "signal_kind": "twilight-or-night"
+    },
+    {
+      "session_id": "s01",
+      "columns_zero_based": [
+        775,
+        775
+      ],
+      "n_columns": 1,
+      "start_label_edt": "01-Jul-2014 17:29:18",
+      "end_label_edt": "01-Jul-2014 17:29:18",
+      "start_utc": "2014-07-01T21:29:18+00:00",
+      "end_utc": "2014-07-01T21:29:18+00:00",
+      "span_minutes": 0.0,
+      "crosses_local_midnight": false,
+      "local_date_of_first_sample": "2014-07-01",
+      "nan_fraction": 0.142602,
+      "no_uv_columns": 1,
+      "zero_cells": 0,
+      "negative_cells": 0,
+      "median_positive_w_m2_nm": 0.2404224191,
+      "sequence_values": [
+        3
+      ],
+      "signal_kind": "daytime-level"
+    },
+    {
+      "session_id": "s02",
+      "columns_zero_based": [
+        776,
+        960
+      ],
+      "n_columns": 185,
+      "start_label_edt": "01-Jul-2014 19:53:25",
+      "end_label_edt": "01-Jul-2014 23:00:51",
+      "start_utc": "2014-07-01T23:53:25+00:00",
+      "end_utc": "2014-07-02T03:00:51+00:00",
+      "span_minutes": 187.433,
+      "crosses_local_midnight": false,
+      "local_date_of_first_sample": "2014-07-01",
+      "nan_fraction": 0.008479,
+      "no_uv_columns": 11,
+      "zero_cells": 148,
+      "negative_cells": 0,
+      "median_positive_w_m2_nm": 9.625530028e-06,
+      "sequence_values": [
+        3
+      ],
+      "signal_kind": "twilight-or-night"
+    },
+    {
+      "session_id": "s03",
+      "columns_zero_based": [
+        961,
+        1225
+      ],
+      "n_columns": 265,
+      "start_label_edt": "01-Jul-2014 23:39:52",
+      "end_label_edt": "02-Jul-2014 04:04:24",
+      "start_utc": "2014-07-02T03:39:52+00:00",
+      "end_utc": "2014-07-02T08:04:24+00:00",
+      "span_minutes": 264.533,
+      "crosses_local_midnight": true,
+      "local_date_of_first_sample": "2014-07-01",
+      "nan_fraction": 0.0,
+      "no_uv_columns": 0,
+      "zero_cells": 27640,
+      "negative_cells": 0,
+      "median_positive_w_m2_nm": 8.566244245e-09,
+      "sequence_values": [
+        3
+      ],
+      "signal_kind": "twilight-or-night"
+    },
+    {
+      "session_id": "s04",
+      "columns_zero_based": [
+        1226,
+        1843
+      ],
+      "n_columns": 618,
+      "start_label_edt": "02-Jul-2014 19:38:19",
+      "end_label_edt": "03-Jul-2014 06:07:19",
+      "start_utc": "2014-07-02T23:38:19+00:00",
+      "end_utc": "2014-07-03T10:07:19+00:00",
+      "span_minutes": 629.0,
+      "crosses_local_midnight": true,
+      "local_date_of_first_sample": "2014-07-02",
+      "nan_fraction": 0.005538,
+      "no_uv_columns": 24,
+      "zero_cells": 34849,
+      "negative_cells": 0,
+      "median_positive_w_m2_nm": 3.301541631e-08,
+      "sequence_values": [
+        4,
+        5
+      ],
+      "signal_kind": "twilight-or-night"
+    },
+    {
+      "session_id": "s05",
+      "columns_zero_based": [
+        1844,
+        2122
+      ],
+      "n_columns": 279,
+      "start_label_edt": "12-Jul-2014 19:09:09",
+      "end_label_edt": "12-Jul-2014 23:50:01",
+      "start_utc": "2014-07-12T23:09:09+00:00",
+      "end_utc": "2014-07-13T03:50:01+00:00",
+      "span_minutes": 280.867,
+      "crosses_local_midnight": false,
+      "local_date_of_first_sample": "2014-07-12",
+      "nan_fraction": 0.031178,
+      "no_uv_columns": 61,
+      "zero_cells": 2719,
+      "negative_cells": 0,
+      "median_positive_w_m2_nm": 1.3800972990000002e-06,
+      "sequence_values": [
+        6
+      ],
+      "signal_kind": "twilight-or-night"
+    },
+    {
+      "session_id": "s06",
+      "columns_zero_based": [
+        2123,
+        2124
+      ],
+      "n_columns": 2,
+      "start_label_edt": "14-Jul-2014 12:35:07",
+      "end_label_edt": "14-Jul-2014 12:36:07",
+      "start_utc": "2014-07-14T16:35:07+00:00",
+      "end_utc": "2014-07-14T16:36:07+00:00",
+      "span_minutes": 1.0,
+      "crosses_local_midnight": false,
+      "local_date_of_first_sample": "2014-07-14",
+      "nan_fraction": 0.142602,
+      "no_uv_columns": 2,
+      "zero_cells": 0,
+      "negative_cells": 0,
+      "median_positive_w_m2_nm": 0.4924107323,
+      "sequence_values": [
+        7
+      ],
+      "signal_kind": "daytime-level"
+    },
+    {
+      "session_id": "s07",
+      "columns_zero_based": [
+        2125,
+        2249
+      ],
+      "n_columns": 125,
+      "start_label_edt": "14-Jul-2014 14:37:40",
+      "end_label_edt": "14-Jul-2014 16:42:45",
+      "start_utc": "2014-07-14T18:37:40+00:00",
+      "end_utc": "2014-07-14T20:42:45+00:00",
+      "span_minutes": 125.083,
+      "crosses_local_midnight": false,
+      "local_date_of_first_sample": "2014-07-14",
+      "nan_fraction": 0.142602,
+      "no_uv_columns": 125,
+      "zero_cells": 0,
+      "negative_cells": 0,
+      "median_positive_w_m2_nm": 0.2774608837,
+      "sequence_values": [
+        7
+      ],
+      "signal_kind": "daytime-level"
+    },
+    {
+      "session_id": "s08",
+      "columns_zero_based": [
+        2250,
+        2371
+      ],
+      "n_columns": 122,
+      "start_label_edt": "14-Jul-2014 19:48:35",
+      "end_label_edt": "14-Jul-2014 21:51:36",
+      "start_utc": "2014-07-14T23:48:35+00:00",
+      "end_utc": "2014-07-15T01:51:36+00:00",
+      "span_minutes": 123.017,
+      "crosses_local_midnight": false,
+      "local_date_of_first_sample": "2014-07-14",
+      "nan_fraction": 0.017533,
+      "no_uv_columns": 15,
+      "zero_cells": 94,
+      "negative_cells": 0,
+      "median_positive_w_m2_nm": 0.0015568041245,
+      "sequence_values": [
+        7
+      ],
+      "signal_kind": "daytime-level"
+    },
+    {
+      "session_id": "s09",
+      "columns_zero_based": [
+        2372,
+        2381
+      ],
+      "n_columns": 10,
+      "start_label_edt": "18-Jul-2014 14:41:32",
+      "end_label_edt": "18-Jul-2014 14:50:32",
+      "start_utc": "2014-07-18T18:41:32+00:00",
+      "end_utc": "2014-07-18T18:50:32+00:00",
+      "span_minutes": 9.0,
+      "crosses_local_midnight": false,
+      "local_date_of_first_sample": "2014-07-18",
+      "nan_fraction": 0.142602,
+      "no_uv_columns": 10,
+      "zero_cells": 0,
+      "negative_cells": 0,
+      "median_positive_w_m2_nm": 0.5243719962,
+      "sequence_values": [
+        8
+      ],
+      "signal_kind": "daytime-level"
+    },
+    {
+      "session_id": "s10",
+      "columns_zero_based": [
+        2382,
+        2437
+      ],
+      "n_columns": 56,
+      "start_label_edt": "18-Jul-2014 15:44:33",
+      "end_label_edt": "18-Jul-2014 16:39:34",
+      "start_utc": "2014-07-18T19:44:33+00:00",
+      "end_utc": "2014-07-18T20:39:34+00:00",
+      "span_minutes": 55.017,
+      "crosses_local_midnight": false,
+      "local_date_of_first_sample": "2014-07-18",
+      "nan_fraction": 0.142602,
+      "no_uv_columns": 56,
+      "zero_cells": 0,
+      "negative_cells": 0,
+      "median_positive_w_m2_nm": 0.4762067553,
+      "sequence_values": [
+        8
+      ],
+      "signal_kind": "daytime-level"
+    },
+    {
+      "session_id": "s11",
+      "columns_zero_based": [
+        2438,
+        3152
+      ],
+      "n_columns": 715,
+      "start_label_edt": "18-Jul-2014 18:00:36",
+      "end_label_edt": "19-Jul-2014 05:58:09",
+      "start_utc": "2014-07-18T22:00:36+00:00",
+      "end_utc": "2014-07-19T09:58:09+00:00",
+      "span_minutes": 717.55,
+      "crosses_local_midnight": true,
+      "local_date_of_first_sample": "2014-07-18",
+      "nan_fraction": 0.020742,
+      "no_uv_columns": 104,
+      "zero_cells": 12833,
+      "negative_cells": 0,
+      "median_positive_w_m2_nm": 6.598673078e-08,
+      "sequence_values": [
+        8,
+        9
+      ],
+      "signal_kind": "twilight-or-night"
+    },
+    {
+      "session_id": "s12",
+      "columns_zero_based": [
+        3153,
+        3191
+      ],
+      "n_columns": 39,
+      "start_label_edt": "19-Jul-2014 18:08:44",
+      "end_label_edt": "19-Jul-2014 18:48:58",
+      "start_utc": "2014-07-19T22:08:44+00:00",
+      "end_utc": "2014-07-19T22:48:58+00:00",
+      "span_minutes": 40.233,
+      "crosses_local_midnight": false,
+      "local_date_of_first_sample": "2014-07-19",
+      "nan_fraction": 0.138946,
+      "no_uv_columns": 38,
+      "zero_cells": 0,
+      "negative_cells": 0,
+      "median_positive_w_m2_nm": 0.0679196081,
+      "sequence_values": [
+        10
+      ],
+      "signal_kind": "daytime-level"
+    }
+  ],
+  "decisions": [
+    {
+      "session_id": "s00",
+      "decision": "not-selected",
+      "reason": "conditions verdict: dusk [moonlit; KN38: partial/high-cloud, KBFD: CLR]; dawn [moon-free; KN38: partial/high-cloud, KBFD: partial/high-cloud]; raw sampling bounded to the two best-supported nights (s04, s11); inventory retained for audit"
+    },
+    {
+      "session_id": "s01",
+      "decision": "rejected",
+      "reason": "daytime-level signal under the frozen screening rule (median positive level >= 1e-5 W m-2 nm-1); not a twilight comparison candidate"
+    },
+    {
+      "session_id": "s02",
+      "decision": "not-selected",
+      "reason": "conditions verdict: dusk [moonlit; KN38: CLR, KBFD: CLR]; raw sampling bounded to the two best-supported nights (s04, s11); inventory retained for audit"
+    },
+    {
+      "session_id": "s03",
+      "decision": "not-selected",
+      "reason": "conditions verdict: dusk [moon-free; KN38: CLR (context rows), KBFD: partial/high-cloud]; dawn [moon-free; KN38: partial/high-cloud, KBFD: partial/high-cloud]; raw sampling bounded to the two best-supported nights (s04, s11); inventory retained for audit"
+    },
+    {
+      "session_id": "s04",
+      "decision": "selected",
+      "role": "primary",
+      "reason": "selected for raw sampling (primary); conditions verdict: dusk [moonlit; KN38: CLR, KBFD: no-observation]; dawn [moon-free; KN38: fog/low-cloud, KBFD: partial/high-cloud]; the only night with all three target twilight depths (-6/-9/-12 deg)"
+    },
+    {
+      "session_id": "s05",
+      "decision": "not-selected",
+      "reason": "conditions verdict: dusk [moonlit; KN38: CLR, KBFD: CLR]; raw sampling bounded to the two best-supported nights (s04, s11); inventory retained for audit"
+    },
+    {
+      "session_id": "s06",
+      "decision": "rejected",
+      "reason": "daytime-level signal under the frozen screening rule (median positive level >= 1e-5 W m-2 nm-1); not a twilight comparison candidate"
+    },
+    {
+      "session_id": "s07",
+      "decision": "rejected",
+      "reason": "daytime-level signal under the frozen screening rule (median positive level >= 1e-5 W m-2 nm-1); not a twilight comparison candidate"
+    },
+    {
+      "session_id": "s08",
+      "decision": "rejected",
+      "reason": "daytime-level signal under the frozen screening rule (median positive level >= 1e-5 W m-2 nm-1); not a twilight comparison candidate"
+    },
+    {
+      "session_id": "s09",
+      "decision": "rejected",
+      "reason": "daytime-level signal under the frozen screening rule (median positive level >= 1e-5 W m-2 nm-1); not a twilight comparison candidate"
+    },
+    {
+      "session_id": "s10",
+      "decision": "rejected",
+      "reason": "daytime-level signal under the frozen screening rule (median positive level >= 1e-5 W m-2 nm-1); not a twilight comparison candidate"
+    },
+    {
+      "session_id": "s11",
+      "decision": "selected",
+      "role": "secondary",
+      "reason": "selected for raw sampling (secondary); conditions verdict: dusk [moon-free; KN38: CLR, KBFD: CLR]; dawn [moonlit; KN38: partial/high-cloud, KBFD: partial/high-cloud]; its window is among the dataset's cleanest screened windows (s11/dusk)"
+    },
+    {
+      "session_id": "s12",
+      "decision": "rejected",
+      "reason": "daytime-level signal under the frozen screening rule (median positive level >= 1e-5 W m-2 nm-1); not a twilight comparison candidate"
+    }
+  ]
+}

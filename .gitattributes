@@ -1,0 +1,5 @@
+# Vendored upstream artifacts whose byte encoding is not UTF-8 (latin-1
+# degree signs in the MICA ephemeris tables). Marking them binary keeps
+# diffs informative ("binary files differ") instead of emitting raw
+# non-UTF-8 bytes that break UTF-8-only tooling.
+validation/data/cssp_observation_inputs/ephemeris/*.txt binary

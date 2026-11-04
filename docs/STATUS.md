@@ -82,6 +82,12 @@ These backends have not replaced production defaults.
   The [2026-11-04 raw-observation follow-up](twilight/MATCHED_OBSERVATIONS.md)
   recovers candidate timestamps/site geometry and identifies a wrong-site
   ephemeris in published rural spectra; full observation matching is pending.
+  The CSSP completion ([CSSP_OBSERVATION_INPUTS](twilight/CSSP_OBSERVATION_INPUTS.md))
+  freezes a 42-record acquisition-contract packet with byte-exact pipeline
+  replay and screens nights independently: spectral shape and same-night decay
+  are conditional (neighbour fog at the 7/3 dawn window; moonlit 7/18–19
+  windows), and absolute irradiance stays uncertified (no angular response,
+  no in-situ columns, no certified-clear night in the dataset).
 - Rare-path MC uncertainty remains large in deep twilight. A single error bar or
   a better fit does not identify missing scattering or calibration error.
 - Horizon luminance and the 32-moment aureole remain unresolved; delta-fit,
