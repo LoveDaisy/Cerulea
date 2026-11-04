@@ -9,12 +9,13 @@ completed work and proposed next scopes are in [ROADMAP.md](ROADMAP.md).
 | Component | Production behavior |
 |---|---|
 | Spectral radiance, 378–780 nm | Rayleigh + Mie + O₃ + NO₂, spherical first-order geometry |
-| Single scattering | Solar attenuation/shadow can refract; viewing rays and phase angles remain geometric |
-| Multiple scattering | Successive orders, delta-M scaled, plane-parallel diffuse field |
-| Deep twilight (below −8°) | Spherical MC split estimator; refracted first order + geometric higher orders |
+| Solar source | One unified finite-disk source for every backend: apparent directions, continuous refracted columns, occultation, 16′ disk and gain (`skycolor/solar_source.py`, contract in [physics/SOLAR_SOURCE.md](physics/SOLAR_SOURCE.md)) |
+| Single scattering | Unified source at every scattering point; viewing rays remain geometric (retained approximation) |
+| Multiple scattering | Successive orders, delta-M scaled diffuse moments (raw-extinction sun), plane-parallel diffuse field; per-disk-beam Fourier source |
+| Deep twilight (below −8°) | Spherical MC split estimator; unified-source first order + straight-flight higher orders |
 | Aerosols | Eight-member Mie library, analytic Legendre moments, RH growth; AOD550 invariant under wavelength slicing |
 | Refraction | On by default; two-branch solar columns and occlusion at the model's opaque bottom |
-| Clouds | One homogeneous plane-parallel deck, delta-Eddington |
+| Clouds | One homogeneous plane-parallel deck, delta-Eddington; per-beam top/base/mixed illumination from the unified source |
 | Horizontal heterogeneity | Radial aerosol field, first order only |
 | Colour and cameras | CIE 1931 → Bradford → tone mapping; panorama, fisheye, perspective |
 

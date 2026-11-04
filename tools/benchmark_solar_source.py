@@ -75,21 +75,25 @@ def baseline_block() -> dict:
     rows["mie_build_81wl_cold_s"] = time.perf_counter() - t0
 
     views = (np.array([0.0]), np.array([0.0]))
-    t, _, _ = _time(lambda: single.sky_radiance(atmo3, 30.0, *views))
+    single.sky_radiance(atmo3, 30.0, *views)   # warm-up: builds the table
+    t, _, _ = _time(lambda: single.sky_radiance(atmo3, 30.0, *views), repeat=3)
     rows["single_3wl_1view_warm_s"] = t
     t, _, _ = _time(lambda: single.sky_radiance(atmo81, 30.0, *views))
     rows["single_81wl_1view_warm_s"] = t
-    t, _, _ = _time(lambda: multiple.solve(atmo3, 30.0, 0.0, 0.0))
+    multiple.solve(atmo3, 30.0, 0.0, 0.0)
+    t, _, _ = _time(lambda: multiple.solve(atmo3, 30.0, 0.0, 0.0), repeat=3)
     rows["sos_3wl_warm_s"] = t
+    mc.mc_radiance(atmo3, 30.0, 0.0, 0.0, n_photons=20_000)
     t, _, _ = _time(lambda: mc.mc_radiance(atmo3, 30.0, 0.0, 0.0,
-                                           n_photons=20_000))
+                                           n_photons=20_000), repeat=3)
     rows["mc_3wl_20k_warm_s"] = t
 
     zen = np.linspace(0.0, 90.0, 46)
     az = np.linspace(0.0, 180.0, 91)
     Z, A = np.meshgrid(zen, az, indexing="ij")
+    single.sky_radiance(atmo3, 30.0, Z.ravel()[:8], A.ravel()[:8], chunk=512)
     t, _, _ = _time(lambda: single.sky_radiance(atmo3, 30.0, Z.ravel(), A.ravel(),
-                                                chunk=512))
+                                                chunk=512), repeat=3)
     rows["single_3wl_dome46x91_warm_s"] = t
 
     # refraction tables (shadow thresholds) are a separate cold cost shared by

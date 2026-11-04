@@ -657,10 +657,17 @@ class PointSourceTable:
         self.top_km = float(medium.z_bounds[-1])
         self.wl = np.asarray(medium.wl, dtype=float)
         self.extinction = species_extinction_weights(medium)
-        # 550 nm anchors the column interpolation conditioning; when 550 nm
-        # is absent the strongest channel per species takes over (scale is
-        # value-free: log1p/expm1 round-trips exactly for any positive scale).
-        ref = np.array([np.interp(550.0, self.wl, row) for row in self.extinction])
+        # 550 nm anchors the column interpolation conditioning; the anchor is
+        # picked by the nearest wavelength *index* so the scale is invariant
+        # under wavelength reordering (np.interp would silently change with
+        # an unsorted grid).  When 550 nm is absent (beyond 25 nm) the
+        # strongest channel per species takes over; the scale is value-free:
+        # log1p/expm1 round-trips exactly for any positive scale.
+        k = int(np.argmin(np.abs(self.wl - 550.0)))
+        if abs(float(self.wl[k]) - 550.0) <= 25.0:
+            ref = self.extinction[:, k]
+        else:
+            ref = np.max(self.extinction, axis=1)
         self.column_scale = np.where(ref > 0, ref,
                                      np.maximum(np.max(self.extinction, axis=1), 1e-300))
         self.column_scale[self.column_scale == 0] = 1.0
@@ -892,9 +899,17 @@ class PointSourceTable:
             for side in (0, 1):
                 rows = i[ind] + side
                 weight = (1 - w[ind]) if side == 0 else w[ind]
-                for row_index in np.unique(rows):
-                    ids = np.flatnonzero(rows == row_index)
-                    val, der, cc = self._evaluate_row(self.rows[row_index],
+                # contiguous per-row groups via argsort: the boolean-mask
+                # variant cost O(rows x points) and dominated wide queries
+                # (dome-shaped batches span ~all height rows)
+                order = np.argsort(rows, kind="stable")
+                sorted_rows = rows[order]
+                boundaries = np.flatnonzero(np.diff(sorted_rows)) + 1
+                starts = np.concatenate([[0], boundaries])
+                ends = np.concatenate([boundaries, [rows.size]])
+                for s0, e0 in zip(starts, ends):
+                    ids = order[s0:e0]
+                    val, der, cc = self._evaluate_row(self.rows[sorted_rows[s0]],
                                                       t[ind[ids]])
                     value[ids] += weight[ids] * val
                     derivative[ids] += weight[ids] * der

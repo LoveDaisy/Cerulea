@@ -78,22 +78,27 @@ first-order term only) and stays silent on the default paths.
 
 | Backend | Standing approximations |
 |---|---|
-| `rt.single` | spherical quadrature; solar attenuation/shadow can refract, viewing rays and phase angles remain geometric; horizontal field applied per scattering point |
-| `rt.multiple` | plane-parallel diffuse field; ground fixed at `z_bounds[0]` (`elevation_km` not read); refracted shadow threshold but geometric solar optical depth; horizontal field not applied |
-| `rt.twilight` | MC assumes a horizontally uniform atmosphere; MC transport has no refraction; horizontal field in the first-order term only |
-| `rt.cloud` | homogeneous plane-parallel deck (delta-Eddington); inherits the clear solver's geometry |
+| `rt.single` | spherical quadrature; unified finite-disk source at every scattering point; viewing rays remain geometric; horizontal field applied to view-side coefficients |
+| `rt.multiple` | plane-parallel diffuse field; ground fixed at `z_bounds[0]` (`elevation_km` not read); per-disk-beam Fourier source with raw-extinction sun `T` (delta-M scales only the diffuse moments); horizontal field not applied |
+| `rt.twilight` | unified-source first order; MC assumes a horizontally uniform atmosphere; MC transport has no refraction; horizontal field in the first-order term only |
+| `rt.cloud` | homogeneous plane-parallel deck (delta-Eddington); per-beam top/base/mixed illumination from the unified source |
 
-### Solar-source approximations
+### The unified solar source
 
-The solar-source audit additionally records two limitations of the current
-refraction prescription: the packaged inverse angle table is sparse, and the
-source amplitude does not include the refracted solar disk's angular
-Jacobian.  Independent reference tools quantify these without changing the
-library defaults; see [SOLAR_SOURCE_AUDIT.md](twilight/SOLAR_SOURCE_AUDIT.md). The later
-[unified-source](twilight/UNIFIED_SOLAR_SOURCE_AUDIT.md) and
-[continuous-transport](twilight/CURVED_TRANSPORT_AUDIT.md) references have separate
-independent checks and remain experimental. Agreement
-between two backends using the same source prescription cannot validate it.
+One module owns the sun: `skycolor/solar_source.py` holds the refractive
+field, the continuous species columns, the lazily built point-source table
+(cached per medium-construction token), the finite disk and the consumer
+kernels; its contract, per-backend consumption table, validation entry
+points and measured budgets are in
+[physics/SOLAR_SOURCE.md](physics/SOLAR_SOURCE.md).  The historical
+limitations recorded by the source audits -- the sparse packaged inverse
+angle table and the missing disk angular Jacobian -- are what this module
+replaces; the audit documents remain unchanged as historical evidence
+([SOLAR_SOURCE_AUDIT.md](twilight/SOLAR_SOURCE_AUDIT.md),
+[unified-source](twilight/UNIFIED_SOLAR_SOURCE_AUDIT.md)).  Agreement between
+two backends using the same source cannot validate it: the independent
+chain lives in `validation/production_solar_source.py` (RK anchors, analytic
+limits, table holdout and the deterministic-vs-MC first-order closure).
 
 ### delta-M quantities vs raw physics (E4)
 
