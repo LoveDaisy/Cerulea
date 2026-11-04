@@ -93,16 +93,25 @@ ledger; the analog-survival albedos are intentionally absent because they
 are survival probabilities, already folded into the scattering densities.
 
 Effect (16 seeds × 2 tiers × 2 depths on the frozen 3-wavelength planning
-table, seeds 80000+, 21.7 min): the candidate total's conditional interval
-is consistently narrower than the direct estimate's at equal rest budget
-(550 nm half-width ratio 0.74 at 400k and 0.55 at 1.6M at −9°), and the
-candidate L2 itself is quasi-deterministic (tier-to-tier drift ≈ 1 %).
-At −12° neither estimator resolves anything (both intervals remain
-tail-dominated; the rest-component variance *grows* with budget as more
-tail mass is seen), so the candidate mitigates but does not cure the deep
-regime. Per-path subtraction (candidate L2 + rest = analog total −
-second-scatter analog) is exact by construction; totals are never
-computed as differences of independent means.
+table, seeds 80000+; one rest MC per repeat, cost bookkeeping corrected in
+review round 1): the comparison anchor is `total_analog` — the same-table,
+same-seed analog estimator in the same records — with the full
+three-wavelength repeat as the shared cost unit. At −9° the candidate is
+the more efficient estimator at the 1.6M tier (lower variance of the mean
+per second of true repeat wall-clock at 550/650 nm) and its conditional
+interval is narrower (550 nm half-width ratio 0.55 against the analog
+comparator); the L2 component is quasi-deterministic (tier-to-tier drift
+≈ 1 %). At −12° neither estimator resolves anything (both intervals remain
+tail-dominated; the rest-component second moment *grows* with budget as
+more tail mass is seen), so the candidate mitigates but does not cure the
+deep regime. The full81 direct baseline is reported only as a
+*distribution reference* across the table/stream boundary — it is not a
+cost comparison, and no equal-wall-clock claim is made against it.
+Per-path subtraction (candidate L2 + rest = analog total − second-scatter
+analog) is exact by construction; totals are never computed as
+differences of independent means. Correctness rests on the closures above
+plus a three-independent-repeat MC closure at −6° (single scenario, not a
+tail-coverage certificate).
 
 ## Sensitivity (plan Step 4)
 
@@ -129,6 +138,11 @@ explicit unknown, not a run under this budget.
 | source-pairs (32 records) | 4965 s | (shared) |
 | candidate (64 records) | 1304 s | 2 h |
 | sensitivity (32 records + singles) | 140 s | 2 h |
+
+Erratum: Darwin records of the first formal wave archived
+`max_rss_bytes` with a 1024× unit error (fixed in the runner); divide
+archived values by 1024 — the frozen records are not rewritten, the
+summary carries the note.
 
 Total ≈ 3.9 h against the plan's ≈ 8 h implementation envelope; each
 record pins its own seconds, peak RSS, thread environment, code and

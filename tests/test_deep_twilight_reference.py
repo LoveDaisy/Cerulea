@@ -261,7 +261,7 @@ MINI_PROTOCOL = {
     "scenario": {"preset": "clear", "anchor_wavelengths_nm": [450.0, 550.0, 650.0],
                  "sun_azimuth_deg": 0.0, "sun_elevations_deg": [-9.0],
                  "spectrum": {"grid": [380.0, 780.0, 5.0], "n_wavelengths": 81}},
-    "source": {"full81_table": {"path": "x", "label": "x", "sha256": "x"},
+    "source": {"full81_table": {"path": "x", "label": "x", "sha256": "t"},
                "point_pairing": {"radius_deg": 0.0}},
     "direct": {"budgets_photons": [400, 800], "repeats": 4,
                "analysis": {"student": {"confidence": 0.95, "df": 3},
@@ -305,24 +305,39 @@ def _synthetic_record81(seed, zero=False):
 
 
 def _populate(data: Path, *, zero_one_record=False, point=True):
+    from tools.deep_twilight_reference import contract_view
+    meta = contract_view(dict(stage="direct", table_sha256="t",
+                              protocol_sha256="p", mode="disk"))
     for sun_index, sun in enumerate([-9.0]):
         for budget_index, photons in enumerate([400, 800]):
             batch_id = f"s{sun_index}b{budget_index}"
             batch = Batch(data / "raw" / "direct", batch_id,
                           [40000 + 10000 * sun_index + 1000 * budget_index + r
-                           for r in range(4)], dict(stage="direct"))
+                           for r in range(4)], dict(meta))
             for r in range(4):
                 seed = 40000 + 10000 * sun_index + 1000 * budget_index + r
                 zero = zero_one_record and seed == 40000
-                batch.record_seed(seed, _synthetic_record81(seed, zero=zero))
+                row = _synthetic_record81(seed, zero=zero)
+                row["table_sha256"] = "t"
+                row["protocol_sha256"] = "p"
+                row["mode"] = "disk"
+                row["photons_per_wavelength"] = photons
+                row["sun_elevation_deg"] = -9.0
+                batch.record_seed(seed, row)
             batch.close("complete")
         if point:
             batch = Batch(data / "raw" / "source-pairs", "s0b1-point",
-                          [41000 + r for r in range(4)], dict(stage="source-pairs"))
+                          [41000 + r for r in range(4)],
+                          dict(stage="source-pairs", table_sha256="t",
+                               protocol_sha256="p", mode="point"))
             for r in range(4):
                 seed = 41000 + r
                 row = _synthetic_record81(seed)
+                row["table_sha256"] = "t"
+                row["protocol_sha256"] = "p"
                 row["mode"] = "point"
+                row["photons_per_wavelength"] = 800
+                row["sun_elevation_deg"] = -9.0
                 # point-source variant: half the higher-order radiance, same
                 # identities (split_total = single + multiple) preserved
                 multiple_p = 0.5 * np.asarray(row["fields"]["multiple"])
@@ -389,13 +404,13 @@ def test_missing_batch_refuses(tmp_path):
 
 def test_candidate_and_sensitivity_sections(tmp_path):
     """The Step-3/Step-4 analysis sections run on synthetic mini batches."""
-    from tools.deep_twilight_reference import Batch, SENSITIVITY_MC_ITEMS
+    from tools.deep_twilight_reference import Batch
     from tools.summarize_deep_twilight_reference import _candidate_stats, \
         _sensitivity_stats
     data = _write_mini_dataset(tmp_path)
     proto = json.loads((data / "protocol.json").read_text())
     proto["candidate"] = {
-        "table": {"path": "probe/x.npz", "label": "x", "sha256": "x"},
+        "table": {"path": "probe/x.npz", "label": "x", "sha256": "c"},
         "wavelengths_nm": [450.0, 550.0, 650.0], "repeats": 4,
         "seed_rule": "test", "tiers": [
             {"candidate_samples": 100, "rest_photons": 400},
@@ -410,42 +425,48 @@ def test_candidate_and_sensitivity_sections(tmp_path):
         for tier_index in (0, 1):
             batch = Batch(data / "raw" / "candidate", f"s{sun_index}t{tier_index}",
                           [80000 + 10000 * sun_index + 1000 * tier_index + r
-                           for r in range(4)], dict(stage="candidate"))
+                           for r in range(4)],
+                          dict(stage="candidate", table_sha256="c",
+                               protocol_sha256="p", mode="disk",
+                               candidate_samples=100, rest_photons=400))
             for r in range(4):
                 seed = 80000 + 10000 * sun_index + 1000 * tier_index + r
                 per_lambda = {}
-                for a, idx in wl_anchor.items():
-                    s2 = rng.uniform(0, 1e-18)
+                for a in wl_anchor:
                     per_lambda[str(a)] = dict(
                         L2=1e-9 * (1 + tier_index), L2_second_moment=2e-18,
                         L2_max_abs=1e-8, candidate_seconds=0.2,
                         candidate_samples=100, c2nt_mean=5e-10, rest_mean=2e-10,
-                        rest_second_moment=s2, mc_multiple=7e-10, mc_seconds=0.1,
-                        deterministic_single=1e-8,
+                        rest_second_moment=(0.0 if r == 3 else 5e-12),
+                        mc_multiple=7e-10, deterministic_single=1e-8,
                         total_cand=1e-8 + 1e-9 * (1 + tier_index) + 2e-10,
                         total_analog=1.17e-8, max_fraction=0.004,
                         top001_fraction=0.2, effective_contributors=50.0)
                 batch.record_seed(seed, dict(
                     seed=seed, sun_elevation_deg=-9.0, tier_index=tier_index,
                     candidate_samples=100, rest_photons=400,
-                    per_lambda=per_lambda, seconds=0.3, table_sha256="t",
+                    per_lambda=per_lambda, mc_seconds=0.1,
+                    seconds=0.3 + 0.1 * (1 + tier_index),
+                    table_sha256="c", protocol_sha256="p",
                     code_sha256={}, batch_id="x", attempt=0))
             batch.close("complete")
     batch = Batch(data / "raw" / "sensitivity", "s0mc",
-                  [110000 + r for r in range(4)], dict(stage="sensitivity"))
+                  [110000 + r for r in range(4)],
+                  dict(stage="sensitivity", table_sha256="c",
+                       protocol_sha256="p", mode="disk"))
     for r in range(4):
         seed = 110000 + r
         items = {}
         for item in ("baseline", "disk4x16"):
             items[item] = dict(
-                fingerprint="fp" if item == "baseline" else "fp",
+                fingerprint="fp",
                 per_lambda={str(a): dict(deterministic_single=1e-8,
                                          multiple=5e-10, total=1.05e-8)
                             for a in wl_anchor}, seconds=0.1)
         batch.record_seed(seed, dict(seed=seed, sun_elevation_deg=-9.0,
                                      photons_per_wavelength=300, items=items,
                                      batch_id="s0mc", attempt=0,
-                                     code_sha256={}, table_sha256="t"))
+                                     code_sha256={}, table_sha256="c"))
     batch.close("complete")
     (data / "raw" / "sensitivity" / "singles-refinement.json").write_text(
         json.dumps(dict(schema="s/1", items={"ss_gauss16": "d"},
@@ -455,9 +476,18 @@ def test_candidate_and_sensitivity_sections(tmp_path):
 
     wl = np.arange(380.0, 781.0, 5.0)
     cand = _candidate_stats(data, proto, wl, [14, 34, 54], {})
-    assert cand["-9.0"]["tiers"]["1"]["anchors"]["550.0"]["total_mean"] \
-        > cand["-9.0"]["tiers"]["0"]["anchors"]["550.0"]["total_mean"]
+    tier0_550 = cand["-9.0"]["tiers"]["0"]["anchors"]["550.0"]
+    tier1_550 = cand["-9.0"]["tiers"]["1"]["anchors"]["550.0"]
+    assert tier1_550["candidate_mean"] > tier0_550["candidate_mean"]
+    # zero rest moments are real zeros in the mean, not dropped samples
+    assert tier0_550["zero_rest_records"] == 1
+    moments = [0.0 if r == 3 else 5e-12 for r in range(4)]
+    assert abs(tier0_550["rest_second_moment_mean"]
+               - sum(moments) / 4) < 1e-30
     assert cand["-9.0"]["drift"]["550.0"]["abs_drift"] > 0.0
+    eff = cand["-9.0"]["efficiency"]["550.0"]
+    assert eff["verdict"] in ("candidate-more-efficient",
+                              "candidate-not-more-efficient")
     sens = _sensitivity_stats(data, proto, wl, [14, 34, 54])
     entry = sens["by_sun"]["-9.0"]["mc"]["disk4x16"]["550.0"]
     assert entry["paired_delta_mean"] == 0.0 and entry["fingerprints_same"]
@@ -465,9 +495,6 @@ def test_candidate_and_sensitivity_sections(tmp_path):
     assert sens["not_run_here"] == ["curved"]
 
 
-# ---------------------------------------------------------------------------
-# real end-to-end pieces (small, but with the actual physics and table)
-# ---------------------------------------------------------------------------
 def test_cli_smoke_real(tmp_path):
     from tools.deep_twilight_reference import main
     out = tmp_path / "smoke"
@@ -494,3 +521,120 @@ def test_disk_point_fingerprint_paired_real():
         common[mode] = record["fingerprint"]
     assert common["disk"] == common["point"], \
         "point/disk sources must not change the native MC paths"
+
+
+# ---------------------------------------------------------------------------
+# review-response: contract identity, units and fresh-run-root mechanics
+# ---------------------------------------------------------------------------
+def test_batch_contract_mismatch_refused(tmp_path):
+    batch = Batch(tmp_path, "c0", [1], dict(stage="direct", mode="disk",
+                                            photons_per_wavelength=400,
+                                            protocol_sha256="p1"))
+    batch.record_seed(1, {"seed": 1})
+    batch.close("complete")
+    with pytest.raises(ValueError, match="stored contract differs"):
+        Batch(tmp_path, "c0", [1], dict(stage="direct", mode="disk",
+                                        photons_per_wavelength=1600000,
+                                        protocol_sha256="p1"))
+    # an explicit re-contract decision records the change instead of mixing
+    rc = Batch(tmp_path, "c0", [1], dict(stage="direct", mode="disk",
+                                         photons_per_wavelength=1600000,
+                                         protocol_sha256="p1"),
+               allow_recontract=True)
+    assert rc.meta["recontracts"][-1]["changed"] == ["photons_per_wavelength"]
+
+
+def test_check_batch_contract_rejects_tampered_record():
+    from tools.summarize_deep_twilight_reference import check_batch_contract
+    meta = dict(protocol_sha256="p", table_sha256="t")
+    good = [dict(seed=1, sun_elevation_deg=-9.0, photons_per_wavelength=400,
+                 mode="disk", protocol_sha256="p", table_sha256="t")]
+    notes = check_batch_contract(good, meta,
+                                 dict(sun_elevation_deg=-9.0,
+                                      photons_per_wavelength=400, mode="disk",
+                                      table_sha256="t"),
+                                 stage="direct", batch_id="b",
+                                 protocol_sha_now="p")
+    assert notes == []
+    tampered = [dict(good[0], photons_per_wavelength=1600000)]
+    with pytest.raises(ValueError, match="contract field"):
+        check_batch_contract(tampered, meta,
+                             dict(sun_elevation_deg=-9.0,
+                                  photons_per_wavelength=400, mode="disk",
+                                  table_sha256="t"),
+                             stage="direct", batch_id="b")
+    drifted = check_batch_contract(good, meta,
+                                   dict(sun_elevation_deg=-9.0,
+                                        photons_per_wavelength=400,
+                                        mode="disk", table_sha256="t"),
+                                   stage="direct", batch_id="b",
+                                   protocol_sha_now="p2")
+    assert len(drifted) == 1 and "executed under protocol" in drifted[0]
+
+
+def test_peak_rss_units_per_platform():
+    import resource
+    import tools.deep_twilight_reference as dtr
+    raw = 1_000_000
+    from types import SimpleNamespace
+    real_getrusage = dtr.resource.getrusage
+    real_system = dtr.platform.system
+    try:
+        dtr.resource.getrusage = lambda _: SimpleNamespace(ru_maxrss=raw)
+        dtr.platform.system = lambda: "Darwin"
+        assert dtr.peak_rss_bytes() == 1_000_000       # already bytes
+        dtr.platform.system = lambda: "Linux"
+        assert dtr.peak_rss_bytes() == 1_024_000_000   # KiB -> bytes
+    finally:
+        dtr.resource.getrusage = real_getrusage
+        dtr.platform.system = real_system
+
+
+def test_cost_probe_cli_exit_path(tmp_path, capsys, monkeypatch):
+    """main() must not assume keys a scratch summary does not carry."""
+    import tools.deep_twilight_reference as dtr
+    fake = dict(stage="cost-probe", status="scratch-only-scheduling-estimate",
+                rows=[dict(sun=-9.0, seed=1, photons=1, seconds=0.5)],
+                seconds_per_wavelength_path=1e-6)
+    monkeypatch.setattr(dtr, "stage_cost_probe",
+                        lambda *a, **k: fake)
+    rc = dtr.main(["--stage", "cost-probe", "--out", str(tmp_path)])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "seconds_per_wavelength_path" in out
+
+
+def test_fresh_run_root_direct_resume(tmp_path):
+    """--out on a fresh directory must work end to end (Major 7/9)."""
+    from tools.deep_twilight_reference import main, load_protocol
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    protocol = json.loads(DEFAULT_PROTOCOL.read_text())
+    protocol["direct"]["repeats"] = 1
+    protocol["direct"]["budgets_photons"] = [400, 800]
+    (input_dir / "protocol.json").write_text(json.dumps(protocol))
+    run_root = tmp_path / "run"
+    argv = ["--protocol", str(input_dir / "protocol.json"),
+            "--stage", "direct", "--out", str(run_root),
+            "--max-stage-hours", "0.02"]
+    rc = main(argv)  # will stop on budget after setup + ~1 record
+    assert rc == 0
+    assert (run_root / "protocol.snapshot.json").exists()
+    batch_dirs = list((run_root / "raw" / "direct").iterdir())
+    assert batch_dirs, "a batch directory must exist"
+    state = json.loads((run_root / "state.json").read_text())
+    assert state["stages"]["direct_and_source_pairs"]["cumulative_seconds"] > 0
+    # resume under the same contract continues the same attempt lineage
+    rc2 = main(argv + ["--max-stage-hours", "0.05"])
+    assert rc2 == 0
+    meta = json.loads((sorted(batch_dirs)[0] / "meta.json").read_text())
+    assert meta["protocol_sha256"]  # pinned at execution time
+    # a contract change against an existing run root is refused at the
+    # protocol snapshot guard (the batch-level refusal is covered by
+    # test_batch_contract_mismatch_refused)
+    protocol["direct"]["budgets_photons"] = [400, 1600]
+    (input_dir / "protocol.json").write_text(json.dumps(protocol))
+    with pytest.raises(SystemExit, match="snapshot differs"):
+        main(["--protocol", str(input_dir / "protocol.json"),
+              "--stage", "direct", "--out", str(run_root),
+              "--max-stage-hours", "0.01"])

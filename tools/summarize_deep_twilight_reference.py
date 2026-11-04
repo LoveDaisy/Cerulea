@@ -142,6 +142,38 @@ def check_record_invariants(records, *, stage, batch_id):
                              "spectrum does not span the 81-wavelength grid")
 
 
+def check_batch_contract(records, meta, expect, *, stage, batch_id,
+                         protocol_sha_now=None):
+    """Records and batch meta must agree with the pre-registered contract.
+
+    Checks the semantic identity (sun elevation, budget, mode, source and
+    protocol hashes) of every record against ``expect`` and the batch meta;
+    cross-batch protocol-hash drift is reported as an auditable note, not
+    silently merged.
+    """
+    notes = []
+    meta_protocol = meta.get("protocol_sha256")
+    for row in records:
+        for key, want in expect.items():
+            got = row.get(key)
+            if got != want:
+                raise ValueError(
+                    f"{stage}/{batch_id} seed {row['seed']}: contract field "
+                    f"{key} is {got!r}, protocol requires {want!r}")
+        for key in ("protocol_sha256", "table_sha256"):
+            if meta.get(key) is not None and row.get(key) != meta[key]:
+                raise ValueError(
+                    f"{stage}/{batch_id} seed {row['seed']}: record {key} "
+                    "differs from the batch meta provenance")
+    if (protocol_sha_now is not None and meta_protocol is not None
+            and meta_protocol != protocol_sha_now):
+        notes.append(
+            f"{stage}/{batch_id}: executed under protocol sha "
+            f"{meta_protocol[:12]}... (current file {protocol_sha_now[:12]}...); "
+            "stage-relevant sections validated semantically above")
+    return notes
+
+
 # ---------------------------------------------------------------------------
 # statistics
 # ---------------------------------------------------------------------------
@@ -181,6 +213,8 @@ def compute_summary(data_dir: Path, protocol: dict) -> dict:
     suns = list(scenario["sun_elevations_deg"])
 
     raw_dir = data_dir / "raw"
+    protocol_sha_now = sha256_file(data_dir / "protocol.json")
+    contract_notes = []
     out = dict(schema="deep-twilight-reference/summary/1",
                generated=time.strftime("%Y-%m-%dT%H:%M:%S%z"),
                protocol_sha256=sha256_file(data_dir / "protocol.json"),
@@ -202,6 +236,13 @@ def compute_summary(data_dir: Path, protocol: dict) -> dict:
             # NOTE: fingerprints identify the per-seed path SET, so they are
             # all distinct within a batch by design; the meaningful identity
             # is same-seed disk/point equality, checked in the pairs section
+            contract_notes.extend(check_batch_contract(
+                records, meta,
+                dict(sun_elevation_deg=sun, photons_per_wavelength=photons,
+                     mode="disk",
+                     table_sha256=protocol["source"]["full81_table"]["sha256"]),
+                stage="direct", batch_id=batch_id,
+                protocol_sha_now=protocol_sha_now))
             disk_records[(sun, photons)] = records
             disk_meta[batch_id] = meta
             per_budget[str(photons)] = _budget_stats(
@@ -245,10 +286,18 @@ def compute_summary(data_dir: Path, protocol: dict) -> dict:
              for r in range(repeats)],
             stage="source-pairs", batch_id=batch_id)
         check_record_invariants(records, stage="source-pairs", batch_id=batch_id)
+        contract_notes.extend(check_batch_contract(
+            records, meta,
+            dict(sun_elevation_deg=sun, photons_per_wavelength=photons,
+                 mode="point",
+                 table_sha256=protocol["source"]["full81_table"]["sha256"]),
+            stage="source-pairs", batch_id=batch_id,
+            protocol_sha_now=protocol_sha_now))
         disk_rows = disk_records[(sun, photons)]
         pairs[str(sun)] = _pair_stats(disk_rows, records, wl, v_curve,
                                       anchor_idx, sun, protocol, pair_cfg)
     out["source_pairs"] = pairs
+    out["contract_notes"] = contract_notes
     # ---- candidate experiment (plan Step 3; may be absent/incomplete) -----
     if (data_dir / "raw" / "candidate").exists():
         out["candidate"] = _candidate_stats(data_dir, protocol, wl, anchor_idx,
@@ -398,19 +447,22 @@ def _budget_stats(records, wl, v_curve, anchor_idx, sun, budget, protocol,
 
 def _candidate_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
                      anchor_idx, direct_section) -> dict:
-    """Candidate-vs-direct comparison at matched rest budgets.
+    """Candidate vs analog comparison at identical work units.
 
-    The candidate runs are self-contained on the 3-wavelength planning
-    table (different RNG streams from the full81 reference): the comparison
-    is between distribution summaries (16-seed conditional intervals,
-    per-path second moments, variance x wall-clock, tier drift), never
-    per-seed pairing.
+    The candidate experiment is self-contained on the 3-wavelength planning
+    table: for every (depth, tier, seed) one candidate sweep plus ONE rest
+    MC on the same seed, so ``total_analog`` in the same records is the
+    same-source, same-seed comparator and the repeat is the shared cost
+    unit.  Reported per anchor: conditional intervals for both totals over
+    the 16 repeats, variance-of-mean per second of true repeat wall-clock,
+    tier drift, and the full81 direct baseline as a clearly separated
+    *distribution reference* (different table/RNG streams -- never a cost
+    comparison).  Zero rest moments are real zeros, not missing values.
     """
     cand_cfg = protocol["candidate"]
     anchors_nm = [float(wl[i]) for i in anchor_idx]
     confidence = protocol["direct"]["analysis"]["student"]["confidence"]
     repeats = int(cand_cfg["repeats"])
-    budgets = protocol["direct"]["budgets_photons"]
     suns = protocol["scenario"]["sun_elevations_deg"]
     raw_dir = data_dir / "raw" / "candidate"
     out = {}
@@ -425,75 +477,85 @@ def _candidate_stats(data_dir: Path, protocol: dict, wl: np.ndarray,
             records = sorted(records, key=lambda r: int(r["seed"]))
             per_anchor = {}
             for a_nm in anchors_nm:
-                total = np.array([r["per_lambda"][str(a_nm)]["total_cand"]
-                                  for r in records])
-                rest_var = np.array([r["per_lambda"][str(a_nm)]["rest_second_moment"]
-                                     or np.nan for r in records])
-                seconds = np.array([r["per_lambda"][str(a_nm)]["candidate_seconds"]
-                                    + r["per_lambda"][str(a_nm)]["mc_seconds"]
-                                    for r in records])
+                cand_total = np.array([r["per_lambda"][str(a_nm)]["total_cand"]
+                                       for r in records])
+                analog_total = np.array([r["per_lambda"][str(a_nm)]["total_analog"]
+                                         for r in records])
+                rest_moments = np.array([
+                    0.0 if r["per_lambda"][str(a_nm)]["rest_second_moment"] is None
+                    else r["per_lambda"][str(a_nm)]["rest_second_moment"]
+                    for r in records])
+                n_zero_rest = int(np.count_nonzero(
+                    r["per_lambda"][str(a_nm)]["rest_second_moment"] is None
+                    for r in records))
+                repeat_seconds = np.array([float(r["seconds"]) for r in records])
+                analog_seconds = np.array([float(r.get("mc_seconds")
+                                                 or r["seconds"] * 0.0)
+                                           for r in records]) \
+                    if all("mc_seconds" in r for r in records) \
+                    else np.array([float(r["seconds"]) for r in records])
+                cand_var_mean = cand_total.var(axis=0, ddof=1) / len(records)
+                analog_var_mean = analog_total.var(axis=0, ddof=1) / len(records)
                 per_anchor[str(a_nm)] = dict(
-                    total_mean=float(total.mean()),
-                    total_sd=float(total.std(axis=0, ddof=1)),
-                    total_t95_halfwidth=float(student_halfwidth(
-                        total.reshape(-1, 1), confidence)[0]),
-                    rest_second_moment_mean=float(np.nanmean(rest_var)),
-                    all_zero_rest=bool(np.all(np.isnan(rest_var))),
-                    seconds_mean=float(seconds.mean()),
-                    L2_mean=float(np.mean([r["per_lambda"][str(a_nm)]["L2"]
-                                           for r in records])),
-                    max_fraction=float(np.nanmax([
-                        r["per_lambda"][str(a_nm)]["max_fraction"] or np.nan
-                        for r in records])) if any(
-                        r["per_lambda"][str(a_nm)]["max_fraction"] is not None
-                        for r in records) else None,
-                    top001_fraction=float(np.nanmax([
-                        r["per_lambda"][str(a_nm)]["top001_fraction"] or np.nan
-                        for r in records])) if any(
-                        r["per_lambda"][str(a_nm)]["top001_fraction"] is not None
-                        for r in records) else None)
-            tiers[str(tier_index)] = dict(rest_photons=tier["rest_photons"],
-                                          candidate_samples=tier["candidate_samples"],
-                                          anchors=per_anchor,
-                                          seconds=float(sum(r["seconds"]
-                                                            for r in records)))
-        # tier drift of total_cand between the two tiers (anchors)
+                    candidate_mean=float(cand_total.mean()),
+                    candidate_sd=float(cand_total.std(axis=0, ddof=1)),
+                    candidate_t95_halfwidth=float(student_halfwidth(
+                        cand_total.reshape(-1, 1), confidence)[0]),
+                    analog_mean=float(analog_total.mean()),
+                    analog_sd=float(analog_total.std(axis=0, ddof=1)),
+                    analog_t95_halfwidth=float(student_halfwidth(
+                        analog_total.reshape(-1, 1), confidence)[0]),
+                    rest_second_moment_mean=float(rest_moments.mean()),
+                    zero_rest_records=n_zero_rest,
+                    # variance of the mean per second of true repeat cost:
+                    # the same-work-unit efficiency metric
+                    candidate_var_of_mean_per_second=float(
+                        cand_var_mean / repeat_seconds.mean()),
+                    analog_var_of_mean_per_second=float(
+                        analog_var_mean / max(analog_seconds.mean(), 1e-9)),
+                    candidate_seconds_per_repeat=float(repeat_seconds.mean()),
+                    analog_mc_seconds_per_repeat=float(analog_seconds.mean()))
+            tiers[str(tier_index)] = dict(
+                rest_photons=tier["rest_photons"],
+                candidate_samples=tier["candidate_samples"],
+                anchors=per_anchor,
+                seconds=float(sum(r["seconds"] for r in records)))
         lo_tier, hi_tier = sorted(tiers, key=int)
         drift = {}
         for a_nm in anchors_nm:
             lo = tiers[lo_tier]["anchors"][str(a_nm)]
             hi = tiers[hi_tier]["anchors"][str(a_nm)]
-            drift[str(a_nm)] = dict(abs_drift=abs(hi["total_mean"]
-                                                  - lo["total_mean"]),
-                                    low_mean=lo["total_mean"],
-                                    high_mean=hi["total_mean"])
-        # comparison against the direct baseline at the matched budget
-        comparison = {}
+            drift[str(a_nm)] = dict(
+                abs_drift=abs(hi["candidate_mean"] - lo["candidate_mean"]),
+                low_mean=lo["candidate_mean"], high_mean=hi["candidate_mean"])
+        efficiency = {}
+        for a_nm in anchors_nm:
+            hi_anchor = tiers[hi_tier]["anchors"][str(a_nm)]
+            c = hi_anchor["candidate_var_of_mean_per_second"]
+            a = hi_anchor["analog_var_of_mean_per_second"]
+            efficiency[str(a_nm)] = dict(
+                candidate_var_of_mean_per_second=c,
+                analog_var_of_mean_per_second=a,
+                verdict=("candidate-more-efficient" if c < a
+                         else "candidate-not-more-efficient"))
+        # full81 direct baseline: distribution reference only
+        reference = {}
         direct_sun = direct_section.get(str(sun), {})
         for tier_index, tier in enumerate(cand_cfg["tiers"]):
-            b_key = str(budgets[tier_index])
+            b_key = str(protocol["direct"]["budgets_photons"][tier_index])
             block = direct_sun.get("budgets", {}).get(b_key)
             if block is None:
                 continue
-            per_anchor = {}
-            for i, a_nm in zip(anchor_idx, anchors_nm):
-                cand = tiers[str(tier_index)]["anchors"][str(a_nm)]
-                d_mean = block["mean"][i]
-                d_half = block["student_halfwidth"][i]
-                c_half = cand["total_t95_halfwidth"]
-                d_seconds = block["seconds"] / max(block["n"], 1)
-                c_seconds = cand["seconds_mean"]
-                per_anchor[str(a_nm)] = dict(
-                    direct_mean=float(d_mean), direct_halfwidth=float(d_half),
-                    candidate_mean=cand["total_mean"],
-                    candidate_halfwidth=c_half,
-                    halfwidth_ratio=(c_half / d_half) if d_half > 0 else None,
-                    direct_seconds_per_seed=float(d_seconds),
-                    candidate_seconds_per_seed=float(c_seconds),
-                    verdict=("candidate-narrower" if c_half < d_half
-                             else "candidate-wider"))
-            comparison[b_key] = per_anchor
-        out[str(sun)] = dict(tiers=tiers, drift=drift, comparison=comparison)
+            reference[b_key] = {
+                str(a_nm): dict(direct_mean=float(block["mean"][i]),
+                                direct_halfwidth=float(
+                                    block["student_halfwidth"][i]),
+                                note="distribution reference across the "
+                                     "table/stream boundary, NOT a cost "
+                                     "comparison")
+                for i, a_nm in zip(anchor_idx, anchors_nm)}
+        out[str(sun)] = dict(tiers=tiers, drift=drift,
+                             efficiency=efficiency, reference=reference)
     return out
 
 
@@ -614,10 +676,18 @@ def _pair_stats(disk_rows, point_rows, wl, v_curve, anchor_idx, sun, protocol,
                 seconds=float(sum(r["seconds"] for r in point)))
 
 
+#: the first formal run wave (2026-11-04, before the fix recorded in the
+#: runner) multiplied Darwin's already-bytes ru_maxrss by 1024
+RSS_ERRATUM = ("direct/source-pairs records executed on Darwin between "
+               "2026-11-04 14:44 and 18:36 archived max_rss_bytes with a "
+               "1024x unit error; divide archived values by 1024 for true "
+               "bytes. Records are frozen; this note is the erratum.")
+
+
 def _cost_stats(data_dir, disk_meta):
     state_path = data_dir / "state.json"
     state = json.loads(state_path.read_text()) if state_path.exists() else {}
-    return dict(stage_state=state.get("stages", {}),
+    return dict(stage_state=state.get("stages", {}), rss_erratum=RSS_ERRATUM,
                 batches={bid: {"created": meta.get("created"),
                                "photons": meta.get("photons_per_wavelength"),
                                "mode": meta.get("mode"),
@@ -683,7 +753,10 @@ def main(argv=None) -> int:
                              "summary; write nothing")
     args = parser.parse_args(argv)
     data_dir = args.directory
-    protocol = json.loads((data_dir / "protocol.json").read_text())
+    protocol_path = data_dir / "protocol.json"
+    if not protocol_path.exists():
+        protocol_path = data_dir / "protocol.snapshot.json"
+    protocol = json.loads(protocol_path.read_text())
 
     summary = compute_summary(data_dir, protocol)
 

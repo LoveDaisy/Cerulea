@@ -87,6 +87,7 @@ CODE_FILES = [
     "tools/point_solar_table.py",
     "tools/unified_solar_transport.py",
     "tools/deep_twilight_reference.py",
+    "tools/twilight_second_order.py",
 ]
 
 #: stages that only write scratch output (never into the tracked data tree)
@@ -125,9 +126,19 @@ def hardware_info() -> dict:
 
 
 def peak_rss_bytes() -> int:
-    """Peak resident set size of this process so far (platform-dependent unit)."""
+    """Peak resident set size of this process so far, in bytes.
+
+    Darwin's ``ru_maxrss`` is already bytes; Linux reports KiB and needs the
+    ×1024 conversion.  Records produced between 2026-11-04 14:44 and 18:36
+    (all formal direct/pairs records) ran the erroneous both-platforms ×1024
+    version, so their archived ``max_rss_bytes`` on Darwin are 1024× too
+    large; the summarizer derives a corrected value instead of rewriting the
+    frozen records.
+    """
     raw = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    return raw * 1024 if platform.system() == "Darwin" else raw * 1024
+    if platform.system() == "Darwin":
+        return int(raw)            # already bytes
+    return int(raw) * 1024         # Linux KiB -> bytes
 
 
 # ---------------------------------------------------------------------------
@@ -267,6 +278,21 @@ def _diagnostics_payload(diag_list, wl, *, keep_per_path):
 # ---------------------------------------------------------------------------
 # batch bookkeeping (append-only attempts)
 # ---------------------------------------------------------------------------
+#: fields that define a batch's computational contract; a resumed batch
+#: whose stored contract differs from the incoming one is refused instead
+#: of silently mixing heterogeneous results under one identity
+CONTRACT_FIELDS = ("stage", "sun_index", "budget_index",
+                   "photons_per_wavelength", "mode", "expected_seeds",
+                   "table_sha256", "protocol_sha256", "candidate_samples",
+                   "rest_photons")
+
+
+def contract_view(meta: dict) -> dict:
+    """The batch-identity subset of a batch meta."""
+    return {k: meta.get(k) for k in CONTRACT_FIELDS
+            if meta.get(k) is not None}
+
+
 class Batch:
     """One (stage, batch-id) group of records with resumable attempts.
 
@@ -274,9 +300,16 @@ class Batch:
     it are never recomputed.  If its last line is corrupt (a crash during
     write), the attempt is marked invalid and ``next_attempt`` starts a new
     file -- a batch then has exactly one *valid* complete attempt.
+
+    On reopen the stored computational contract is compared against the
+    incoming ``meta_base``; a mismatch raises instead of appending records
+    computed under a different budget/source/protocol into the old
+    identity.  ``allow_recontract`` reopens with the new contract recorded
+    explicitly (new attempt lineage), never by overwriting history.
     """
 
-    def __init__(self, root: Path, batch_id: str, expected_seeds, meta_base: dict):
+    def __init__(self, root: Path, batch_id: str, expected_seeds, meta_base: dict,
+                 *, allow_recontract=False):
         self.dir = root / batch_id
         self.dir.mkdir(parents=True, exist_ok=True)
         self.batch_id = batch_id
@@ -284,6 +317,25 @@ class Batch:
         self.meta_path = self.dir / "meta.json"
         if self.meta_path.exists():
             self.meta = json.loads(self.meta_path.read_text())
+            incoming = contract_view(dict(meta_base,
+                                          expected_seeds=self.expected_seeds))
+            stored = contract_view(self.meta)
+            if incoming != stored:
+                if not allow_recontract:
+                    raise ValueError(
+                        f"{root.name}/{batch_id}: stored contract differs from "
+                        f"this invocation; refusing to append. stored="
+                        f"{json.dumps(stored, sort_keys=True)} incoming="
+                        f"{json.dumps(incoming, sort_keys=True)}; use a new run "
+                        "root or an explicit re-contract decision")
+                changed = {k for k in set(incoming) | set(stored)
+                           if incoming.get(k) != stored.get(k)}
+                self.meta.setdefault("recontracts", []).append(dict(
+                    changed=sorted(changed), stored={k: stored.get(k) for k in changed},
+                    incoming={k: incoming.get(k) for k in changed},
+                    at=time.strftime("%Y-%m-%dT%H:%M:%S%z")))
+                for k, v in incoming.items():
+                    self.meta[k] = v
         else:
             self.meta = dict(meta_base, batch_id=batch_id, attempts=[],
                              expected_seeds=self.expected_seeds)
@@ -468,6 +520,11 @@ def run_formal_stage(protocol, atmo, table, stage, data_dir, state, *,
     billed = started  # seconds of this invocation already noted into state
     computed = 0
     stopped = None
+    # execution-time provenance for every record written by THIS invocation;
+    # never inherited from a stored batch meta (resume must not relabel new
+    # computation with old hashes)
+    provenance = dict(protocol_sha256=sha256_file(protocol_path),
+                      code_sha256=code_hashes(), table_sha256=table_sha)
 
     def remaining():
         # budget_left already excludes prior invocations' cumulative cost
@@ -519,9 +576,9 @@ def run_formal_stage(protocol, atmo, table, stage, data_dir, state, *,
                                     mode=mode)
                 record["batch_id"] = batch_id
                 record["attempt"] = batch.attempt
-                record["protocol_sha256"] = batch.meta["protocol_sha256"]
-                record["code_sha256"] = batch.meta["code_sha256"]
-                record["table_sha256"] = batch.meta["table_sha256"]
+                record["protocol_sha256"] = provenance["protocol_sha256"]
+                record["code_sha256"] = provenance["code_sha256"]
+                record["table_sha256"] = provenance["table_sha256"]
                 batch.record_seed(seed, record)
                 computed += 1
                 bill(computed)
@@ -606,12 +663,16 @@ def stage_cost_probe(protocol, atmo, table, out: Path) -> dict:
     return summary
 
 
-def candidate_table_load(protocol: dict, data_dir: Path, atmo):
-    """Load the candidate experiment's frozen 3-wavelength table."""
+def candidate_table_load(protocol: dict, input_root: Path, atmo):
+    """Load the candidate experiment's frozen 3-wavelength table.
+
+    ``input_root`` is the *protocol* directory (read-only frozen inputs),
+    never the run output root.
+    """
     from tools.twilight_second_order import estimate  # noqa: F401 (wiring)
 
     spec = protocol["candidate"]["table"]
-    path = data_dir / spec["path"]
+    path = input_root / spec["path"]
     digest = sha256_file(path)
     if digest != spec["sha256"]:
         raise ValueError(f"candidate table hash mismatch: {path} is {digest}, "
@@ -620,7 +681,7 @@ def candidate_table_load(protocol: dict, data_dir: Path, atmo):
 
 
 def stage_candidate(protocol, atmo, table, data_dir, state, *, protocol_path,
-                    max_stage_hours=None) -> int:
+                    input_root, max_stage_hours=None) -> int:
     """Candidate estimator experiment (plan Step 3).
 
     For every (depth, tier, seed): candidate L2 at the three anchor
@@ -636,7 +697,7 @@ def stage_candidate(protocol, atmo, table, data_dir, state, *, protocol_path,
                for a in cand["wavelengths_nm"]]
     wl3 = WL_COARSE[anchors]
     atmo3 = atmo._restrict(anchors)
-    table3 = candidate_table_load(protocol, data_dir, atmo3)
+    table3 = candidate_table_load(protocol, input_root, atmo3)
     singles3 = {}
     for sun_elev in protocol["scenario"]["sun_elevations_deg"]:
         started = time.perf_counter()
@@ -676,6 +737,7 @@ def stage_candidate(protocol, atmo, table, data_dir, state, *, protocol_path,
                                      "candidate", sun_index, tier_index,
                                      tier["rest_photons"], "disk")
             meta_base["candidate_samples"] = tier["candidate_samples"]
+            meta_base["rest_photons"] = tier["rest_photons"]
             batch = Batch(data_dir / "raw" / "candidate", batch_id, seeds,
                           meta_base)
             missing = [s for s in seeds if s not in batch.done]
@@ -686,31 +748,35 @@ def stage_candidate(protocol, atmo, table, data_dir, state, *, protocol_path,
                 if remaining() <= 0.0:
                     stopped = "budget-exhausted"
                     break
+                # ONE rest MC per (seed, tier) covering all three anchor
+                # wavelengths; every lambda's candidate estimate then
+                # reuses the same decomposition -- running the MC once per
+                # lambda tripled the cost and broke the per-repeat cost unit
+                source_mc = FiniteSolarSource(atmo3, table3)
+                t_mc = time.perf_counter()
+                with mc_solar_source(source_mc):
+                    mc_res = mc.mc_radiance_split(
+                        atmo3, 90.0 - sun_elev, [0.0], [0.0],
+                        n_photons=int(tier["rest_photons"]), seed=seed,
+                        max_scatter=50, diagnostics=True)
+                mc_seconds = time.perf_counter() - t_mc
                 per_lambda = {}
                 for pos, iw in enumerate(anchors):
                     source = FiniteSolarSource(atmo3, table3)
                     cand_res = estimate(atmo3, pos, source, sun_elev,
                                         int(tier["candidate_samples"]),
                                         seed=seed)
-                    # MC rest with per-path decomposition on the same seed
-                    source = FiniteSolarSource(atmo3, table3)
-                    t_mc = time.perf_counter()
-                    with mc_solar_source(source):
-                        mc_res = mc.mc_radiance_split(
-                            atmo3, 90.0 - sun_elev, [0.0], [0.0],
-                            n_photons=int(tier["rest_photons"]), seed=seed,
-                            max_scatter=50, diagnostics=True)
-                    mc_seconds = time.perf_counter() - t_mc
                     d = mc_res["diagnostics"][pos]["per_view"][0]
                     n_paths = int(tier["rest_photons"])
                     c2nt_mean = d["s1"][1] / n_paths
                     rest_mean = float(mc_res["multiple"][0, pos]) - c2nt_mean
                     # per-path second moment of rest = mult - c2nt; an
                     # all-zero rest batch has s2 = None ("no tail evidence")
-                    rest_second = None
-                    if d["s2"] is not None:
-                        s2 = np.array(d["s2"]) / n_paths
-                        rest_second = float(s2[0][0] + s2[1][1] - 2.0 * s2[0][1])
+                    # and a genuine zero second moment, not a missing value
+                    rest_second = 0.0 if d["s2"] is None else \
+                        float((np.array(d["s2"]) / n_paths)[0][0]
+                              + (np.array(d["s2"]) / n_paths)[1][1]
+                              - 2.0 * (np.array(d["s2"]) / n_paths)[0][1])
                     deterministic = float(singles3[sun_elev][pos])
                     per_lambda[str(wl3[pos])] = dict(
                         L2=cand_res["L2"], L2_second_moment=cand_res["second_moment"],
@@ -720,7 +786,6 @@ def stage_candidate(protocol, atmo, table, data_dir, state, *, protocol_path,
                         c2nt_mean=c2nt_mean, rest_mean=rest_mean,
                         rest_second_moment=rest_second,
                         mc_multiple=float(mc_res["multiple"][0, pos]),
-                        mc_seconds=mc_seconds,
                         deterministic_single=deterministic,
                         total_cand=deterministic + cand_res["L2"] + rest_mean,
                         total_analog=deterministic
@@ -733,9 +798,14 @@ def stage_candidate(protocol, atmo, table, data_dir, state, *, protocol_path,
                               candidate_samples=tier["candidate_samples"],
                               rest_photons=tier["rest_photons"],
                               per_lambda=per_lambda,
-                              seconds=sum(v["candidate_seconds"] + v["mc_seconds"]
-                                          for v in per_lambda.values()),
+                              # one rest MC per repeat is the shared MC cost
+                              # of all three anchors (never per-lambda)
+                              mc_seconds=mc_seconds,
+                              seconds=sum(v["candidate_seconds"]
+                                          for v in per_lambda.values())
+                              + mc_seconds,
                               table_sha256=cand["table"]["sha256"],
+                              protocol_sha256=sha256_file(protocol_path),
                               code_sha256=code_hashes(),
                               batch_id=batch_id, attempt=batch.attempt)
                 batch.record_seed(seed, record)
@@ -783,7 +853,7 @@ SENSITIVITY_SEED_BASE = 110000
 
 
 def stage_sensitivity(protocol, atmo, table, data_dir, state, *, protocol_path,
-                      max_stage_hours=None) -> int:
+                      input_root, max_stage_hours=None) -> int:
     """Discretisation/refinement sensitivity (plan Step 4).
 
     Three anchor wavelengths, 16 seeds per depth at 100k photons, on the
@@ -800,7 +870,7 @@ def stage_sensitivity(protocol, atmo, table, data_dir, state, *, protocol_path,
                for a in protocol["scenario"]["anchor_wavelengths_nm"]]
     wl3 = WL_COARSE[anchors]
     atmo3 = atmo._restrict(anchors)
-    table3 = candidate_table_load(protocol, data_dir, atmo3)
+    table3 = candidate_table_load(protocol, input_root, atmo3)
     singles3 = {}
     for sun_elev in protocol["scenario"]["sun_elevations_deg"]:
         singles3[sun_elev] = single_zenith(atmo3, FiniteSolarSource(atmo3, table3),
@@ -969,35 +1039,62 @@ def main(argv=None) -> int:
     atmo = build_scenario(protocol)
     table = load_source_table(protocol, atmo)
 
+    # the protocol directory is the READ-ONLY input root (frozen tables,
+    # frozen protocol); --out is the writable run root and defaults to the
+    # input root for the default archive layout.  A fresh run root is
+    # created and receives a validated protocol snapshot so the summarizer
+    # can work offline against the run alone.
+    input_root = args.protocol.resolve().parent
+    run_root = args.out.resolve() if args.out is not None else input_root
     if args.stage in SCRATCH_STAGES:
         if args.out is None:
             parser.error(f"--stage {args.stage} requires --out (scratch only)")
         if args.stage == "smoke":
             summary = stage_smoke(protocol, atmo, table, args.out)
-        else:
-            summary = stage_cost_probe(protocol, atmo, table, args.out)
+            print(json.dumps(dict(stage=args.stage, status=summary["status"],
+                                  seconds=summary["seconds"])))
+            return 0
+        summary = stage_cost_probe(protocol, atmo, table, args.out)
         print(json.dumps(dict(stage=args.stage, status=summary["status"],
-                              seconds=summary["seconds"])))
+                              seconds=sum(r["seconds"] for r in summary["rows"]),
+                              seconds_per_wavelength_path=(
+                                  summary["seconds_per_wavelength_path"]))))
         return 0
 
+    run_root.mkdir(parents=True, exist_ok=True)
+    if run_root != input_root:
+        snapshot = run_root / "protocol.snapshot.json"
+        current = json.loads(args.protocol.read_text())
+        if snapshot.exists():
+            frozen = json.loads(snapshot.read_text())
+            relevant = {k: current[k] for k in
+                        ("scenario", "source", "direct", "precision",
+                         "luminance") if k in current}
+            frozen_relevant = {k: frozen[k] for k in
+                               ("scenario", "source", "direct", "precision",
+                                "luminance") if k in frozen}
+            if relevant != frozen_relevant:
+                raise SystemExit(
+                    "run-root protocol snapshot differs from the input "
+                    "protocol in contract-relevant sections; use a fresh "
+                    "run root or consciously delete the snapshot")
+        else:
+            snapshot.write_text(json.dumps(current, indent=1) + "\n")
+    state = load_state(run_root)
     if args.stage == "candidate":
-        data_dir = args.out if args.out is not None else args.protocol.parent
-        state = load_state(data_dir)
-        stage_candidate(protocol, atmo, table, data_dir, state,
+        stage_candidate(protocol, atmo, table, run_root, state,
                         protocol_path=args.protocol.resolve(),
+                        input_root=input_root,
                         max_stage_hours=args.max_stage_hours)
         return 0
     if args.stage == "sensitivity":
-        data_dir = args.out if args.out is not None else args.protocol.parent
-        state = load_state(data_dir)
-        stage_sensitivity(protocol, atmo, table, data_dir, state,
+        stage_sensitivity(protocol, atmo, table, run_root, state,
                           protocol_path=args.protocol.resolve(),
+                          input_root=input_root,
                           max_stage_hours=args.max_stage_hours)
         return 0
 
-    data_dir = args.out if args.out is not None else args.protocol.parent
-    state = load_state(data_dir)
-    run_formal_stage(protocol, atmo, table, args.stage, data_dir, state,
+    run_formal_stage(protocol, atmo, table, args.stage, run_root, state,
                      protocol_path=args.protocol.resolve(),
                      table_sha=protocol["source"]["full81_table"]["sha256"],
                      max_stage_hours=args.max_stage_hours,

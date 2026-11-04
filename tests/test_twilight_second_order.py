@@ -245,8 +245,15 @@ def test_zenith_view_tau_matches_fine_trapezoid():
     np.testing.assert_allclose(tau, tau_ref, rtol=2e-4)
 
 
-def test_real_adapter_matches_mc_second_component():
-    """-6 deg, 550 nm: candidate vs the MC's own analog c2nt component."""
+@pytest.mark.parametrize("mc_seed,cand_seed", [(202, 303), (204, 305), (206, 307)])
+def test_real_adapter_matches_mc_second_component(mc_seed, cand_seed):
+    """-6 deg, 550 nm: candidate vs the MC's own analog c2nt component.
+
+    The plan requires a MULTI-seed closure; each pair keeps its own result
+    and must agree within its own combined Monte Carlo error.  This is a
+    single-scenario, three-independent-repeat check -- not a tail-coverage
+    certificate.
+    """
     from skycolor import presets
     from skycolor.rt import mc
     from tools.point_solar_table import PointSolarTable
@@ -258,11 +265,10 @@ def test_real_adapter_matches_mc_second_component():
     table = PointSolarTable.load(
         ROOT / "validation/data/deep_twilight_reference/probe/point-source.npz",
         atmo, expected_label="deep-twilight-plan-probe-450-550-650-clear-v1")
-    seed = 202
     source = FiniteSolarSource(atmo, table)
     with mc_solar_source(source):
         result = mc.mc_radiance_split(atmo, 96.0, [0.0], [0.0],
-                                      n_photons=300_000, seed=seed,
+                                      n_photons=300_000, seed=mc_seed,
                                       diagnostics=True)
     n_paths = 300_000
     d = result["diagnostics"][1]["per_view"][0]
@@ -273,7 +279,7 @@ def test_real_adapter_matches_mc_second_component():
     se_mc = np.sqrt(max(c2nt_second - c2nt_mean ** 2, 0.0) / n_paths)
 
     candidate = estimate(atmo, 1, FiniteSolarSource(atmo, table), -6.0,
-                         120_000, seed=303)
+                         120_000, seed=cand_seed)
     se_cand = np.sqrt(max(candidate["second_moment"] - candidate["L2"] ** 2, 0.0)
                       / candidate["n_samples"])
     tol = 5.0 * np.hypot(se_mc, se_cand) + 1e-30
