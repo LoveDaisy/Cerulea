@@ -1676,14 +1676,17 @@ class SolarSource:
         if not active.size:
             return
         gpos = pos[active]
-        dr = np.einsum("ij,ij->i", backward_chunk, radial)[:, None]
+        bw = backward_chunk[active]
+        rad_a = radial[active]
+        dr = np.einsum("ij,ij->i", bw, rad_a)[:, None]
         # horizontal projection of each point-beam direction: subtract the
         # radial component of the backward ray, then project onto the
-        # per-point directions (mu = sin e_b from the construction)
+        # per-point directions (mu = sin e_b from the construction); every
+        # row follows ``active`` so the skipped fully-shadowed points keep
+        # the chunk's arrays aligned
         horizontal_dot = np.einsum(
             "ij,ibj->ib",
-            backward_chunk - radial * np.einsum("ij,ij->i", backward_chunk,
-                                                radial)[:, None],
+            bw - rad_a * dr,
             directions[active]) \
             / np.sqrt(np.maximum(1.0 - sin_e[active] ** 2, 1e-30))
         phase_mu = np.cos(app_rad[active]) * horizontal_dot \
