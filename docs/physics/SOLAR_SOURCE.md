@@ -151,13 +151,15 @@ the git head and per-check numbers. Source-level evidence:
   sensitivity larger than the smooth-field budget; the DOP853 ray-tube
   arbitration of plan 6.2 is the referee for those points and is part of
   the follow-up acceptance matrix.
-* Availability gate (plan 6.5) measured on the reference machine: source
-  cold build ~9.7 s (budget 10 s), warm single 3wl single-direction
-  0.008 s (budget 1 s), MC 3wl x 20k 3.0x the legacy run (budget 4x),
-  peak RSS +0.11 GiB (budget +0.5 GiB); the standard clear dome runs at
-  ~6x the legacy wall time (budget 3x) because the per-beam contract costs
-  `n_beams` table queries per scattering point -- see the escalation
-  candidates in the task record.
+* Availability gate (plan 6.5), reference-machine measurement after the
+  round-4 fixes: source cold build 9.6 s (budget 10 s), warm single 81wl
+  single-direction 0.014 s (budget 1 s), MC 3wl x 20k 3.3x the legacy run
+  (budget 4x), SOS 0.026x, peak RSS +0.3 GiB (budget +0.5 GiB).  The one
+  standing breach is the standard clear dome at ~6.1x the legacy wall time
+  (budget 3x): the per-beam contract costs `n_beams` table queries per
+  scattering point, and the contact-band adaptive scatter disk (a
+  round-4 accuracy fix) raises the in-band beam count -- see the
+  escalation candidates in the task record.
 
 Historical evidence for the unified source's physics (independent direction,
 columns, etendue and first-order closure experiments) lives in
