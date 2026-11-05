@@ -382,9 +382,14 @@ session handoffs are not a substitute for this record.
 
 ## Open questions that matter now
 
-1. **Production source consistency.** Backends still mix solar attenuation,
-   direction and shadow prescriptions. M14/M15 establish a checked experimental
-   contract; integrating it across production scenes remains work to scope.
+1. **Production source consistency.** Done: one unified finite-disk solar
+   source (apparent direction, continuous refracted columns, occultation,
+   16' disk, gain) now feeds single scattering, SOS, twilight MC, clouds
+   and direct illumination (`skycolor/solar_source.py`; contract and the
+   2026-11-06 adjudicated deviations in [physics/SOLAR_SOURCE.md](physics/SOLAR_SOURCE.md)).
+   Remaining candidates, each awaiting a separate go/no-go: a DOP853
+   ray-tube referee for near-caustic knot rows, and a per-height vectorized
+   dome query kernel (the standing dome cost breach).
    [Source audit](twilight/SOLAR_SOURCE_AUDIT.md), [unified source](twilight/UNIFIED_SOLAR_SOURCE_AUDIT.md).
 2. **Absolute twilight brightness and altitude response.** Domain truncation,
    raised-ground occlusion and AOD550 slicing are fixed. The remaining station

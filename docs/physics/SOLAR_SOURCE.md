@@ -140,27 +140,56 @@ the git head and per-check numbers. Source-level evidence:
   a no-550 nm grid changes only the value-free column-conditioning scale
   (columns agree to ~1e-4, within the tau certificates).
 
-## Known deviations and open items
+## Known deviations and accepted limits (owner adjudication, 2026-11-06)
 
-* The plan's 2e-4 deg direction budget is met at the RK anchors to 2.7e-4
-  and by the table holdout to 1.4e-3 at one point class (mid-height,
-  mid-elevation); the physical impact is negligible and the full acceptance
-  matrix re-measures it.
-* Rays whose turning point lands within ~100 m of a profile-formula
-  discontinuity (e.g. the 11 km US76 lapse break) have a local slope
-  sensitivity larger than the smooth-field budget; the DOP853 ray-tube
-  arbitration of plan 6.2 is the referee for those points and is part of
-  the follow-up acceptance matrix.
-* Availability gate (plan 6.5), reference-machine measurement after the
-  round-6 rewrite (per-chunk exact disk construction, no cross-call disk
-  cache): source cold build 9.98 s (budget 10 s, borderline), warm single
-  81wl single-direction 0.015 s (budget 1 s), MC 3wl x 20k 3.2x the legacy
-  run (budget 4x), SOS 0.03x, cold peak RSS 0.30 GiB (budget +0.5 GiB).
-  The standing breach is the standard clear dome at 6.3x the legacy wall
-  time (budget 3x): the per-beam contract costs `n_beams` table queries
-  per scattering point, and the contact-band adaptive scatter disk
-  (rounds 4-6 accuracy fixes) raises the in-band beam count -- see the
-  escalation candidates in the task record.
+The unified finite-disk source is the production default for every backend.
+The deviations below are recorded conditions of that admission: each carries
+its measured value, the plan budget it misses, and the adjudicated
+disposition. They are settled for this task's review loop; funding any of
+them further is a separate user decision.
+
+1. **Direction anchor 2.673e-4 deg vs the 2e-4 deg plan budget.** The
+   Cartesian-RK anchors measure a max direction error of 2.673e-4 deg
+   (about 0.96 arcsec, ~0.05% of the solar disk diameter). This is the
+   representation limit of the monotone-PCHIP knot grid, not a table
+   density choice: rows whose turning point sits near the 150-200 km
+   near-caustic fold are not representable by any monotone interpolant
+   (stable across review rounds R4-R7; a 0.3 km refinement experiment
+   reproduced the fold and was reverted). Accepted as a representation
+   limit with this support-domain caveat. The table holdout adds 1.4e-3 deg
+   at one mid-height/mid-elevation point class, with negligible radiative
+   effect.
+2. **Deep-twilight first-order closure is budget-limited-unresolved.** At
+   the plan's budget cap (both grounds, sun -9/-12 deg, 8 seeds x 500k
+   photons per seed) the MC-vs-SS first-order closure passes the
+   |mean-SS| bound where the signal is detectable, but the signability
+   gate SE/|SS| <= 5% fails at -9 deg (both grounds) and -12 deg
+   g = 2.4 km, which also misses |mean-SS| <= 4SE + 1%. Recorded as the
+   terminal "not signable at the funded budget" state: two independent
+   chains (this suite and the archived deep-twilight-reference task,
+   ROADMAP M19) measure the same statistical shape, which is the answer
+   rather than a pending item. `closure.json` reports these honestly as
+   failures; raising the budget or deleting the deep points is out of
+   scope.
+3. **Availability gate: dome query cost.** Reference-machine measurement
+   after the round-6 rewrite and the gen2-R1 fixes: source cold build
+   9.3-10.0 s (budget 10 s), warm single 81wl single-direction 0.015 s
+   (budget 1 s), MC 3wl x 20k 3.1-3.5x legacy (budget 4x), SOS 0.03x,
+   cold peak RSS 0.34 GiB (budget +0.5 GiB). The standing breach is the
+   standard clear dome: 5.9-6.3x the legacy wall time (budget 3x), i.e.
+   6.6-7.0 s for the 46x91 3-wavelength warm dome vs the legacy 1.12 s.
+   The cost is structural to the per-beam contract (`n_beams` table
+   queries per scattering point) together with the contact-band adaptive
+   disk from the rounds 4-6 accuracy fixes. Accepted as a recorded
+   deviation; for interactive use lower
+   `skycolor.render.sky_dome(n_zenith, n_azimuth)` (default 46/91) -- the
+   dome grid, not the image size, dominates this cost.
+4. **Ray-tube referee not built.** Rays whose turning point lands within
+   ~100 m of a profile-formula discontinuity (e.g. the 11 km US76 lapse
+   break) have a local slope sensitivity above the smooth-field budget.
+   The DOP853 ray-tube arbitration of plan 6.2 remains unbuilt. Together
+   with the per-height vectorized dome query kernel (item 3) it is
+   recorded as a backlog candidate awaiting a separate user decision.
 
 Historical evidence for the unified source's physics (independent direction,
 columns, etendue and first-order closure experiments) lives in

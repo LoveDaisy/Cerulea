@@ -13,12 +13,15 @@ uv run python -m tools.benchmark_solar_source --out /tmp/perf-final.json
 
 * `source.json` — source-level thresholds (RK direction anchors, holdout
   direction/TG, column identities, disk quadrature). Current known failures:
-  the RK direction anchors (2.67e-4 deg vs the 2e-4 deg plan budget) — an
-  owner-level tabulation-design adjudication (near-caustic rows), recorded
-  in the task dispute record.
+  the RK direction anchors (2.673e-4 deg vs the 2e-4 deg plan budget),
+  adjudicated 2026-11-06 as the monotone-PCHIP representation limit
+  (near-caustic fold rows); see `docs/physics/SOLAR_SOURCE.md`.
 * `closure.json` — deterministic-vs-MC first-order closure and signability.
-  Current known failures: deep-twilight (-9/-12 deg) `SE/|SS|` signability at
-  the plan's budget cap — budget-limited, owner adjudication.
+  Current known failures: the five deep-twilight items (-9/-12 deg, both
+  grounds, at the plan's 8x500k budget cap), adjudicated 2026-11-06 as the
+  terminal budget-limited-unresolved state (corroborated by the archived
+  deep-twilight-reference task, ROADMAP M19); see `docs/physics/SOLAR_SOURCE.md`.
 * `perf-final.json` — availability gate (plan §6.5). Current known breach:
-  clear dome ~6.3x legacy (budget 3x), structural to the per-beam contract;
-  owner adjudication.
+  clear dome 5.9-6.3x legacy (budget 3x), structural to the per-beam
+  contract, accepted as a recorded deviation with a documented resolution
+  knob; all other rows pass; see `docs/physics/SOLAR_SOURCE.md`.
