@@ -1098,34 +1098,43 @@ class SolarGeometry:
         self.top_km = float(medium.z_bounds[-1])
         self.n_species = self.columns_tool.n_species
         self._table: PointSourceTable | None = None
-        self._critical_curve: tuple[np.ndarray, np.ndarray] | None = None
+        self._critical_curve = None
         if build_table:
             self.ensure_table()
 
     def critical_curve(self) -> tuple[np.ndarray, np.ndarray]:
         """Interpolated critical-elevation curve, shared per construction.
 
-        Batch classification (``SolarSource._point_disk_keys``) runs per
-        scattering point; exact field roots there cost a full bending
-        integral each and dominated the MC hot path.  The critical elevation
-        is smooth in height, so exact evaluation on a fixed lattice (denser
-        near the ground where the curve bends) with linear interpolation is
-        accurate to ~1e-3 deg -- far inside the one disk-radius
-        classification band.  Built once per construction on the token-cached
-        geometry (a per-source rebuild would tax every fresh MC call);
-        per-disk construction still uses the exact root.
+        Batch classification and the adaptive-disk construction both consume
+        this curve per scattering point, so it must be accurate where the
+        boundary lives: near the ground the critical elevation falls off
+        like ``-sqrt(2h/R)``, which is LINEAR in ``u = sqrt(h - ground)`` --
+        the lattice is uniform in ``u`` below 3 km (linear interpolation is
+        exact there to round-off) and progressively coarser above, with a
+        PCHIP through the exact field roots on the ``u`` axis.  A linear
+        height lattice here interpolated the 10 m critical elevation with a
+        0.06 deg error (review round 5, Major cache geometry).
         """
         if self._critical_curve is None:
             ground = float(self.ground_km)
             top = float(self.top_km)
-            span = top - ground
-            lattice = np.unique(np.concatenate([
-                ground + np.linspace(0.0, 3.0, 61),
-                ground + np.linspace(3.0, 30.0, 41),
-                ground + np.linspace(30.0, span, 25)]))
+            u_top = np.sqrt(max(top - ground, 1e-9))
+            u = np.unique(np.concatenate([
+                np.linspace(0.0, np.sqrt(min(3.0, top - ground)), 121),
+                np.linspace(np.sqrt(min(3.0, top - ground)),
+                            np.sqrt(min(30.0, top - ground)), 41),
+                np.linspace(np.sqrt(min(30.0, top - ground)), u_top, 45)]))
+            heights = ground + u * u
             crits = np.array([self._exact_critical_true(float(h))
-                              for h in lattice])
-            self._critical_curve = (lattice, crits)
+                              for h in heights])
+            interp = PchipInterpolator(u, crits)
+
+            def curve(h_arr):
+                uu = np.sqrt(np.clip(np.asarray(h_arr, dtype=float) - ground,
+                                     0.0, None))
+                return interp(uu)
+
+            self._critical_curve = curve
         return self._critical_curve
 
     def _exact_critical_true(self, height_km: float) -> float:
@@ -1145,13 +1154,6 @@ class SolarGeometry:
         live = [ref for ref in self.medium_refs if ref() is not None]
         self.medium_refs = live
         return live[0]() if live else None
-
-    @property
-    def table(self) -> PointSourceTable:
-        if self._table is None:
-            raise RuntimeError(
-                "solar source table not built yet; call ensure_table() first")
-        return self._table
 
     def ensure_table(self, **kw) -> PointSourceTable:
         if self._table is None:
@@ -1195,37 +1197,6 @@ def get_solar_geometry(medium, *, refracted: bool = True) -> SolarGeometry:
 # ---------------------------------------------------------------------------
 # 5. the scenario-bound source with consumer kernels
 # ---------------------------------------------------------------------------
-class _CoarseDisk:
-    """Production 2x8 disk in the earth frame.
-
-    Per-beam lit flags from the vertex query do the occultation -- exact
-    whenever the shadow boundary does not cut the cap (no in-band point in
-    the batch)."""
-
-    def __init__(self, directions, weights):
-        self.directions = directions
-        self.weights = weights
-        self.n_beam = int(directions.shape[0])
-
-
-class _LocalDisk:
-    """Occultation-adaptive disk in the point's LOCAL frame.
-
-    ``beams`` are unit directions with the local up as +z and the sun in
-    the local x-z plane; ``sin_elev`` is their local-up component.  The
-    per-beam apparent-angle argument is then constant per beam, and the
-    per-point kernels rotate only the backward / normal vectors into the
-    local frame (see :meth:`SolarSource._adaptive_disk` for the two lit
-    topologies and the weight conventions)."""
-
-    def __init__(self, beams, weights, sin_elev, delta_deg):
-        self.beams = beams
-        self.weights = weights
-        self.sin_elev = sin_elev
-        self.delta_deg = float(delta_deg)
-        self.n_beam = int(beams.shape[0])
-
-
 class SolarSource:
     """The finite-disk solar source bound to one atmosphere and sun direction.
 
@@ -1298,56 +1269,27 @@ class SolarSource:
             self._disk_cache[key] = cached
         return cached
 
-    def _point_disk_keys(self, x, kind: str):
-        """Per-point disk key from the point's OWN local geometry.
+    def _classify_points(self, x):
+        """Exact per-point band data — no rounding anywhere.
 
-        Batch-invariance contract: the beam set a point gets depends only on
-        its position and the sun -- never on which other points share the
-        call.  The governing local quantities are ``delta = local sun
-        elevation - critical elevation`` (both at the point: the elevation
-        is measured against the point's own radial, not the observer's axis
-        -- the round-5 reference-frame finding) and the critical elevation
-        itself; grouping shares identical local geometry and nothing else.
+        Returns ``(in_band, radial, e_loc_deg, crit_deg, height_km)``; the
+        round-5 review showed cached rounded geometry shifting the sun and
+        re-cutting visible beams, so the construction consumes these exact
+        values and nothing else.
         """
         radius = np.linalg.norm(x, axis=1)
+        radial = x / np.maximum(radius[:, None], 1e-300)
         heights = np.clip((radius - R_EARTH) / 1e3,
                           self._medium.z_bounds[0], self._medium.z_bounds[-1])
-        radial = x / np.maximum(radius[:, None], 1e-300)
-        curve_h, curve_c = self.geometry.critical_curve()
-        crits = np.interp(heights, curve_h, curve_c)
         e_loc = np.degrees(np.arcsin(np.clip(radial @ self.sun_hat, -1.0, 1.0)))
-        delta = e_loc - crits
-        # inside one disk radius of the grazing elevation the shadow
-        # boundary crosses the cap (partial occultation possible); outside
-        # it every beam shares one lit state, which the coarse disk's
-        # per-beam lit drop already represents exactly
-        in_band = np.abs(delta) < self.radius_deg
-        keys = [("coarse",)] * len(heights)
-        for i in np.flatnonzero(in_band):
-            keys[i] = (kind, round(float(delta[i]), 3), round(float(crits[i]), 1))
-        return keys
+        crit = self.geometry.critical_curve()(heights)
+        in_band = np.abs(e_loc - crit) < self.radius_deg
+        return in_band, radial, e_loc, crit, heights
 
-    def _disk_for_key(self, key):
-        if key[0] == "coarse":
-            return _CoarseDisk(*self.disk())
-        n_r, n_az = (16, 384) if key[0] == "flux" else (8, 64)
-        return self._adaptive_disk(key[1], key[2], n_r, n_az, key[0])
-
-    def _group_by_disk(self, keys):
-        """Group point indices by identical local geometry.  Coarse groups
-        share one earth-frame disk; local groups share one local-frame disk
-        that the kernels rotate per point (row-wise arithmetic throughout,
-        so grouping never changes a value)."""
-        groups: dict = {}
-        for i, key in enumerate(keys):
-            groups.setdefault(key, []).append(i)
-        return [(np.asarray(v, dtype=int), self._disk_for_key(k))
-                for k, v in groups.items()]
-
-    def _chunk_for_disk(self, disk) -> int:
-        """Point chunk bounded so points*beams temporaries stay bounded."""
-        n_beam = disk.n_beam
-        return max(64, min(self.chunk, 2_000_000 // max(n_beam, 1)))
+    def _chunk_for_nbeam(self, n_beam, n_wl, full_spectrum):
+        budget = 2_500_000 if full_spectrum else self.chunk
+        per_point = n_beam * (n_wl if full_spectrum else 1)
+        return max(64, min(self.chunk, budget // max(per_point, 1)))
 
     def _critical_true(self, height_km: float) -> float:
         """True elevation of the ground-grazing ray at ``height_km``."""
@@ -1395,145 +1337,125 @@ class SolarSource:
                 z_high = z_mid
         return 0.5 * (z_low + z_high)
 
-    def _adaptive_disk(self, delta_deg: float, crit_deg: float,
-                       n_r: int, n_az: int, tag: str):
-        """Occultation-adaptive disk for one local band offset, LOCAL frame.
+    def _local_grid(self, radial, u1, u2, e_loc_deg, crit_deg, n_r, n_az):
+        """Exact per-point adaptive disk, closed form, computed per chunk.
 
-        The source's occultation criterion is a clean threshold in the
-        beam's true elevation at the point (``e_b > crit``, independent of
-        azimuth).  In ``(rho, phi)`` cap coordinates the elevation profile
-        along one azimuth, ``asin(sin e_loc cos rho + cos e_loc sin rho
-        cos phi)``, is monotone, so each azimuth has exactly one crossing
-        ``rho*`` of the critical elevation (bisection) and exactly one lit
-        radial interval.  Two topologies by band offset
-        ``delta = e_loc - crit``:
+        ``e_loc``/``crit`` are the point's own local sun elevation and
+        critical elevation (degrees, exact -- no cache-key rounding: the
+        round-5 review showed rounded values moving the sun and re-cutting
+        visible beams).  In ``(rho, phi)`` cap coordinates the elevation
+        profile along an azimuth is monotone, so each (point, azimuth) has
+        exactly one crossing ``rho*`` of the critical elevation (vectorized
+        bisection); the radial Gauss-Legendre rule covers that azimuth's
+        lit interval exactly where the discontinuity sits.  Two topologies:
+        centre shadowed (``delta < 0``) concentrates azimuths on the lit arc
+        and lights ``[rho*, alpha]``; centre visible (``delta > 0``) spans
+        the full circle and lights ``[0, rho*]``.  Weights keep the plain
+        disk's centre-normal convention with each azimuth's true measure.
 
-        * ``delta <= 0`` (disk centre shadowed): azimuths concentrate on the
-          lit arc ``|phi| < phi_half``; each lit azimuth is lit on the outer
-          ``[rho*, alpha]``;
-        * ``delta > 0`` (disk centre lit): the full azimuth circle, each
-          azimuth lit on the inner ``[0, rho*]`` (or the whole cap where the
-          elevation never drops below critical).
-
-        Radial Gauss-Legendre nodes cover each lit interval exactly where
-        the discontinuity sits; weights keep the plain disk's centre-normal
-        convention (the azimuthal measure of concentrated arcs is scaled
-        accordingly), so a fully lit cap reproduces ``sum(w*cos(rho)) = 1``
-        and partial occultation removes exactly the occulted flux.
-
-        Returns a :class:`_LocalDisk`; beams are directions with the local
-        up as +z and the sun in the local x-z plane.  Callers rotate their
-        per-point vectors into this frame -- the kernels then run verbatim
-        with ``mu = sin(e_b)`` constant per beam.  The construction depends
-        on ``crit`` at fixed ``delta`` only weakly (second order), so the
-        cache key may round it coarsely.
+        Returns ``(directions (n, nb, 3) earth-frame, weights (n, nb),
+        sin_elev (n, nb))``.
         """
-        key = (tag, n_r, n_az, round(float(delta_deg), 3), round(float(crit_deg), 1))
-        cached = self._disk_cache.get(key)
-        if cached is not None:
-            return cached
         alpha = np.radians(self.radius_deg)
-        e_loc = np.radians(crit_deg + delta_deg)
-        s_loc, c_loc = np.sin(e_loc), np.cos(e_loc)
-        crit = np.radians(crit_deg)
-        delta_rad = np.radians(delta_deg)
-        # elevation slope per azimuth: d(e)/d(rho) sign follows cos(phi)
-        # (phi measured from the up-tilt direction); the lit arc for a
-        # shadowed centre is where the rim elevation still exceeds crit
-        cos_phi_half = (crit - s_loc * np.cos(alpha)) / (c_loc * np.sin(alpha)) \
-            if c_loc * np.sin(alpha) > 1e-300 else (-1.0 if delta_deg <= 0 else 1.0)
-        centre_lit = delta_deg > 0.0
-        if not centre_lit and cos_phi_half >= 1.0:
-            # no azimuth can be lit: the per-beam lit test drops everything
-            cached = _CoarseDisk(*self.disk())
-            self._disk_cache[key] = cached
-            return cached
+        e_r = np.radians(e_loc_deg)
+        c_r = np.radians(crit_deg)
+        s_loc, c_loc = np.sin(e_r), np.cos(e_r)
+        centre_lit = (e_loc_deg - crit_deg) > 0.0
+        # azimuths: centre visible -> full circle; centre shadowed -> the
+        # lit arc |phi| < phi_half where the rim elevation still exceeds crit
         if centre_lit:
-            phi = 2 * np.pi * (np.arange(n_az) + 0.5) / n_az
-            az_measure_ratio = 1.0 / n_az
+            phi_half = np.full(e_loc_deg.shape, np.pi)
+            az_measure_ratio = np.full(e_loc_deg.shape, 1.0 / n_az)
         else:
-            phi_half = float(np.arccos(np.clip(cos_phi_half, -1.0, 1.0)))
-            phi = -phi_half + 2 * phi_half * (np.arange(n_az) + 0.5) / n_az
+            den = c_loc * np.sin(alpha)
+            cos_ph_half = np.where(den > 1e-300,
+                                   (c_r - s_loc * np.cos(alpha))
+                                   / np.where(den > 1e-300, den, 1.0), 1.0)
+            phi_half = np.arccos(np.clip(cos_ph_half, -1.0, 1.0))
             az_measure_ratio = phi_half / (np.pi * n_az)
-        # local-frame directions at elevation e: (cos e cos phi, cos e sin phi,
-        # sin e); t1 is the direction of increasing elevation at phi = 0
-        s_hat = np.array([c_loc, 0.0, s_loc])
-        t1 = np.array([-s_loc, 0.0, c_loc])
-        t2 = np.array([0.0, 1.0, 0.0])
-        t = np.cos(phi)[:, None] * t1 + np.sin(phi)[:, None] * t2   # (n_az,3)
-
-        def elevations(rho):
-            d = np.cos(rho)[:, None] * s_hat[None, :] \
-                + np.sin(rho)[:, None] * t
-            return np.arcsin(np.clip(d[:, 2], -1.0, 1.0))
-
-        # per-azimuth crossing rho* of the critical elevation (bisection;
-        # the profile is monotone along each azimuth)
-        rho_lo = np.zeros(n_az)
-        rho_hi = np.full(n_az, alpha)
+        # phi grid per point, centred on the local sun-tilt direction
+        j = (np.arange(n_az) + 0.5)[None, :]
+        phi = -phi_half[:, None] + (2.0 * phi_half[:, None] / n_az) * j
+        # per-point local frame: t(phi) = cos(phi) t1 + sin(phi) t2 with
+        # t1 = [-sin e_loc, 0, cos e_loc] (increasing elevation), t2 = +y
+        t = np.stack([-s_loc[:, None] * np.cos(phi),
+                      np.broadcast_to(np.sin(phi), phi.shape),
+                      c_loc[:, None] * np.cos(phi)], axis=2)     # (n, n_az, 3)
+        # profile elevation along each azimuth: asin(s_loc cos rho + c_loc
+        # sin rho cos phi) -- monotone in rho; bisection for the crossing
+        rho_lo = np.zeros((e_r.shape[0], n_az))
+        rho_hi = np.full((e_r.shape[0], n_az), alpha)
         for _ in range(60):
             mid = 0.5 * (rho_lo + rho_hi)
-            g = elevations(mid) - crit
-            increasing = t[:, 2] > 0.0
+            # dz stays (n, n_az): a trailing axis here would promote the
+            # bisection state one rank per iteration and hang the loop
+            dz = np.cos(mid) * s_loc[:, None] + np.sin(mid) * t[:, :, 2]
+            g = np.arcsin(np.clip(dz, -1.0, 1.0)) - c_r
+            increasing = t[:, :, 2] > 0.0
             move_lo = np.where(increasing, g < 0.0, g > 0.0)
             rho_lo = np.where(move_lo, mid, rho_lo)
             rho_hi = np.where(move_lo, rho_hi, mid)
         rho_star = 0.5 * (rho_lo + rho_hi)
-        g0 = delta_rad                                   # e(0) - crit
-        ga = elevations(np.full(n_az, alpha)) - crit
+        g0 = np.radians(e_loc_deg)[:, None] - c_r
+        ga = np.arcsin(np.clip(
+            np.cos(alpha) * s_loc + np.sin(alpha) * t[:, :, 2], -1.0, 1.0)) - c_r
         if centre_lit:
-            lit_lo = np.zeros(n_az)      # centre lit: inner segment [0, rho*]
+            lit_lo = np.zeros_like(ga)                    # centre lit: inner
             lit_hi = np.where(ga >= 0.0, alpha, rho_star)
         else:
-            lit_lo = rho_star                             # outer lit
-            lit_hi = np.full(n_az, alpha)
-        keep = lit_hi > lit_lo
-        # radial Gauss-Legendre nodes on each lit interval, in cos(rho)
-        # where the cap area measure is linear; the dc-span factor carries
-        # each azimuth's lit fraction of the cap
+            lit_lo = rho_star                             # centre shadowed: outer
+            lit_hi = np.full_like(ga, alpha)
+        # never-lit azimuths (empty interval) keep their slot with zero
+        # dc-span, so every point of the chunk shares the rectangular
+        # (n_az, n_r) beam layout
+        lit_lo = np.clip(lit_lo, 0.0, alpha)
+        lit_hi = np.clip(lit_hi, 0.0, alpha)
+        # radial Gauss-Legendre nodes per azimuth's lit interval, in
+        # cos(rho) where the cap area measure is linear; the dc-span factor
+        # carries each azimuth's lit fraction of the cap
         x_g, w_g = np.polynomial.legendre.leggauss(max(2, int(n_r)))
-        cos_lo = np.cos(lit_lo[keep])                     # > cos_hi
-        cos_hi = np.cos(lit_hi[keep])
-        c_r = cos_hi[:, None] + (cos_lo - cos_hi)[:, None] * (0.5 * (x_g + 1.0))
-        dc = cos_lo - cos_hi
+        cos_lo = np.cos(lit_lo)                           # >= cos_hi
+        cos_hi = np.cos(lit_hi)
+        c_grid = cos_hi[:, :, None] + (cos_lo - cos_hi)[:, :, None] \
+            * (0.5 * (x_g + 1.0))[None, None, :]           # (n, n_az, n_r)
+        dc = np.maximum(cos_lo - cos_hi, 0.0)
         dc_total = 1.0 - np.cos(alpha)
-        w = (dc[:, None] / dc_total) * w_g[None, :] \
-            * (az_measure_ratio / (1.0 + np.cos(alpha)))
-        rho = np.arccos(np.clip(c_r, -1.0, 1.0))
-        # beams in the local frame: d = cos(rho) s_hat + sin(rho) t(phi)
-        beams = (np.cos(rho)[..., None] * s_hat
-                 + np.sin(rho)[..., None] * t[keep][:, None, :]).reshape(-1, 3)
-        sin_elev = beams[:, 2].copy()
-        weights = w.reshape(-1)
-        cached = _LocalDisk(beams, weights, sin_elev, float(delta_deg))
-        self._disk_cache[key] = cached
-        return cached
+        w = (dc[:, :, None] / dc_total) * w_g[None, None, :] \
+            * (az_measure_ratio[:, None, None] / (1.0 + np.cos(alpha)))
+        rho = np.arccos(np.clip(c_grid, -1.0, 1.0))
+        # earth-frame directions: d = cos(rho) sun_hat + sin(rho) t(phi);
+        # the arc azimuths are measured from the local sun-tilt direction
+        directions = (np.cos(rho)[:, :, :, None] * self.sun_hat[None, None, None, :]
+                      + np.sin(rho)[:, :, :, None] * t[:, :, None, :]).reshape(
+                          e_loc_deg.shape[0], n_az * n_r, 3)
+        sin_elev = directions[:, :, 2].copy()
+        weights = w.reshape(e_loc_deg.shape[0], n_az * n_r)
+        return directions, weights, sin_elev
 
     def disk_for_column(self, height_km: float, *, n_r: int = 16,
-                        n_az: int = 384) -> tuple[np.ndarray, np.ndarray]:
+                        n_az: int = 384):
         """Adaptive disk in the EARTH frame for a point on the observer's
-        vertical column (decks, ground seams): the local frame is the
-        observer frame there, so the beams rotate back with the fixed
-        sun-azimuth basis."""
-        curve_h, curve_c = self.geometry.critical_curve()
-        crit = float(np.interp(float(height_km), curve_h, curve_c))
+        vertical column (decks): the column's local frame is the observer
+        frame, so one exact construction serves the slab."""
+        curve = self.geometry.critical_curve()
+        z = np.array([float(height_km)])
+        crit = float(curve(z)[0])
         e_loc = 90.0 - self.sun_zenith_deg
-        delta = e_loc - crit
-        if abs(delta) >= self.radius_deg:
+        if abs(e_loc - crit) >= self.radius_deg:
             return self.disk()
-        disk = self._adaptive_disk(delta, crit, n_r, n_az, "column")
-        zs = float(self.sun_zenith_deg)
-        az = float(self.sun_azimuth_deg)
         up = np.array([0.0, 0.0, 1.0])
+        radial = up[None, :]
         hz = self.sun_hat - np.dot(self.sun_hat, up) * up
         n = np.linalg.norm(hz)
-        u1 = hz / n if n > 1e-12 else np.array([np.sin(zs + 1.0), 0.0, 0.0])
-        u2 = np.cross(up, u1)
-        beams = (np.outer(disk.beams[:, 0], u1) + np.outer(disk.beams[:, 1], u2)
-                 + np.outer(disk.beams[:, 2], up))
-        return beams, disk.weights
+        u1 = (hz / n)[None, :] if n > 1e-12 \
+            else np.array([[np.sin(np.radians(self.sun_zenith_deg + 1.0)), 0.0, 0.0]])
+        u2 = np.cross(radial, u1)
+        e_loc_arr = np.array([e_loc])
+        crit_arr = np.array([crit])
+        directions, weights, _ = self._local_grid(
+            radial, u1, u2, e_loc_arr, crit_arr, n_r, n_az)
+        return directions[0], weights[0]
 
-    # -- kernels --------------------------------------------------------------
     def vertex(self, height_km, true_elevation_deg, *, iw=None):
         """Table query for arbitrary (height, true elevation) points.
 
@@ -1690,7 +1612,7 @@ class SolarSource:
         argument is the *apparent* beam direction composed with the backward
         ray, not the geometric one.  ``disk`` overrides the per-point beam
         selection with an earth-frame set (validation reference quadratures
-        only; production callers get the per-point contact-band selection).
+        only; production callers get the exact per-point contact-band grid).
         """
         atmo = self._atmo_ref()
         if atmo is None:
@@ -1700,72 +1622,177 @@ class SolarSource:
         out = np.zeros((len(x), n_wl)) if iw is None else np.zeros(len(x))
         wavelengths = atmo.wl if iw is None else np.array([atmo.wl[iw]])
         if disk is not None:
-            groups = [(np.arange(len(x)), _CoarseDisk(disk[0], disk[1]))]
-        else:
-            groups = self._group_by_disk(self._point_disk_keys(x, "scatter"))
-        for idx, group_disk in groups:
-            idx = np.asarray(idx)
-            n_beam = group_disk.n_beam
-            budget = 2_500_000 if iw is None else self.chunk
-            step = max(64, min(self.chunk, budget // max(n_beam * (n_wl if iw is None else 1), 1)))
-            local = isinstance(group_disk, _LocalDisk)
-            if local:
-                radial_g, u1_g, u2_g = self._local_frame_basis(x[idx])
-            for start in range(0, idx.size, step):
-                pos = idx[start:start + step]
-                if local:
-                    self._scatter_local_chunk(
-                        x[pos], backward[pos], radial_g[start:start + step],
-                        u1_g[start:start + step], u2_g[start:start + step],
-                        group_disk, iw, wavelengths, atmo, ray_fraction,
-                        aerosol_fractions, out, pos)
-                    continue
-                radial, directions, mu, app, transmission, gain, lit = \
-                    self._geometry_arrays(x[pos], iw,
-                                          disk=(group_disk.directions,
-                                                group_disk.weights))
-                active = np.flatnonzero(np.any(lit, axis=1))
-                if not active.size:
-                    continue
-                # Twilight has many fully shadowed collisions; skipping their
-                # Mie phase evaluations does not change any sampled path.
-                pos = pos[active]
-                radial, mu, app = radial[active], mu[active], app[active]
-                transmission, gain = transmission[active], gain[active]
-                dr = np.einsum("ij,ij->i", backward[pos], radial)[:, None]
-                horizontal_dot = (backward[pos] @ directions.T - mu * dr) / \
-                    np.sqrt(np.maximum(1 - mu ** 2, 1e-30))
-                phase_mu = np.cos(app) * horizontal_dot + np.sin(app) * dr
-                phase_mu = np.where(np.abs(mu) > 1 - 1e-14, np.sign(mu) * dr,
-                                    phase_mu)
-                phase_mu = np.clip(phase_mu, -1.0, 1.0)
-                p_ray = spectra.rayleigh_phase(phase_mu)
-                if iw is None:
-                    phase = p_ray[..., None] * ray_fraction[pos, None, :]
-                else:
-                    phase = p_ray * ray_fraction[pos, None]
-                for j, layer in enumerate(atmo.aerosols):
-                    aerosol_phase = np.asarray(
-                        layer.aerosol.phase(phase_mu.ravel(), wavelengths))
-                    if aerosol_phase.ndim == 1:
-                        # wavelength-independent phase functions return one
-                        # value per direction; broadcast across the band
-                        aerosol_phase = np.broadcast_to(
-                            aerosol_phase.reshape(phase_mu.shape + (1,)),
-                            phase_mu.shape + (len(wavelengths),))
-                    else:
-                        aerosol_phase = aerosol_phase.reshape(
-                            phase_mu.shape + (len(wavelengths),))
-                    if iw is None:
-                        phase = phase + aerosol_phase * aerosol_fractions[pos, j, None, :]
-                    else:
-                        phase = phase + aerosol_phase[..., 0] * aerosol_fractions[pos, j, None]
-                if iw is None:
-                    out[pos] = np.sum(transmission * gain[..., None] * phase, axis=1)
-                else:
-                    out[pos] = np.sum(transmission * gain * phase, axis=1)
+            self._scatter_coarse_chunk(x, backward, np.arange(len(x)),
+                                       disk[0], disk[1], iw, wavelengths, atmo,
+                                       ray_fraction, aerosol_fractions, out)
+            self.n_points += len(x)
+            return out
+        in_band, radial, e_loc, crit, _h = self._classify_points(x)
+        n_r, n_az = 8, 64
+        n_beam = n_r * n_az
+        # out-of-band points: the coarse production disk (their per-beam lit
+        # drop is exact whenever the boundary does not cut the cap)
+        coarse_idx = np.flatnonzero(~in_band)
+        if coarse_idx.size:
+            step = self._chunk_for_nbeam(16, n_wl, iw is None)
+            for st in range(0, coarse_idx.size, step):
+                pos = coarse_idx[st:st + step]
+                dsk = self.disk()
+                self._scatter_coarse_chunk(x[pos], backward[pos], pos,
+                                           dsk[0], dsk[1], iw, wavelengths,
+                                           atmo, ray_fraction,
+                                           aerosol_fractions, out)
+        # in-band points: exact per-point grid, chunked by the elements budget
+        band_idx = np.flatnonzero(in_band)
+        if band_idx.size:
+            step = self._chunk_for_nbeam(n_beam, n_wl, iw is None)
+            for st in range(0, band_idx.size, step):
+                pos = band_idx[st:st + step]
+                self._scatter_local_chunk(x[pos], backward[pos], pos, n_r, n_az,
+                                          iw, wavelengths, atmo, ray_fraction,
+                                          aerosol_fractions, out)
         self.n_points += len(x)
         return out
+
+    def _scatter_coarse_chunk(self, x_chunk, backward_chunk, pos, directions,
+                              weights, iw, wavelengths, atmo, ray_fraction,
+                              aerosol_fractions, out):
+        radial, _, mu, app, transmission, gain, lit = self._geometry_arrays(
+            x_chunk, iw, disk=(directions, weights))
+        active = np.flatnonzero(np.any(lit, axis=1))
+        if not active.size:
+            return
+        # Twilight has many fully shadowed collisions; skipping their Mie
+        # phase evaluations does not change any sampled path.
+        pos = pos[active]
+        radial, mu, app = radial[active], mu[active], app[active]
+        transmission, gain = transmission[active], gain[active]
+        dr = np.einsum("ij,ij->i", backward_chunk[pos - pos[0]], radial)[:, None]
+        horizontal_dot = (backward_chunk[pos - pos[0]] @ directions.T
+                          - mu * dr) / np.sqrt(np.maximum(1 - mu ** 2, 1e-30))
+        phase_mu = np.cos(app) * horizontal_dot + np.sin(app) * dr
+        phase_mu = np.where(np.abs(mu) > 1 - 1e-14, np.sign(mu) * dr, phase_mu)
+        phase_mu = np.clip(phase_mu, -1.0, 1.0)
+        p_ray = spectra.rayleigh_phase(phase_mu)
+        if iw is None:
+            phase = p_ray[..., None] * ray_fraction[pos, None, :]
+        else:
+            phase = p_ray * ray_fraction[pos, None]
+        for j, layer in enumerate(atmo.aerosols):
+            aerosol_phase = np.asarray(
+                layer.aerosol.phase(phase_mu.ravel(), wavelengths))
+            if aerosol_phase.ndim == 1:
+                aerosol_phase = np.broadcast_to(
+                    aerosol_phase.reshape(phase_mu.shape + (1,)),
+                    phase_mu.shape + (len(wavelengths),))
+            else:
+                aerosol_phase = aerosol_phase.reshape(
+                    phase_mu.shape + (len(wavelengths),))
+            if iw is None:
+                phase = phase + aerosol_phase * aerosol_fractions[pos, j, None, :]
+            else:
+                phase = phase + aerosol_phase[..., 0] * aerosol_fractions[pos, j, None]
+        if iw is None:
+            out[pos] = np.sum(transmission * gain[..., None] * phase, axis=1)
+        else:
+            out[pos] = np.sum(transmission * gain * phase, axis=1)
+
+    def _scatter_local_chunk(self, x_chunk, backward_chunk, pos, n_r, n_az,
+                             iw, wavelengths, atmo, ray_fraction,
+                             aerosol_fractions, out):
+        """One chunk of in-band points on the exact per-point grid: the
+        construction, the vertex query and the phase evaluation are all
+        row-wise in the point, so chunking never changes a value."""
+        radial, u1, u2 = self._local_frame_basis(x_chunk)
+        in_band, radial, e_loc, crit, _h = self._classify_points(x_chunk)
+        directions, weights, sin_e = self._local_grid(
+            radial, u1, u2, e_loc, crit, n_r, n_az)
+        true_e = np.degrees(np.arcsin(sin_e))
+        medium = self._medium
+        radius = np.linalg.norm(x_chunk, axis=1)
+        height = np.clip((radius - R_EARTH) / 1e3,
+                         medium.z_bounds[0], medium.z_bounds[-1])
+        app, columns, gain, lit = self.geometry.ensure_table().query_fields(
+            height[:, None], true_e)
+        ext = species_extinction_weights(medium)
+        if iw is None:
+            tau = columns @ ext
+            transmission = np.where(lit[..., None], np.exp(-tau), 0.0)
+        else:
+            tau = columns @ ext[:, int(iw)]
+            transmission = np.where(lit, np.exp(-tau), 0.0)
+        app_rad = np.radians(app)
+        local_n = self.geometry.field.refractive_index(height)
+        gain = gain * (self.observer_n / local_n[:, None]) ** 2 * weights
+        active = np.flatnonzero(np.any(lit, axis=1))
+        if not active.size:
+            return
+        gpos = pos[active]
+        dr = np.einsum("ij,ij->i", backward_chunk, radial)[:, None]
+        # horizontal projection of each point-beam direction: subtract the
+        # radial component of the backward ray, then project onto the
+        # per-point directions (mu = sin e_b from the construction)
+        horizontal_dot = np.einsum(
+            "ij,ibj->ib",
+            backward_chunk - radial * np.einsum("ij,ij->i", backward_chunk,
+                                                radial)[:, None],
+            directions[active]) \
+            / np.sqrt(np.maximum(1.0 - sin_e[active] ** 2, 1e-30))
+        phase_mu = np.cos(app_rad[active]) * horizontal_dot \
+            + np.sin(app_rad[active]) * dr
+        phase_mu = np.clip(phase_mu, -1.0, 1.0)
+        p_ray = spectra.rayleigh_phase(phase_mu)
+        if iw is None:
+            phase = p_ray[..., None] * ray_fraction[gpos, None, :]
+        else:
+            phase = p_ray * ray_fraction[gpos, None]
+        for j, layer in enumerate(atmo.aerosols):
+            aerosol_phase = np.asarray(
+                layer.aerosol.phase(phase_mu.ravel(), wavelengths))
+            if aerosol_phase.ndim == 1:
+                aerosol_phase = np.broadcast_to(
+                    aerosol_phase.reshape(phase_mu.shape + (1,)),
+                    phase_mu.shape + (len(wavelengths),))
+            else:
+                aerosol_phase = aerosol_phase.reshape(
+                    phase_mu.shape + (len(wavelengths),))
+            if iw is None:
+                phase = phase + aerosol_phase * aerosol_fractions[gpos, j, None, :]
+            else:
+                phase = phase + aerosol_phase[..., 0] * aerosol_fractions[gpos, j, None]
+        if iw is None:
+            out[gpos] = np.sum(transmission[active] * gain[active][..., None]
+                               * phase, axis=1)
+        else:
+            out[gpos] = np.sum(transmission[active] * gain[active] * phase,
+                               axis=1)
+
+    def _ground_local_chunk(self, x_chunk, pos, n_r, n_az, iw, out):
+        radial, u1, u2 = self._local_frame_basis(x_chunk)
+        in_band, radial, e_loc, crit, _h = self._classify_points(x_chunk)
+        directions, weights, sin_e = self._local_grid(
+            radial, u1, u2, e_loc, crit, n_r, n_az)
+        true_e = np.degrees(np.arcsin(sin_e))
+        medium = self._medium
+        radius = np.linalg.norm(x_chunk, axis=1)
+        height = np.clip((radius - R_EARTH) / 1e3,
+                         medium.z_bounds[0], medium.z_bounds[-1])
+        app, columns, gain, lit = self.geometry.ensure_table().query_fields(
+            height[:, None], true_e)
+        ext = species_extinction_weights(medium)
+        app_rad = np.radians(app)
+        gain = gain * (self.observer_n / self.geometry.field
+                       .refractive_index(height)[:, None]) ** 2 * weights
+        flux = np.maximum(np.sin(app_rad), 0.0)
+        if iw is None:
+            tau = columns @ ext
+            transmission = np.where(lit[..., None], np.exp(-tau), 0.0)
+            out[pos] = np.sum(transmission * gain[..., None] * flux[..., None],
+                              axis=1)
+        else:
+            tau = columns @ ext[:, int(iw)]
+            transmission = np.where(lit, np.exp(-tau), 0.0)
+            out[pos] = np.sum(transmission * gain * flux, axis=1)
 
     def ground(self, x, *, iw=None):
         """Detector-referred solar angular integral of ``T*G*max(sin app, 0)``."""
@@ -1774,58 +1801,76 @@ class SolarSource:
             raise RuntimeError("the owning atmosphere is gone; rebuild the source")
         self._validate(atmo)
         out = np.zeros(len(x)) if iw is not None else np.zeros((len(x), len(atmo.wl)))
-        for idx, group_disk in self._group_by_disk(self._point_disk_keys(x, "flux")):
-            idx = np.asarray(idx)
-            step = self._chunk_for_disk(group_disk)
-            local = isinstance(group_disk, _LocalDisk)
-            true_e = (np.degrees(np.arcsin(group_disk.sin_elev))[None, :]
-                      if local else None)
-            for start in range(0, idx.size, step):
-                pos = idx[start:start + step]
-                if local:
-                    radius = np.linalg.norm(x[pos], axis=1)
-                    height = np.clip((radius - R_EARTH) / 1e3,
-                                     self._medium.z_bounds[0],
-                                     self._medium.z_bounds[-1])
-                    app, columns, gain, lit = self.geometry.ensure_table() \
-                        .query_fields(height[:, None], true_e)
-                    ext = species_extinction_weights(self._medium)
-                    if iw is None:
-                        tau = columns @ ext
-                        transmission = np.where(lit[..., None], np.exp(-tau), 0.0)
-                        gain = gain * (self.observer_n / self.geometry.field
-                                       .refractive_index(height)[:, None]) ** 2
-                        gain = gain * group_disk.weights
-                        app_rad = np.radians(app)[..., None]
-                        out[pos] = np.sum(transmission * gain[..., None]
-                                          * np.maximum(np.sin(app_rad), 0.0),
-                                          axis=1)
-                    else:
-                        tau = columns @ ext[:, int(iw)]
-                        transmission = np.where(lit, np.exp(-tau), 0.0)
-                        gain = gain * (self.observer_n / self.geometry.field
-                                       .refractive_index(height)[:, None]) ** 2
-                        gain = gain * group_disk.weights
-                        app_rad = np.radians(app)
-                        out[pos] = np.sum(transmission * gain
-                                          * np.maximum(np.sin(app_rad), 0.0),
-                                          axis=1)
-                    continue
+        in_band, _radial, _e, _c, _h = self._classify_points(x)
+        n_beam = 16 * 384
+        step = self._chunk_for_nbeam(n_beam, len(atmo.wl), iw is None)
+        coarse_idx = np.flatnonzero(~in_band)
+        if coarse_idx.size:
+            dsk = self.disk()
+            for st in range(0, coarse_idx.size, step):
+                pos = coarse_idx[st:st + step]
                 _, _, _, app, transmission, gain, _ = self._geometry_arrays(
-                    x[pos], iw, disk=(group_disk.directions, group_disk.weights))
+                    x[pos], iw, disk=(dsk[0], dsk[1]))
                 if iw is None:
-                    gain = gain[..., None]     # gain is wavelength independent
+                    gain = gain[..., None]
                     app = app[..., None]
-                out[pos] = np.sum(transmission * gain * np.maximum(np.sin(app), 0.0),
-                                  axis=1)
+                out[pos] = np.sum(transmission * gain
+                                  * np.maximum(np.sin(app), 0.0), axis=1)
+        band_idx = np.flatnonzero(in_band)
+        for st in range(0, band_idx.size, step):
+            pos = band_idx[st:st + step]
+            self._ground_local_chunk(x[pos], pos, 16, 384, iw, out)
         return out
+
+    def _direct_local_chunk(self, x_chunk, normal, pos, n_r, n_az, iw, f_inf,
+                            out):
+        radial, u1, u2 = self._local_frame_basis(x_chunk)
+        in_band, radial, e_loc, crit, _h = self._classify_points(x_chunk)
+        directions, weights, sin_e = self._local_grid(
+            radial, u1, u2, e_loc, crit, n_r, n_az)
+        true_e = np.degrees(np.arcsin(sin_e))
+        medium = self._medium
+        radius = np.linalg.norm(x_chunk, axis=1)
+        height = np.clip((radius - R_EARTH) / 1e3,
+                         medium.z_bounds[0], medium.z_bounds[-1])
+        app, columns, gain, lit = self.geometry.ensure_table().query_fields(
+            height[:, None], true_e)
+        ext = species_extinction_weights(medium)
+        n_dot_radial = np.einsum("ij,ij->i", normal, radial)[:, None]
+        n_loc = np.stack([np.einsum("ij,ij->i", normal, u1),
+                          np.einsum("ij,ij->i", normal, u2),
+                          n_dot_radial[:, 0]], axis=1)
+        # the beam directions are per point: project the normal explicitly
+        n_dot_beam = np.einsum("ib,ibj->ib", np.broadcast_to(
+            normal, directions.shape[:2] + (3,)), directions)
+        sin_true = sin_e
+        cos_true = np.sqrt(np.maximum(1.0 - sin_true ** 2, 1e-300))
+        horizontal = (n_dot_beam - n_dot_radial * sin_true) / cos_true
+        app_rad = np.radians(app)
+        adn = np.sin(app_rad) * n_dot_radial + np.cos(app_rad) * horizontal
+        gain = gain * (self.observer_n / self.geometry.field
+                       .refractive_index(height)[:, None]) ** 2 * weights
+        if iw is None:
+            tau = columns @ ext
+            transmission = np.where(lit[..., None], np.exp(-tau), 0.0)
+            weighted = transmission * gain[..., None] \
+                * np.maximum(adn[..., None], 0.0)          # (n,nb,n_wl)
+            out[pos] = weighted.sum(axis=1) * f_inf[None, :]
+        else:
+            tau = columns @ ext[:, int(iw)]
+            transmission = np.where(lit, np.exp(-tau), 0.0)
+            weighted = transmission * gain * np.maximum(adn, 0.0)
+            out[pos] = weighted.sum(axis=1) * f_inf[iw]
 
     def direct_irradiance(self, x, normal, *, iw=None):
         """Spectral flux through a plane at the points ``x``.
 
         ``normal`` is the plane's unit normal in the Earth-centred frame;
         the flux is ``F_inf * sum_beams w*T*G*max(apparent_beam . normal, 0)``
-        (detector-referred through the same single ``n^2`` factor).
+        (detector-referred through the same single ``n^2`` factor).  The
+        full-spectrum default (renderer seam) and the per-wavelength calls
+        share one (point, beam) projection; only the spectral multiplication
+        gains a wavelength axis.
         """
         atmo = self._atmo_ref()
         if atmo is None:
@@ -1836,80 +1881,38 @@ class SolarSource:
         f_inf = spectra.solar_irradiance(atmo.wl)
         n_pts = len(x)
         out = np.zeros((n_pts, len(atmo.wl))) if iw is None else np.zeros(n_pts)
-        for idx, group_disk in self._group_by_disk(self._point_disk_keys(x, "flux")):
-            idx = np.asarray(idx)
-            step = self._chunk_for_disk(group_disk)
-            local = isinstance(group_disk, _LocalDisk)
-            true_e = (np.degrees(np.arcsin(group_disk.sin_elev))[None, :]
-                      if local else None)
-            for start in range(0, idx.size, step):
-                pos = idx[start:start + step]
-                radial = x[pos] / np.linalg.norm(x[pos], axis=1)[:, None]
-                if local:
-                    _, u1, u2 = self._local_frame_basis(x[pos])
-                    n_dot_radial = np.einsum("ij,ij->i", normal[None, :].repeat(
-                        len(pos), axis=0), radial)[:, None]
-                    n_loc = np.stack([np.einsum("ij,ij->i", normal[None, :].repeat(
-                        len(pos), axis=0), u1),
-                        np.einsum("ij,ij->i", normal[None, :].repeat(
-                            len(pos), axis=0), u2),
-                        n_dot_radial[:, 0]], axis=1)
-                    n_dot_beam = n_loc @ group_disk.beams.T       # (n, n_beam)
-                    sin_true = group_disk.sin_elev[None, :]
-                    cos_true = np.sqrt(np.maximum(1.0 - sin_true ** 2, 1e-300))
-                    horizontal = (n_dot_beam - n_dot_radial * sin_true) / cos_true
-                    radius = np.linalg.norm(x[pos], axis=1)
-                    height = np.clip((radius - R_EARTH) / 1e3,
-                                     self._medium.z_bounds[0],
-                                     self._medium.z_bounds[-1])
-                    app, columns, gain, lit = self.geometry.ensure_table() \
-                        .query_fields(height[:, None], true_e)
-                    ext = species_extinction_weights(self._medium)
-                    if iw is None:
-                        tau = columns @ ext
-                        transmission = np.where(lit[..., None], np.exp(-tau), 0.0)
-                        app_rad = np.radians(app)[..., None]
-                        gain = (gain * (self.observer_n / self.geometry.field
-                                        .refractive_index(height)[:, None]) ** 2
-                                * group_disk.weights)[..., None]
-                        adn = np.sin(app_rad) * n_dot_radial \
-                            + np.cos(app_rad) * horizontal
-                        weighted = transmission * gain \
-                            * np.maximum(adn[..., None], 0.0)
-                        out[pos] = weighted.sum(axis=1) * f_inf[None, :]
-                    else:
-                        tau = columns @ ext[:, int(iw)]
-                        transmission = np.where(lit, np.exp(-tau), 0.0)
-                        gain = (gain * (self.observer_n / self.geometry.field
-                                        .refractive_index(height)[:, None]) ** 2
-                                * group_disk.weights)
-                        app_rad = np.radians(app)
-                        adn = np.sin(app_rad) * n_dot_radial \
-                            + np.cos(app_rad) * horizontal
-                        weighted = transmission * gain * np.maximum(adn, 0.0)
-                        out[pos] = weighted.sum(axis=1) * f_inf[iw]
-                    continue
-                directions = group_disk.directions
+        in_band, _radial, _e, _c, _h = self._classify_points(x)
+        n_beam = 16 * 384
+        step = self._chunk_for_nbeam(n_beam, len(atmo.wl), iw is None)
+        coarse_idx = np.flatnonzero(~in_band)
+        if coarse_idx.size:
+            dsk = self.disk()
+            for st in range(0, coarse_idx.size, step):
+                pos = coarse_idx[st:st + step]
+                directions = dsk[0]
                 _, _, _, app, transmission, gain, _ = self._geometry_arrays(
-                    x[pos], iw, disk=(directions, group_disk.weights))
-                sin_true = np.clip(radial @ directions.T, -1, 1)  # sin(true elev)
+                    x[pos], iw, disk=(directions, dsk[1]))
+                radial = x[pos] / np.linalg.norm(x[pos], axis=1)[:, None]
+                sin_true = np.clip(radial @ directions.T, -1, 1)
                 cos_true = np.sqrt(np.maximum(1.0 - sin_true ** 2, 1e-300))
-                # The apparent beam direction is  sin(app)*radial + cos(app)*e_h
-                # (app = apparent *elevation*, radians); resolve the unit normal
-                # against that basis:
                 n_dot_radial = np.einsum("ij,j->i", radial, normal)[:, None]
-                n_dot_beam = (normal[None, :] @ directions.T)[0]   # (n_beam,)
+                n_dot_beam = (normal @ directions.T)[0]
                 horizontal = (n_dot_beam - n_dot_radial * sin_true) / cos_true
                 app_dot_normal = (np.sin(app) * n_dot_radial
                                   + np.cos(app) * horizontal)
                 if iw is None:
-                    gain = gain[..., None]     # gain is wavelength independent
+                    gain = gain[..., None]
                     app_dot_normal = app_dot_normal[..., None]
                 weighted = transmission * gain * np.maximum(app_dot_normal, 0.0)
                 if iw is None:
                     out[pos] = weighted.sum(axis=1) * f_inf[None, :]
                 else:
                     out[pos] = weighted.sum(axis=1) * f_inf[iw]
+        band_idx = np.flatnonzero(in_band)
+        for st in range(0, band_idx.size, step):
+            pos = band_idx[st:st + step]
+            self._direct_local_chunk(x[pos], normal, pos, 16, 384, iw, f_inf,
+                                     out)
         return out
 
     def central_transmittance(self, height_km=None, *, iw=None):

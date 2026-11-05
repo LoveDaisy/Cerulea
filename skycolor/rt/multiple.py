@@ -155,54 +155,53 @@ def _log_factorial_ratio(l_max: int, m: int) -> np.ndarray:
     return out
 
 
-def _direct_beam_tables(atmo, source, n_modes: int):
-    """Per-beam direct-beam tables on the pseudo-spherical column.
+def _direct_source_coefficients(atmo, source, n_modes: int, l_max: int):
+    """Per-layer direct-source Fourier coefficients on the pseudo-spherical
+    column: ``C[k, l, m, w] = sum_b beam_w*T*G * P_l^m(mu_s_b) *
+    cos(m*phi_b)``.
 
-    Returns ``(t_mid, gain_mid, mu_s, app_mid, t_ground, gain_ground,
-    app_ground, cos_m, weights)`` where ``t_mid``/``gain_mid`` have shape
-    ``(nz, n_beam, n_wl)`` (layer mid-points), ``mu_s``/``app_mid`` shape
-    ``(nz, n_beam)`` and the ground triplets ``(n_beam, n_wl)`` /
-    ``(n_beam,)``.  ``mu_s`` is the beam's *apparent* propagation cosine at
-    the layer (negative above the horizon) and ``cos_m[m, b]`` the disk
-    azimuth factor ``cos(m * phi_b)`` used by the Fourier projection.
+    Each layer gets the source's own contact-band adaptive disk at its
+    mid-point height (the round-5 review's +73% l=0 error came from the
+    fixed 2x8 disk mis-integrating partially occulted caps INSIDE the
+    layer sources, before any propagation); layers outside the contact band
+    keep the production coarse disk, whose per-beam lit drop is exact
+    there.  The projection accumulates per layer -- layer beam counts may
+    differ -- so no (nz, nb, n_modes) mega-tensor is materialised.
     """
-    medium = atmo._medium
     rb = atmo.r_bounds
     z_b = (rb - R_EARTH) / 1e3
     z_mid = 0.5 * (z_b[1:] + z_b[:-1])
-    directions, weights = source.disk()
-    n_beam = directions.shape[0]
+    n_wl = len(atmo.wl)
+    nz = z_mid.size
     up = np.array([0.0, 0.0, 1.0])
-    # each beam's true elevation is constant along the column (the local up
-    # of the pseudo-spherical column is z-hat everywhere)
-    true_e = np.degrees(np.arcsin(np.clip(directions @ up, -1.0, 1.0)))
-    zq = np.concatenate([z_mid, z_b[:1]])                     # mids + ground
-    heights = np.broadcast_to(zq[:, None], (zq.size, n_beam))
-    true_grid = np.broadcast_to(true_e[None, :], heights.shape)
-    app, t_all, gain_all, _lit = source.vertex(heights, true_grid)
-    t_mid, gain_mid, app_mid = t_all[:-1], gain_all[:-1], app[:-1]
-    t_ground, gain_ground, app_ground = t_all[-1], gain_all[-1], app[-1]
-    mu_s = -np.sin(np.radians(app_mid))                       # propagation cosine
-    # Fourier azimuth factors: each beam's LOCAL azimuth offset from the sun
-    # meridian (the whole disk spans only ~16 arcmin / sin(zenith) of local
-    # azimuth, so cos(m*d_az) ~ 1 for every mode -- the disk is azimuthally
-    # delta-like even though it wraps the full circle *around the sun*)
     a_rad = np.radians(float(source.sun_azimuth_deg))
     m_hat = np.array([np.sin(a_rad), np.cos(a_rad), 0.0])
     p_hat = np.array([np.cos(a_rad), -np.sin(a_rad), 0.0])
-    d_h = directions - np.outer(directions @ up, up)
-    az_rel = np.arctan2(d_h @ p_hat, d_h @ m_hat)
-    # sized by the effective n_modes (not a hardcoded cap): solve() accepts
-    # any n_modes its quadrature supports, and the projection indexes one row
-    # per mode
-    cos_m = np.cos(np.outer(np.arange(n_modes), az_rel))
-    return (t_mid, gain_mid, mu_s, app_mid, t_ground, gain_ground, app_ground,
-            cos_m, weights)
+    e_loc = 90.0 - float(source.sun_zenith_deg)
+    curve = source.geometry.critical_curve()
+    c_direct = np.zeros((nz, l_max + 1, n_modes, n_wl))
+    for k, zk in enumerate(z_mid):
+        crit_k = float(curve(np.array([zk]))[0])
+        delta_k = e_loc - crit_k
+        if abs(delta_k) < source.radius_deg:
+            directions_k, weights_k = source.disk_for_column(zk)
+        else:
+            directions_k, weights_k = source.disk()
+        nb_k = int(directions_k.shape[0])
+        true_e_k = np.degrees(np.arcsin(np.clip(directions_k @ up, -1.0, 1.0)))
+        app_k, t_k, gain_k, _lit = source.vertex(np.array([zk]), true_e_k)
+        mu_k = -np.sin(np.radians(app_k))
+        beam_wg_k = weights_k[:, None] * t_k * gain_k[:, None]   # (nb_k, n_wl)
+        p_k = assoc_legendre_p_all(l_max, n_modes - 1, mu_k)[0][:, :n_modes, :]
+        d_h = directions_k - np.outer(directions_k @ up, up)
+        az_rel = np.arctan2(d_h @ p_hat, d_h @ m_hat)
+        cos_m_k = np.cos(np.outer(np.arange(n_modes), az_rel))
+        for m in range(n_modes):
+            c_direct[k, :, m, :] = np.einsum(
+                "bw,lb,b->lw", beam_wg_k, p_k[:, m, :], cos_m_k[m])
+    return c_direct
 
 
-# ---------------------------------------------------------------------------
-# Main solver
-# ---------------------------------------------------------------------------
 def solve(
     atmo,
     sun_zenith_deg,
@@ -260,14 +259,7 @@ def solve(
     from ..solar_source import SolarSource
 
     source = SolarSource(atmo, float(sun_zenith_deg), float(sun_azimuth_deg))
-    (t_mid_b, gain_mid_b, mu_s_b, app_mid_b, t_ground_b, gain_ground_b,
-     app_ground_b, cos_m_all, beam_w) = _direct_beam_tables(atmo, source, n_modes)
-    n_beam = beam_w.size
-    # physical amplitude: F_sun * T * G per beam at the layer mid-points.
-    # (Normalising by the vertical transmittance difference instead would
-    # close the column energy budget exactly, but it over-weights grazing
-    # twilight rays by a large factor, so the physical amplitude is used.)
-    b_beam = f_sun[None, None, :] * t_mid_b * gain_mid_b[..., None]  # (nz,nb,n_wl)
+    directions_toa, beam_w = source.disk()
     # direct irradiance incident on the ground: plain local per-beam sum at
     # the domain bottom (z_bounds[0]) — the same reference as the layer
     # sources, independent of the facade's elevation_km (this backend
@@ -281,8 +273,7 @@ def solve(
     x_ground = np.array([[0.0, 0.0, R_EARTH + z0 * 1e3]])
     e_direct = f_sun * source.ground(x_ground, iw=None)[0]
     up_hat = np.array([0.0, 0.0, 1.0])
-    directions, _ = source.disk()
-    incident = f_sun * np.sum(beam_w * np.maximum(directions @ up_hat, 0.0))
+    incident = f_sun * np.sum(beam_w * np.maximum(directions_toa @ up_hat, 0.0))
     direct_down = e_direct.copy()
     mu_s = -float(np.cos(np.radians(float(sun_zenith_deg))))  # view-frame mu0 (diagnostics)
 
@@ -310,6 +301,9 @@ def solve(
     n_modes = int(min(max(int(n_modes), 1), n_moments))
     l_max = n_moments - 1
     m_max = n_modes - 1
+    # per-layer direct-source Fourier coefficients (needs l_max; the layer
+    # projection is where the contact-band adaptive quadrature applies)
+    c_direct = _direct_source_coefficients(atmo, source, n_modes, l_max)
 
     n_down = int(np.count_nonzero(x < 0.0))
     n_up = x.size - n_down
@@ -325,13 +319,10 @@ def solve(
         beta = np.asarray(atmo.phase_moments(n_moments), dtype=float)
     beta = beta[:, :n_moments, :]
 
-    # associated Legendre functions at the Gauss nodes and at each beam's
-    # apparent propagation cosine per layer (scipy appends the x axis last
-    # for array input)
+    # associated Legendre functions at the Gauss nodes (scipy appends the
+    # x axis last for array input); the per-layer beam projection lives in
+    # _direct_source_coefficients
     p_nodes = assoc_legendre_p_all(l_max, m_max, x)      # (1,L+1,2M+1,n_mu)
-    mu_flat = np.ascontiguousarray(mu_s_b.T.reshape(-1))  # (nb*nz,), b-major
-    p_beams = assoc_legendre_p_all(l_max, m_max, mu_flat)[0]   # (L+1,2M+1,nb*nz)
-    p_beams = p_beams[:, :n_modes, :].reshape(l_max + 1, n_modes, n_beam, nz)
 
     # Fourier weights W_l^m = (2l+1) beta_l (l-m)!/(l+m)!
     lfac = (2.0 * np.arange(l_max + 1) + 1.0)
@@ -356,13 +347,7 @@ def solve(
     # difference between the two is part of the declared SOS-vs-SS
     # propagation error (plan 6.3) and is documented in
     # docs/physics/SOLAR_SOURCE.md.
-    beam_wg = beam_w[None, :, None] * t_mid_b * gain_mid_b[..., None]  # (nz, nb, n_wl)
     source_factor = omega * f_sun[None, :]                     # (nz, n_wl)
-
-    def _direct_coeff(m):
-        pm = p_beams[:, m, :, :]                               # (L+1, nb, nz)
-        return np.einsum("kbw,lbk->klw", beam_wg,
-                         pm * cos_m_all[m][None, :, None])
 
     # -- transmission factors (wavelength dependent) -------------------------
     trans_down = np.exp(-dtau[:, None, :] / (-x_down)[None, :, None])
@@ -376,7 +361,7 @@ def solve(
     # S_dir,m = (omega F /4pi)(2-delta_m0) sum_l W_l^m C_m[k,l,w] P_l^m(mu)
     j_direct = np.zeros((nz, n_modes, x.size, n_wl))
     for m in range(n_modes):
-        a = w_modes[m] * _direct_coeff(m)
+        a = w_modes[m] * c_direct[:, :, m, :]             # (nz,L,n_wl)
         jm = np.einsum("klw,li->kiw", a, q_nodes[m])     # (nz,n_mu,n_wl)
         factor = source_factor * (2.0 if m > 0 else 1.0) / (4.0 * np.pi)
         j_direct[:, m] = jm * factor[:, None, :]
@@ -500,7 +485,7 @@ def solve(
                 j_ms += jv.transpose(0, 2, 1)
 
                 if single_view:
-                    a0 = (w_modes[m] * _direct_coeff(m)).transpose(
+                    a0 = (w_modes[m] * c_direct[:, :, m, :]).transpose(
                         0, 2, 1).reshape(nz * n_wl, l_max + 1)
                     jv0 = (a0 @ qv).reshape(nz, n_wl, nc)
                     jv0 *= (source_factor
