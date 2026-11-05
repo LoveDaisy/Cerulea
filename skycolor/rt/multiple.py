@@ -155,7 +155,7 @@ def _log_factorial_ratio(l_max: int, m: int) -> np.ndarray:
     return out
 
 
-def _direct_beam_tables(atmo, source):
+def _direct_beam_tables(atmo, source, n_modes: int):
     """Per-beam direct-beam tables on the pseudo-spherical column.
 
     Returns ``(t_mid, gain_mid, mu_s, app_mid, t_ground, gain_ground,
@@ -192,7 +192,10 @@ def _direct_beam_tables(atmo, source):
     p_hat = np.array([np.cos(a_rad), -np.sin(a_rad), 0.0])
     d_h = directions - np.outer(directions @ up, up)
     az_rel = np.arctan2(d_h @ p_hat, d_h @ m_hat)
-    cos_m = np.cos(np.outer(np.arange(64), az_rel))
+    # sized by the effective n_modes (not a hardcoded cap): solve() accepts
+    # any n_modes its quadrature supports, and the projection indexes one row
+    # per mode
+    cos_m = np.cos(np.outer(np.arange(n_modes), az_rel))
     return (t_mid, gain_mid, mu_s, app_mid, t_ground, gain_ground, app_ground,
             cos_m, weights)
 
@@ -258,7 +261,7 @@ def solve(
 
     source = SolarSource(atmo, float(sun_zenith_deg), float(sun_azimuth_deg))
     (t_mid_b, gain_mid_b, mu_s_b, app_mid_b, t_ground_b, gain_ground_b,
-     app_ground_b, cos_m_all, beam_w) = _direct_beam_tables(atmo, source)
+     app_ground_b, cos_m_all, beam_w) = _direct_beam_tables(atmo, source, n_modes)
     n_beam = beam_w.size
     # physical amplitude: F_sun * T * G per beam at the layer mid-points.
     # (Normalising by the vertical transmittance difference instead would

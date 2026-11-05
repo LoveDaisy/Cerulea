@@ -188,8 +188,8 @@ def suite_source(out: Path) -> int:
             holdout.append((h, te))
     z = np.array([p[0] for p in holdout])
     te = np.array([p[1] for p in holdout])
-    app_q, t_q, gain_q, lit_q = table.query(z, te)
     ext = species_extinction_weights(atmo._medium)
+    app_q, t_q, gain_q, lit_q = table.query(z, te, ext)
     worst_app = worst_tg = worst_tab = 0.0
     disagreement = 0
     for i, (h, t_elev) in enumerate(holdout):

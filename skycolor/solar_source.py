@@ -83,14 +83,25 @@ _PROFILE_TOP_M = 1.2e6
 _PROFILE_POINTS = 4000
 
 #: integration segment scheme [km] shared by the field and column integrals:
-#: 1 km through the atmosphere (fine enough that the Gauss quadrature of the
-#: smooth density profiles is converged; validated against the independent
-#: Cartesian RK chain), 5 km in the negligible upper mesosphere.
-_SEGMENT_KM_LOW_STEP = 0.3
-_SEGMENT_LOW_TOP_KM = 12.0
+#: 1 km through the atmosphere, 5 km in the negligible upper mesosphere.
+#: The columns reproduce the RK chain to ~1.3e-4 relative; the field's
+#: direction anchor saturates at ~2.67e-4 deg against the 2e-4 deg plan
+#: budget because a 0.3 km lower-level refinement (tried and reverted in the
+#: round-3 review) resolves genuine near-caustic folds that a monotone
+#: PCHIP tabulation cannot certify -- an owner-level design decision, not a
+#: wiring bug (see docs/physics/SOLAR_SOURCE.md).
 _SEGMENT_KM_MID = 1.0
 _SEGMENT_MID_TOP_KM = 120.0
 _SEGMENT_KM_HIGH = 5.0
+
+#: request-independent physical anchors for the shared-table build [nm]:
+#: the column-interpolation conditioning is anchored at 550 nm, the vacuum
+#: and optical-depth certificates at 380 nm (the working band's strongest
+#: extinction).  Both are evaluated from the species data directly -- the
+#: registrar's wavelength grid must never influence the shared build
+#: (review round 4, Major table-build spectral dependence).
+_TABLE_SCALE_WL_NM = 550.0
+_TABLE_CERT_WL_NM = 380.0
 
 #: angular radius of the solar disk [deg]
 SUN_RADIUS_DEG = 16.0 / 60.0
@@ -143,13 +154,15 @@ class SolarRayField:
         slope integrands involve n'' (a jump at every interior knot), and
         integrating across one is exactly what made the knot-sensitive
         slopes of the experimental audit non-convergent.  Spacing follows
-        the atmosphere: 0.3 km through the lower troposphere (the twilight
-        anchors' 2e-4 deg angle budget needs that scale — 1 km knots leave a
-        2.7e-4 deg residual), 1 km through the upper stratosphere (knot
-        alignment, not segment size, is what protects the slope integrand --
-        the analytic derivative is exact per segment), 5 km in the upper
-        mesosphere and 50 km in the exosphere where n is indistinguishable
-        from n_inf.
+        the atmosphere: 1 km from the ground through the upper stratosphere
+        (knot alignment, not segment size, is what protects the slope
+        integrand -- the analytic derivative is exact per segment), 5 km in
+        the upper mesosphere and 50 km in the exosphere where n is
+        indistinguishable from n_inf.  (A 0.3 km lower-level refinement was
+        tried and reverted in the round-3 review: it resolves genuine
+        near-caustic folds in high rows that a monotone PCHIP tabulation
+        cannot represent -- an owner-level design decision recorded in
+        docs/physics/SOLAR_SOURCE.md, not dead wiring.)
         """
         ground_km = float(medium.z_bounds[0])
         profile_top_km = _PROFILE_TOP_M / 1e3
@@ -536,8 +549,9 @@ class SolarSpeciesColumns:
         # Density-formula boundaries are integration boundaries, not a
         # piecewise-constant approximation of the densities.
         # the columns' integrand is n (C1, no curvature term) — the 1 km
-        # scheme reproduces the RK chain to 1.3e-4, within the 1e-3 budget;
-        # only the field's slope integrand needs the 0.3 km lower knots
+        # scheme reproduces the RK chain to 1.3e-4, within the 1e-3 budget
+        # (the reverted 0.3 km lower-level experiment concerned only the
+        # field's slope integrand; see the module constants comment)
         levels = np.unique(np.concatenate([
             np.arange(ground_km, min(_SEGMENT_MID_TOP_KM, top_km) + _SEGMENT_KM_MID,
                       _SEGMENT_KM_MID),
@@ -659,6 +673,24 @@ class _TableRow:
     columns: np.ndarray           # PCHIP coefficients, (4, n_knot, n_species)
 
 
+def _anchor_extinction(medium, wl_nm: float) -> np.ndarray:
+    """Species extinction evaluated at one fixed anchor wavelength.
+
+    The registrar's wavelength grid must never leak into the shared table's
+    build (whichever slice registers first would otherwise set the
+    conditioning and the refinement certificates for every later query), so
+    the build anchors are evaluated from the species data functions directly
+    at fixed physical wavelengths.  Returns ``(n_species, 1)``.
+    """
+    wl = np.array([float(wl_nm)])
+    aerosol_ext = [lay.aerosol.relative_coefficients(wl)[0]
+                   for lay in medium.aerosols]
+    return np.stack([spectra.rayleigh_cross_section(wl),
+                     spectra.ozone_cross_section(wl),
+                     spectra.no2_cross_section(wl)]
+                    + [np.asarray(e, dtype=float) for e in aerosol_ext])
+
+
 class PointSourceTable:
     """Shadow-aligned table of direction, columns and gain versus (h, true elev).
 
@@ -689,20 +721,17 @@ class PointSourceTable:
         self.ground_km = float(medium.z_bounds[0])
         self.top_km = float(medium.z_bounds[-1])
         self.wl = np.asarray(medium.wl, dtype=float)
-        self.extinction = species_extinction_weights(medium)
-        # 550 nm anchors the column interpolation conditioning; the anchor is
-        # picked by the nearest wavelength *index* so the scale is invariant
-        # under wavelength reordering (np.interp would silently change with
-        # an unsorted grid).  When 550 nm is absent (beyond 25 nm) the
-        # strongest channel per species takes over; the scale is value-free:
-        # log1p/expm1 round-trips exactly for any positive scale.
-        k = int(np.argmin(np.abs(self.wl - 550.0)))
-        if abs(float(self.wl[k]) - 550.0) <= 25.0:
-            ref = self.extinction[:, k]
-        else:
-            ref = np.max(self.extinction, axis=1)
-        self.column_scale = np.where(ref > 0, ref,
-                                     np.maximum(np.max(self.extinction, axis=1), 1e-300))
+        # Request-independent physical anchors (plan 3.2; review round 4):
+        # the table must come out identical whichever wavelength slice of the
+        # shared construction registers first, so the interpolation
+        # conditioning (550 nm) and the vacuum / optical-depth certificates
+        # (380 nm, the working band's strongest extinction) are evaluated
+        # from the species data directly and never from the registrar's
+        # grid.  Queries apply the querying atmosphere's own cross sections.
+        self.extinction = _anchor_extinction(medium, _TABLE_CERT_WL_NM)
+        scale_ref = _anchor_extinction(medium, _TABLE_SCALE_WL_NM)[:, 0]
+        self.column_scale = np.where(scale_ref > 0, scale_ref,
+                                     np.full_like(scale_ref, 1e-300))
         self.column_scale[self.column_scale == 0] = 1.0
         self.constant_index = bool(np.all(field.n == field.n_inf))
         self.angle_tolerance_deg = float(angle_tolerance_deg)
@@ -1025,21 +1054,22 @@ class PointSourceTable:
         return (app.reshape(shape), columns.reshape(shape + (len(self.column_scale),)),
                 gain.reshape(shape), lit.reshape(shape))
 
-    def query(self, height_km, true_elevation_deg, iw=None):
-        """Return ``(app_deg, T, gain_local, lit)``; ``iw=None`` adds all wl.
+    def query(self, height_km, true_elevation_deg, extinction):
+        """Return ``(app_deg, T, gain_local, lit)`` for one extinction set.
 
-        ``T = exp(-columns . extinction)`` is the pure attenuation, zeroed
-        where shadowed; gain is returned separately (their product is never
-        named transmittance and never clipped).
+        The table stores wavelength-independent species columns;
+        ``extinction`` — the CALLER's cross-section weighting, ``(n_species,)``
+        or ``(n_species, n_wl)`` — turns them into the pure attenuation
+        ``T = exp(-columns . extinction)``, zeroed where shadowed; gain is
+        returned separately (their product is never named transmittance and
+        never clipped).  The table's own anchor extinction drives only the
+        build certificates, never a query.
         """
         app, columns, gain, lit = self.query_fields(height_km, true_elevation_deg)
-        if iw is None:
-            tau = columns @ self.extinction
+        tau = columns @ extinction
+        if extinction.ndim == 2:
             transmittance = np.where(lit[..., None], np.exp(-tau), 0.0)
         else:
-            if not 0 <= int(iw) < len(self.wl):
-                raise IndexError("wavelength index outside the source table")
-            tau = columns @ self.extinction[:, int(iw)]
             transmittance = np.where(lit, np.exp(-tau), 0.0)
         return app, transmittance, gain, lit
 
@@ -1068,8 +1098,41 @@ class SolarGeometry:
         self.top_km = float(medium.z_bounds[-1])
         self.n_species = self.columns_tool.n_species
         self._table: PointSourceTable | None = None
+        self._critical_curve: tuple[np.ndarray, np.ndarray] | None = None
         if build_table:
             self.ensure_table()
+
+    def critical_curve(self) -> tuple[np.ndarray, np.ndarray]:
+        """Interpolated critical-elevation curve, shared per construction.
+
+        Batch classification (``SolarSource._point_disk_keys``) runs per
+        scattering point; exact field roots there cost a full bending
+        integral each and dominated the MC hot path.  The critical elevation
+        is smooth in height, so exact evaluation on a fixed lattice (denser
+        near the ground where the curve bends) with linear interpolation is
+        accurate to ~1e-3 deg -- far inside the one disk-radius
+        classification band.  Built once per construction on the token-cached
+        geometry (a per-source rebuild would tax every fresh MC call);
+        per-disk construction still uses the exact root.
+        """
+        if self._critical_curve is None:
+            ground = float(self.ground_km)
+            top = float(self.top_km)
+            span = top - ground
+            lattice = np.unique(np.concatenate([
+                ground + np.linspace(0.0, 3.0, 61),
+                ground + np.linspace(3.0, 30.0, 41),
+                ground + np.linspace(30.0, span, 25)]))
+            crits = np.array([self._exact_critical_true(float(h))
+                              for h in lattice])
+            self._critical_curve = (lattice, crits)
+        return self._critical_curve
+
+    def _exact_critical_true(self, height_km: float) -> float:
+        field = self.field
+        lower = float(field.grazing_apparent_elevation(np.array([height_km]))[0])
+        return float(field.forward(np.array([height_km]),
+                                   np.array([lower + 1e-6]))[0])
 
     def register_medium(self, medium) -> None:
         """Track another medium sharing this geometry's construction token."""
@@ -1204,19 +1267,50 @@ class SolarSource:
             self._disk_cache[key] = cached
         return cached
 
-    def _flux_disk_for_points(self, x):
-        """Contact-band refined disk — the direct_irradiance seam convention.
+    def _point_disk_keys(self, x, kind: str):
+        """Per-point disk key from the point's OWN occultation geometry.
 
-        Deterministic in the point's height: the same position always gets
-        the same beam set regardless of batch size or call site.  (The MC
-        ground estimator deliberately uses the production scatter disk; the
-        two conventions are documented in docs/physics/SOLAR_SOURCE.md.)
+        Batch-invariance contract: the beam set a point gets depends only on
+        its position and the sun -- never on which other points share the
+        call.  Batch shape, chunking and call-site grouping affect execution
+        cost only (review round 4, Major batch-invariance).
         """
         heights = np.clip((np.linalg.norm(x, axis=1) - R_EARTH) / 1e3,
                           self._medium.z_bounds[0], self._medium.z_bounds[-1])
-        if float(heights.max()) - float(heights.min()) < 1e-6:
-            return self._flux_disk(float(heights[0]))
-        return self.disk()
+        elev = 90.0 - self.sun_zenith_deg
+        curve_h, curve_c = self.geometry.critical_curve()
+        crits = np.interp(heights, curve_h, curve_c)
+        # inside one disk radius of the grazing elevation the shadow
+        # boundary crosses the cap (partial occultation possible per
+        # azimuth); outside it every beam shares one lit state, which
+        # the coarse disk's per-beam lit drop already represents exactly
+        in_band = np.abs(elev - crits) < self.radius_deg
+        if not in_band.any():
+            # every point shares the production disk (the common high-sun
+            # MC/LOS case): one identical key, no per-point tuples
+            return [("coarse",)] * len(heights)
+        keys = [("coarse",)] * len(heights)
+        for i in np.flatnonzero(in_band):
+            keys[i] = (kind, round(float(heights[i]), 3))
+        return keys
+
+    def _disk_for_key(self, key):
+        if key[0] == "coarse":
+            return self.disk()
+        if key[0] == "scatter":
+            return self._scatter_refined_disk(key[1])
+        return self._flux_disk(key[1])
+
+    def _group_by_disk(self, keys):
+        """Group point indices by identical disk so each group runs one
+        ``(points, beams)`` batch; groups are executed separately and the
+        per-point arithmetic is row-wise, so grouping never changes a
+        value."""
+        groups: dict = {}
+        for i, key in enumerate(keys):
+            groups.setdefault(key, []).append(i)
+        return [(np.asarray(v, dtype=int), self._disk_for_key(k))
+                for k, v in groups.items()]
 
     def _chunk_for_disk(self, disk) -> int:
         """Point chunk bounded so points*beams temporaries stay bounded."""
@@ -1235,64 +1329,173 @@ class SolarSource:
         cache[height_km] = crit
         return crit
 
+    def critical_curve(self) -> tuple[np.ndarray, np.ndarray]:
+        """Lazily built critical-elevation curve, shared per construction."""
+        return self.geometry.critical_curve()
+
+    def shadow_height(self, true_elevation_deg: float) -> float:
+        """Height where the vertical column enters Earth's shadow for one beam.
+
+        Solves ``critical_true(z) = true_elevation_deg`` along the observer's
+        vertical column by bisection (``critical_true`` decreases
+        monotonically with height: from higher up, grazing rays dip deeper).
+        Below the root the column point is occluded for that beam direction;
+        above it the beam lights the point.  This -- not the perigee of some
+        other ray -- is the occultation boundary every deck consumer must
+        classify against (review round 4, Major cloud lit-segment).
+        """
+        elev = float(true_elevation_deg)
+        if elev >= 0.0:
+            raise ValueError(
+                "shadow_height is the below-horizon occultation root; "
+                "descending beams (elevation >= 0) enter through the top")
+        z_low = float(self._medium.z_bounds[0])
+        z_high = float(self._medium.z_bounds[-1])
+        if elev < self._critical_true(z_high) - 1e-9:
+            raise ValueError(
+                f"beam elevation {elev:.4f} deg is below the deepest grazing "
+                f"ray at the model top; the whole column is occluded")
+        for _ in range(80):
+            z_mid = 0.5 * (z_low + z_high)
+            if self._critical_true(z_mid) > elev:
+                z_low = z_mid      # grazing still above the beam: root higher
+            else:
+                z_high = z_mid
+        return 0.5 * (z_low + z_high)
+
+    def _shadow_split_disk(self, height_km: float, n_r: int, n_az: int,
+                           tag: str) -> tuple[np.ndarray, np.ndarray]:
+        """Occultation-adaptive disk: per-azimuth lit interval, exact boundary.
+
+        Near the horizon the shadow boundary is *not* a radial ring: a disk
+        beam at (rho, phi) has true elevation
+        ``asin((cos rho s + sin rho t(phi)) . up)``, which sweeps the local
+        critical elevation at azimuth-dependent rho.  Along an arc the beam
+        elevation is ``e_s + alpha*A*cos(phi - phi_up)`` (A = cos sun
+        elevation), so only the arc ``|phi - phi_up| < arccos((crit-e_s)/
+        (alpha*A))`` can contain lit beams; all azimuth nodes are
+        concentrated on that arc (shadowed azimuths contribute exactly zero,
+        so moving their nodes there is pure resolution gain).  For every arc
+        azimuth the boundary rho* is found by bisection (monotone along the
+        arc) and the radial Gauss-Legendre rule is placed on the lit
+        interval only.  Each node carries its true azimuthal measure
+        (``half/pi/n_az``), so a fully lit cap reproduces the plain disk's
+        ``sum(w*cos(rho)) = 1`` and partial occultation removes exactly the
+        occulted flux without renormalisation.
+        """
+        key = (self.sun_hat.tobytes(), tag, n_r, n_az, round(float(height_km), 3))
+        cached = self._disk_cache.get(key)
+        if cached is not None:
+            return cached
+        crit = self._critical_true(float(height_km))
+        s = self.sun_hat
+        alpha = np.radians(self.radius_deg)
+        up = np.array([0.0, 0.0, 1.0])
+        reference = (np.array([0.0, 0.0, 1.0])
+                     if abs(s[2]) < 0.9 else np.array([1.0, 0.0, 0.0]))
+        e1 = reference - np.dot(reference, s) * s
+        e1 /= np.linalg.norm(e1)
+        e2 = np.cross(s, e1)
+        e_s = 90.0 - self.sun_zenith_deg
+        amp = float(np.sqrt(max(1.0 - float(s @ up) ** 2, 0.0)))    # A
+        phi_up = float(np.arctan2(e2 @ up, e1 @ up))
+        ratio = (crit - e_s) / (self.radius_deg * amp) if amp > 0 else (
+            -1.0 if e_s >= crit else 1.0)
+        if ratio >= 1.0:                       # no azimuth can be lit
+            return self.disk()                 # per-beam lit drops everything
+        half = float(np.arccos(np.clip(ratio, -1.0, 1.0)))
+        if half >= np.pi:                      # fully lit cap: uniform grid
+            phi = 2 * np.pi * (np.arange(n_az) + 0.5) / n_az
+        else:                                  # concentrate nodes on the arc
+            phi = phi_up - half + 2 * half * (np.arange(n_az) + 0.5) / n_az
+        az_measure = (2 * half if half < np.pi else 2 * np.pi) / n_az
+        t = np.cos(phi)[:, None] * e1 + np.sin(phi)[:, None] * e2   # (n_az,3)
+
+        def elevations(rho):
+            d = np.cos(rho)[:, None] * s + np.sin(rho)[:, None] * t
+            return np.degrees(np.arcsin(np.clip(d @ up, -1.0, 1.0)))
+
+        # bisection for the boundary rho* per azimuth (60 iters: <1e-15 deg)
+        rho_lo = np.zeros(n_az)
+        rho_hi = np.full(n_az, alpha)
+        for _ in range(60):
+            mid = 0.5 * (rho_lo + rho_hi)
+            g = elevations(mid) - crit
+            increasing = (t @ up) > 0.0
+            move_lo = np.where(increasing, g < 0.0, g > 0.0)
+            rho_lo = np.where(move_lo, mid, rho_lo)
+            rho_hi = np.where(move_lo, rho_hi, mid)
+        rho_star = 0.5 * (rho_lo + rho_hi)
+        # g is monotone per azimuth, so the endpoint signs fix the lit
+        # interval: both lit -> whole arc; crossing -> one side
+        g0 = e_s - crit
+        ga = elevations(np.full(n_az, alpha)) - crit
+        lit_lo = np.where(g0 >= 0.0, 0.0, np.where(ga >= 0.0, rho_star, alpha))
+        lit_hi = np.where(g0 >= 0.0,
+                          np.where(ga >= 0.0, alpha, rho_star),
+                          np.where(ga >= 0.0, alpha, alpha))
+        keep = lit_hi > lit_lo                 # zero-width intervals drop out
+        # radial Gauss-Legendre nodes on each azimuth's lit interval, in
+        # cos(rho) where the cap area measure is linear.  Each node carries
+        # its true azimuthal measure (``az_measure``; the plain disk is the
+        # full-circle special case), so a fully lit cap reproduces
+        # sum(w*cos(rho)) = 1 exactly.
+        x_g, w_g = np.polynomial.legendre.leggauss(max(2, int(n_r)))
+        cos_lo = np.cos(lit_lo[keep])                    # > cos_hi
+        cos_hi = np.cos(lit_hi[keep])
+        c = cos_hi[:, None] + (cos_lo - cos_hi)[:, None] * (0.5 * (x_g + 1.0))
+        dc = cos_lo - cos_hi                             # lit dc-span per azimuth
+        dc_total = 1.0 - np.cos(np.radians(self.radius_deg))
+        w_rad = (dc[:, None] / dc_total) * w_g[None, :] \
+            * (az_measure / (2 * np.pi)) \
+            / (1.0 + np.cos(np.radians(self.radius_deg)))
+        rho = np.arccos(np.clip(c, -1.0, 1.0))
+        sin_rho = np.sin(rho)
+        tt = t[keep]
+        directions = (np.cos(rho)[..., None] * s
+                      + sin_rho[..., None] * tt[:, None, :]).reshape(-1, 3)
+        # flatten (n_keep, n_r) in the same (azimuth, radial) order as the
+        # directions; leggauss integrates the linear cos(rho) exactly, so a
+        # fully lit cap reproduces the plain disk's sum(w*cos(rho)) = 1
+        weights = w_rad.reshape(-1)
+        cached = (directions, weights)
+        self._disk_cache[key] = cached
+        return cached
+
     def _flux_disk(self, height_km):
         """Disk for single-height flux kernels, refined near the occultation band.
 
         When the shadow boundary cuts through the disk at this height, the
         coarse product quadrature integrates the partially lit cap poorly
-        (tens of per cent of the tiny signal).  Densify the radial nodes
-        around the boundary ring and widen the azimuth grid; the weights keep
-        the same centre-normal normalisation, so this is pure refinement.
+        (tens of per cent of the tiny signal).  The boundary-adaptive rule
+        places the radial nodes on each azimuth's lit interval; the weights
+        keep the whole-cap centre-normal normalisation, so this is pure
+        refinement.
         """
         crit = self._critical_true(float(height_km))
         elev = 90.0 - self.sun_zenith_deg
-        if abs(elev - crit) >= 3.0 * self.radius_deg:
+        if abs(elev - crit) >= self.radius_deg:
             return self.disk()
-        key = (self.sun_hat.tobytes(), "refined", round(float(height_km), 3))
-        cached = self._disk_cache.get(key)
-        if cached is None:
-            # the horizontal-flux integrand steps across the horizon line, so
-            # the azimuth resolution dominates the error: a fine azimuth grid
-            # (single-point flux calls can afford thousands of beams) with a
-            # boundary-split radial rule
-            n_r, n_a = 32, 768
-            cos_crit = np.cos(np.radians(min(abs(elev - crit), self.radius_deg)))
-            lo_nodes, lo_w = np.polynomial.legendre.leggauss(max(2, n_r // 2))
-            hi_nodes, hi_w = np.polynomial.legendre.leggauss(max(2, n_r // 2))
-            # inner segment [0, rho_crit] and outer [rho_crit, radius], in
-            # cos(rho) where the cap area measure is linear
-            c_in = cos_crit + (1.0 - cos_crit) * (0.5 * (lo_nodes + 1.0))
-            w_in = (1.0 - cos_crit) * 0.5 * lo_w
-            c_out = cos_crit + (np.cos(np.radians(self.radius_deg)) - cos_crit) \
-                * (0.5 * (hi_nodes + 1.0))
-            w_out = (np.cos(np.radians(self.radius_deg)) - cos_crit) * 0.5 * hi_w
-            cos_r = np.concatenate([c_in, c_out])
-            # per-node weight = w_gauss * segment_dc_span / 2, normalized by
-            # (1 + cos(alpha)) * n_azimuth -- the plain disk's convention with
-            # the segment Jacobian restored (the dc spans live per segment)
-            # dc-span weights rescaled to the full cap (2/(1-cos(alpha)) is
-            # the plain disk's implicit x-space factor): a degenerate segment
-            # gets zero weight, the surviving segment carries the whole disk
-            dc_total = 1.0 - np.cos(np.radians(self.radius_deg))
-            w_r = np.concatenate([(1.0 - cos_crit) / dc_total * lo_w,
-                                  (cos_crit - np.cos(np.radians(self.radius_deg)))
-                                  / dc_total * hi_w]) \
-                / ((1.0 + np.cos(np.radians(self.radius_deg))) * n_a)
-            alpha = np.radians(self.radius_deg)
-            sin_rho = np.sqrt(np.maximum(1 - np.asarray(cos_r) ** 2, 0))
-            reference = (np.array([0.0, 0.0, 1.0])
-                         if abs(self.sun_hat[2]) < 0.9 else np.array([1.0, 0.0, 0.0]))
-            e1 = reference - np.dot(reference, self.sun_hat) * self.sun_hat
-            e1 /= np.linalg.norm(e1)
-            e2 = np.cross(self.sun_hat, e1)
-            phi = 2 * np.pi * (np.arange(n_a) + 0.5) / n_a
-            transverse = np.cos(phi)[:, None] * e1 + np.sin(phi)[:, None] * e2
-            directions = (np.asarray(cos_r)[:, None, None] * self.sun_hat
-                          + sin_rho[:, None, None] * transverse).reshape(-1, 3)
-            weights = np.repeat(np.asarray(w_r), n_a)
-            cached = (directions, weights)
-            self._disk_cache[key] = cached
-        return cached
+        # the horizontal-flux integrand steps across the horizon line, so the
+        # azimuth resolution dominates the error; flux kernels are evaluated
+        # once per point and can afford a wide azimuth grid
+        return self._shadow_split_disk(float(height_km), 16, 384, "flux-refined")
+
+    def _scatter_refined_disk(self, height_km):
+        """Contact-band scatter disk: boundary-adaptive, modest beam count.
+
+        The scatter integrand (phase x T x G) is smooth inside the lit
+        region; the entire difficulty is the occultation boundary, which the
+        per-azimuth interval placement resolves exactly.  The beam count
+        stays affordable for the line-of-sight / MC hot path (the flux
+        kernels, evaluated once per point, use a wider azimuth grid; see
+        docs/physics/SOLAR_SOURCE.md).
+        """
+        crit = self._critical_true(float(height_km))
+        elev = 90.0 - self.sun_zenith_deg
+        if abs(elev - crit) >= self.radius_deg:
+            return self.disk()
+        return self._shadow_split_disk(float(height_km), 8, 64, "scatter-refined")
 
     # -- kernels --------------------------------------------------------------
     def vertex(self, height_km, true_elevation_deg, *, iw=None):
@@ -1355,14 +1558,17 @@ class SolarSource:
         weighted_gain = gain * weights
         return radial, directions, true_mu, app_rad, transmission, weighted_gain, lit
 
-    def scatter(self, x, backward, *, iw=None, ray_fraction, aerosol_fractions):
+    def scatter(self, x, backward, *, iw=None, ray_fraction, aerosol_fractions,
+                disk=None):
         """Solar angular integral of ``T * G * p_mix`` over the disk beams.
 
         For scalar ``iw`` the fractions have shapes ``(n,)`` / ``(n, n_ae)``
         and the output is ``(n,)``; for ``iw=None`` they have ``(n, n_wl)``
         / ``(n, n_ae, n_wl)`` and the output is ``(n, n_wl)``.  The phase
         argument is the *apparent* beam direction composed with the backward
-        ray, not the geometric one.
+        ray, not the geometric one.  ``disk`` overrides the per-point beam
+        selection (validation reference quadratures only; production callers
+        get the contact-band adaptive selection).
         """
         atmo = self._atmo_ref()
         if atmo is None:
@@ -1371,52 +1577,60 @@ class SolarSource:
         n_wl = len(atmo.wl)
         out = np.zeros((len(x), n_wl)) if iw is None else np.zeros(len(x))
         wavelengths = atmo.wl if iw is None else np.array([atmo.wl[iw]])
-        # full-spectrum batches materialise (points, beams, n_wl) arrays;
-        # shrink the step so the peak transient stays bounded
-        step = self.chunk if iw is not None else max(2048, self.chunk // 8)
-        for start in range(0, len(x), step):
-            sl = slice(start, min(start + step, len(x)))
-            radial, directions, mu, app, transmission, gain, lit = \
-                self._geometry_arrays(x[sl], iw)
-            active = np.flatnonzero(np.any(lit, axis=1))
-            if not active.size:
-                continue
-            # Twilight has many fully shadowed collisions; skipping their Mie
-            # phase evaluations does not change any sampled path.
-            positions = start + active
-            radial, mu, app = radial[active], mu[active], app[active]
-            transmission, gain = transmission[active], gain[active]
-            dr = np.einsum("ij,ij->i", backward[positions], radial)[:, None]
-            horizontal_dot = (backward[positions] @ directions.T - mu * dr) / np.sqrt(
-                np.maximum(1 - mu ** 2, 1e-30))
-            phase_mu = np.cos(app) * horizontal_dot + np.sin(app) * dr
-            phase_mu = np.where(np.abs(mu) > 1 - 1e-14, np.sign(mu) * dr, phase_mu)
-            phase_mu = np.clip(phase_mu, -1.0, 1.0)
-            p_ray = spectra.rayleigh_phase(phase_mu)
-            if iw is None:
-                phase = p_ray[..., None] * ray_fraction[positions, None, :]
-            else:
-                phase = p_ray * ray_fraction[positions, None]
-            for j, layer in enumerate(atmo.aerosols):
-                aerosol_phase = np.asarray(
-                    layer.aerosol.phase(phase_mu.ravel(), wavelengths))
-                if aerosol_phase.ndim == 1:
-                    # wavelength-independent phase functions return one value
-                    # per direction; broadcast across the band
-                    aerosol_phase = np.broadcast_to(
-                        aerosol_phase.reshape(phase_mu.shape + (1,)),
-                        phase_mu.shape + (len(wavelengths),))
-                else:
-                    aerosol_phase = aerosol_phase.reshape(
-                        phase_mu.shape + (len(wavelengths),))
+        if disk is not None:
+            groups = [(np.arange(len(x)), disk)]
+        else:
+            groups = self._group_by_disk(self._point_disk_keys(x, "scatter"))
+        for idx, group_disk in groups:
+            idx = np.asarray(idx)
+            n_beam = group_disk[0].shape[0]
+            # full-spectrum batches materialise (points, beams, n_wl) arrays;
+            # bound the transient by the same elements budget at any beam count
+            budget = 2_500_000 if iw is None else self.chunk
+            step = max(64, min(self.chunk, budget // max(n_beam * n_wl, 1)))
+            for start in range(0, idx.size, step):
+                pos = idx[start:start + step]      # global positions
+                radial, directions, mu, app, transmission, gain, lit = \
+                    self._geometry_arrays(x[pos], iw, disk=group_disk)
+                active = np.flatnonzero(np.any(lit, axis=1))
+                if not active.size:
+                    continue
+                # Twilight has many fully shadowed collisions; skipping their Mie
+                # phase evaluations does not change any sampled path.
+                pos = pos[active]
+                radial, mu, app = radial[active], mu[active], app[active]
+                transmission, gain = transmission[active], gain[active]
+                dr = np.einsum("ij,ij->i", backward[pos], radial)[:, None]
+                horizontal_dot = (backward[pos] @ directions.T - mu * dr) / np.sqrt(
+                    np.maximum(1 - mu ** 2, 1e-30))
+                phase_mu = np.cos(app) * horizontal_dot + np.sin(app) * dr
+                phase_mu = np.where(np.abs(mu) > 1 - 1e-14, np.sign(mu) * dr, phase_mu)
+                phase_mu = np.clip(phase_mu, -1.0, 1.0)
+                p_ray = spectra.rayleigh_phase(phase_mu)
                 if iw is None:
-                    phase = phase + aerosol_phase * aerosol_fractions[positions, j, None, :]
+                    phase = p_ray[..., None] * ray_fraction[pos, None, :]
                 else:
-                    phase = phase + aerosol_phase[..., 0] * aerosol_fractions[positions, j, None]
-            if iw is None:
-                out[positions] = np.sum(transmission * gain[..., None] * phase, axis=1)
-            else:
-                out[positions] = np.sum(transmission * gain * phase, axis=1)
+                    phase = p_ray * ray_fraction[pos, None]
+                for j, layer in enumerate(atmo.aerosols):
+                    aerosol_phase = np.asarray(
+                        layer.aerosol.phase(phase_mu.ravel(), wavelengths))
+                    if aerosol_phase.ndim == 1:
+                        # wavelength-independent phase functions return one value
+                        # per direction; broadcast across the band
+                        aerosol_phase = np.broadcast_to(
+                            aerosol_phase.reshape(phase_mu.shape + (1,)),
+                            phase_mu.shape + (len(wavelengths),))
+                    else:
+                        aerosol_phase = aerosol_phase.reshape(
+                            phase_mu.shape + (len(wavelengths),))
+                    if iw is None:
+                        phase = phase + aerosol_phase * aerosol_fractions[pos, j, None, :]
+                    else:
+                        phase = phase + aerosol_phase[..., 0] * aerosol_fractions[pos, j, None]
+                if iw is None:
+                    out[pos] = np.sum(transmission * gain[..., None] * phase, axis=1)
+                else:
+                    out[pos] = np.sum(transmission * gain * phase, axis=1)
         self.n_points += len(x)
         return out
 
@@ -1427,17 +1641,17 @@ class SolarSource:
             raise RuntimeError("the owning atmosphere is gone; rebuild the source")
         self._validate(atmo)
         out = np.zeros(len(x)) if iw is not None else np.zeros((len(x), len(atmo.wl)))
-        for start in range(0, len(x), self._chunk_for_disk(
-                self._flux_disk_for_points(x[:1] if len(x) else x))):
-            sl = slice(start, min(start + self._chunk_for_disk(
-                self._flux_disk_for_points(x[:1] if len(x) else x)), len(x)))
-            _, _, _, app, transmission, gain, _ = self._geometry_arrays(
-                x[sl], iw, disk=self._flux_disk_for_points(x[sl]))
-            if iw is None:
-                gain = gain[..., None]     # gain is wavelength independent
-                app = app[..., None]
-            out[sl] = np.sum(transmission * gain * np.maximum(np.sin(app), 0.0),
-                             axis=1)
+        for idx, disk_used in self._group_by_disk(self._point_disk_keys(x, "flux")):
+            step = self._chunk_for_disk(disk_used)
+            for start in range(0, idx.size, step):
+                pos = idx[start:start + step]
+                _, _, _, app, transmission, gain, _ = self._geometry_arrays(
+                    x[pos], iw, disk=disk_used)
+                if iw is None:
+                    gain = gain[..., None]     # gain is wavelength independent
+                    app = app[..., None]
+                out[pos] = np.sum(transmission * gain * np.maximum(np.sin(app), 0.0),
+                                  axis=1)
         return out
 
     def direct_irradiance(self, x, normal, *, iw=None):
@@ -1456,36 +1670,36 @@ class SolarSource:
         f_inf = spectra.solar_irradiance(atmo.wl)
         n_pts = len(x)
         out = np.zeros((n_pts, len(atmo.wl))) if iw is None else np.zeros(n_pts)
-        step = self._chunk_for_disk(self._flux_disk_for_points(
-            x[:1] if len(x) else x))
-        for start in range(0, n_pts, step):
-            sl = slice(start, min(start + step, n_pts))
-            directions, _ = disk_used = self._flux_disk_for_points(x[sl])
-            _, _, _, app, transmission, gain, _ = self._geometry_arrays(
-                x[sl], iw, disk=disk_used)
-            # The apparent direction stays in the vertical plane of the true
-            # direction (radial refraction preserves azimuth), so its unit
-            # vector is the true beam direction tilted from the radial by
-            # (true -> apparent elevation).
-            radial = x[sl] / np.linalg.norm(x[sl], axis=1)[:, None]
-            sin_true = np.clip(radial @ directions.T, -1, 1)     # sin(true elev)
-            cos_true = np.sqrt(np.maximum(1.0 - sin_true ** 2, 1e-300))
-            # The apparent beam direction is  sin(app)*radial + cos(app)*e_h
-            # (app = apparent *elevation*, radians); resolve the unit normal
-            # against that basis:
-            n_dot_radial = np.einsum("ij,j->i", radial, normal)[:, None]
-            n_dot_beam = (normal[None, :] @ directions.T)[0]     # (n_beam,)
-            horizontal = (n_dot_beam - n_dot_radial * sin_true) / cos_true
-            app_dot_normal = (np.sin(app) * n_dot_radial
-                              + np.cos(app) * horizontal)
-            if iw is None:
-                gain = gain[..., None]     # gain is wavelength independent
-                app_dot_normal = app_dot_normal[..., None]
-            weighted = transmission * gain * np.maximum(app_dot_normal, 0.0)
-            if iw is None:
-                out[sl] = weighted.sum(axis=1) * f_inf[None, :]
-            else:
-                out[sl] = weighted.sum(axis=1) * f_inf[iw]
+        for idx, disk_used in self._group_by_disk(self._point_disk_keys(x, "flux")):
+            step = self._chunk_for_disk(disk_used)
+            for start in range(0, idx.size, step):
+                pos = idx[start:start + step]
+                directions = disk_used[0]
+                _, _, _, app, transmission, gain, _ = self._geometry_arrays(
+                    x[pos], iw, disk=disk_used)
+                # The apparent direction stays in the vertical plane of the
+                # true direction (radial refraction preserves azimuth), so
+                # its unit vector is the true beam direction tilted from the
+                # radial by (true -> apparent elevation).
+                radial = x[pos] / np.linalg.norm(x[pos], axis=1)[:, None]
+                sin_true = np.clip(radial @ directions.T, -1, 1)  # sin(true elev)
+                cos_true = np.sqrt(np.maximum(1.0 - sin_true ** 2, 1e-300))
+                # The apparent beam direction is  sin(app)*radial + cos(app)*e_h
+                # (app = apparent *elevation*, radians); resolve the unit normal
+                # against that basis:
+                n_dot_radial = np.einsum("ij,j->i", radial, normal)[:, None]
+                n_dot_beam = (normal[None, :] @ directions.T)[0]   # (n_beam,)
+                horizontal = (n_dot_beam - n_dot_radial * sin_true) / cos_true
+                app_dot_normal = (np.sin(app) * n_dot_radial
+                                  + np.cos(app) * horizontal)
+                if iw is None:
+                    gain = gain[..., None]     # gain is wavelength independent
+                    app_dot_normal = app_dot_normal[..., None]
+                weighted = transmission * gain * np.maximum(app_dot_normal, 0.0)
+                if iw is None:
+                    out[pos] = weighted.sum(axis=1) * f_inf[None, :]
+                else:
+                    out[pos] = weighted.sum(axis=1) * f_inf[iw]
         return out
 
     def central_transmittance(self, height_km=None, *, iw=None):

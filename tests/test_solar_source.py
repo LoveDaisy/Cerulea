@@ -230,8 +230,8 @@ def test_table_holdout_against_direct_field(small_source):
             pts.append((h, true, crit))
     z = np.array([p[0] for p in pts])
     te = np.array([p[1] for p in pts])
-    app, tval, gain, lit = table.query(z, te)
     ext = species_extinction_weights(atmo._medium)
+    app, tval, gain, lit = table.query(z, te, ext)
     worst_angle = worst_tg = 0.0
     for i, (h, true, crit) in enumerate(pts):
         if true < crit - 1e-9:
@@ -265,9 +265,10 @@ def test_table_wavelength_slices_identical(small_source):
     table = geom.table
     z = np.array([1.0, 20.0, 60.0])
     te = np.array([-2.0, 10.0, 70.0])
-    app_a, t_all, gain_a, lit_a = table.query(z, te)
+    ext = species_extinction_weights(atmo._medium)
+    app_a, t_all, gain_a, lit_a = table.query(z, te, ext)
     for iw in range(len(atmo.wl)):
-        app_b, t_b, gain_b, lit_b = table.query(z, te, iw=iw)
+        app_b, t_b, gain_b, lit_b = table.query(z, te, ext[:, iw])
         assert np.array_equal(app_a, app_b)
         assert np.array_equal(gain_a, gain_b)
         assert np.array_equal(lit_a, lit_b)
@@ -281,7 +282,9 @@ def test_transmittance_is_pure_attenuation(small_source):
     rng = np.random.default_rng(3)
     z = rng.uniform(0.0, 199.0, 500)
     te = rng.uniform(-15.0, 89.9, 500)
-    _, tval, gain, _ = geom.table.query(z, te)
+    from skycolor.optics import species_extinction_weights as _sew
+    _, tval, gain, _ = geom.table.query(
+        z, te, _sew(atmo._medium))
     assert np.all((tval >= 0.0) & (tval <= 1.0))
     assert np.all(gain >= 0.0)
 
@@ -319,3 +322,158 @@ def test_refraction_off_is_same_contract_at_n_one():
     # discretisation of the legacy chord that the continuous integration
     # removes; agreement at that level pins the shared n=1 geometry
     assert np.allclose(t_central, t_ref, rtol=5e-4)
+
+
+# ---------------------------------------------------------------------------
+# batch invariance, contact-band kernels and build anchors (review round 4)
+# ---------------------------------------------------------------------------
+def _vacuum_550():
+    return Atmosphere(np.array([550.0]), ozone_du=300.0, aerosols=[],
+                      refraction=False)
+
+
+def test_flux_kernels_batch_invariant():
+    """A point's flux kernel must not depend on its batch companions.
+
+    The round-4 reviewer's probe: a sea-level point queried alone got the
+    contact-band refined disk while the same point in a mixed-height batch
+    fell back to the coarse disk (+20.7% on direct_irradiance).  Per-point
+    disk selection makes batching a pure execution concern; the shared
+    point's value must be bit-identical across batch composition, order and
+    call site.
+    """
+    atmo = _vacuum_550()                 # keep alive: the source is weak-ref'd
+    source = SolarSource(atmo, 90.2, 0.0)   # sun elevation -0.2 deg
+    x_ground = np.array([[0.0, 0.0, R_EARTH]])
+    x_mixed = np.array([[0.0, 0.0, R_EARTH], [0.0, 0.0, R_EARTH + 1e3]])
+    normal = np.array([0.0, 0.0, 1.0])
+    single = source.direct_irradiance(x_ground, normal, iw=0)
+    mixed = source.direct_irradiance(x_mixed, normal, iw=0)
+    assert np.array_equal(single[0], mixed[0])
+    assert np.array_equal(single[0],
+                          source.direct_irradiance(x_mixed[::-1], normal,
+                                                   iw=0)[1])
+    g_single = source.ground(x_ground, iw=0)
+    g_mixed = source.ground(x_mixed, iw=0)
+    assert np.array_equal(g_single[0], g_mixed[0])
+
+
+def test_scatter_contact_band_meets_budget():
+    """Local scatter kernel accuracy where the shadow boundary cuts the disk.
+
+    The round-4 reviewer's probe (vacuum, sun -0.2 deg, sea level, zenith
+    backward, unit Rayleigh fraction): the fixed 2x8 disk carried ~+72%
+    error against a converged reference.  The occultation-adaptive disk
+    must hold the plan's 0.5% source-kernel budget, and the probe must stay
+    a genuine contact-band scenario (the old disk remains tens of per cent
+    wrong here, so the assertion cannot silently degrade into a vacuous
+    pass).
+    """
+    atmo = _vacuum_550()                 # keep alive: the source is weak-ref'd
+    source = SolarSource(atmo, 90.2, 0.0)
+    x = np.array([[0.0, 0.0, R_EARTH]])
+    backward = np.array([[0.0, 0.0, 1.0]])
+    rf = np.ones(1)
+    af = np.zeros((1, 0))
+
+    def run(disk=None):
+        kw = {} if disk is None else {"disk": disk}
+        return float(source.scatter(x, backward, iw=0, ray_fraction=rf,
+                                    aerosol_fractions=af, **kw)[0])
+
+    ref = run(source._shadow_split_disk(0.0, 24, 768, "test-dense"))
+    assert abs(run() - ref) <= 5e-3 * abs(ref)
+    old = run(solar_disk(source.sun_hat, 2, 8))
+    assert abs(old - ref) > 0.3 * abs(ref)
+    # a fully lit cap reproduces the plain disk's centre-normal convention
+    atmo_hi = _vacuum_550()
+    hi = SolarSource(atmo_hi, 60.0, 0.0)
+    disk = hi._shadow_split_disk(0.0, 8, 64, "test-norm")
+    np.testing.assert_allclose(np.sum(disk[1] * (disk[0] @ hi.sun_hat)),
+                               1.0, atol=1e-12)
+
+
+def test_table_build_independent_of_query_order():
+    """Build anchors make the shared table registration-order free.
+
+    The round-4 reviewer's probe: a wavelength slice queried first shifted
+    the later full-spectrum T by ~0.15% because the build took its column
+    scale and refinement criteria from whichever medium registered first.
+    The anchors are fixed physical wavelengths, so slice-first and
+    full-first builds come out bit-identical -- and so do tables of
+    constructions that differ only in their wavelength grid.
+    """
+    atmo_a = Atmosphere.standard(W3)
+    geom_a = get_solar_geometry(atmo_a._medium)
+    geom_a.ensure_table(n_height=9)
+
+    atmo_b = Atmosphere.standard(W3)
+    slice_b = atmo_b._restrict([0])
+    geom_b = get_solar_geometry(slice_b._medium)
+    geom_b.ensure_table(n_height=9)            # the slice registers first
+    assert get_solar_geometry(atmo_b._medium) is geom_b   # token-shared
+
+    ta, tb = geom_a.table, geom_b.table
+    assert np.array_equal(ta.critical, tb.critical)
+    assert np.array_equal(ta.column_scale, tb.column_scale)
+    z = np.array([1.4, 8.0, 40.0])
+    te = np.array([-1.0, -2.0, 5.0])
+    # same-shape readout on both sides: bitwise equality of T is the
+    # contract, and a (n_species,) vs (n_species, n_wl) matmul reduction
+    # may differ in the last ulp without any physical meaning
+    ext_a = species_extinction_weights(atmo_a._medium)[:, :1]
+    ext_b = species_extinction_weights(slice_b._medium)[:, :1]
+    app_a, t_a, gain_a, lit_a = ta.query(z, te, ext_a)
+    app_b, t_b, gain_b, lit_b = tb.query(z, te, ext_b)
+    assert np.array_equal(app_a, app_b)
+    assert np.array_equal(gain_a, gain_b)
+    assert np.array_equal(lit_a, lit_b)
+    assert np.array_equal(t_a[:, 0], t_b[:, 0])    # 450 nm through both paths
+
+    # a grid without 550 nm (and a reordered one) build the same geometry:
+    # the anchors never see the registrar's wavelengths
+    atmo_c = Atmosphere.standard(np.array([560.0, 570.0, 650.0]))
+    geom_c = get_solar_geometry(atmo_c._medium)
+    geom_c.ensure_table(n_height=9)
+    assert np.array_equal(ta.critical, geom_c.table.critical)
+    atmo_d = Atmosphere.standard(np.array([650.0, 450.0, 550.0]))
+    geom_d = get_solar_geometry(atmo_d._medium)
+    geom_d.ensure_table(n_height=9)
+    assert np.array_equal(ta.critical, geom_d.table.critical)
+    assert np.array_equal(ta.column_scale, geom_d.table.column_scale)
+
+
+def test_build_anchors_match_grid_values():
+    """Anchor extinction equals the grid value at the anchor wavelength.
+
+    This pins the bit-compatibility claim: for grids that contain the
+    anchor wavelengths the certificate values are unchanged, so only grids
+    without them see (tighter) certificate changes.
+    """
+    from skycolor.constants import WL_COARSE
+    from skycolor.solar_source import (_TABLE_CERT_WL_NM, _TABLE_SCALE_WL_NM,
+                                       _anchor_extinction)
+    atmo = Atmosphere.standard(WL_COARSE)
+    grid = species_extinction_weights(atmo._medium)
+    cert = _anchor_extinction(atmo._medium, _TABLE_CERT_WL_NM)
+    scale = _anchor_extinction(atmo._medium, _TABLE_SCALE_WL_NM)
+    k_cert = int(np.argmin(np.abs(atmo.wl - _TABLE_CERT_WL_NM)))
+    k_scale = int(np.argmin(np.abs(atmo.wl - _TABLE_SCALE_WL_NM)))
+    assert atmo.wl[k_cert] == _TABLE_CERT_WL_NM
+    assert atmo.wl[k_scale] == _TABLE_SCALE_WL_NM
+    assert np.array_equal(cert[:, 0], grid[:, k_cert])
+    assert np.array_equal(scale[:, 0], grid[:, k_scale])
+
+
+@pytest.mark.parametrize("elev", [-0.5, -1.0, -3.0, -10.0])
+def test_shadow_height_matches_vacuum_analytic(elev):
+    """Column shadow boundary = the spherical R/cos(e) - R root in vacuum.
+
+    The deck lit-segment classification consumes exactly this root; the
+    analytic form is the reviewer's independent formula.
+    """
+    atmo = Atmosphere(W3, refraction=False, aerosols=[])
+    source = SolarSource(atmo, 90.0 - elev, 0.0)
+    z_sh = source.shadow_height(elev)
+    analytic = R_EARTH * (1.0 / np.cos(np.radians(elev)) - 1.0) / 1e3
+    assert abs(z_sh - analytic) <= max(2e-3, 2e-5 * abs(analytic))

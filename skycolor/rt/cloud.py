@@ -536,35 +536,24 @@ def illuminate_cloud(atmo, cloud: CloudLayer, sun_zenith_deg: float,
     up = np.array([0.0, 0.0, 1.0])
     true_e = np.degrees(np.arcsin(np.clip(directions @ up, -1.0, 1.0)))
 
-    # Per-beam entry height from the unified source's own occultation
-    # authority: each beam's invariant a = n(z_top) r(z_top) cos(e_app) has
-    # its perigee at q^{-1}(a); an ascending beam crosses exactly the heights
-    # at/above its perigee, so a perigee inside the deck is where its light
-    # enters the sunlit part (the per-beam replacement for the historical
-    # center-beam midpoint closure), a perigee below the base lights the
-    # whole deck from below, and a perigee at/above the top never reaches
-    # the deck.  Descending beams (sun above this deck's horizon) enter
-    # through the top.  This is refraction aware and shares one occultation
-    # authority with every other consumer of the source.
+    # Per-beam lit segment from the unified source's occultation authority.
+    # The boundary that matters for a deck on the observer's vertical column
+    # is where the COLUMN enters Earth's shadow for that beam direction:
+    # ``source.shadow_height`` solves critical_true(z) = true elevation along
+    # the column (exactly R/cos(e) - R in vacuum).  A beam ascending at the
+    # deck top lights the column only above that shadow height -- the deck
+    # is entered at z_shadow when it straddles it, from the base when the
+    # whole deck sits above it, and never when the shadow height is above
+    # the top.  (The perigee of the deck-top ray is a different geometric
+    # quantity at a different horizontal position and must not be used as
+    # this boundary -- review round 4, Major cloud lit-segment.)  Descending
+    # beams (sun above the deck-top horizon) enter through the top.
     app_top, t_top, gain_top, lit_top = source.vertex(
         np.full(n_beam, z_top), true_e)
-    ascending = lit_top & (np.asarray(app_top) <= 1e-8)
-    invariant = (source.geometry.field.refractive_index(np.full(n_beam, z_top))
-                 * (R_EARTH + z_top * 1e3) * np.cos(np.radians(app_top)))
-    r_perigee = np.full(n_beam, source.geometry.field.r_ground)
-    if ascending.any():
-        # only ascending beams have a perigee above the ground (descending
-        # beams are top entries and never need their perigee)
-        r_perigee[ascending] = source.geometry.field.turning_radius(
-            np.asarray(invariant)[ascending])
-    perigee_km = (r_perigee - R_EARTH) / 1000.0
     beams = []
     for b in range(n_beam):
         if not lit_top[b]:
             continue
-        h_b = float(perigee_km[b])
-        if h_b >= z_top:
-            continue                      # this beam never crosses the deck
         tau = optics.tau
         if float(app_top[b]) > 1e-8:
             # descending (sun above this deck's horizon): top entry, full deck
@@ -575,29 +564,41 @@ def illuminate_cloud(atmo, cloud: CloudLayer, sun_zenith_deg: float,
             inc = weights[b] * f_inf * t_entry * gain_entry
             ts = delta_eddington(tau_deck, optics.omega, optics.g, mu0,
                                  f=optics.f, ground_albedo=ag, incident=inc)
-        elif h_b <= z_base:
-            # ascending with the whole deck above the perigee: base entry
-            # (underlit), full deck, no shadowed sub-layer
-            kind, z_entry = "base", z_base
-            e_base = float(source.vertex(np.array([z_base]),
-                                         np.array([true_e[b]]))[0][0])
-            mu0 = max(float(abs(np.sin(np.radians(e_base)))), 1e-8)
-            v = source.vertex(np.array([z_base]), np.array([true_e[b]]))
-            t_entry, gain_entry = v[1][0], v[2][0]
-            tau_deck, tau_below = tau, np.zeros_like(tau)
-            inc = weights[b] * f_inf * t_entry * gain_entry
-            ts = delta_eddington(tau_deck, optics.omega, optics.g, -mu0,
-                                 f=optics.f, ground_albedo=0.0, incident=inc)
         else:
-            # base < shadow_h < top: grazes into the sunlit part at its own
-            # shadow height (per-beam midpoint-closure generalization)
-            kind = "base"
-            z_entry = h_b
-            e_entry = float(source.vertex(np.array([z_entry]),
-                                          np.array([true_e[b]]))[0][0])
-            mu0 = max(float(abs(np.sin(np.radians(e_entry)))), 1e-8)
-            v = source.vertex(np.array([z_entry]), np.array([true_e[b]]))
-            t_entry, gain_entry = v[1][0], v[2][0]
+            # ascending at the deck top: classify against the column's own
+            # shadow height for this beam direction
+            try:
+                z_sh = float(source.shadow_height(float(true_e[b])))
+            except ValueError:
+                # elevation >= 0: the column never occludes for this beam
+                # (the whole deck sits above the would-be root) -> base entry
+                z_sh = z_base - 1.0
+            if z_sh >= z_top:
+                continue                  # this beam lights only above the deck
+            if z_sh <= z_base:
+                # whole deck above the shadow height: base entry (underlit),
+                # full deck, no shadowed sub-layer
+                kind, z_entry = "base", z_base
+            else:
+                # z_base < shadow height < z_top: the beam grazes into the
+                # sunlit part at the shadow height (per-beam generalisation
+                # of the historical midpoint closure)
+                kind = "base"
+                z_entry = z_sh
+            # entry quantities from the source's own vertex query; sit a hair
+            # inside the lit side -- at the root the ray grazes and the lit
+            # flag flickers on rounding
+            app_e = t_e = g_e = None
+            for eps in (0.0, 1e-4, 1e-3, 1e-2):
+                v = source.vertex(np.array([z_entry + eps]),
+                                  np.array([true_e[b]]))
+                if bool(v[3][0]):
+                    app_e, t_e, g_e = float(v[0][0]), v[1][0], v[2][0]
+                    break
+            if app_e is None:
+                continue                  # unlit entry (defensive; zero light)
+            mu0 = max(float(abs(np.sin(np.radians(app_e)))), 1e-8)
+            t_entry, gain_entry = t_e, g_e
             tau_deck = tau * (z_top - z_entry) / (z_top - z_base)
             tau_below = tau * (z_entry - z_base) / (z_top - z_base)
             inc = weights[b] * f_inf * t_entry * gain_entry

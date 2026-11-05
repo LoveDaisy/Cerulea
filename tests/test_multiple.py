@@ -212,3 +212,18 @@ def test_scalar_zenith_with_azimuth_array():
     assert np.all(ms > 0.0)
     # the sun-side value must differ from the anti-sun value
     assert abs(ms[0, 0] - ms[2, 0]) > 0.0
+
+
+def test_direct_beam_projection_supports_many_modes():
+    """The per-beam Fourier azimuth table must size itself by n_modes.
+
+    The round-4 reviewer's probe: the hardcoded 64-row table crashed with
+    IndexError for any legally configured n_modes > 64.
+    """
+    atmo = Atmosphere(WL550, ozone_du=300.0, aerosols=[],
+                      refraction=False, ground_albedo=0.0)
+    res = multiple.solve(atmo, 65.0, np.array([0.0, 45.0]),
+                         np.array([0.0, 90.0]), n_mu=64, n_modes=65,
+                         n_moments=65, max_orders=1, single_view=True)
+    assert np.all(np.isfinite(res.radiance))
+    assert np.all(res.radiance >= 0.0)

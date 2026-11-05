@@ -68,6 +68,38 @@ declared in each module's ``CAPABILITIES``.
 * `T = exp(-tau)` is always the pure attenuation of the physical columns,
   reported separately from gain; `T*G` is never named transmittance and
   never clipped.
+* Reference-frame authority (which interface returns which quantity):
+  the `single`, `mc`, `twilight`, `cloud` and `render` kernels return
+  detector-referred quantities carrying the single
+  `(n_observer/n_point)^2` transfer above.  The SOS backend
+  (`rt.multiple`) is the one documented exception: its diffuse paths keep
+  plain LOCAL radiance/flux with no detector transfer anywhere (ground and
+  TOA diagnostics included), because along the straight-transport
+  approximation plain radiance -- not `L/n^2` -- is the invariant, and
+  reduced bookkeeping there broke energy conservation in check.  The
+  ~1e-4-level convention difference between SOS and single-scattering
+  radiances is part of the declared SOS-vs-SS propagation error (plan 6.3)
+  and must not be "reconciled" by adding a transfer to one side only.
+
+## Disk quadrature conventions
+
+* Production scatter disk: a 2x8 centre-normal product disk
+  (`sum(w*cos(rho)) = 1`); per-beam lit flags drop occulted beams without
+  renormalising the rest.
+* Contact band (`|sun elevation - critical_true|` under one disk radius at
+  the point): the shadow boundary crosses the cap as an azimuth-dependent
+  curve, so flux and scatter kernels switch to the occultation-adaptive
+  disk: all azimuth nodes concentrate on the lit arc, each azimuth's radial
+  Gauss-Legendre rule covers exactly its lit interval (boundary by
+  bisection), and every node carries its true azimuthal measure.  Flux
+  kernels use 16x384 (evaluated once per point), scatter 8x64 (hot path);
+  measured against 24x768 references across the band, the scatter kernel
+  holds <= 0.06% and the horizontal-flux kernel <= 0.003% (plan 6.2 budget
+  0.5%).  Outside the band every beam shares one lit state and the coarse
+  disk's per-beam lit drop is exact.
+* Selection is per point -- the point's own geometry decides.  Batch
+  composition, chunking and call-site grouping change execution cost only,
+  never a value (review round 4, Major batch invariance).
 
 ## What each backend consumes, and what it still approximates
 
@@ -76,7 +108,7 @@ declared in each module's ``CAPABILITIES``.
 | `rt.single` | per-scattering-point `scatter` kernel; phase from the *apparent* beam direction | straight viewing rays; view-path optical depth from the shell quadrature with the aerosol `HorizontalField` applied to the view-side coefficients only (solar columns stay radial) |
 | `rt.multiple` (SOS) | per-disk-beam tables on the pseudo-spherical column; beams projected onto the Fourier source with their local azimuth factors (the disk spans only ~16'/sin(z) of local azimuth, so `cos(m d_az) ~ 1`); sun `T` is the raw physical extinction -- delta-M scales only the diffuse moments | plane-parallel diffuse transport; ground fixed at `z_bounds[0]` |
 | `rt.mc`, `rt.twilight` | deferred batched `scatter`/`ground` evaluation; the RNG stream, free paths and event classification are bit-identical to a run with the solar values blanked | straight-line photon transport; horizontally uniform atmosphere |
-| `rt.cloud` | per-beam classification (top entry / base entry / mid-deck perigee / blocked), per-beam two-stream responses, `geometry="mixed"` when the disk straddles the boundary | plane-parallel homogeneous deck; the per-beam generalisation of the historical midpoint closure for perigee-inside-deck beams |
+| `rt.cloud` | per-beam classification (top entry / base entry / mid-deck column-shadow entry / blocked): the entry height is the vertical column's shadow root for that beam direction (`SolarSource.shadow_height`, exactly `R/cos(e)-R` in vacuum), per-beam two-stream responses, `geometry="mixed"` when the disk straddles the boundary | plane-parallel homogeneous deck; the per-beam generalisation of the historical midpoint closure for decks the shadow boundary cuts through |
 | `render.ground_radiance` | `direct_irradiance` on the horizontal at the observer's ground | display-only; the retired `direct_transmittance` override still works but warns and cannot be combined with the new override |
 
 The Monte Carlo signability note (plan 6.3): the deterministic-vs-MC
