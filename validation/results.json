@@ -54,9 +54,9 @@
       "key": "check2",
       "metrics": [
         {
-          "dev": 4.84857031598115,
+          "dev": 4.839041433865051,
           "dev_kind": "rel_pct",
-          "model": 101.85200444996241,
+          "model": 101.84274790272703,
           "name": "DNI illuminance, AM1.5 (48.19deg)",
           "passed": true,
           "reference": 97.1420059834979,
@@ -64,9 +64,9 @@
           "unit": "klx"
         },
         {
-          "dev": 5.321255554652797,
+          "dev": 5.3127701733195245,
           "dev_kind": "rel_pct",
-          "model": 394.75982714473247,
+          "model": 394.72802266565805,
           "name": "DNI, 400-700 nm, AM1.5",
           "passed": true,
           "reference": 374.81496500000003,
@@ -74,9 +74,9 @@
           "unit": "W/m2"
         },
         {
-          "dev": 6.49555776439663,
+          "dev": 6.488620524563706,
           "dev_kind": "abs",
-          "model": 6.49555776439663,
+          "model": 6.488620524563706,
           "name": "DNI spectral RMS, 400-700 nm",
           "passed": true,
           "reference": 0.0,
@@ -104,9 +104,9 @@
           "unit": "klx"
         },
         {
-          "dev": 3.9548201574786814,
+          "dev": 3.8694556474657014,
           "dev_kind": "rel_pct",
-          "model": 94.78783027237102,
+          "model": 94.70999341329959,
           "name": "DNI illuminance, h=30deg (Bird)",
           "passed": true,
           "reference": 91.18175581351514,
@@ -114,9 +114,9 @@
           "unit": "klx"
         },
         {
-          "dev": 5.6563787669415975,
+          "dev": 5.645780335427771,
           "dev_kind": "rel_pct",
-          "model": 109.44658491013551,
+          "model": 109.43560628160282,
           "name": "DNI illuminance, h=60deg (Bird)",
           "passed": true,
           "reference": 103.58729514244891,
@@ -124,7 +124,7 @@
           "unit": "klx"
         }
       ],
-      "summary": "DNI: 94.8/101.9/109.4 klx at h=30/48.19/60 vs 91.2/97.1/103.6; DHI: 9.8/11.6 klx vs CIE 6.9/7.9.",
+      "summary": "DNI: 94.7/101.8/109.4 klx at h=30/48.19/60 vs 91.2/97.1/103.6; DHI: 9.8/11.6 klx vs CIE 6.9/7.9.",
       "title": "Clear-sky direct and diffuse illuminance",
       "verdict": "FAIL"
     },
@@ -153,9 +153,9 @@
           "unit": ""
         },
         {
-          "dev": 10.53997294829964,
+          "dev": 10.539972948299642,
           "dev_kind": "abs",
-          "model": 10.53997294829964,
+          "model": 10.539972948299642,
           "name": "RMS dev, theta<=60deg, h=45deg",
           "passed": true,
           "reference": 0.0,
@@ -183,9 +183,9 @@
           "unit": "%"
         },
         {
-          "dev": 35.23430481909276,
+          "dev": 35.234304819092756,
           "dev_kind": "abs",
-          "model": 35.23430481909276,
+          "model": 35.234304819092756,
           "name": "RMS dev, whole sky, h=45deg",
           "passed": false,
           "reference": 0.0,
@@ -271,9 +271,9 @@
       "key": "check5",
       "metrics": [
         {
-          "dev": -0.4703042206526652,
+          "dev": -0.47030266151805017,
           "dev_kind": "abs",
-          "model": 13.574377390754643,
+          "model": 13.574426123401592,
           "name": "zenith luminance, h=-3deg (extrapolated ref)",
           "passed": true,
           "reference": 40.0889,
@@ -281,9 +281,9 @@
           "unit": "cd/m2"
         },
         {
-          "dev": -0.2747939563164375,
+          "dev": -0.27480273183625753,
           "dev_kind": "abs",
-          "model": 0.27430272423050706,
+          "model": 0.274297181621117,
           "name": "zenith luminance, h=-6deg",
           "passed": true,
           "reference": 0.516445,
@@ -291,9 +291,9 @@
           "unit": "cd/m2"
         },
         {
-          "dev": -1.5618634214389269,
+          "dev": -1.5618684155981795,
           "dev_kind": "abs",
-          "model": 0.000469417368788847,
+          "model": 0.00046941197076581423,
           "name": "zenith luminance, h=-9deg",
           "passed": false,
           "reference": 0.0171168,
@@ -301,9 +301,9 @@
           "unit": "cd/m2"
         },
         {
-          "dev": -3.475922022622808,
+          "dev": -3.475937270916155,
           "dev_kind": "abs",
-          "model": 4.878686433009873e-07,
+          "model": 4.878515142931296e-07,
           "name": "zenith luminance, h=-12deg",
           "passed": false,
           "reference": 0.00145957,
@@ -330,9 +330,9 @@
       "key": "check6",
       "metrics": [
         {
-          "dev": -0.25813100566146174,
+          "dev": -0.25813990403285747,
           "dev_kind": "abs",
-          "model": 0.35644339502913,
+          "model": 0.3564360918435051,
           "name": "zenith luminance, h=-6deg",
           "passed": false,
           "reference": 0.645835,
@@ -340,27 +340,27 @@
           "unit": "cd/m2"
         },
         {
-          "dev": -0.1796375144532498,
+          "dev": 0.062020920408800424,
           "dev_kind": "abs",
-          "model": 0.010676397720482607,
+          "model": 0.01862443809205211,
           "name": "zenith luminance, h=-9deg",
           "passed": true,
           "reference": 0.0161459,
-          "tolerance": 0.3364871983116271,
+          "tolerance": 0.3306541125282621,
           "unit": "cd/m2"
         },
         {
-          "dev": -0.2275993828741358,
+          "dev": -0.12469951324626592,
           "dev_kind": "abs",
-          "model": 0.0007648075913226677,
+          "model": 0.0009692862670143115,
           "name": "zenith luminance, h=-12deg",
           "passed": true,
           "reference": 0.00129167,
-          "tolerance": 0.8229558026014708,
+          "tolerance": 0.6910507442024668,
           "unit": "cd/m2"
         }
       ],
-      "summary": "model/Koomen: -6deg 0.55, -9deg 0.66, -12deg 0.59; model/Patat at -6deg 0.69.",
+      "summary": "model/Koomen: -6deg 0.55, -9deg 1.15, -12deg 0.75; model/Patat at -6deg 0.69.",
       "title": "Twilight against Koomen et al. (1952)",
       "verdict": "FAIL"
     }

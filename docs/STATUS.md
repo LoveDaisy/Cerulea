@@ -29,7 +29,7 @@ shared-physics validation blind spots: [ARCHITECTURE.md](ARCHITECTURE.md).
 ## Validation snapshot
 
 The latest committed [six-check results](../validation/results.json) are
-**3 PASS / 3 FAIL**. Passing regression tests do not close these physical gaps.
+**2 PASS / 4 FAIL** (unified solar source; see [physics/SOLAR_SOURCE.md](physics/SOLAR_SOURCE.md)). Passing regression tests do not close these physical gaps.
 Use `uv run pytest -q` for the current test count; the M18 full run is preserved
 in [CURVED_TRANSPORT_AUDIT.md](twilight/CURVED_TRANSPORT_AUDIT.md).
 
@@ -40,7 +40,7 @@ in [CURVED_TRANSPORT_AUDIT.md](twilight/CURVED_TRANSPORT_AUDIT.md).
 | 3 — CIE relative luminance | FAIL; upper sky RMS 10.6%, sun-side horizon +142% at sun 45° |
 | 4 — Horizon chromaticity | PASS, marginal; Δxy = 0.0184 |
 | 5 — Twilight, first order only | FAIL in deep twilight; does not test the full engine |
-| 6 — Koomen twilight | PASS within stated tolerances; −6° deterministic 0.69×, −9°/−12° engine 1.12×/0.59× |
+| 6 — Koomen twilight | FAIL; −6° deterministic 0.55×, −9°/−12° engine 1.15×/0.75× — the round-4 contact-band disk fix raised the deep-twilight MC NEE (old 2×8 disk under-integrated partially occulted beams; deterministic SS unchanged) |
 
 Check6's deep points are one low-budget seed, not converged predictions. The
 [deep-twilight reference](twilight/DEEP_TWILIGHT_REFERENCE.md) quantifies
