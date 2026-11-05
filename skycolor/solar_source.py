@@ -1155,6 +1155,13 @@ class SolarGeometry:
         self.medium_refs = live
         return live[0]() if live else None
 
+    @property
+    def table(self) -> PointSourceTable:
+        if self._table is None:
+            raise RuntimeError(
+                "solar source table not built yet; call ensure_table() first")
+        return self._table
+
     def ensure_table(self, **kw) -> PointSourceTable:
         if self._table is None:
             medium = self.resolve_medium()
@@ -1362,49 +1369,50 @@ class SolarSource:
         s_loc, c_loc = np.sin(e_r), np.cos(e_r)
         centre_lit = (e_loc_deg - crit_deg) > 0.0
         # azimuths: centre visible -> full circle; centre shadowed -> the
-        # lit arc |phi| < phi_half where the rim elevation still exceeds crit
-        if centre_lit:
-            phi_half = np.full(e_loc_deg.shape, np.pi)
-            az_measure_ratio = np.full(e_loc_deg.shape, 1.0 / n_az)
-        else:
-            den = c_loc * np.sin(alpha)
-            cos_ph_half = np.where(den > 1e-300,
-                                   (c_r - s_loc * np.cos(alpha))
-                                   / np.where(den > 1e-300, den, 1.0), 1.0)
-            phi_half = np.arccos(np.clip(cos_ph_half, -1.0, 1.0))
-            az_measure_ratio = phi_half / (np.pi * n_az)
+        # lit arc |phi| < phi_half where the rim elevation still exceeds crit.
+        # Both branches are per point -- an in-band chunk mixes topologies.
+        den = c_loc * np.sin(alpha)
+        cos_ph_half = np.where(den > 1e-300,
+                               (c_r - s_loc * np.cos(alpha))
+                               / np.where(den > 1e-300, den, 1.0), 1.0)
+        phi_half = np.where(centre_lit, np.pi,
+                            np.arccos(np.clip(cos_ph_half, -1.0, 1.0)))
+        az_measure_ratio = np.where(centre_lit, 1.0 / n_az,
+                                    phi_half / (np.pi * n_az))
         # phi grid per point, centred on the local sun-tilt direction
         j = (np.arange(n_az) + 0.5)[None, :]
         phi = -phi_half[:, None] + (2.0 * phi_half[:, None] / n_az) * j
-        # per-point local frame: t(phi) = cos(phi) t1 + sin(phi) t2 with
-        # t1 = [-sin e_loc, 0, cos e_loc] (increasing elevation), t2 = +y
-        t = np.stack([-s_loc[:, None] * np.cos(phi),
-                      np.broadcast_to(np.sin(phi), phi.shape),
-                      c_loc[:, None] * np.cos(phi)], axis=2)     # (n, n_az, 3)
-        # profile elevation along each azimuth: asin(s_loc cos rho + c_loc
-        # sin rho cos phi) -- monotone in rho; bisection for the crossing
+        # per-point earth-frame cap basis: t(phi) = cos(phi) t1 + sin(phi) u2
+        # with t1 = c_loc * radial - s_loc * u1 the tilt toward higher
+        # elevation; t1 and u2 are both exactly orthogonal to sun_hat, so
+        # cos(rho) sun_hat + sin(rho) t is a unit direction for every beam
+        cos_phi = np.cos(phi)[:, :, None]
+        sin_phi = np.sin(phi)[:, :, None]
+        t1 = c_loc[:, None] * radial - s_loc[:, None] * u1        # (n, 3)
+        t = cos_phi * t1[:, None, :] + sin_phi * u2[:, None, :]   # (n, n_az, 3)
+        # radial component of t(phi) is frame-free: radial*t1 = c_loc and
+        # radial*u2 = 0, so sin(e_b) = cos(rho) s_loc + sin(rho) c_loc cos(phi)
+        # -- the profile elevation along each azimuth, monotone in rho
+        t_r = c_loc[:, None] * np.cos(phi)                        # (n, n_az)
         rho_lo = np.zeros((e_r.shape[0], n_az))
         rho_hi = np.full((e_r.shape[0], n_az), alpha)
         for _ in range(60):
             mid = 0.5 * (rho_lo + rho_hi)
             # dz stays (n, n_az): a trailing axis here would promote the
             # bisection state one rank per iteration and hang the loop
-            dz = np.cos(mid) * s_loc[:, None] + np.sin(mid) * t[:, :, 2]
-            g = np.arcsin(np.clip(dz, -1.0, 1.0)) - c_r
-            increasing = t[:, :, 2] > 0.0
+            dz = np.cos(mid) * s_loc[:, None] + np.sin(mid) * t_r
+            g = np.arcsin(np.clip(dz, -1.0, 1.0)) - c_r[:, None]
+            increasing = t_r > 0.0
             move_lo = np.where(increasing, g < 0.0, g > 0.0)
             rho_lo = np.where(move_lo, mid, rho_lo)
             rho_hi = np.where(move_lo, rho_hi, mid)
         rho_star = 0.5 * (rho_lo + rho_hi)
-        g0 = np.radians(e_loc_deg)[:, None] - c_r
         ga = np.arcsin(np.clip(
-            np.cos(alpha) * s_loc + np.sin(alpha) * t[:, :, 2], -1.0, 1.0)) - c_r
-        if centre_lit:
-            lit_lo = np.zeros_like(ga)                    # centre lit: inner
-            lit_hi = np.where(ga >= 0.0, alpha, rho_star)
-        else:
-            lit_lo = rho_star                             # centre shadowed: outer
-            lit_hi = np.full_like(ga, alpha)
+            np.cos(alpha) * s_loc[:, None] + np.sin(alpha) * t_r,
+            -1.0, 1.0)) - c_r[:, None]
+        lit = centre_lit[:, None]
+        lit_lo = np.where(lit, 0.0, rho_star)         # centre lit: inner
+        lit_hi = np.where(lit, np.where(ga >= 0.0, alpha, rho_star), alpha)
         # never-lit azimuths (empty interval) keep their slot with zero
         # dc-span, so every point of the chunk shares the rectangular
         # (n_az, n_r) beam layout
@@ -1428,7 +1436,9 @@ class SolarSource:
         directions = (np.cos(rho)[:, :, :, None] * self.sun_hat[None, None, None, :]
                       + np.sin(rho)[:, :, :, None] * t[:, :, None, :]).reshape(
                           e_loc_deg.shape[0], n_az * n_r, 3)
-        sin_elev = directions[:, :, 2].copy()
+        sin_elev = (np.cos(rho) * s_loc[:, None, None]
+                    + np.sin(rho) * t_r[:, :, None]).reshape(
+                        e_loc_deg.shape[0], n_az * n_r)
         weights = w.reshape(e_loc_deg.shape[0], n_az * n_r)
         return directions, weights, sin_elev
 
@@ -1535,73 +1545,6 @@ class SolarSource:
         u2 = np.cross(radial, u1)
         return radial, u1, u2
 
-    def _scatter_local_chunk(self, x_chunk, backward_chunk, radial, u1, u2,
-                             disk, iw, wavelengths, atmo, ray_fraction,
-                             aerosol_fractions, out, pos):
-        """One chunk of the local-frame scatter evaluation (shared contract
-        with the coarse path; ``mu`` and the apparent angle are constant per
-        beam, the per-point vectors are rotated into the local frame)."""
-        true_e = np.degrees(np.arcsin(disk.sin_elev))[None, :]
-        medium = self._medium
-        radius = np.linalg.norm(x_chunk, axis=1)
-        height = np.clip((radius - R_EARTH) / 1e3,
-                         medium.z_bounds[0], medium.z_bounds[-1])
-        app, columns, gain, lit = self.geometry.ensure_table().query_fields(
-            height[:, None], true_e)
-        ext = species_extinction_weights(medium)
-        if iw is None:
-            tau = columns @ ext
-            transmission = np.where(lit[..., None], np.exp(-tau), 0.0)
-        else:
-            tau = columns @ ext[:, int(iw)]
-            transmission = np.where(lit, np.exp(-tau), 0.0)
-        app_rad = np.radians(app)
-        local_n = self.geometry.field.refractive_index(height)
-        gain = gain * (self.observer_n / local_n[:, None]) ** 2 * disk.weights
-        active = np.flatnonzero(np.any(lit, axis=1))
-        if not active.size:
-            return
-        gpos = pos[active]
-        mu = disk.sin_elev[None, :]
-        dr = np.einsum("ij,ij->i", backward_chunk, radial)[:, None]
-        bw_loc = np.stack([np.einsum("ij,ij->i", backward_chunk, u1),
-                           np.einsum("ij,ij->i", backward_chunk, u2),
-                           np.einsum("ij,ij->i", backward_chunk, radial)],
-                          axis=1)
-        horizontal_dot = (bw_loc @ disk.beams.T - mu * dr) / \
-            np.sqrt(np.maximum(1.0 - mu ** 2, 1e-30))
-        phase_mu = np.cos(app_rad) * horizontal_dot + np.sin(app_rad) * dr
-        # a beam on the local vertical has no horizontal reference: its
-        # apparent direction lies in the vertical plane by construction
-        phase_mu = np.where(np.abs(mu) > 1 - 1e-14,
-                            np.sign(mu) * dr, phase_mu)
-        phase_mu = np.clip(phase_mu[active], -1.0, 1.0)
-        mu = np.broadcast_to(mu, phase_mu.shape)
-        p_ray = spectra.rayleigh_phase(phase_mu)
-        if iw is None:
-            phase = p_ray[..., None] * ray_fraction[gpos, None, :]
-        else:
-            phase = p_ray * ray_fraction[gpos, None]
-        for j, layer in enumerate(atmo.aerosols):
-            aerosol_phase = np.asarray(
-                layer.aerosol.phase(phase_mu.ravel(), wavelengths))
-            if aerosol_phase.ndim == 1:
-                aerosol_phase = np.broadcast_to(
-                    aerosol_phase.reshape(phase_mu.shape + (1,)),
-                    phase_mu.shape + (len(wavelengths),))
-            else:
-                aerosol_phase = aerosol_phase.reshape(
-                    phase_mu.shape + (len(wavelengths),))
-            if iw is None:
-                phase = phase + aerosol_phase * aerosol_fractions[gpos, j, None, :]
-            else:
-                phase = phase + aerosol_phase[..., 0] * aerosol_fractions[gpos, j, None]
-        if iw is None:
-            out[gpos] = np.sum(transmission[active] * gain[active][..., None] * phase,
-                               axis=1)
-        else:
-            out[gpos] = np.sum(transmission[active] * gain[active] * phase, axis=1)
-
     def scatter(self, x, backward, *, iw=None, ray_fraction, aerosol_fractions,
                 disk=None):
         """Solar angular integral of ``T * G * p_mix`` over the disk beams.
@@ -1667,8 +1610,13 @@ class SolarSource:
         pos = pos[active]
         radial, mu, app = radial[active], mu[active], app[active]
         transmission, gain = transmission[active], gain[active]
-        dr = np.einsum("ij,ij->i", backward_chunk[pos - pos[0]], radial)[:, None]
-        horizontal_dot = (backward_chunk[pos - pos[0]] @ directions.T
+        # rows of the passed chunk follow ``active``, not ``pos``: ``pos``
+        # indexes the caller's full batch (coarse points are a filtered,
+        # non-contiguous subset there), so the backward rays are the chunk's
+        # own rows in the same order
+        bw = backward_chunk[active]
+        dr = np.einsum("ij,ij->i", bw, radial)[:, None]
+        horizontal_dot = (bw @ directions.T
                           - mu * dr) / np.sqrt(np.maximum(1 - mu ** 2, 1e-30))
         phase_mu = np.cos(app) * horizontal_dot + np.sin(app) * dr
         phase_mu = np.where(np.abs(mu) > 1 - 1e-14, np.sign(mu) * dr, phase_mu)
@@ -1836,13 +1784,9 @@ class SolarSource:
         app, columns, gain, lit = self.geometry.ensure_table().query_fields(
             height[:, None], true_e)
         ext = species_extinction_weights(medium)
-        n_dot_radial = np.einsum("ij,ij->i", normal, radial)[:, None]
-        n_loc = np.stack([np.einsum("ij,ij->i", normal, u1),
-                          np.einsum("ij,ij->i", normal, u2),
-                          n_dot_radial[:, 0]], axis=1)
+        n_dot_radial = np.einsum("ij,j->i", radial, normal)[:, None]
         # the beam directions are per point: project the normal explicitly
-        n_dot_beam = np.einsum("ib,ibj->ib", np.broadcast_to(
-            normal, directions.shape[:2] + (3,)), directions)
+        n_dot_beam = np.einsum("ibj,j->ib", directions, normal)
         sin_true = sin_e
         cos_true = np.sqrt(np.maximum(1.0 - sin_true ** 2, 1e-300))
         horizontal = (n_dot_beam - n_dot_radial * sin_true) / cos_true

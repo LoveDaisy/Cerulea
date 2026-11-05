@@ -444,12 +444,16 @@ def test_scatter_contact_band_meets_budget():
                              disk=dense)[0])
     assert abs(v - r) <= 1e-9 * max(abs(r), 1e-300)
 
-    # a fully lit cap reproduces the plain disk's centre-normal convention
+    # a fully lit cap reproduces the plain disk's centre-normal convention:
+    # sum(w * cos rho) = 1 with cos rho measured against the sun direction
     atmo_hi = _vacuum_550()
-    hi = SolarSource(atmo_hi, 60.0, 0.0)
-    disk = hi._adaptive_disk(0.3, 0.0, 8, 64, "test-norm")
-    s_loc = np.array([np.cos(np.radians(0.3)), 0.0, np.sin(np.radians(0.3))])
-    np.testing.assert_allclose(np.sum(disk.weights * (disk.beams @ s_loc)),
+    hi = SolarSource(atmo_hi, 89.7, 0.0)   # sun elevation +0.3 deg, az 0
+    radial = np.array([[0.0, 0.0, 1.0]])   # column point: local up = +z
+    u1 = np.array([[0.0, 1.0, 0.0]])       # sun's horizontal direction
+    u2 = np.cross(radial, u1)
+    d, w, _se = hi._local_grid(radial, u1, u2, np.array([0.3]),
+                               np.array([0.0]), 8, 64)
+    np.testing.assert_allclose(np.sum(w[0] * (d[0] @ hi.sun_hat)),
                                1.0, atol=1e-12)
 
 
