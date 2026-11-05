@@ -152,14 +152,14 @@ the git head and per-check numbers. Source-level evidence:
   arbitration of plan 6.2 is the referee for those points and is part of
   the follow-up acceptance matrix.
 * Availability gate (plan 6.5), reference-machine measurement after the
-  round-4 fixes: source cold build 9.6 s (budget 10 s), warm single 81wl
-  single-direction 0.014 s (budget 1 s), MC 3wl x 20k 3.3x the legacy run
-  (budget 4x), SOS 0.026x, peak RSS +0.3 GiB (budget +0.5 GiB).  The one
-  standing breach is the standard clear dome at ~6.1x the legacy wall time
-  (budget 3x): the per-beam contract costs `n_beams` table queries per
-  scattering point, and the contact-band adaptive scatter disk (a
-  round-4 accuracy fix) raises the in-band beam count -- see the
-  escalation candidates in the task record.
+  round-5 fixes: source cold build ~10.7-11.2 s (budget 10 s, borderline),
+  warm single 81wl single-direction 0.017 s (budget 1 s), MC 3wl x 20k
+  3.5x the legacy run (budget 4x), SOS 0.03x, peak RSS +0.3 GiB
+  (budget +0.5 GiB).  The standing breach is the standard clear dome at
+  ~7.5x the legacy wall time (budget 3x): the per-beam contract costs
+  `n_beams` table queries per scattering point, and the contact-band
+  adaptive scatter disk (rounds 4-5 accuracy fixes) raises the in-band
+  beam count -- see the escalation candidates in the task record.
 
 Historical evidence for the unified source's physics (independent direction,
 columns, etendue and first-order closure experiments) lives in
