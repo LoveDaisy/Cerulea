@@ -536,35 +536,35 @@ def illuminate_cloud(atmo, cloud: CloudLayer, sun_zenith_deg: float,
     up = np.array([0.0, 0.0, 1.0])
     true_e = np.degrees(np.arcsin(np.clip(directions @ up, -1.0, 1.0)))
 
-    # Per-beam classification (per-beam generalization of the historical
-    # shadow-height closure): each beam's own shadow height
-    # shadow_h(b) = (r_ground)/sin(theta_b) - r_ground decides where its
-    # light enters the deck.  Descending beams (sun above this deck's
-    # horizon, shadow_h <= base) enter through the top.  Ascending beams
-    # with base < shadow_h < top enter at the shadow height: the sunlit
-    # fraction [shadow_h, top] gets the two-stream, the shadowed fraction
-    # [base, shadow_h] attenuates the view (the per-beam replacement for the
-    # historical midpoint closure).  Beams with shadow_h >= top never reach
-    # the deck.  This uses each beam's own apparent zenith in pure geometry
-    # -- the same retained approximation as the old center-beam closure.
+    # Per-beam entry height from the unified source's own occultation
+    # authority: each beam's invariant a = n(z_top) r(z_top) cos(e_app) has
+    # its perigee at q^{-1}(a); an ascending beam crosses exactly the heights
+    # at/above its perigee, so a perigee inside the deck is where its light
+    # enters the sunlit part (the per-beam replacement for the historical
+    # center-beam midpoint closure), a perigee below the base lights the
+    # whole deck from below, and a perigee at/above the top never reaches
+    # the deck.  Descending beams (sun above this deck's horizon) enter
+    # through the top.  This is refraction aware and shares one occultation
+    # authority with every other consumer of the source.
     app_top, t_top, gain_top, lit_top = source.vertex(
         np.full(n_beam, z_top), true_e)
-    r_ground = float(atmo.r_bounds[0])
-    z_ground_km = float(atmo.z_bounds[0])
-    theta_beam = 90.0 - true_e
-    # descending beams (theta <= 90): whole deck above the ground perigee —
-    # shadow height is the ground itself (old shadow_height_km semantics,
-    # per beam); ascending beams: the pure-geometry grazing height
-    shadow_h = np.where(theta_beam <= 90.0, z_ground_km,
-                        (r_ground / np.maximum(np.sin(np.radians(theta_beam)), 1e-9)
-                         - r_ground) / 1000.0 + z_ground_km)
+    ascending = lit_top & (np.asarray(app_top) <= 1e-8)
+    invariant = (source.geometry.field.refractive_index(np.full(n_beam, z_top))
+                 * (R_EARTH + z_top * 1e3) * np.cos(np.radians(app_top)))
+    r_perigee = np.full(n_beam, source.geometry.field.r_ground)
+    if ascending.any():
+        # only ascending beams have a perigee above the ground (descending
+        # beams are top entries and never need their perigee)
+        r_perigee[ascending] = source.geometry.field.turning_radius(
+            np.asarray(invariant)[ascending])
+    perigee_km = (r_perigee - R_EARTH) / 1000.0
     beams = []
     for b in range(n_beam):
         if not lit_top[b]:
             continue
-        h_b = float(shadow_h[b])
+        h_b = float(perigee_km[b])
         if h_b >= z_top:
-            continue                      # this beam never reaches the deck
+            continue                      # this beam never crosses the deck
         tau = optics.tau
         if float(app_top[b]) > 1e-8:
             # descending (sun above this deck's horizon): top entry, full deck

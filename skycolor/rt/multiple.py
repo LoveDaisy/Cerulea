@@ -265,12 +265,19 @@ def solve(
     # close the column energy budget exactly, but it over-weights grazing
     # twilight rays by a large factor, so the physical amplitude is used.)
     b_beam = f_sun[None, None, :] * t_mid_b * gain_mid_b[..., None]  # (nz,nb,n_wl)
-    # direct irradiance incident on the ground: the unified ground kernel
-    # (disk-weighted, occultation-aware, detector-referred at the ground,
-    # where the observer of the SOS domain stands)
-    r_ground = atmo.r_bounds[0]
-    x_ground = np.array([[0.0, 0.0, r_ground]])
-    e_direct = f_sun * source.ground(x_ground)[0]
+    # direct irradiance incident on the ground: plain local per-beam sum at
+    # the domain bottom (z_bounds[0]) — the same reference as the layer
+    # sources, independent of the facade's elevation_km (this backend
+    # declares ground = z_bounds[0] and does not read elevation_km)
+    z0 = float(z_bounds[0])
+    directions_g, _ = source.disk()
+    true_e_g = np.degrees(np.arcsin(np.clip(directions_g @ np.array([0.0, 0.0, 1.0]),
+                                            -1.0, 1.0)))
+    app_g, t_g, gain_g, lit_g = source.vertex(np.full(len(directions_g), z0),
+                                              true_e_g)
+    e_direct = f_sun * np.sum(
+        beam_w[:, None] * lit_g[:, None] * t_g * gain_g[:, None]
+        * np.maximum(np.sin(np.radians(app_g)), 0.0)[:, None], axis=0)
     up_hat = np.array([0.0, 0.0, 1.0])
     directions, _ = source.disk()
     incident = f_sun * np.sum(beam_w * np.maximum(directions @ up_hat, 0.0))

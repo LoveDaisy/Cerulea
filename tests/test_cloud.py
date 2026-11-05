@@ -299,11 +299,14 @@ def test_shadow_height():
 def test_high_clouds_stay_lit_longer(atmo, altostratus, cirrus):
     assert rtcloud.illuminate_cloud(atmo, altostratus, 92.0).geometry == "base"
     assert rtcloud.illuminate_cloud(atmo, cirrus, 93.0).geometry == "base"
-    # a low stratus is inside the Earth's shadow at the same sun angle:
-    # per-beam shadow heights at zenith 92 deg sit at ~4-7 km, all above the
-    # stratus top (1.5 km) — the whole disk misses the deck
+    # per-beam shadow heights at zenith 92 deg span ~0.3-2.9 km around the
+    # stratus (0.5-1.5 km): the near-limb beams still reach it (base entry),
+    # while the whole disk misses only at deeper sun (zenith 97 deg puts
+    # every beam's shadow height above 20 km)
     assert rtcloud.illuminate_cloud(atmo, cloud.get_preset("stratus"),
-                                    92.0).geometry == "none"
+                                    92.0).geometry == "base"
+    assert rtcloud.illuminate_cloud(atmo, cloud.get_preset("stratus"),
+                                    97.0).geometry == "none"
 
 
 def test_underlit_base_turns_red(atmo, altostratus):

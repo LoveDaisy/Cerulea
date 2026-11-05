@@ -59,12 +59,15 @@ def _cloud_direct_irradiance(atmo, cloud_layer, sun_zenith_deg):
     from skycolor import spectra
 
     source = SolarSource(atmo, float(sun_zenith_deg), 0.0)
-    xg = np.array([[0.0, 0.0, atmo.r_bounds[0]]])
     directions, weights = source.disk()
     n_beam = directions.shape[0]
     up = np.array([0.0, 0.0, 1.0])
     true_e = np.degrees(np.arcsin(np.clip(directions @ up, -1.0, 1.0)))
-    app_g, t_g, gain_g, lit_g = source.vertex(np.zeros(n_beam), true_e)
+    z_ground = float(atmo.z_bounds[0])   # the model's opaque ground height
+    if z_ground > 0.0 and cloud_layer is not None and cloud_layer.base_km < z_ground:
+        # deck below the raised ground plane: no ground-level direct light
+        return np.zeros(len(atmo.wl))
+    app_g, t_g, gain_g, lit_g = source.vertex(np.full(n_beam, z_ground), true_e)
     optics = cloud_layer.optics(atmo.wl) if cloud_layer is not None else None
     if optics is not None:
         app_t, _, _, _ = source.vertex(np.full(n_beam, float(cloud_layer.top_km)),
