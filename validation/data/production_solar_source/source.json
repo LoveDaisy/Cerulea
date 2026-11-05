@@ -1,7 +1,7 @@
 {
   "suite": "source",
-  "git_head": "3ee04f07440cb34d9f9b129eb36036ed5d641f37",
-  "seconds": 53.57906808401458,
+  "git_head": "2a5c10b77c1d9f4c5a7b4157b66872df98854772",
+  "seconds": 47.66658229206223,
   "passed": false,
   "checks": [
     {
@@ -146,21 +146,21 @@
     },
     {
       "name": "DNI(sza=30.0) vs centre beam max rel",
-      "value": 9.807608729006656e-05,
+      "value": 0.00010151783126921554,
       "threshold": 0.012,
       "passed": true,
       "detail": ""
     },
     {
       "name": "DNI(sza=60.0) vs centre beam max rel",
-      "value": 0.0008248462979206783,
+      "value": 0.0008289120816624695,
       "threshold": 0.012,
       "passed": true,
       "detail": ""
     },
     {
       "name": "DNI(sza=80.0) vs centre beam max rel",
-      "value": 0.007911107567808884,
+      "value": 0.0079171383172284,
       "threshold": 0.012,
       "passed": true,
       "detail": ""
