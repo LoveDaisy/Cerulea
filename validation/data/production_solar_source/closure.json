@@ -1,7 +1,7 @@
 {
   "suite": "closure",
-  "git_head": "619b0da3f6932a95241165304922d6f09075511b",
-  "seconds": 144.26735645800363,
+  "git_head": "3ee04f07440cb34d9f9b129eb36036ed5d641f37",
+  "seconds": 146.9295738330111,
   "passed": false,
   "checks": [
     {
@@ -62,56 +62,56 @@
     },
     {
       "name": "SS/MC clear g0 sun=-6: |mean-SS| <= 4SE+1%",
-      "value": 0.20757716392916203,
+      "value": 0.19737966851581845,
       "threshold": 1.0,
       "passed": true,
       "detail": ""
     },
     {
       "name": "SS/MC clear g0 sun=-6: signability SE/|SS|",
-      "value": 0.0402778102163357,
+      "value": 0.040277810467310236,
       "threshold": 0.05,
       "passed": true,
       "detail": ""
     },
     {
       "name": "SS/MC clear g2.4 sun=-6: |mean-SS| <= 4SE+1%",
-      "value": 0.4206177728935484,
+      "value": 0.3422762297743377,
       "threshold": 1.0,
       "passed": true,
       "detail": ""
     },
     {
       "name": "SS/MC clear g2.4 sun=-6: signability SE/|SS|",
-      "value": 0.03747605929876946,
+      "value": 0.037475594899984026,
       "threshold": 0.05,
       "passed": true,
       "detail": ""
     },
     {
       "name": "SS/MC clear g0 sun=-9: |mean-SS| <= 4SE+1%",
-      "value": 0.19618033363632847,
+      "value": 0.2008517997744513,
       "threshold": 1.0,
       "passed": true,
       "detail": ""
     },
     {
       "name": "SS/MC clear g0 sun=-9: signability SE/|SS|",
-      "value": 0.5388723258121731,
+      "value": 0.5388718842791148,
       "threshold": 0.05,
       "passed": false,
       "detail": ""
     },
     {
       "name": "SS/MC clear g0 sun=-12: |mean-SS| <= 4SE+1%",
-      "value": 0.23939441560596011,
+      "value": 0.2393944108739442,
       "threshold": 1.0,
       "passed": true,
       "detail": ""
     },
     {
       "name": "SS/MC clear g0 sun=-12: signability SE/|SS|",
-      "value": 23.628918193310103,
+      "value": 23.62890764941239,
       "threshold": 0.05,
       "passed": false,
       "detail": ""

@@ -20,5 +20,5 @@ uv run python -m tools.benchmark_solar_source --out /tmp/perf-final.json
   Current known failures: deep-twilight (-9/-12 deg) `SE/|SS|` signability at
   the plan's budget cap — budget-limited, owner adjudication.
 * `perf-final.json` — availability gate (plan §6.5). Current known breach:
-  clear dome ~7.5x legacy (budget 3x), structural to the per-beam contract;
+  clear dome ~6.3x legacy (budget 3x), structural to the per-beam contract;
   owner adjudication.
