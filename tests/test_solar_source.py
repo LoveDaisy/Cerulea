@@ -577,3 +577,173 @@ def test_shadow_height_matches_vacuum_analytic(elev):
     z_sh = source.shadow_height(elev)
     analytic = R_EARTH * (1.0 / np.cos(np.radians(elev)) - 1.0) / 1e3
     assert abs(z_sh - analytic) <= max(2e-3, 2e-5 * abs(analytic))
+
+
+# ---------------------------------------------------------------------------
+# gen2 R1 review regressions
+# ---------------------------------------------------------------------------
+def test_direct_irradiance_coarse_matches_ground_and_analytic():
+    """Out-of-band plane flux: per-beam projection, analytic limit, ground seam.
+
+    Review gen2 R1 Major#1/#6: the coarse branch broadcast beam 0's normal
+    projection to every disk beam, inflating the default renderer ground
+    flux by 3.8% at sun elevation 3 deg and 42% near the horizon.  The
+    horizontal flux must equal ground() exactly (same projection seam),
+    and in vacuum with the full disk visible the quadrature is exact for
+    the linear plane projection: E/F = max(s . n, 0).
+    """
+    from skycolor import spectra
+    atmo = _vacuum_550()
+    source = SolarSource(atmo, 87.0, 0.0)      # sun elevation +3 deg
+    x = np.array([[0.0, 0.0, R_EARTH]])
+    up = np.array([0.0, 0.0, 1.0])
+    f = float(spectra.solar_irradiance(np.array([550.0]))[0])
+    e_h = source.direct_irradiance(x, up, iw=0)[0]
+    assert abs(e_h / f - np.sin(np.radians(3.0))) <= 1e-9
+    # ground() is the F-free angular integral; direct_irradiance scales it
+    # by the same F_inf the SOS and renderer apply
+    assert np.array_equal(e_h, f * source.ground(x, iw=0)[0])
+    tilt = np.radians(30.0)
+    n_t = np.array([0.0, np.sin(tilt), np.cos(tilt)])   # tilted toward the sun
+    e_t = source.direct_irradiance(x, n_t, iw=0)[0]
+    assert abs(e_t / f - np.sin(np.radians(3.0) + tilt)) <= 1e-9
+    # near-horizon full disk and the full-spectrum default
+    src_lo = SolarSource(atmo, 89.0, 0.0)      # sun elevation +1 deg
+    e_lo = src_lo.direct_irradiance(x, up, iw=0)[0]
+    assert abs(e_lo / f - np.sin(np.radians(1.0))) <= 1e-9
+    assert np.array_equal(source.direct_irradiance(x, up)[0, 0], e_h)
+
+
+def _crescent_reference(e_loc_deg, crit_deg, n_az=512, n_r=24):
+    """Independent cap integral for a shadowed-centre crescent.
+
+    Local-elevation parametrisation: the lit radial interval per azimuth
+    comes from brentq on the analytic profile (not from the production
+    construction), the azimuth span from the rim equation with
+    ``sin(crit)``, and the normalisation from the cap area measure -- the
+    same flux convention as the Monte-Carlo oracle.  Shares only the
+    physics definition, no production code path.
+    """
+    from skycolor import spectra
+    alpha = np.radians(16.0 / 60.0)
+    e_loc = np.radians(e_loc_deg)
+    c_r = np.radians(crit_deg)
+    s, c = np.sin(e_loc), np.cos(e_loc)
+
+    def profile(rho, phi):
+        return np.arcsin(np.clip(np.cos(rho) * s + np.sin(rho) * c * np.cos(phi),
+                                 -1.0, 1.0)) - c_r
+
+    den = c * np.sin(alpha)
+    cos_ph = (np.sin(c_r) - s * np.cos(alpha)) / den
+    if cos_ph >= 1.0:
+        return 0.0
+    phi_half = float(np.arccos(np.clip(cos_ph, -1.0, 1.0)))
+    xg, wg = np.polynomial.legendre.leggauss(n_r)
+    total = 0.0
+    for phi in np.linspace(-phi_half, phi_half, n_az):
+        if profile(alpha, np.array([phi]))[0] <= 0.0:
+            continue
+        lo = float(brentq(lambda r: profile(r, phi), 0.0, alpha))
+        rho = lo + (alpha - lo) * 0.5 * (xg + 1.0)
+        w = wg * 0.5 * (alpha - lo)
+        mu = np.arcsin(np.clip(np.cos(rho) * s + np.sin(rho) * c * np.cos(phi),
+                               -1.0, 1.0))
+        total += float(np.sum(w * np.sin(rho)
+                              * spectra.rayleigh_phase(mu))) \
+            * (2.0 * phi_half / n_az)
+    return total / (np.pi * (1.0 - np.cos(alpha) ** 2))
+
+
+def test_narrow_crescent_scatter_matches_independent_cap_integral():
+    """High-altitude contact band: the lit-arc width must use sin(crit).
+
+    Review gen2 R1 Major#9: cos_ph_half mixed the critical ANGLE into a
+    sine relation, widening the sampled arc at altitude (+11% at 200 km,
+    +0.9% at 100 km against an independent quadrature).  Both topologies
+    are pinned against the independent cap integral at the 0.5% budget.
+    """
+    atmo = _vacuum_550()
+    backward = np.array([[0.0, 0.0, 1.0]])
+    for h_km, delta in [(200.0, -0.2665), (100.0, -0.265)]:
+        probe = SolarSource(atmo, 90.0, 0.0)
+        crit = float(probe.geometry.critical_curve()(np.array([h_km]))[0])
+        e_loc = crit + delta
+        src = SolarSource(atmo, 90.0 - e_loc, 0.0)
+        x = np.array([[0.0, 0.0, R_EARTH + h_km * 1e3]])
+        v = float(src.scatter(x, backward, iw=0, ray_fraction=np.ones(1),
+                              aerosol_fractions=np.zeros((1, 0)))[0])
+        t = _crescent_reference(e_loc, crit)
+        assert t > 0.0
+        assert abs(v - t) <= 5e-3 * t, (h_km, v, t)
+
+
+def test_ground_local_accounting_is_observer_invariant():
+    """SOS bottom-boundary seam: local plane flux never sees the observer.
+
+    Review gen2 R1 Major#2: ground() applied the facade observer's n^2
+    transfer, so the SOS direct_down_boa scaled with (n_2.4/n_0)^2 for an
+    unrelated elevation_km while the layer sources stayed local.
+    ``local=True`` must depend only on the medium and the point; the
+    detector default keeps the transfer and scales exactly with
+    (n_obs / n_local)^2.  The solve-level BOA/TOA diagnostics inherit the
+    invariance through this seam.
+    """
+    from skycolor.rt import multiple
+    kw = dict(ozone_du=0.0, no2_column=0.0, aerosols=[],
+              air_profile=lambda z: 2.0e20
+              * np.exp(-np.asarray(z, float) / 8.0))
+    # refracting medium with a decaying profile: the observer transfer must
+    # actually differ between the two facade elevations (constant density
+    # or n=1 would make the assertion vacuous)
+    a0 = Atmosphere(W3, **kw)
+    a24 = Atmosphere(W3, elevation_km=2.4, **kw)
+    assert a24.elevation_km != a0.elevation_km
+    assert np.array_equal(a24.z_bounds, a0.z_bounds)   # ground unchanged
+    x = np.array([[0.0, 0.0, R_EARTH]])
+    s0 = SolarSource(a0, 60.0, 0.0)
+    s24 = SolarSource(a24, 60.0, 0.0)
+    assert s24.observer_n != s0.observer_n
+    g0 = s0.ground(x, iw=0, local=True)[0]
+    assert np.array_equal(g0, s24.ground(x, iw=0, local=True)[0])
+    d0 = s0.direct_irradiance(x, np.array([0.0, 0.0, 1.0]), iw=0)[0]
+    assert np.array_equal(d0, s24.direct_irradiance(
+        x, np.array([0.0, 0.0, 1.0]), iw=0, local=True)[0])
+    # detector default keeps the transfer: exact (n24/n0)^2 scaling
+    g0_det = s0.ground(x, iw=0)[0]
+    assert np.array_equal(s24.ground(x, iw=0)[0],
+                          g0_det * (s24.observer_n / s0.observer_n) ** 2)
+    # solve-level: same domain and ground, only the facade observer moves
+    r0 = multiple.solve(a0, 60.0, np.array([0.0]), np.array([0.0]),
+                        n_mu=6, single_view=True)
+    r24 = multiple.solve(a24, 60.0, np.array([0.0]), np.array([0.0]),
+                         n_mu=6, single_view=True)
+    assert np.array_equal(r0.direct_down_boa, r24.direct_down_boa)
+    assert np.array_equal(r0.flux_up_boa, r24.flux_up_boa)
+
+
+def test_real_point_solar_table_feeds_finite_source():
+    """End-to-end smoke: real Atmosphere + real PointSolarTable + adapter.
+
+    Review gen2 R1 Major#3/#4: the experimental adapter guessed the query
+    protocol from atmosphere attributes and passed a positional extinction
+    array into the real table's ``iw`` keyword parameter, so every real
+    audit run raised TypeError.  Both supported table kinds speak iw;
+    this test proves the real supply-consumer chain executes.
+    """
+    from pathlib import Path
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from tools.point_solar_table import PointSolarTable
+    from tools.unified_solar_transport import FiniteSolarSource
+    atmo = Atmosphere.standard(W3)
+    table = PointSolarTable(atmo, n_height=6)
+    source = FiniteSolarSource(atmo, table)
+    x = np.array([[0.0, 0.0, R_EARTH], [0.0, 0.0, R_EARTH + 5e3]])
+    backward = np.tile(np.array([0.0, 0.0, 1.0]), (2, 1))
+    zs = np.radians(87.0)                       # sun zenith, azimuth 0
+    sun_hat = np.array([0.0, np.sin(zs), np.cos(zs)])
+    out = source.scatter(x, backward, sun_hat, iw=1, ray_fraction=np.ones(2),
+                         aerosol_fractions=np.zeros((2, len(atmo.aerosols))))
+    assert out.shape == (2,)
+    assert np.all(np.isfinite(out)) and np.all(out >= 0.0)

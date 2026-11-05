@@ -271,7 +271,12 @@ def solve(
     # (review round 5: the fixed-disk beam sum carried the +21% contact-band
     # error into the SOS diagnostics)
     x_ground = np.array([[0.0, 0.0, R_EARTH + z0 * 1e3]])
-    e_direct = f_sun * source.ground(x_ground, iw=None)[0]
+    # local=True: the BOA boundary flux is a plane flux at the ground point
+    # itself and must not carry the facade observer's n^2 transfer -- the
+    # layer sources above are local, so the boundary has to match (review
+    # gen2 R1: the detector-referred default made direct_down_boa scale
+    # with an unrelated elevation_km)
+    e_direct = f_sun * source.ground(x_ground, iw=None, local=True)[0]
     up_hat = np.array([0.0, 0.0, 1.0])
     incident = f_sun * np.sum(beam_w * np.maximum(directions_toa @ up_hat, 0.0))
     direct_down = e_direct.copy()

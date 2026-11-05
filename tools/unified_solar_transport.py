@@ -77,25 +77,7 @@ class FiniteSolarSource:
         self.fingerprint = hashlib.sha256()
         self.n_calls = self.n_points = 0
         self._disk = None
-        self._ext = None
         self._original_transmittance = mc._sun_transmittance
-
-    def _extinction(self):
-        """Grid extinction for the table readout.
-
-        Production tables apply the querying atmosphere's own cross sections
-        at readout (the shared table's build anchors are
-        wavelength-independent and carry no query-side extinction).  The
-        experimental driver's analytic toy tables keep their own ``iw``
-        query convention instead -- namespace test atmospheres have no
-        species data -- signalled by an empty sentinel here.
-        """
-        if self._ext is None:
-            if hasattr(self.atmo, "_sigma_ray"):
-                self._ext = species_extinction_weights(self.atmo)
-            else:
-                self._ext = np.zeros((0, 0))
-        return self._ext
 
     def validate_transport(self, atmo):
         """This experimental clone accepts its exact construction, never an anchor subset."""
@@ -128,13 +110,15 @@ class FiniteSolarSource:
                          self.atmo.z_bounds[0], self.atmo.z_bounds[-1])
         true_mu = np.clip(radial @ directions.T, -1, 1)
         true_e = np.degrees(np.arcsin(true_mu))
-        ext = self._extinction()
-        if ext.size == 0:                       # toy table: keep iw convention
-            app, transmission, gain, lit = self.table.query(height[:, None],
-                                                            true_e, iw=iw)
-        else:
-            app, transmission, gain, lit = self.table.query(
-                height[:, None], true_e, ext if iw is None else ext[:, int(iw)])
+        # Every table this driver supports -- the real
+        # tools.point_solar_table.PointSolarTable and the analytic toy
+        # tables -- speaks the iw keyword convention and applies its own
+        # build-side extinction at readout.  Positional extinction arrays
+        # belong to the production skycolor PointSourceTable, which this
+        # experimental driver does not consume (review gen2 R1: guessing
+        # the protocol from atmosphere attributes broke the real table).
+        app, transmission, gain, lit = self.table.query(height[:, None],
+                                                        true_e, iw=iw)
         app = np.radians(app)
         local_n = self.table.mapping.refractive_index(height)
         # The solar table gain is LOCAL L. Propagate reduced L/n^2 to the

@@ -1373,7 +1373,7 @@ class SolarSource:
         # Both branches are per point -- an in-band chunk mixes topologies.
         den = c_loc * np.sin(alpha)
         cos_ph_half = np.where(den > 1e-300,
-                               (c_r - s_loc * np.cos(alpha))
+                               (np.sin(c_r) - s_loc * np.cos(alpha))
                                / np.where(den > 1e-300, den, 1.0), 1.0)
         phi_half = np.where(centre_lit, np.pi,
                             np.arccos(np.clip(cos_ph_half, -1.0, 1.0)))
@@ -1494,14 +1494,16 @@ class SolarSource:
             transmittance = np.where(lit, np.exp(-tau), 0.0)
         return app, transmittance, gain, lit
 
-    def _geometry_arrays(self, x, iw, disk=None):
+    def _geometry_arrays(self, x, iw, disk=None, local=False):
         """Per-point per-beam geometry: true elevations, app, T, weighted gain.
 
         ``x`` is ``(n, 3)`` in the Earth-centred frame with the observer on
         the +z axis.  ``disk`` overrides the beam set (contact-band refined
-        flux kernels); the gain carries the disk weights and the single
-        observer transfer ``(n_obs / n_point)^2``; nothing else in the
-        chain may apply an ``n^2`` factor.
+        flux kernels); the gain carries the disk weights and -- unless
+        ``local`` -- the single observer transfer ``(n_obs / n_point)^2``;
+        nothing else in the chain may apply an ``n^2`` factor.  ``local``
+        reads the plane flux at the point itself (SOS boundaries), which
+        must not depend on where the facade's observer happens to be.
         """
         directions, weights = disk if disk is not None else self.disk()
         medium = self._medium
@@ -1521,10 +1523,33 @@ class SolarSource:
             tau = columns @ ext[:, int(iw)]
             transmission = np.where(lit, np.exp(-tau), 0.0)
         app_rad = np.radians(app)
-        local_n = self.geometry.field.refractive_index(height)
-        gain = gain * (self.observer_n / local_n[:, None]) ** 2
-        weighted_gain = gain * weights
-        return radial, directions, true_mu, app_rad, transmission, weighted_gain, lit
+        gain = gain * weights
+        if not local:
+            gain = gain * (self.observer_n / self.geometry.field
+                           .refractive_index(height)[:, None]) ** 2
+        return radial, directions, true_mu, app_rad, transmission, gain, lit
+
+    @staticmethod
+    def _apparent_plane_projection(normal, radial, directions, sin_true,
+                                   app_rad):
+        """Apparent-direction flux projection onto the unit-normal plane.
+
+        Refraction preserves each beam's horizontal direction, so the
+        apparent beam direction is ``sin(app) * radial + cos(app) * h_hat``
+        with ``h_hat`` the TRUE beam's horizontal unit vector; the plane
+        projection follows without building apparent vectors.  Shared by
+        the coarse and contact-band branches so the two cannot drift
+        (review gen2 R1: the coarse branch broadcast beam 0's projection
+        to the whole disk).
+        """
+        n_dot_radial = np.einsum("ij,j->i", radial, normal)[:, None]
+        if directions.ndim == 2:                       # shared disk (nb, 3)
+            n_dot_beam = np.einsum("bj,j->b", directions, normal)[None, :]
+        else:                                          # per point (n, nb, 3)
+            n_dot_beam = np.einsum("nbj,j->nb", directions, normal)
+        cos_true = np.sqrt(np.maximum(1.0 - sin_true ** 2, 1e-300))
+        horizontal = (n_dot_beam - n_dot_radial * sin_true) / cos_true
+        return np.sin(app_rad) * n_dot_radial + np.cos(app_rad) * horizontal
 
     def _local_frame_basis(self, x):
         """Per-point local frame: radial, sun-horizontal and cross vectors.
@@ -1718,7 +1743,7 @@ class SolarSource:
             out[gpos] = np.sum(transmission[active] * gain[active] * phase,
                                axis=1)
 
-    def _ground_local_chunk(self, x_chunk, pos, n_r, n_az, iw, out):
+    def _ground_local_chunk(self, x_chunk, pos, n_r, n_az, iw, out, local):
         radial, u1, u2 = self._local_frame_basis(x_chunk)
         in_band, radial, e_loc, crit, _h = self._classify_points(x_chunk)
         directions, weights, sin_e = self._local_grid(
@@ -1732,8 +1757,10 @@ class SolarSource:
             height[:, None], true_e)
         ext = species_extinction_weights(medium)
         app_rad = np.radians(app)
-        gain = gain * (self.observer_n / self.geometry.field
-                       .refractive_index(height)[:, None]) ** 2 * weights
+        gain = gain * weights
+        if not local:
+            gain = gain * (self.observer_n / self.geometry.field
+                           .refractive_index(height)[:, None]) ** 2
         flux = np.maximum(np.sin(app_rad), 0.0)
         if iw is None:
             tau = columns @ ext
@@ -1745,8 +1772,15 @@ class SolarSource:
             transmission = np.where(lit, np.exp(-tau), 0.0)
             out[pos] = np.sum(transmission * gain * flux, axis=1)
 
-    def ground(self, x, *, iw=None):
-        """Detector-referred solar angular integral of ``T*G*max(sin app, 0)``."""
+    def ground(self, x, *, iw=None, local=False):
+        """Solar angular integral of ``T*G*max(sin app, 0)`` on the horizontal.
+
+        Default: detector-referred through the single ``n^2`` observer
+        transfer (renderer/ground-display seam).  ``local=True`` reads the
+        horizontal flux at the point itself -- no observer dependence --
+        which is the accounting SOS's bottom boundary must use to match its
+        layer sources (review gen2 R1).
+        """
         atmo = self._atmo_ref()
         if atmo is None:
             raise RuntimeError("the owning atmosphere is gone; rebuild the source")
@@ -1761,7 +1795,7 @@ class SolarSource:
             for st in range(0, coarse_idx.size, step):
                 pos = coarse_idx[st:st + step]
                 _, _, _, app, transmission, gain, _ = self._geometry_arrays(
-                    x[pos], iw, disk=(dsk[0], dsk[1]))
+                    x[pos], iw, disk=(dsk[0], dsk[1]), local=local)
                 if iw is None:
                     gain = gain[..., None]
                     app = app[..., None]
@@ -1770,11 +1804,11 @@ class SolarSource:
         band_idx = np.flatnonzero(in_band)
         for st in range(0, band_idx.size, step):
             pos = band_idx[st:st + step]
-            self._ground_local_chunk(x[pos], pos, 16, 384, iw, out)
+            self._ground_local_chunk(x[pos], pos, 16, 384, iw, out, local)
         return out
 
     def _direct_local_chunk(self, x_chunk, normal, pos, n_r, n_az, iw, f_inf,
-                            out):
+                            out, local):
         radial, u1, u2 = self._local_frame_basis(x_chunk)
         in_band, radial, e_loc, crit, _h = self._classify_points(x_chunk)
         directions, weights, sin_e = self._local_grid(
@@ -1787,16 +1821,15 @@ class SolarSource:
         app, columns, gain, lit = self.geometry.ensure_table().query_fields(
             height[:, None], true_e)
         ext = species_extinction_weights(medium)
-        n_dot_radial = np.einsum("ij,j->i", radial, normal)[:, None]
-        # the beam directions are per point: project the normal explicitly
-        n_dot_beam = np.einsum("ibj,j->ib", directions, normal)
-        sin_true = sin_e
-        cos_true = np.sqrt(np.maximum(1.0 - sin_true ** 2, 1e-300))
-        horizontal = (n_dot_beam - n_dot_radial * sin_true) / cos_true
         app_rad = np.radians(app)
-        adn = np.sin(app_rad) * n_dot_radial + np.cos(app_rad) * horizontal
-        gain = gain * (self.observer_n / self.geometry.field
-                       .refractive_index(height)[:, None]) ** 2 * weights
+        # the beam directions are per point: project through the shared
+        # apparent-direction seam (identical formula to the coarse branch)
+        adn = self._apparent_plane_projection(normal, radial, directions,
+                                              sin_e, app_rad)
+        gain = gain * weights
+        if not local:
+            gain = gain * (self.observer_n / self.geometry.field
+                           .refractive_index(height)[:, None]) ** 2
         if iw is None:
             tau = columns @ ext
             transmission = np.where(lit[..., None], np.exp(-tau), 0.0)
@@ -1809,15 +1842,18 @@ class SolarSource:
             weighted = transmission * gain * np.maximum(adn, 0.0)
             out[pos] = weighted.sum(axis=1) * f_inf[iw]
 
-    def direct_irradiance(self, x, normal, *, iw=None):
+    def direct_irradiance(self, x, normal, *, iw=None, local=False):
         """Spectral flux through a plane at the points ``x``.
 
         ``normal`` is the plane's unit normal in the Earth-centred frame;
-        the flux is ``F_inf * sum_beams w*T*G*max(apparent_beam . normal, 0)``
-        (detector-referred through the same single ``n^2`` factor).  The
-        full-spectrum default (renderer seam) and the per-wavelength calls
-        share one (point, beam) projection; only the spectral multiplication
-        gains a wavelength axis.
+        the flux is ``F_inf * sum_beams w*T*G*max(apparent_beam . normal, 0)``.
+        By default the flux is detector-referred through the single
+        ``n^2`` observer transfer; ``local=True`` reads the plane flux at
+        the point itself (SOS boundaries), which must not depend on where
+        the facade's observer happens to be.  The full-spectrum default
+        (renderer seam) and the per-wavelength calls share one (point,
+        beam) projection; only the spectral multiplication gains a
+        wavelength axis.
         """
         atmo = self._atmo_ref()
         if atmo is None:
@@ -1838,15 +1874,11 @@ class SolarSource:
                 pos = coarse_idx[st:st + step]
                 directions = dsk[0]
                 _, _, _, app, transmission, gain, _ = self._geometry_arrays(
-                    x[pos], iw, disk=(directions, dsk[1]))
+                    x[pos], iw, disk=(directions, dsk[1]), local=local)
                 radial = x[pos] / np.linalg.norm(x[pos], axis=1)[:, None]
                 sin_true = np.clip(radial @ directions.T, -1, 1)
-                cos_true = np.sqrt(np.maximum(1.0 - sin_true ** 2, 1e-300))
-                n_dot_radial = np.einsum("ij,j->i", radial, normal)[:, None]
-                n_dot_beam = (normal @ directions.T)[0]
-                horizontal = (n_dot_beam - n_dot_radial * sin_true) / cos_true
-                app_dot_normal = (np.sin(app) * n_dot_radial
-                                  + np.cos(app) * horizontal)
+                app_dot_normal = self._apparent_plane_projection(
+                    normal, radial, directions, sin_true, app)
                 if iw is None:
                     gain = gain[..., None]
                     app_dot_normal = app_dot_normal[..., None]
@@ -1859,7 +1891,7 @@ class SolarSource:
         for st in range(0, band_idx.size, step):
             pos = band_idx[st:st + step]
             self._direct_local_chunk(x[pos], normal, pos, 16, 384, iw, f_inf,
-                                     out)
+                                     out, local)
         return out
 
     def central_transmittance(self, height_km=None, *, iw=None):

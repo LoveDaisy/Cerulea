@@ -352,7 +352,9 @@ def suite_closure(out: Path) -> int:
         ("clear g0 sun=-6", atmo, 96.0, 0.0, 0.0, 500_000, 8),
         ("clear g2.4 sun=-6", atmo_hi, 96.0, 0.0, 0.0, 500_000, 8),
         ("clear g0 sun=-9", atmo, 99.0, 0.0, 0.0, 500_000, 8),
-        ("clear g0 sun=-12", atmo, 102.0, 0.0, 0.0, 500_000, 4),
+        ("clear g2.4 sun=-9", atmo_hi, 99.0, 0.0, 0.0, 500_000, 8),
+        ("clear g0 sun=-12", atmo, 102.0, 0.0, 0.0, 500_000, 8),
+        ("clear g2.4 sun=-12", atmo_hi, 102.0, 0.0, 0.0, 500_000, 8),
     ]
     for label, atmo_, sza, vza, vaz, n_photons, n_seeds in points:
         det, mean, se = _run_point(atmo_, sza, vza, vaz, n_photons, n_seeds)
