@@ -328,7 +328,12 @@ def test_refraction_off_is_same_contract_at_n_one():
 # batch invariance, contact-band kernels and build anchors (review round 4)
 # ---------------------------------------------------------------------------
 def _vacuum_550():
-    return Atmosphere(np.array([550.0]), ozone_du=300.0, aerosols=[],
+    # TRUE vacuum: zero density (T=1 exactly), matching the analytic oracle's
+    # transparent-extinction assumption -- refraction=False alone keeps the
+    # US1976 density and its horizon-grazing extinction
+    return Atmosphere(np.array([550.0]), ozone_du=0.0, no2_column=0.0,
+                      aerosols=[], air_profile=lambda z: np.zeros_like(
+                          np.asarray(z, float)),
                       refraction=False)
 
 
@@ -358,39 +363,130 @@ def test_flux_kernels_batch_invariant():
     assert np.array_equal(g_single[0], g_mixed[0])
 
 
-def test_scatter_contact_band_meets_budget():
-    """Local scatter kernel accuracy where the shadow boundary cuts the disk.
+def _vacuum_mc_oracle(e_loc_deg, crit_deg, mu_of_dloc, rng, n=int(4_000_000)):
+    """Independent Monte-Carlo truth for the local scatter kernel.
 
-    The round-4 reviewer's probe (vacuum, sun -0.2 deg, sea level, zenith
-    backward, unit Rayleigh fraction): the fixed 2x8 disk carried ~+72%
-    error against a converged reference.  The occultation-adaptive disk
-    must hold the plan's 0.5% source-kernel budget, and the probe must stay
-    a genuine contact-band scenario (the old disk remains tens of per cent
-    wrong here, so the assertion cannot silently degrade into a vacuous
-    pass).
+    Uniform samples on the solar cap, the kernel's own phase function, the
+    exact occultation threshold ``e_b > crit`` -- shares no code with the
+    adaptive disk (the round-5 review rejected same-function refinement as
+    an oracle).
     """
+    from skycolor import spectra
+    alpha = np.radians(16.0 / 60.0)
+    e_loc = np.radians(e_loc_deg)
+    s_hat = np.array([np.cos(e_loc), 0.0, np.sin(e_loc)])
+    t1 = np.array([-np.sin(e_loc), 0.0, np.cos(e_loc)])
+    t2 = np.array([0.0, 1.0, 0.0])
+    u = rng.random(n)
+    cos_rho = 1.0 - (1.0 - np.cos(alpha)) * u
+    rho = np.arccos(cos_rho)
+    phi = rng.random(n) * 2 * np.pi
+    d = (np.cos(rho)[:, None] * s_hat[None, :]
+         + np.sin(rho)[:, None] * (np.cos(phi)[:, None] * t1[None, :]
+                                   + np.sin(phi)[:, None] * t2[None, :]))
+    ez = np.arcsin(d[:, 2])
+    lit = ez > np.radians(crit_deg)
+    mu = mu_of_dloc(d)
+    f = np.where(lit, spectra.rayleigh_phase(mu), 0.0)
+    cap_norm = np.pi * (1.0 - np.cos(alpha) ** 2)
+    return f.mean() * 2 * np.pi * (1 - np.cos(alpha)) / cap_norm
+
+
+def test_scatter_contact_band_meets_budget():
+    """Local scatter kernel accuracy across BOTH contact-band topologies.
+
+    The round-4 adaptive disk had two reviewer-probed defects: an
+    observer-frame classification that deleted visible beams at off-axis
+    points (-93%) and a lit-arc cut that dropped the inner-lit sectors of
+    centre-visible caps (-15%).  The per-point local-frame selection must
+    hold the plan's 0.5% source-kernel budget against the independent
+    Monte-Carlo oracle on the shadowed side, the centre-lit side, and the
+    fully visible off-axis case -- and batch composition must stay
+    value-neutral.
+    """
+    rng = np.random.default_rng(11)
     atmo = _vacuum_550()                 # keep alive: the source is weak-ref'd
-    source = SolarSource(atmo, 90.2, 0.0)
+    source = SolarSource(atmo, 90.2, 0.0)   # sun elevation -0.2 deg
     x = np.array([[0.0, 0.0, R_EARTH]])
     backward = np.array([[0.0, 0.0, 1.0]])
     rf = np.ones(1)
     af = np.zeros((1, 0))
 
-    def run(disk=None):
-        kw = {} if disk is None else {"disk": disk}
-        return float(source.scatter(x, backward, iw=0, ray_fraction=rf,
-                                    aerosol_fractions=af, **kw)[0])
+    def run(xq, bwq):
+        return float(source.scatter(xq, bwq, iw=0, ray_fraction=np.ones(len(xq)),
+                                    aerosol_fractions=np.zeros((len(xq), 0)))[0])
 
-    ref = run(source._shadow_split_disk(0.0, 24, 768, "test-dense"))
-    assert abs(run() - ref) <= 5e-3 * abs(ref)
-    old = run(solar_disk(source.sun_hat, 2, 8))
-    assert abs(old - ref) > 0.3 * abs(ref)
+    crit0 = source._critical_true(0.0)
+    # centre shadowed (delta < 0): the reviewer's original probe scenario
+    t = _vacuum_mc_oracle(-0.2, crit0, lambda d: d[:, 2], rng)
+    v = run(x, backward)
+    assert abs(v - t) <= 5e-3 * t
+    # centre lit (delta > 0): the inner-lit topology the arc cut destroyed
+    sh = source.sun_hat
+    hz = sh - sh[2] * np.array([0.0, 0.0, 1.0])
+    hz /= np.linalg.norm(hz)
+    for theta, delta in [(np.radians(0.3), 0.1), (np.radians(0.45), 0.25)]:
+        xo = (R_EARTH * (np.cos(theta) * np.array([0.0, 0.0, 1.0])
+                         + np.sin(theta) * hz)).reshape(1, 3)
+        bwo = xo / np.linalg.norm(xo)
+        t = _vacuum_mc_oracle(delta + crit0, crit0,
+                              lambda d, b=bwo.reshape(3): d @ b, rng)
+        v = run(xo, bwo.reshape(1, 3))
+        assert abs(v - t) <= 5e-3 * t
+    # fully visible off-axis point (delta beyond the band): coarse path
+    xo = (R_EARTH * np.array([[0.0, np.sin(np.radians(1.0)),
+                               np.cos(np.radians(1.0))]]))
+    v = run(xo, xo / np.linalg.norm(xo))
+    dense = solar_disk(source.sun_hat, 32, 768)
+    r = float(source.scatter(xo, xo / np.linalg.norm(xo), iw=0,
+                             ray_fraction=np.ones(1),
+                             aerosol_fractions=np.zeros((1, 0)),
+                             disk=dense)[0])
+    assert abs(v - r) <= 1e-9 * max(abs(r), 1e-300)
+
     # a fully lit cap reproduces the plain disk's centre-normal convention
     atmo_hi = _vacuum_550()
     hi = SolarSource(atmo_hi, 60.0, 0.0)
-    disk = hi._shadow_split_disk(0.0, 8, 64, "test-norm")
-    np.testing.assert_allclose(np.sum(disk[1] * (disk[0] @ hi.sun_hat)),
+    disk = hi._adaptive_disk(0.3, 0.0, 8, 64, "test-norm")
+    s_loc = np.array([np.cos(np.radians(0.3)), 0.0, np.sin(np.radians(0.3))])
+    np.testing.assert_allclose(np.sum(disk.weights * (disk.beams @ s_loc)),
                                1.0, atol=1e-12)
+
+
+def test_scatter_frame_equivariant_and_batch_invariant():
+    """Rotating the scene must rotate the value, never change it; batch
+    composition must not change any point's value (round-5 Major
+    reference-frame + batch invariance)."""
+    atmo_a = _vacuum_550()
+    source_a = SolarSource(atmo_a, 90.2, 0.0)
+    atmo_b = _vacuum_550()
+    source_b = SolarSource(atmo_b, 90.2, 73.0)
+    xo = R_EARTH * np.array([[0.0, np.sin(np.radians(1.0)),
+                              np.cos(np.radians(1.0))]])
+    c, s = np.cos(np.radians(73.0)), np.sin(np.radians(73.0))
+    rot = np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]])
+    xo_rot = xo @ rot
+    rf = np.ones(1)
+    af = np.zeros((1, 0))
+    va = float(source_a.scatter(xo, xo / np.linalg.norm(xo), iw=0,
+                                ray_fraction=rf, aerosol_fractions=af)[0])
+    vb = float(source_b.scatter(xo_rot, xo_rot / np.linalg.norm(xo_rot), iw=0,
+                                ray_fraction=rf, aerosol_fractions=af)[0])
+    assert va == vb
+
+    # mixed in-band / off-axis batch vs the points alone: bitwise equal
+    x = np.array([[0.0, 0.0, R_EARTH]])
+    bw = np.array([[0.0, 0.0, 1.0]])
+    xm = np.vstack([x, xo])
+    bwm = np.vstack([bw, xo / np.linalg.norm(xo)])
+    vm = source_a.scatter(xm, bwm, iw=0, ray_fraction=np.ones(2),
+                          aerosol_fractions=np.zeros((2, 0)))
+    v1 = float(source_a.scatter(x, bw, iw=0, ray_fraction=np.ones(1),
+                                aerosol_fractions=np.zeros((1, 0)))[0])
+    v2 = float(source_a.scatter(xo, xo / np.linalg.norm(xo), iw=0,
+                                ray_fraction=np.ones(1),
+                                aerosol_fractions=np.zeros((1, 0)))[0])
+    assert np.array_equal(vm[0], v1) and np.array_equal(vm[1], v2)
 
 
 def test_table_build_independent_of_query_order():

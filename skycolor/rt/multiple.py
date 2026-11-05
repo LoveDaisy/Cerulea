@@ -273,14 +273,13 @@ def solve(
     # sources, independent of the facade's elevation_km (this backend
     # declares ground = z_bounds[0] and does not read elevation_km)
     z0 = float(z_bounds[0])
-    directions_g, _ = source.disk()
-    true_e_g = np.degrees(np.arcsin(np.clip(directions_g @ np.array([0.0, 0.0, 1.0]),
-                                            -1.0, 1.0)))
-    app_g, t_g, gain_g, lit_g = source.vertex(np.full(len(directions_g), z0),
-                                              true_e_g)
-    e_direct = f_sun * np.sum(
-        beam_w[:, None] * lit_g[:, None] * t_g * gain_g[:, None]
-        * np.maximum(np.sin(np.radians(app_g)), 0.0)[:, None], axis=0)
+    # BOA direct flux through the unified per-point ground seam: the same
+    # contact-band adaptive evaluation the renderer and validation DNI use,
+    # so every consumer agrees on the direct solar flux at one position
+    # (review round 5: the fixed-disk beam sum carried the +21% contact-band
+    # error into the SOS diagnostics)
+    x_ground = np.array([[0.0, 0.0, R_EARTH + z0 * 1e3]])
+    e_direct = f_sun * source.ground(x_ground, iw=None)[0]
     up_hat = np.array([0.0, 0.0, 1.0])
     directions, _ = source.disk()
     incident = f_sun * np.sum(beam_w * np.maximum(directions @ up_hat, 0.0))

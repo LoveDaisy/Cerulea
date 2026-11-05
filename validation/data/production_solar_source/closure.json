@@ -1,0 +1,135 @@
+{
+  "suite": "closure",
+  "git_head": "619b0da3f6932a95241165304922d6f09075511b",
+  "seconds": 144.26735645800363,
+  "passed": false,
+  "checks": [
+    {
+      "name": "SS/MC clear g0 sza=30: |mean-SS| <= 4SE+1%",
+      "value": 0.17035542264407522,
+      "threshold": 1.0,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g0 sza=30: signability SE/|SS|",
+      "value": 0.012096286045982339,
+      "threshold": 0.05,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g0 sza=60: |mean-SS| <= 4SE+1%",
+      "value": 0.27983627923875565,
+      "threshold": 1.0,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g0 sza=60: signability SE/|SS|",
+      "value": 0.011127616424911873,
+      "threshold": 0.05,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g0 sun=0: |mean-SS| <= 4SE+1%",
+      "value": 0.44002629326681725,
+      "threshold": 1.0,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g0 sun=0: signability SE/|SS|",
+      "value": 0.016369118428407107,
+      "threshold": 0.05,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g2.4 sun=0: |mean-SS| <= 4SE+1%",
+      "value": 0.33701373351666236,
+      "threshold": 1.0,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g2.4 sun=0: signability SE/|SS|",
+      "value": 0.015743604725654347,
+      "threshold": 0.05,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g0 sun=-6: |mean-SS| <= 4SE+1%",
+      "value": 0.20757716392916203,
+      "threshold": 1.0,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g0 sun=-6: signability SE/|SS|",
+      "value": 0.0402778102163357,
+      "threshold": 0.05,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g2.4 sun=-6: |mean-SS| <= 4SE+1%",
+      "value": 0.4206177728935484,
+      "threshold": 1.0,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g2.4 sun=-6: signability SE/|SS|",
+      "value": 0.03747605929876946,
+      "threshold": 0.05,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g0 sun=-9: |mean-SS| <= 4SE+1%",
+      "value": 0.19618033363632847,
+      "threshold": 1.0,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g0 sun=-9: signability SE/|SS|",
+      "value": 0.5388723258121731,
+      "threshold": 0.05,
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g0 sun=-12: |mean-SS| <= 4SE+1%",
+      "value": 0.23939441560596011,
+      "threshold": 1.0,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g0 sun=-12: signability SE/|SS|",
+      "value": 23.628918193310103,
+      "threshold": 0.05,
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "name": "SOS single-view vs rt.single max rel",
+      "value": 0.003117503769600738,
+      "threshold": 0.02,
+      "passed": true,
+      "detail": "plane-parallel vs shell quadrature, same source"
+    },
+    {
+      "name": "cloud beam-sum linear identity",
+      "value": 0.0,
+      "threshold": 0.0,
+      "passed": true,
+      "detail": ""
+    }
+  ],
+  "deviations": []
+}

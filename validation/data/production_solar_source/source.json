@@ -1,0 +1,250 @@
+{
+  "suite": "source",
+  "git_head": "619b0da3f6932a95241165304922d6f09075511b",
+  "seconds": 77.51179620902985,
+  "passed": false,
+  "checks": [
+    {
+      "name": "constant-n[1.0] direction unbent [deg]",
+      "value": 0.0,
+      "threshold": 1e-10,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "constant-n[1.0] slope==1",
+      "value": 0.0,
+      "threshold": 1e-10,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "constant-n[1.0] gain==1",
+      "value": 0.0,
+      "threshold": 1e-10,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "constant-n[1.0] uniform column rel err",
+      "value": 6.360025839313721e-09,
+      "threshold": 1e-08,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "blocked rays exactly NaN",
+      "value": 0.0,
+      "threshold": 0.0,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "constant-n[1.000278] direction unbent [deg]",
+      "value": 0.0,
+      "threshold": 1e-10,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "constant-n[1.000278] slope==1",
+      "value": 0.0,
+      "threshold": 1e-10,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "constant-n[1.000278] gain==1",
+      "value": 0.0,
+      "threshold": 1e-10,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "constant-n[1.000278] uniform column rel err",
+      "value": 6.360022730689252e-09,
+      "threshold": 1e-08,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "blocked rays exactly NaN",
+      "value": 0.0,
+      "threshold": 0.0,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "RK anchor ground=0.0: max |dT/T| (T>=1e-4)",
+      "value": 0.00013084623312198396,
+      "threshold": 0.001,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "RK anchor ground=0.0: max angle error [deg]",
+      "value": 0.00026728906899275984,
+      "threshold": 0.0002,
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "name": "RK anchor ground=2.4: max |dT/T| (T>=1e-4)",
+      "value": 0.00012869070900656254,
+      "threshold": 0.001,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "RK anchor ground=2.4: max angle error [deg]",
+      "value": 0.00026728870714443076,
+      "threshold": 0.0002,
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "name": "holdout: shadow disagreements",
+      "value": 0.0,
+      "threshold": 0.0,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "holdout: max |app| error [deg]",
+      "value": 5.897737160509564e-05,
+      "threshold": 0.0002,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "holdout: max |TG| rel err (TG>=1e-4)",
+      "value": 0.0008133121432475354,
+      "threshold": 0.01,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "holdout: max |T| abs err",
+      "value": 6.280163267469163e-05,
+      "threshold": 0.002,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "disk sum(w cos rho)==1",
+      "value": 0.0,
+      "threshold": 1e-12,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "disk sum(w)==2/(1+cos alpha)",
+      "value": 0.0,
+      "threshold": 1e-12,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "DNI(sza=30.0) vs centre beam max rel",
+      "value": 0.00010151783126921554,
+      "threshold": 0.012,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "DNI(sza=60.0) vs centre beam max rel",
+      "value": 0.0008289120816624695,
+      "threshold": 0.012,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "DNI(sza=80.0) vs centre beam max rel",
+      "value": 0.0079171383172284,
+      "threshold": 0.012,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "restrict shares geometry",
+      "value": 0.0,
+      "threshold": 0.0,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "slice columns rel err (no-550 anchor change)",
+      "value": 0.0,
+      "threshold": 0.0001,
+      "passed": true,
+      "detail": "without a 550 nm anchor the conditioning scale changes, so the stored PCHIP interpolation differs at its own accuracy level (~1e-5); tau certificates still bound the physical error"
+    },
+    {
+      "name": "slice T rel err (no-550 anchor change)",
+      "value": 0.0,
+      "threshold": 0.0001,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "reorder shares geometry",
+      "value": 0.0,
+      "threshold": 0.0,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "reorder columns identical",
+      "value": 0.0,
+      "threshold": 0.0,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "reorder T bit-identical to independent build",
+      "value": 0.0,
+      "threshold": 0.0,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "altitude gets fresh geometry",
+      "value": 0.0,
+      "threshold": 0.0,
+      "passed": true,
+      "detail": ""
+    }
+  ],
+  "deviations": [
+    {
+      "name": "uniform column 1e-8 budget at production quad",
+      "value": 1.7e-08,
+      "plan_threshold": 1e-08,
+      "detail": "measured 1.7e-8 at n_quad=8; meeting 1e-8 costs a higher build quad for no physical payoff (T shift <1e-6 relative at tau=25)"
+    },
+    {
+      "name": "uniform column 1e-8 budget at production quad",
+      "value": 1.7e-08,
+      "plan_threshold": 1e-08,
+      "detail": "measured 1.7e-8 at n_quad=8; meeting 1e-8 costs a higher build quad for no physical payoff (T shift <1e-6 relative at tau=25)"
+    },
+    {
+      "name": "RK anchor angle budget ground=0.0",
+      "value": 0.00026728906899275984,
+      "plan_threshold": 0.0002,
+      "detail": "measured 2.7e-4 at one of 8 anchors with the coarsened segment scheme; needs either finer segments near that anchor or owner approval"
+    },
+    {
+      "name": "RK anchor angle budget ground=2.4",
+      "value": 0.00026728870714443076,
+      "plan_threshold": 0.0002,
+      "detail": "measured 2.7e-4 at one of 8 anchors with the coarsened segment scheme; needs either finer segments near that anchor or owner approval"
+    },
+    {
+      "name": "holdout direction budget (measured worst point class)",
+      "value": 5.897737160509564e-05,
+      "plan_threshold": 0.0002,
+      "detail": "worst 1.4e-3 deg at mid-height/mid-elevation; needs owner adjudication or table rework"
+    }
+  ]
+}

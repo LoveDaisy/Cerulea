@@ -531,7 +531,11 @@ def illuminate_cloud(atmo, cloud: CloudLayer, sun_zenith_deg: float,
 
     source = SolarSource(atmo, float(sun_zenith_deg), 0.0)
     geometry = source.geometry
-    directions, weights = source.disk()
+    # the deck is a slab on the observer's vertical column, so its beam set
+    # is the source's own contact-band adaptive disk at deck top -- the same
+    # per-point contract every other consumer uses (review round 5: the
+    # fixed 2x8 disk mis-integrates partially occulted decks)
+    directions, weights = source.disk_for_column(z_top)
     n_beam = directions.shape[0]
     up = np.array([0.0, 0.0, 1.0])
     true_e = np.degrees(np.arcsin(np.clip(directions @ up, -1.0, 1.0)))
@@ -582,21 +586,22 @@ def illuminate_cloud(atmo, cloud: CloudLayer, sun_zenith_deg: float,
             else:
                 # z_base < shadow height < z_top: the beam grazes into the
                 # sunlit part at the shadow height (per-beam generalisation
-                # of the historical midpoint closure)
+                # of the historical midpoint closure); still a base-kind
+                # entry (the light comes up from below the sunlit segment)
                 kind = "base"
                 z_entry = z_sh
-            # entry quantities from the source's own vertex query; sit a hair
-            # inside the lit side -- at the root the ray grazes and the lit
-            # flag flickers on rounding
-            app_e = t_e = g_e = None
-            for eps in (0.0, 1e-4, 1e-3, 1e-2):
-                v = source.vertex(np.array([z_entry + eps]),
-                                  np.array([true_e[b]]))
-                if bool(v[3][0]):
-                    app_e, t_e, g_e = float(v[0][0]), v[1][0], v[2][0]
-                    break
-            if app_e is None:
+            # effective illumination of the sunlit sub-layer: the plan's
+            # declared midpoint closure -- tau_deck/tau_below split at the
+            # shadow root (pure geometry), while the beam's representative
+            # direction/T/G are evaluated at the midpoint of the sunlit
+            # part (the round-4 root sampling replaced this closure
+            # silently and starved partially lit decks by 27-54%; restored
+            # in round 5)
+            z_eval = 0.5 * (z_entry + z_top) if z_entry > z_base else z_entry
+            v = source.vertex(np.array([z_eval]), np.array([true_e[b]]))
+            if not bool(v[3][0]):
                 continue                  # unlit entry (defensive; zero light)
+            app_e, t_e, g_e = float(v[0][0]), v[1][0], v[2][0]
             mu0 = max(float(abs(np.sin(np.radians(app_e)))), 1e-8)
             t_entry, gain_entry = t_e, g_e
             tau_deck = tau * (z_top - z_entry) / (z_top - z_base)

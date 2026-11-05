@@ -24,7 +24,7 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from skycolor import cloud, presets  # noqa: E402
+from skycolor import cloud, presets, spectra  # noqa: E402
 from skycolor.atmosphere import Atmosphere  # noqa: E402
 from skycolor.rt import cloud as rtcloud  # noqa: E402
 from skycolor.rt.solver import sky_radiance_total  # noqa: E402
@@ -429,3 +429,39 @@ def test_deck_lit_segment_matches_column_shadow():
     # and the base really receives light: the radiance is not the zero deck
     rad = rtcloud.cloud_radiance(illum, 60.0)
     assert float(np.max(rad)) > 0.0
+
+
+def test_graze_entry_uses_midpoint_closure(atmo):
+    """Plan-declared midpoint closure for partially lit decks.
+
+    The shadow root splits tau_deck/tau_below (geometry), while the beam's
+    representative direction/T/G are evaluated at the MIDPOINT of the
+    sunlit segment -- the round-4 root sampling starved partially lit
+    decks by 27-54% (review round 5).  Every graze beam's entry triple
+    must equal the source's own vertex query at the sunlit midpoint.
+    """
+    from skycolor.solar_source import SolarSource
+    deck = cloud.CloudLayer(base_km=5.0, top_km=12.0, tau550=1.0)
+    illum = rtcloud.illuminate_cloud(atmo, deck, 93.0)      # sun -3 deg
+    src = SolarSource(atmo, 93.0, 0.0)
+    src.geometry.ensure_table()
+    dirs, _ = src.disk_for_column(deck.top_km)
+    up = np.array([0.0, 0.0, 1.0])
+    e_b = np.degrees(np.arcsin(np.clip(dirs @ up, -1.0, 1.0)))
+    roots = np.array([src.shadow_height(float(e)) for e in e_b])
+    checked = 0
+    for b in illum.beams:
+        if b.z_entry_km <= deck.base_km + 1e-9:
+            continue                     # base entry: evaluated at the base
+        matches = [e for e, r in zip(e_b, roots)
+                   if abs(r - b.z_entry_km) <= 5e-3]
+        assert matches, "entry height must equal a beam's column shadow root"
+        z_mid = 0.5 * (b.z_entry_km + deck.top_km)
+        v = src.vertex(np.array([z_mid]), np.array([matches[0]]))
+        np.testing.assert_allclose(b.transmittance_entry, v[1][0], rtol=1e-12)
+        np.testing.assert_allclose(b.gain_entry, v[2][0], rtol=1e-12)
+        f_inf = spectra.solar_irradiance(atmo.wl)
+        np.testing.assert_allclose(
+            b.incident, float(b.weight) * f_inf * v[1][0] * v[2][0], rtol=1e-12)
+        checked += 1
+    assert checked >= 8                 # the -3 deg deck is partially lit
