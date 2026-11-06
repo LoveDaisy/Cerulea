@@ -1,7 +1,7 @@
 {
   "suite": "closure",
-  "git_head": "2a5c10b77c1d9f4c5a7b4157b66872df98854772",
-  "seconds": 168.05701504193712,
+  "git_head": "bf4013113b92e745f164d82b74e06072cc534808",
+  "seconds": 178.93473374994937,
   "passed": false,
   "checks": [
     {

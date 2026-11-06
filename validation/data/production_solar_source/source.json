@@ -1,7 +1,7 @@
 {
   "suite": "source",
-  "git_head": "2a5c10b77c1d9f4c5a7b4157b66872df98854772",
-  "seconds": 47.66658229206223,
+  "git_head": "bf4013113b92e745f164d82b74e06072cc534808",
+  "seconds": 49.35187470901292,
   "passed": false,
   "checks": [
     {

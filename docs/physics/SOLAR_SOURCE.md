@@ -197,8 +197,8 @@ them further is a separate user decision.
    9.3-10.0 s (budget 10 s), warm single 81wl single-direction 0.015 s
    (budget 1 s), MC 3wl x 20k 3.1-3.5x legacy (budget 4x), SOS 0.03x,
    cold peak RSS 0.34 GiB (budget +0.5 GiB). The standing breach is the
-   standard clear dome: 5.9-6.3x the legacy wall time (budget 3x), i.e.
-   6.6-7.0 s for the 46x91 3-wavelength warm dome vs the legacy 1.12 s.
+   standard clear dome: 5.9-6.4x the legacy wall time (budget 3x), i.e.
+   6.6-7.1 s for the 46x91 3-wavelength warm dome vs the legacy 1.12 s.
    The cost is structural to the per-beam contract (`n_beams` table
    queries per scattering point) together with the contact-band adaptive
    disk from the rounds 4-6 accuracy fixes. Accepted as a recorded
