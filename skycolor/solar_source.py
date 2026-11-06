@@ -1054,6 +1054,17 @@ class PointSourceTable:
         return (app.reshape(shape), columns.reshape(shape + (len(self.column_scale),)),
                 gain.reshape(shape), lit.reshape(shape))
 
+    def app_of_true(self, height_km, true_elevation_deg):
+        """Apparent elevation only -- the exact map :meth:`query_fields` reads.
+
+        The projection-boundary solves evaluate the angular map tens of
+        times per candidate beam; columns and gain would be dead weight
+        there.  Reading through ``query_fields`` keeps a single
+        interpolation authority, so the resolved boundary region and the
+        discrete beam integrand cannot drift apart.
+        """
+        return self.query_fields(height_km, true_elevation_deg)[0]
+
     def query(self, height_km, true_elevation_deg, extinction):
         """Return ``(app_deg, T, gain_local, lit)`` for one extinction set.
 
@@ -1162,12 +1173,25 @@ class SolarGeometry:
                 "solar source table not built yet; call ensure_table() first")
         return self._table
 
-    def ensure_table(self, **kw) -> PointSourceTable:
+    def ensure_table(self) -> PointSourceTable:
+        """Build (once) the shared production table -- fixed configuration.
+
+        The shared geometry serves exactly one table configuration: the
+        production defaults of :class:`PointSourceTable`.  There is
+        deliberately no configuration entry point (gen3-R1 review): the
+        keyword arguments this method once accepted were consumed only on
+        the first call, so a low-density probe silently re-tuned every
+        later production query on the same medium -- a cache-identity
+        violation (plan 3.2) that moved T by -5.4% in the reviewer's
+        probe.  Custom-density probes build a standalone
+        :class:`PointSourceTable` instead; the shared production table is
+        not reconfigurable.
+        """
         if self._table is None:
             medium = self.resolve_medium()
             if medium is None:
                 raise RuntimeError("the owning medium is gone; rebuild the source")
-            self._table = PointSourceTable(medium, self.field, self.columns_tool, **kw)
+            self._table = PointSourceTable(medium, self.field, self.columns_tool)
         return self._table
 
     def validate_medium(self, medium) -> None:
@@ -1254,6 +1278,7 @@ class SolarSource:
             np.array([atmo.elevation_km]))[0])
         self._disk_cache: dict[bytes, tuple] = {}
         self._crit_cache: dict[float, float] = {}
+        self._plane_zero_cache: dict[float, float] = {}
         self.n_calls = 0
         self.n_points = 0
 
@@ -1294,9 +1319,20 @@ class SolarSource:
         return in_band, radial, e_loc, crit, heights
 
     def _chunk_for_nbeam(self, n_beam, n_wl, full_spectrum):
+        # Per-chunk fixed cost (frame + adaptive-grid construction + table
+        # query) needs amortisation, but the floor must never override the
+        # element budget that bounds transient memory.  Full-spectrum mode
+        # is the memory contract the gen3-R1 review pinned: the 2.5M-element
+        # budget decides alone (6144 x 81 -> 5 points; the old 64 floor
+        # forced 1.2 GiB).  Single-wavelength arrays are n_beam x 1 (a
+        # 64-point x 6144-beam chunk is ~3 MB), so the 64 amortisation
+        # floor is memory-safe there -- dropping it collapses twilight MC
+        # ground flushes to 10-point chunks and slowed the golden twilight
+        # run ~20x.
         budget = 2_500_000 if full_spectrum else self.chunk
         per_point = n_beam * (n_wl if full_spectrum else 1)
-        return max(64, min(self.chunk, budget // max(per_point, 1)))
+        floor = 1 if full_spectrum else 64
+        return max(floor, min(self.chunk, budget // max(per_point, 1)))
 
     def _critical_true(self, height_km: float) -> float:
         """True elevation of the ground-grazing ray at ``height_km``."""
@@ -1344,7 +1380,170 @@ class SolarSource:
                 z_high = z_mid
         return 0.5 * (z_low + z_high)
 
-    def _local_grid(self, radial, u1, u2, e_loc_deg, crit_deg, n_r, n_az):
+    def _center_plane_projection(self, plane, radial, s_loc, c_loc, height_km,
+                                 e_loc_deg):
+        """Projection of the apparent disk-CENTRE direction onto ``plane``.
+
+        The apparent beam direction lives in the beam's vertical plane
+        (``sin(app) * radial + cos(app) * h_hat``), so the centre projection
+        is ``sin(app_c) * (n.radial) + cos(app_c) * n.h_hat_c`` with the
+        apparent centre elevation read from the table -- the same angular
+        map the beam integrand consumes.  Its magnitude decides whether the
+        receiver plane cuts the disk interior (|projection| < sin alpha).
+        At a vertical sun the horizontal component is undefined; the centre
+        direction is then radial and the bare ``n.radial`` is exact.
+        """
+        a_dn = np.einsum("ij,ij->i", radial, plane)
+        ns = plane @ self.sun_hat
+        app_c = self.geometry.ensure_table().app_of_true(height_km, e_loc_deg)
+        app_c = np.where(np.isfinite(app_c), app_c, 0.0)
+        safe = c_loc > 1e-12
+        ch_n = np.where(safe, (ns - s_loc * a_dn) / np.maximum(c_loc, 1e-300), 0.0)
+        return np.where(safe,
+                        np.sin(np.radians(app_c)) * a_dn
+                        + np.cos(np.radians(app_c)) * ch_n,
+                        a_dn)
+
+    def _plane_zero_true_elevation(self, height_km):
+        """True elevation whose apparent elevation is zero at ``height_km``.
+
+        For a horizontal receiver the plane projection boundary is the
+        apparent horizon (``app = 0``); the angular map is monotone, so one
+        scalar root solve per unique height suffices and heights repeat
+        across batches (ground flushes), so the roots are cached on the
+        source.  A constant-index medium is its own identity map: the
+        boundary is exactly true elevation zero.
+        """
+        cached = self._plane_zero_cache
+        out = np.empty(height_km.shape)
+        for h in np.unique(height_km):
+            key = float(h)
+            val = cached.get(key)
+            if val is None:
+                table = self.geometry.ensure_table()
+                if table.constant_index:
+                    val = 0.0
+                else:
+                    lower = self._critical_true(key)
+
+                    def f(e, _h=key, _t=table):
+                        return float(_t.app_of_true(np.array([_h]),
+                                                    np.array([e]))[0])
+                    a = lower + 1e-9
+                    # at ground level the apparent horizon coincides with
+                    # the shadow boundary (the grazing ray appears AT the
+                    # horizon), so the lit angular map never crosses zero:
+                    # the plane cut degenerates onto the earth cut -- pin
+                    # the root to the boundary instead of bracketing
+                    val = lower if f(a) >= 0.0 \
+                        else brentq(f, a, 90.0, xtol=1e-9)
+                cached[key] = val
+            out = np.where(height_km == key, val, out)
+        return out
+
+    def _plane_interval(self, plane, radial, t, t_r, height_km, s_loc, c_loc,
+                        alpha, lit_lo, lit_hi, plane_cuts):
+        """Intersect the earth-lit radial interval with the receiver plane's
+        ``apparent beam . normal`` sign interval, per point and azimuth.
+
+        Along one azimuth the apparent beam direction sweeps its vertical
+        plane monotonically as rho grows, so ``app . n`` has at most one
+        zero on the cap; the zero is bracketed on ``[0, alpha]`` and
+        bisected with the same apparent map the beam integrand consumes
+        (the table), so the resolved region and the discrete integrand
+        cannot drift.  Azimuths entirely above the plane keep the earth
+        interval; entirely below collapse to an empty interval.  A plane
+        containing the sweep degenerates to zero projection everywhere and
+        integrates to zero, which is the correct grazing result.
+
+        Horizontal receivers (``|normal . radial| = 1`` -- the production
+        ground, MC and renderer seam) have ``app . n = +-sin(app)``: the
+        boundary is the cached per-height apparent-horizon root and the
+        per-azimuth bisection reuses the closed-form ``dz`` profile of the
+        earth-shadow construction -- no angular-map evaluations in the
+        loop.  Only genuinely tilted planes pay the generic per-iteration
+        map evaluation (rare: validation DNI planes and experiments).
+        """
+        p_lo = np.zeros_like(t_r)
+        p_hi = np.full_like(t_r, alpha)
+        cuts = np.flatnonzero(plane_cuts)
+        if cuts.size:
+            a_dn = np.einsum("ij,ij->i", radial, plane)[cuts]
+            horizontal = np.abs(a_dn) >= 1.0 - 1e-9
+            flat = cuts[horizontal]
+            tilt = cuts[~horizontal]
+            if flat.size:
+                sgn = np.sign(a_dn[horizontal])[:, None]
+                tgt = np.sin(np.radians(
+                    self._plane_zero_true_elevation(height_km[flat])))[:, None]
+                s_l = s_loc[flat][:, None]
+                t_r_i = t_r[flat]
+                lo = np.zeros_like(t_r_i)
+                hi = np.full_like(t_r_i, alpha)
+                for _ in range(60):
+                    mid = 0.5 * (lo + hi)
+                    dz = np.cos(mid) * s_l + np.sin(mid) * t_r_i
+                    move_lo = np.where(t_r_i > 0.0, dz < tgt, dz > tgt)
+                    lo = np.where(move_lo, mid, lo)
+                    hi = np.where(move_lo, hi, mid)
+                root = 0.5 * (lo + hi)
+                g0 = sgn * (s_l - tgt)
+                ga = sgn * (np.cos(alpha) * s_l
+                            + np.sin(alpha) * t_r_i - tgt)
+                above_all = (g0 > 0.0) & (ga > 0.0)
+                sub_lo = np.where(above_all, 0.0,
+                                  np.where(ga >= 0.0, root, 0.0))
+                sub_hi = np.where(above_all, alpha,
+                                  np.where(ga >= 0.0, alpha,
+                                           np.where(g0 > 0.0, root, 0.0)))
+                p_lo[flat] = sub_lo
+                p_hi[flat] = sub_hi
+            if tilt.size:
+                ns = plane @ self.sun_hat
+                nt = np.einsum("naj,nj->na", t, plane)[tilt]
+                app_map = self.geometry.ensure_table().app_of_true
+                h = height_km[tilt]
+                s_l = s_loc[tilt][:, None]
+                t_r_i = t_r[tilt]
+                a_dn_t = a_dn[~horizontal][:, None]
+
+                def proj(cos_rho, sin_rho):
+                    dz = cos_rho * s_l + sin_rho * t_r_i
+                    eps = np.degrees(np.arcsin(np.clip(dz, -1.0, 1.0)))
+                    app = np.radians(app_map(h[:, None], eps))
+                    nd = cos_rho * ns[tilt][:, None] + sin_rho * nt
+                    ct = np.sqrt(np.maximum(1.0 - dz * dz, 1e-300))
+                    horizontal_part = (nd - a_dn_t * dz) / ct
+                    return np.sin(app) * a_dn_t + np.cos(app) * horizontal_part
+
+                g0 = proj(1.0, 0.0)
+                ga = proj(np.cos(alpha), np.sin(alpha))
+                lo = np.zeros_like(t_r_i)
+                hi = np.full_like(t_r_i, alpha)
+                for _ in range(60):
+                    mid = 0.5 * (lo + hi)
+                    gm = proj(np.cos(mid), np.sin(mid))
+                    increasing = ga > g0
+                    move_lo = np.where(increasing, gm < 0.0, gm > 0.0)
+                    lo = np.where(move_lo, mid, lo)
+                    hi = np.where(move_lo, hi, mid)
+                root = 0.5 * (lo + hi)
+                above_all = (g0 > 0.0) & (ga > 0.0)
+                sub_lo = np.where(above_all, 0.0,
+                                  np.where(ga >= 0.0, root, 0.0))
+                sub_hi = np.where(above_all, alpha,
+                                  np.where(ga >= 0.0, alpha,
+                                           np.where(g0 > 0.0, root, 0.0)))
+                p_lo[tilt] = sub_lo
+                p_hi[tilt] = sub_hi
+        lit_lo = np.maximum(np.clip(lit_lo, 0.0, alpha),
+                            np.clip(p_lo, 0.0, alpha))
+        lit_hi = np.minimum(np.clip(lit_hi, 0.0, alpha),
+                            np.clip(p_hi, 0.0, alpha))
+        return lit_lo, lit_hi
+
+    def _local_grid(self, radial, u1, u2, e_loc_deg, crit_deg, n_r, n_az,
+                    plane=None, height_km=None):
         """Exact per-point adaptive disk, closed form, computed per chunk.
 
         ``e_loc``/``crit`` are the point's own local sun elevation and
@@ -1360,6 +1559,15 @@ class SolarSource:
         the full circle and lights ``[0, rho*]``.  Weights keep the plain
         disk's centre-normal convention with each azimuth's true measure.
 
+        With ``plane`` (per-point receiver normals; the flux kernels) the
+        earth-lit interval is additionally intersected with the receiver
+        plane's ``apparent beam . normal`` sign interval
+        (:meth:`_plane_interval`) -- a second physical cut the coarse disk
+        cannot resolve -- and affected points span the full azimuth circle
+        because that boundary is not confined to the earth-lit arc.
+        ``plane=None`` (scatter) keeps the earth-only construction
+        bit-for-bit.
+
         Returns ``(directions (n, nb, 3) earth-frame, weights (n, nb),
         sin_elev (n, nb))``.
         """
@@ -1368,6 +1576,12 @@ class SolarSource:
         c_r = np.radians(crit_deg)
         s_loc, c_loc = np.sin(e_r), np.cos(e_r)
         centre_lit = (e_loc_deg - crit_deg) > 0.0
+        # a receiver plane cutting the disk interior needs the full circle:
+        # its boundary is not confined to the earth-lit arc
+        if plane is not None:
+            plane_cuts = np.abs(self._center_plane_projection(
+                plane, radial, s_loc, c_loc, height_km, e_loc_deg)) \
+                < np.sin(alpha)
         # azimuths: centre visible -> full circle; centre shadowed -> the
         # lit arc |phi| < phi_half where the rim elevation still exceeds crit.
         # Both branches are per point -- an in-band chunk mixes topologies.
@@ -1377,6 +1591,8 @@ class SolarSource:
                                / np.where(den > 1e-300, den, 1.0), 1.0)
         phi_half = np.where(centre_lit, np.pi,
                             np.arccos(np.clip(cos_ph_half, -1.0, 1.0)))
+        if plane is not None:
+            phi_half = np.where(plane_cuts, np.pi, phi_half)
         az_measure_ratio = np.where(centre_lit, 1.0 / n_az,
                                     phi_half / (np.pi * n_az))
         # phi grid per point, centred on the local sun-tilt direction
@@ -1418,6 +1634,10 @@ class SolarSource:
         # (n_az, n_r) beam layout
         lit_lo = np.clip(lit_lo, 0.0, alpha)
         lit_hi = np.clip(lit_hi, 0.0, alpha)
+        if plane is not None:
+            lit_lo, lit_hi = self._plane_interval(
+                plane, radial, t, t_r, height_km, s_loc, c_loc,
+                alpha, lit_lo, lit_hi, plane_cuts)
         # radial Gauss-Legendre nodes per azimuth's lit interval, in
         # cos(rho) where the cap area measure is linear; the dc-span factor
         # carries each azimuth's lit fraction of the cap
@@ -1542,11 +1762,18 @@ class SolarSource:
         (review gen2 R1: the coarse branch broadcast beam 0's projection
         to the whole disk).
         """
-        n_dot_radial = np.einsum("ij,j->i", radial, normal)[:, None]
-        if directions.ndim == 2:                       # shared disk (nb, 3)
-            n_dot_beam = np.einsum("bj,j->b", directions, normal)[None, :]
-        else:                                          # per point (n, nb, 3)
-            n_dot_beam = np.einsum("nbj,j->nb", directions, normal)
+        if normal.ndim == 2:                           # per-point normals (n, 3)
+            n_dot_radial = np.einsum("ij,ij->i", radial, normal)[:, None]
+            if directions.ndim == 2:                   # shared disk (nb, 3)
+                n_dot_beam = (directions @ normal.T).T             # (n, nb)
+            else:                                      # per point (n, nb, 3)
+                n_dot_beam = np.einsum("nbj,nj->nb", directions, normal)
+        else:                                          # one shared normal (3,)
+            n_dot_radial = np.einsum("ij,j->i", radial, normal)[:, None]
+            if directions.ndim == 2:                   # shared disk (nb, 3)
+                n_dot_beam = np.einsum("bj,j->b", directions, normal)[None, :]
+            else:                                      # per point (n, nb, 3)
+                n_dot_beam = np.einsum("nbj,j->nb", directions, normal)
         cos_true = np.sqrt(np.maximum(1.0 - sin_true ** 2, 1e-300))
         horizontal = (n_dot_beam - n_dot_radial * sin_true) / cos_true
         return np.sin(app_rad) * n_dot_radial + np.cos(app_rad) * horizontal
@@ -1743,34 +1970,122 @@ class SolarSource:
             out[gpos] = np.sum(transmission[active] * gain[active] * phase,
                                axis=1)
 
-    def _ground_local_chunk(self, x_chunk, pos, n_r, n_az, iw, out, local):
+    def _flux_band(self, x, normals):
+        """Points whose flux needs the exact per-point grid.
+
+        The shared coarse disk is exact only while neither physical
+        boundary crosses the disk interior: the earth-shadow boundary
+        (``|e_loc - crit| < alpha``) or the receiver-plane projection
+        (|apparent centre . normal| < sin alpha -- gen3-R1 review).  Out of
+        both bands every beam sits on one side of both cuts and the
+        per-beam ``max(., 0)`` drop is exact.
+
+        A fully shadowed disk (``e_loc - crit <= -alpha``) has zero flux
+        through every kernel, so the plane test is masked by
+        ``lit_possible`` there -- both routes return zero and the exact
+        grid must not be spent on dark twilight ground points.  (The
+        centre's apparent reading below the shadow boundary is the grazing
+        placeholder, not the sun's position, so the raw plane test would
+        misflag every such point.)
+        """
+        in_band, radial, e_loc, crit, heights = self._classify_points(x)
+        e_r = np.radians(e_loc)
+        adn_c = self._center_plane_projection(normals, radial,
+                                              np.sin(e_r), np.cos(e_r),
+                                              heights, e_loc)
+        lit_possible = (e_loc - crit) > -self.radius_deg
+        plane_band = (np.abs(adn_c) < np.sin(np.radians(self.radius_deg))) \
+            & lit_possible
+        return in_band | plane_band
+
+    def _flux_local_chunk(self, x_chunk, normals, pos, n_r, n_az, iw, f_inf,
+                          out, local):
+        """One chunk of flux-band points on the exact per-point grid.
+
+        ``ground`` and ``direct_irradiance`` share this kernel: both the
+        earth-shadow and the receiver-plane boundaries are resolved by the
+        construction, so ``max(., 0)`` only removes sign noise at the
+        roots.  ``f_inf`` is ``None`` for ``ground`` (normalised integral,
+        no spectrum) and the ``F_inf`` grid for ``direct_irradiance``.
+        """
         radial, u1, u2 = self._local_frame_basis(x_chunk)
-        in_band, radial, e_loc, crit, _h = self._classify_points(x_chunk)
+        in_band, radial, e_loc, crit, heights = self._classify_points(x_chunk)
         directions, weights, sin_e = self._local_grid(
-            radial, u1, u2, e_loc, crit, n_r, n_az)
+            radial, u1, u2, e_loc, crit, n_r, n_az,
+            plane=normals, height_km=heights)
         true_e = np.degrees(np.arcsin(sin_e))
         medium = self._medium
-        radius = np.linalg.norm(x_chunk, axis=1)
-        height = np.clip((radius - R_EARTH) / 1e3,
-                         medium.z_bounds[0], medium.z_bounds[-1])
         app, columns, gain, lit = self.geometry.ensure_table().query_fields(
-            height[:, None], true_e)
+            heights[:, None], true_e)
         ext = species_extinction_weights(medium)
         app_rad = np.radians(app)
+        adn = self._apparent_plane_projection(normals, radial, directions,
+                                              sin_e, app_rad)
         gain = gain * weights
         if not local:
             gain = gain * (self.observer_n / self.geometry.field
-                           .refractive_index(height)[:, None]) ** 2
-        flux = np.maximum(np.sin(app_rad), 0.0)
+                           .refractive_index(heights)[:, None]) ** 2
         if iw is None:
             tau = columns @ ext
             transmission = np.where(lit[..., None], np.exp(-tau), 0.0)
-            out[pos] = np.sum(transmission * gain[..., None] * flux[..., None],
-                              axis=1)
+            weighted = transmission * gain[..., None] \
+                * np.maximum(adn[..., None], 0.0)          # (n,nb,n_wl)
+            total = weighted.sum(axis=1)
+            out[pos] = total * f_inf[None, :] if f_inf is not None else total
         else:
             tau = columns @ ext[:, int(iw)]
             transmission = np.where(lit, np.exp(-tau), 0.0)
-            out[pos] = np.sum(transmission * gain * flux, axis=1)
+            weighted = transmission * gain * np.maximum(adn, 0.0)
+            total = weighted.sum(axis=1)
+            out[pos] = total * f_inf[iw] if f_inf is not None else total
+
+    def _flux(self, x, normals, *, iw, local, f_inf):
+        """Shared flux driver of ``ground`` and ``direct_irradiance``.
+
+        ``normals`` are per-point unit plane normals: ``ground`` passes the
+        local vertical, ``direct_irradiance`` one shared normal broadcast
+        over the points.  Flux-band points (either boundary cutting the
+        disk) go through the exact per-point kernel; the rest keep the
+        shared coarse disk, exact there because every beam sits on one
+        side of both boundaries.
+        """
+        atmo = self._atmo_ref()
+        if atmo is None:
+            raise RuntimeError("the owning atmosphere is gone; rebuild the source")
+        self._validate(atmo)
+        out = np.zeros(len(x)) if iw is not None else np.zeros((len(x), len(atmo.wl)))
+        band = self._flux_band(x, normals)
+        n_beam = 16 * 384
+        step = self._chunk_for_nbeam(n_beam, len(atmo.wl), iw is None)
+        coarse_idx = np.flatnonzero(~band)
+        if coarse_idx.size:
+            dsk = self.disk()
+            for st in range(0, coarse_idx.size, step):
+                pos = coarse_idx[st:st + step]
+                directions = dsk[0]
+                _, _, _, app, transmission, gain, _ = self._geometry_arrays(
+                    x[pos], iw, disk=(directions, dsk[1]), local=local)
+                radial = x[pos] / np.linalg.norm(x[pos], axis=1)[:, None]
+                sin_true = np.clip(radial @ directions.T, -1, 1)
+                app_dot_normal = self._apparent_plane_projection(
+                    normals[pos], radial, directions, sin_true, app)
+                if iw is None:
+                    gain = gain[..., None]
+                    app_dot_normal = app_dot_normal[..., None]
+                weighted = transmission * gain * np.maximum(app_dot_normal, 0.0)
+                total = weighted.sum(axis=1)
+                if iw is None:
+                    out[pos] = (total * f_inf[None, :] if f_inf is not None
+                                else total)
+                else:
+                    out[pos] = (total * f_inf[iw] if f_inf is not None
+                                else total)
+        band_idx = np.flatnonzero(band)
+        for st in range(0, band_idx.size, step):
+            pos = band_idx[st:st + step]
+            self._flux_local_chunk(x[pos], normals[pos], pos, 16, 384, iw,
+                                   f_inf, out, local)
+        return out
 
     def ground(self, x, *, iw=None, local=False):
         """Solar angular integral of ``T*G*max(sin app, 0)`` on the horizontal.
@@ -1779,68 +2094,16 @@ class SolarSource:
         transfer (renderer/ground-display seam).  ``local=True`` reads the
         horizontal flux at the point itself -- no observer dependence --
         which is the accounting SOS's bottom boundary must use to match its
-        layer sources (review gen2 R1).
+        layer sources (review gen2 R1).  The integral shares the
+        direct-irradiance kernel and resolves both the earth-shadow and
+        the horizon-plane projection boundary of the disk (gen3-R1): a
+        disk straddling the plane no longer relies on coarse per-beam
+        ``max`` truncation.
         """
-        atmo = self._atmo_ref()
-        if atmo is None:
-            raise RuntimeError("the owning atmosphere is gone; rebuild the source")
-        self._validate(atmo)
-        out = np.zeros(len(x)) if iw is not None else np.zeros((len(x), len(atmo.wl)))
-        in_band, _radial, _e, _c, _h = self._classify_points(x)
-        n_beam = 16 * 384
-        step = self._chunk_for_nbeam(n_beam, len(atmo.wl), iw is None)
-        coarse_idx = np.flatnonzero(~in_band)
-        if coarse_idx.size:
-            dsk = self.disk()
-            for st in range(0, coarse_idx.size, step):
-                pos = coarse_idx[st:st + step]
-                _, _, _, app, transmission, gain, _ = self._geometry_arrays(
-                    x[pos], iw, disk=(dsk[0], dsk[1]), local=local)
-                if iw is None:
-                    gain = gain[..., None]
-                    app = app[..., None]
-                out[pos] = np.sum(transmission * gain
-                                  * np.maximum(np.sin(app), 0.0), axis=1)
-        band_idx = np.flatnonzero(in_band)
-        for st in range(0, band_idx.size, step):
-            pos = band_idx[st:st + step]
-            self._ground_local_chunk(x[pos], pos, 16, 384, iw, out, local)
-        return out
-
-    def _direct_local_chunk(self, x_chunk, normal, pos, n_r, n_az, iw, f_inf,
-                            out, local):
-        radial, u1, u2 = self._local_frame_basis(x_chunk)
-        in_band, radial, e_loc, crit, _h = self._classify_points(x_chunk)
-        directions, weights, sin_e = self._local_grid(
-            radial, u1, u2, e_loc, crit, n_r, n_az)
-        true_e = np.degrees(np.arcsin(sin_e))
-        medium = self._medium
-        radius = np.linalg.norm(x_chunk, axis=1)
-        height = np.clip((radius - R_EARTH) / 1e3,
-                         medium.z_bounds[0], medium.z_bounds[-1])
-        app, columns, gain, lit = self.geometry.ensure_table().query_fields(
-            height[:, None], true_e)
-        ext = species_extinction_weights(medium)
-        app_rad = np.radians(app)
-        # the beam directions are per point: project through the shared
-        # apparent-direction seam (identical formula to the coarse branch)
-        adn = self._apparent_plane_projection(normal, radial, directions,
-                                              sin_e, app_rad)
-        gain = gain * weights
-        if not local:
-            gain = gain * (self.observer_n / self.geometry.field
-                           .refractive_index(height)[:, None]) ** 2
-        if iw is None:
-            tau = columns @ ext
-            transmission = np.where(lit[..., None], np.exp(-tau), 0.0)
-            weighted = transmission * gain[..., None] \
-                * np.maximum(adn[..., None], 0.0)          # (n,nb,n_wl)
-            out[pos] = weighted.sum(axis=1) * f_inf[None, :]
-        else:
-            tau = columns @ ext[:, int(iw)]
-            transmission = np.where(lit, np.exp(-tau), 0.0)
-            weighted = transmission * gain * np.maximum(adn, 0.0)
-            out[pos] = weighted.sum(axis=1) * f_inf[iw]
+        x = np.asarray(x, dtype=float)
+        radial = x / np.linalg.norm(x, axis=1)[:, None]
+        return self._flux(x, np.ascontiguousarray(radial), iw=iw, local=local,
+                          f_inf=None)
 
     def direct_irradiance(self, x, normal, *, iw=None, local=False):
         """Spectral flux through a plane at the points ``x``.
@@ -1853,7 +2116,9 @@ class SolarSource:
         the facade's observer happens to be.  The full-spectrum default
         (renderer seam) and the per-wavelength calls share one (point,
         beam) projection; only the spectral multiplication gains a
-        wavelength axis.
+        wavelength axis.  When the disk straddles the plane (or the earth
+        shadow), the per-point grid resolves the exact boundary region
+        instead of coarse ``max`` truncation (gen3-R1).
         """
         atmo = self._atmo_ref()
         if atmo is None:
@@ -1862,37 +2127,9 @@ class SolarSource:
         normal = np.asarray(normal, dtype=float)
         normal = normal / np.linalg.norm(normal)
         f_inf = spectra.solar_irradiance(atmo.wl)
-        n_pts = len(x)
-        out = np.zeros((n_pts, len(atmo.wl))) if iw is None else np.zeros(n_pts)
-        in_band, _radial, _e, _c, _h = self._classify_points(x)
-        n_beam = 16 * 384
-        step = self._chunk_for_nbeam(n_beam, len(atmo.wl), iw is None)
-        coarse_idx = np.flatnonzero(~in_band)
-        if coarse_idx.size:
-            dsk = self.disk()
-            for st in range(0, coarse_idx.size, step):
-                pos = coarse_idx[st:st + step]
-                directions = dsk[0]
-                _, _, _, app, transmission, gain, _ = self._geometry_arrays(
-                    x[pos], iw, disk=(directions, dsk[1]), local=local)
-                radial = x[pos] / np.linalg.norm(x[pos], axis=1)[:, None]
-                sin_true = np.clip(radial @ directions.T, -1, 1)
-                app_dot_normal = self._apparent_plane_projection(
-                    normal, radial, directions, sin_true, app)
-                if iw is None:
-                    gain = gain[..., None]
-                    app_dot_normal = app_dot_normal[..., None]
-                weighted = transmission * gain * np.maximum(app_dot_normal, 0.0)
-                if iw is None:
-                    out[pos] = weighted.sum(axis=1) * f_inf[None, :]
-                else:
-                    out[pos] = weighted.sum(axis=1) * f_inf[iw]
-        band_idx = np.flatnonzero(in_band)
-        for st in range(0, band_idx.size, step):
-            pos = band_idx[st:st + step]
-            self._direct_local_chunk(x[pos], normal, pos, 16, 384, iw, f_inf,
-                                     out, local)
-        return out
+        normals = np.ascontiguousarray(np.broadcast_to(normal, (len(x), 3)))
+        return self._flux(np.asarray(x, dtype=float), normals, iw=iw,
+                          local=local, f_inf=f_inf)
 
     def central_transmittance(self, height_km=None, *, iw=None):
         """Pure central-beam attenuation ``T`` at ``height_km`` (default: observer).

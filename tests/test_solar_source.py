@@ -25,6 +25,7 @@ from skycolor.optics import species_extinction_weights
 from skycolor.geometry import path_lengths_sun
 from skycolor.solar_source import (
     SUN_RADIUS_DEG,
+    PointSourceTable,
     SolarRayField,
     SolarSpeciesColumns,
     SolarSource,
@@ -200,16 +201,21 @@ def test_source_rejects_swapped_medium():
 # ---------------------------------------------------------------------------
 @pytest.fixture(scope="module")
 def small_source():
-    """A reduced table (9 rows) on the standard clear 3-wl atmosphere."""
+    """A reduced table (9 rows) on the standard clear 3-wl atmosphere.
+
+    The table is a standalone :class:`PointSourceTable` (gen3-R1): the
+    shared geometry's ``ensure_table`` serves only the production
+    configuration, so reduced-density probes construct their own table.
+    """
     atmo = Atmosphere.standard(W3)
     geom = get_solar_geometry(atmo._medium)
-    geom.ensure_table(n_height=9)
-    return atmo, geom
+    table = PointSourceTable(atmo._medium, geom.field, geom.columns_tool,
+                             n_height=9)
+    return atmo, geom, table
 
 
 def test_table_holdout_against_direct_field(small_source):
-    atmo, geom = small_source
-    table = geom.table
+    atmo, geom, table = small_source
     field = geom.field
     pts = []
     for h in [0.05, 1.4, 12.0, 33.0, 70.0]:
@@ -261,8 +267,7 @@ def test_table_holdout_against_direct_field(small_source):
 
 
 def test_table_wavelength_slices_identical(small_source):
-    atmo, geom = small_source
-    table = geom.table
+    atmo, geom, table = small_source
     z = np.array([1.0, 20.0, 60.0])
     te = np.array([-2.0, 10.0, 70.0])
     ext = species_extinction_weights(atmo._medium)
@@ -278,12 +283,12 @@ def test_table_wavelength_slices_identical(small_source):
 def test_transmittance_is_pure_attenuation(small_source):
     # T stays in [0, 1] and gain is reported separately: their product is
     # never clipped or renamed (plan section 3.1 item 3)
-    atmo, geom = small_source
+    atmo, geom, table = small_source
     rng = np.random.default_rng(3)
     z = rng.uniform(0.0, 199.0, 500)
     te = rng.uniform(-15.0, 89.9, 500)
     from skycolor.optics import species_extinction_weights as _sew
-    _, tval, gain, _ = geom.table.query(
+    _, tval, gain, _ = table.query(
         z, te, _sew(atmo._medium))
     assert np.all((tval >= 0.0) & (tval <= 1.0))
     assert np.all(gain >= 0.0)
@@ -505,17 +510,16 @@ def test_table_build_independent_of_query_order():
     """
     atmo_a = Atmosphere.standard(W3)
     geom_a = get_solar_geometry(atmo_a._medium)
-    geom_a.ensure_table(n_height=9)
+    ta = PointSourceTable(atmo_a._medium, geom_a.field, geom_a.columns_tool,
+                          n_height=9)
 
     atmo_b = Atmosphere.standard(W3)
     slice_b = atmo_b._restrict([0])
     geom_b = get_solar_geometry(slice_b._medium)
-    geom_b.ensure_table(n_height=9)            # the slice registers first
+    tb = PointSourceTable(slice_b._medium, geom_b.field, geom_b.columns_tool,
+                          n_height=9)     # the slice registers first
     assert get_solar_geometry(atmo_b._medium) is geom_b   # token-shared
 
-    ta, tb = geom_a.table, geom_b.table
-    assert np.array_equal(ta.critical, tb.critical)
-    assert np.array_equal(ta.column_scale, tb.column_scale)
     z = np.array([1.4, 8.0, 40.0])
     te = np.array([-1.0, -2.0, 5.0])
     # same-shape readout on both sides: bitwise equality of T is the
@@ -534,13 +538,15 @@ def test_table_build_independent_of_query_order():
     # the anchors never see the registrar's wavelengths
     atmo_c = Atmosphere.standard(np.array([560.0, 570.0, 650.0]))
     geom_c = get_solar_geometry(atmo_c._medium)
-    geom_c.ensure_table(n_height=9)
-    assert np.array_equal(ta.critical, geom_c.table.critical)
+    tc = PointSourceTable(atmo_c._medium, geom_c.field, geom_c.columns_tool,
+                          n_height=9)
+    assert np.array_equal(ta.critical, tc.critical)
     atmo_d = Atmosphere.standard(np.array([650.0, 450.0, 550.0]))
     geom_d = get_solar_geometry(atmo_d._medium)
-    geom_d.ensure_table(n_height=9)
-    assert np.array_equal(ta.critical, geom_d.table.critical)
-    assert np.array_equal(ta.column_scale, geom_d.table.column_scale)
+    td = PointSourceTable(atmo_d._medium, geom_d.field, geom_d.columns_tool,
+                          n_height=9)
+    assert np.array_equal(ta.critical, td.critical)
+    assert np.array_equal(ta.column_scale, td.column_scale)
 
 
 def test_build_anchors_match_grid_values():
@@ -747,3 +753,143 @@ def test_real_point_solar_table_feeds_finite_source():
                          aerosol_fractions=np.zeros((2, len(atmo.aerosols))))
     assert out.shape == (2,)
     assert np.all(np.isfinite(out)) and np.all(out >= 0.0)
+
+
+# ---------------------------------------------------------------------------
+# gen3-R1 regressions: shared-table config, chunk budget, plane boundary
+# ---------------------------------------------------------------------------
+def _vacuum_atmo(wl=W3):
+    return Atmosphere(np.array(wl), z_bounds_km=[0.0, 200.0], aerosols=[],
+                      ozone_du=0.0, no2_column=0.0, refraction=False)
+
+
+def test_shared_table_config_is_not_mutable():
+    """ensure_table takes no configuration; probes cannot retune production.
+
+    The gen3-R1 reviewer's probe: ensure_table(**kw) consumed its keyword
+    arguments only on the first call, so a low-density probe silently
+    re-tuned every later production query on the medium (T moved -5.4%).
+    The shared geometry now serves exactly the production configuration;
+    custom densities build standalone tables and cannot touch it.
+    """
+    atmo = _vacuum_atmo(np.array([550.0]))
+    geom = get_solar_geometry(atmo._medium, refracted=False)
+    with pytest.raises(TypeError):
+        geom.ensure_table(n_height=9)
+    probe = PointSourceTable(atmo._medium, geom.field, geom.columns_tool,
+                             n_height=2)
+    assert probe.n_height == 2
+    assert geom._table is None          # the probe never touched the shared slot
+    t_a = np.ravel(SolarSource(atmo, 30.0).vertex([50.0], [30.0])[1])
+    atmo_b = _vacuum_atmo(np.array([550.0]))
+    t_b = np.ravel(SolarSource(atmo_b, 30.0).vertex([50.0], [30.0])[1])
+    assert np.array_equal(t_a, t_b)     # probe order cannot leak into production
+
+
+def test_chunk_respects_element_budget():
+    """The point chunk honours the element budget; chunk size never moves a value.
+
+    A 64-point floor used to override the budget itself (6144-beam x 81-wl
+    contact-band queries: budget 5 -> forced 64, ~1.2 GiB transient).  The
+    floor is 1 now and chunking must stay value-invariant.
+    """
+    atmo = _vacuum_atmo()
+    src = SolarSource(atmo, 90.0 - (-0.2))
+    step = src._chunk_for_nbeam(6144, 81, True)
+    assert step == 2_500_000 // (6144 * 81)      # budget respected exactly
+    assert 1 <= src._chunk_for_nbeam(512, 81, True) <= src.chunk
+    xs = np.repeat(np.array([[0.0, 0.0, R_EARTH]]), 16, axis=0)
+    f_a = src.direct_irradiance(xs, np.array([0.0, 0.0, 1.0]), iw=1)
+    src.chunk = 1
+    f_b = src.direct_irradiance(xs, np.array([0.0, 0.0, 1.0]), iw=1)
+    src.chunk = 1_000_000
+    f_c = src.direct_irradiance(xs, np.array([0.0, 0.0, 1.0]), iw=1)
+    assert np.array_equal(f_a, f_b) and np.array_equal(f_a, f_c)
+
+
+def _flux_reference(atmo, tab, x, normal, sun_hat, alpha_deg=SUN_RADIUS_DEG,
+                    n_rho=1600, n_phi=2400, iw=1):
+    """Dense-grid T-weighted cap integral, independent quadrature scheme.
+
+    A plain trapezoid grid over (rho, phi) with the medium's own T and
+    apparent map -- it shares the physical inputs (the table) but not the
+    kernel's per-azimuth GL + root construction, so it is a referee for
+    the region resolution, not a restatement of it.
+    """
+    r = float(np.linalg.norm(x[0]))
+    radial = x[0] / r
+    h_km = (r - R_EARTH) / 1e3
+    a = np.radians(alpha_deg)
+    sun = sun_hat / np.linalg.norm(sun_hat)
+    ref = np.array([0.0, 0.0, 1.0]) if abs(sun[2]) < 0.9 else np.array([1.0, 0.0, 0.0])
+    e1 = np.cross(ref, sun)
+    e1 /= np.linalg.norm(e1)
+    e2 = np.cross(sun, e1)
+    rho = np.linspace(0.0, a, n_rho)
+    phi = (np.arange(n_phi) + 0.5) * 2.0 * np.pi / n_phi
+    d = (np.cos(rho)[:, None, None] * sun
+         + np.sin(rho)[:, None, None] * (np.cos(phi)[None, :, None] * e1
+                                         + np.sin(phi)[None, :, None] * e2))
+    sin_true = np.clip(d @ radial, -1.0, 1.0)
+    true_e = np.degrees(np.arcsin(sin_true))
+    app, cols, _gain, lit = tab.query_fields(
+        np.full(sin_true.shape, h_km), true_e)
+    tau = cols @ species_extinction_weights(atmo._medium)[:, iw][:, None]
+    trans = np.where(lit, np.exp(-tau[..., 0]), 0.0)
+    app_rad = np.radians(app)
+    a_dn = float(normal @ radial)
+    b_dn = d @ normal
+    ct = np.sqrt(np.maximum(1.0 - sin_true ** 2, 1e-300))
+    adn = (np.sin(app_rad) * a_dn
+           + np.cos(app_rad) * (b_dn - a_dn * sin_true) / ct)
+    f = (np.maximum(adn, 0.0) * trans
+         * np.cos(rho)[:, None] * np.sin(rho)[:, None])
+    integral = np.trapezoid(f, rho, axis=0).mean() * 2.0 * np.pi
+    return integral / (np.pi * np.sin(a) ** 2)
+
+
+def test_flux_receiver_plane_boundary():
+    """Flux resolves the receiver-plane projection boundary exactly.
+
+    The gen3-R1 reviewer's defect: the disk straddling the receiving
+    plane (but clear of the earth shadow) was integrated with the coarse
+    disk's per-beam ``max`` truncation -- 16% low at sun -0.2 deg, an
+    exact false zero at -0.25 deg, -23% at +0.2 deg.  The exact kernel is
+    compared against a dense independent grid on both plane sides, a
+    tilted plane, and its own radial refinement.
+    """
+    atmo = _vacuum_atmo()
+    src = SolarSource(atmo, 90.0 - (-0.2))     # sun elevation -0.2 deg
+    tab = src.geometry.ensure_table()
+    x = np.array([[0.0, 0.0, R_EARTH + 2400.0]])
+    up = np.array([0.0, 0.0, 1.0])
+    from skycolor import spectra
+    f_inf = float(spectra.solar_irradiance(atmo.wl)[1])
+
+    for elev, tol in ((-0.2, 2e-3), (-0.25, 2e-3), (0.2, 5e-3)):
+        s = SolarSource(atmo, 90.0 - elev)
+        ker = float(np.ravel(s.direct_irradiance(x, up, iw=1))[0]) / f_inf
+        ref = _flux_reference(atmo, s.geometry.ensure_table(), x, up,
+                              s.sun_hat)
+        assert ker > 0.0, f"false zero at sun {elev}"
+        assert abs(ker / ref - 1.0) < tol, (elev, ker, ref)
+
+    # tilted plane (45 deg from the vertical toward the sun's azimuth)
+    s = SolarSource(atmo, 90.0 - (-0.2))
+    tilt = np.array([np.sin(np.radians(45.0)), 0.0, np.cos(np.radians(45.0))])
+    ker = float(np.ravel(s.direct_irradiance(x, tilt, iw=1))[0]) / f_inf
+    ref = _flux_reference(atmo, s.geometry.ensure_table(), x, tilt, s.sun_hat)
+    assert abs(ker / ref - 1.0) < 5e-3, (ker, ref)
+
+    # ground() is the horizontal-plane instance of the same kernel
+    ground_val = float(np.ravel(s.ground(x, iw=1))[0])
+    direct_val = float(np.ravel(s.direct_irradiance(x, up, iw=1))[0])
+    assert ground_val == pytest.approx(direct_val / f_inf, rel=1e-14)
+
+    # radial refinement does not move the resolved region's integral
+    normals = np.ascontiguousarray(np.broadcast_to(up, (1, 3)))
+    o1 = np.zeros(1)
+    o2 = np.zeros(1)
+    src._flux_local_chunk(x, normals, np.array([0]), 16, 384, 1, None, o1, False)
+    src._flux_local_chunk(x, normals, np.array([0]), 24, 768, 1, None, o2, False)
+    assert float(o2[0]) == pytest.approx(float(o1[0]), rel=1e-3)

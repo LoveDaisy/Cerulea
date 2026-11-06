@@ -42,7 +42,11 @@ declared in each module's ``CAPABILITIES``.
    medium's construction token (the same rule as the refraction tables):
    wavelength subsets share one geometry; `at_altitude` and any other
    redefinition build their own. The cache holds no strong reference to the
-   medium, so dead media do not pin their geometry.
+   medium, so dead media do not pin their geometry. The shared geometry
+   serves exactly one table configuration (the `PointSourceTable`
+   production defaults) -- `ensure_table` takes no configuration arguments,
+   and custom-density probes build standalone tables so a probe can never
+   re-tune later production queries on the same medium (gen3-R1).
 5. **`SolarSource`** -- binds a geometry to an observing scenario and one
    true sun direction, adds the finite disk (uniform cap, radius 16', disk
    weights with `sum(w cos rho) = 1` under the centre-normal-plane `F_inf`
@@ -69,17 +73,23 @@ declared in each module's ``CAPABILITIES``.
   reported separately from gain; `T*G` is never named transmittance and
   never clipped.
 * Reference-frame authority (which interface returns which quantity):
-  the `single`, `mc`, `twilight`, `cloud` and `render` kernels return
+  the `single`, `mc`, `twilight` and `render` kernels return
   detector-referred quantities carrying the single
-  `(n_observer/n_point)^2` transfer above.  The SOS backend
-  (`rt.multiple`) is the one documented exception: its diffuse paths keep
-  plain LOCAL radiance/flux with no detector transfer anywhere (ground and
-  TOA diagnostics included), because along the straight-transport
+  `(n_observer/n_point)^2` transfer above.  Two documented LOCAL
+  exceptions keep plain radiance/flux with no detector transfer anywhere:
+  the SOS backend (`rt.multiple`) -- its diffuse paths, ground and TOA
+  diagnostics included -- because along the straight-transport
   approximation plain radiance -- not `L/n^2` -- is the invariant, and
-  reduced bookkeeping there broke energy conservation in check.  The
-  ~1e-4-level convention difference between SOS and single-scattering
-  radiances is part of the declared SOS-vs-SS propagation error (plan 6.3)
-  and must not be "reconciled" by adding a transfer to one side only.
+  reduced bookkeeping there broke energy conservation in check; and the
+  cloud deck (`illuminate_cloud` beam incident flux, the two-stream layer
+  responses and `cloud_radiance`), which is a local two-stream operator
+  driven by local beam flux (`weight * F_inf * T_entry * G_local`).  When
+  local cloud radiances are combined with detector-referred single/MC
+  radiances, that reference-frame difference stays part of the declared
+  propagation approximation; it must not be "reconciled" by adding a
+  transfer to one side only.  The ~1e-4-level convention difference
+  between SOS and single-scattering radiances is part of the declared
+  SOS-vs-SS propagation error (plan 6.3).
 
 ## Disk quadrature conventions
 
@@ -97,6 +107,17 @@ declared in each module's ``CAPABILITIES``.
   holds <= 0.06% and the horizontal-flux kernel <= 0.003% (plan 6.2 budget
   0.5%).  Outside the band every beam shares one lit state and the coarse
   disk's per-beam lit drop is exact.
+* Receiver-plane boundary (flux kernels only, gen3-R1): `ground` and
+  `direct_irradiance` share one kernel that also resolves the plane's own
+  projection cut -- when the apparent disk straddles the receiving plane
+  (`|apparent centre . normal| < sin alpha`), the coarse per-beam
+  `max(., 0)` truncation mis-integrates the partially incident disk, so
+  those points enter the exact per-point grid with their lit interval
+  intersected against the plane's `apparent beam . normal = 0` root
+  (bisected with the same apparent map the beam integrand reads).  This
+  boundary is orthogonal to the earth-shadow band: a point can need it
+  while fully clear of occultation (raised observers, low sun over any
+  tilted plane).
 * Selection is per point -- the point's own geometry decides.  Batch
   composition, chunking and call-site grouping change execution cost only,
   never a value (review round 4, Major batch invariance).
