@@ -1,9 +1,16 @@
 {
   "suite": "source",
-  "git_head": "8701af5ff49783f38885e1a1aa8ee8a9e52e0d81",
-  "seconds": 75.8515922910301,
+  "git_head": "29042f4cdcd0c332ed03f81feecb15294bfb608c",
+  "seconds": 50.8449185420759,
   "passed": false,
   "checks": [
+    {
+      "name": "constant-n[1.0] field n_inf == index",
+      "value": 0.0,
+      "threshold": 1e-12,
+      "passed": true,
+      "detail": ""
+    },
     {
       "name": "constant-n[1.0] direction unbent [deg]",
       "value": 0.0,
@@ -27,7 +34,7 @@
     },
     {
       "name": "constant-n[1.0] uniform column rel err",
-      "value": 6.360025839313721e-09,
+      "value": 0.0,
       "threshold": 1e-08,
       "passed": true,
       "detail": ""
@@ -36,6 +43,13 @@
       "name": "blocked rays exactly NaN",
       "value": 0.0,
       "threshold": 0.0,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "constant-n[1.000278] field n_inf == index",
+      "value": 0.0,
+      "threshold": 1e-12,
       "passed": true,
       "detail": ""
     },
@@ -62,7 +76,7 @@
     },
     {
       "name": "constant-n[1.000278] uniform column rel err",
-      "value": 6.360022730689252e-09,
+      "value": 6.360022952733857e-09,
       "threshold": 1e-08,
       "passed": true,
       "detail": ""
