@@ -19,7 +19,8 @@ from scipy.optimize import brentq
 
 from skycolor.atmosphere import Atmosphere, ExponentialProfile
 from skycolor.aerosol import HinterlandAerosol, shared
-from skycolor.constants import R_EARTH
+from skycolor.constants import N_STD_AIR, R_EARTH
+from skycolor.refraction import REFRACTIVITY_STD
 from skycolor.medium import Medium
 from skycolor.optics import species_extinction_weights
 from skycolor.geometry import path_lengths_sun
@@ -69,17 +70,29 @@ def test_constant_index_direction_and_gain(refracted):
 
 @pytest.mark.parametrize("index", [1.0, 1.000278])
 def test_constant_index_uniform_column(index):
+    # the constant density is derived from the target index through the
+    # Gladstone-Dale mapping (n - 1 = 2.78e-4 * rho / N_STD_AIR): the index
+    # used to be label decoration while every build ran at a fixed 2e20
+    # density, i.e. n_inf = 1.0000000022, so the non-unity constant-index
+    # case the plan names was never actually exercised (gen3-R3)
+    density = N_STD_AIR * (index - 1.0) / REFRACTIVITY_STD
     medium = Medium(wl=W3, z_bounds=np.array([0.0, 200.0]),
                     ozone_du=0.0, no2_column=0.0, aerosols=(),
-                    air_profile=lambda z: np.full_like(np.asarray(z, float), 2.0e20))
+                    air_profile=lambda z: np.full_like(np.asarray(z, float), density))
     field = SolarRayField(medium, refracted=True, n_quad=8)
+    assert np.allclose(field.refractive_index(np.array([1.0, 40.0, 150.0])),
+                       index, rtol=0, atol=1e-12)
     columns = SolarSpeciesColumns(medium, field, n_quad=8)
     heights = np.array([0.0, 40.0, 40.0, 120.0])
     apps = np.array([90.0, 20.0, -6.0, 1.0])
     value = columns.columns(heights, apps)
-    expected = _straight_column(field, columns, heights, apps) * 2.0e20
-    rel = np.abs(value[:, 0] / expected - 1.0)
-    assert rel.max() <= 1e-8
+    expected = _straight_column(field, columns, heights, apps) * density
+    if density == 0.0:
+        # vacuum: both sides are identically zero -- a relative check is 0/0
+        assert np.all(value == 0.0) and np.all(expected == 0.0)
+    else:
+        rel = np.abs(value[:, 0] / expected - 1.0)
+        assert rel.max() <= 1e-8
     # zero species stay exactly zero; blocked rays are exactly NaN
     assert np.all(value[:, 1:] == 0.0)
     assert np.all(np.isnan(columns.columns([30.0, 0.0], [-6.0, -1.0])))
@@ -926,3 +939,106 @@ def test_position_domain_contract_across_kernels():
     surf = float(np.ravel(src.direct_irradiance(
         np.array([[0.0, 0.0, R_EARTH]]), up, iw=0))[0])
     assert surf > 0.0
+
+
+# ---------------------------------------------------------------------------
+# gen3-R3 regressions: orthonormal fallback frame and rotation equivariance
+# ---------------------------------------------------------------------------
+def _cap_side_reference(alpha_deg=SUN_RADIUS_DEG):
+    """Flux/F_inf on a plane through the cap centre (normal perpendicular
+    to the sun direction): ``(alpha - sin alpha cos alpha)/(pi sin^2 alpha)``.
+    """
+    a = np.radians(alpha_deg)
+    return (a - np.sin(a) * np.cos(a)) / (np.pi * np.sin(a) ** 2)
+
+
+def _vacuum_550():
+    return Atmosphere(np.array([550.0]), z_bounds_km=[0.0, 200.0], aerosols=[],
+                      ozone_du=0.0, no2_column=0.0, refraction=False,
+                      air_profile=lambda z: np.zeros_like(np.asarray(z, float)))
+
+
+def test_local_zenith_frame_plane_flux_analytic():
+    """Direct flux stays exact when the sun sits at the point's zenith.
+
+    gen3-R3: the degenerate-frame fallback picked a fixed global axis that
+    was not orthogonal to radial (it could even be parallel), so the
+    constructed cap stopped being a unit disk: the reviewer's probes saw a
+    false zero (6.1e-17 vs the analytic 9.877e-4), -13.4%, and ~100%
+    swings under a global rotation.  The fallback now projects a
+    least-aligned coordinate axis onto the tangent plane, and the public
+    kernel reproduces the analytic cap-side integral at every orientation.
+    """
+    from skycolor import spectra
+    wl = np.array([550.0])
+    vac = _vacuum_550()
+    f_inf = float(spectra.solar_irradiance(wl)[0])
+    ref = _cap_side_reference()
+
+    # reviewer repro A: sun at zenith 90 / azimuth 90, point on the sun
+    # axis, horizontal receiving plane through the cap centre
+    s = SolarSource(vac, 90.0, 90.0)
+    x = (R_EARTH + 1000.0) * s.sun_hat
+    got = float(np.ravel(s.direct_irradiance(
+        x[None, :], np.array([0.0, 0.0, 1.0]), iw=0))[0]) / f_inf
+    assert got == pytest.approx(ref, rel=2e-3), got
+
+    # the same scene rotated to azimuth 0: rotation equivariance
+    s0 = SolarSource(vac, 90.0, 0.0)
+    x0 = (R_EARTH + 1000.0) * s0.sun_hat
+    got0 = float(np.ravel(s0.direct_irradiance(
+        x0[None, :], np.array([0.0, 0.0, 1.0]), iw=0))[0]) / f_inf
+    assert got0 == pytest.approx(got, rel=1e-9), (got, got0)
+
+    # reviewer repro B: sun at the point's zenith, vertical plane that
+    # contains the sun direction
+    s30 = SolarSource(vac, 30.0, 90.0)
+    x30 = (R_EARTH + 10000.0) * s30.sun_hat
+    normal = np.cross(s30.sun_hat, np.array([0.0, 1.0, 0.0]))
+    normal = normal / np.linalg.norm(normal)
+    got30 = float(np.ravel(s30.direct_irradiance(
+        x30[None, :], normal, iw=0))[0]) / f_inf
+    assert got30 == pytest.approx(ref, rel=2e-3), got30
+
+    # sun on the local zenith of a non-axis radial
+    s_diag = SolarSource(vac, 60.0, 45.0)
+    x_diag = (R_EARTH + 10000.0) * s_diag.sun_hat
+    n_diag = np.cross(s_diag.sun_hat, np.array([0.0, 0.0, 1.0]))
+    n_diag = n_diag / np.linalg.norm(n_diag)
+    got_diag = float(np.ravel(s_diag.direct_irradiance(
+        x_diag[None, :], n_diag, iw=0))[0]) / f_inf
+    assert got_diag == pytest.approx(ref, rel=2e-3), got_diag
+
+
+def test_direct_flux_rotation_equivariant():
+    """Rotating the whole scene about the global z axis leaves the flux.
+
+    The reviewer's probes produced near-100% swings under a pure global
+    rotation; the tolerance here covers float reassociation only.
+    """
+    from skycolor import spectra
+    vac = _vacuum_550()
+    f_inf = float(spectra.solar_irradiance(np.array([550.0]))[0])
+
+    zenith, azim = 70.0, 33.0
+    s1 = SolarSource(vac, zenith, azim)
+    x1 = (R_EARTH + 5000.0) * s1.sun_hat
+    n1 = np.cross(s1.sun_hat, np.array([0.0, 0.0, 1.0]))
+    n1 = n1 / np.linalg.norm(n1)
+    f1 = float(np.ravel(s1.direct_irradiance(x1[None, :], n1, iw=0))[0])
+
+    # rotate the whole scene about the global z axis; the rotated plane
+    # normal is the cross product of the rotated sun with z -- no separate
+    # rotation-matrix sign convention to get wrong
+    s2 = SolarSource(vac, zenith, azim + 41.0)
+    x2 = (R_EARTH + 5000.0) * s2.sun_hat
+    n2 = np.cross(s2.sun_hat, np.array([0.0, 0.0, 1.0]))
+    n2 = n2 / np.linalg.norm(n2)
+    f2 = float(np.ravel(s2.direct_irradiance(x2[None, :], n2, iw=0))[0])
+    # Measured equivariance floor ~8.6e-8 relative: at an exact-zenith sun
+    # with a plane through the cap centre, the azimuthal EDGE of the
+    # above-plane region is decided by +-1e-16 projections, and the nodes
+    # there are noise-tier -- the quadrature impact is bounded by the edge
+    # region's own vanishing measure.  The defect this pins swung the same
+    # scene by 13-100%; the quadrature budget is 5e-3.
+    assert f1 / f_inf == pytest.approx(f2 / f_inf, rel=1e-6), (f1, f2)

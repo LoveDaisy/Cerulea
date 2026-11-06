@@ -1337,7 +1337,16 @@ class SolarSource:
         radius = np.linalg.norm(x, axis=1)
         radial = x / np.maximum(radius[:, None], 1e-300)
         heights = self._position_heights(x)
-        e_loc = np.degrees(np.arcsin(np.clip(radial @ self.sun_hat, -1.0, 1.0)))
+        dot = np.clip(radial @ self.sun_hat, -1.0, 1.0)
+        e_loc = np.degrees(np.arcsin(dot))
+        # within 1e-12 of the local zenith/nadir the elevation's tangent
+        # half-angle is below 1.4e-6 rad: pin to exactly +-90 degrees.
+        # sqrt(1 - dot^2) there is pure cancellation noise (dot = 1 - eps
+        # loses half its digits), which used to tilt the constructed disk
+        # by ~1e-8 rad in a scene-dependent way and break rotation
+        # equivariance (gen3-R3); the exact pole is the honest limit.
+        e_loc = np.where(dot > 1.0 - 1e-12, 90.0, e_loc)
+        e_loc = np.where(dot < -(1.0 - 1e-12), -90.0, e_loc)
         crit = self.geometry.critical_curve()(heights)
         in_band = np.abs(e_loc - crit) < self.radius_deg
         return in_band, radial, e_loc, crit, heights
@@ -1805,16 +1814,27 @@ class SolarSource:
         """Per-point local frame: radial, sun-horizontal and cross vectors.
 
         ``u1`` points along the sun's horizontal component at the point,
-        ``u2 = radial x u1``; a point whose local sun elevation is +-90
-        degrees (sun on the vertical) falls back to a fixed perpendicular.
+        ``u2 = radial x u1``; ``radial``/``u1``/``u2`` are exactly orthonormal
+        in both branches.  A point whose local sun elevation is +-90 degrees
+        (sun on the vertical) has no horizontal component: the fallback picks,
+        per point, the coordinate axis least aligned with ``radial``, projects
+        it into the tangent plane and normalises.  The former fixed ``+x``
+        fallback was not orthogonal to ``radial`` -- it could even be parallel
+        -- so the constructed cap stopped being a unit disk and any plane flux
+        depended on the global orientation, up to a false zero (gen3-R3;
+        plan 6.1 rotation equivariance and zenith degeneracy).
         """
         radius = np.linalg.norm(x, axis=1)
         radial = x / np.maximum(radius[:, None], 1e-300)
         dot = np.einsum("j,ij->i", self.sun_hat, radial)
         hz = self.sun_hat[None, :] - dot[:, None] * radial
         n = np.linalg.norm(hz, axis=1)
-        fallback = np.zeros_like(hz)
-        fallback[:, 0] = 1.0
+        axis = np.argmin(np.abs(radial), axis=1)
+        e = np.zeros_like(radial)
+        e[np.arange(radial.shape[0]), axis] = 1.0
+        fallback = e - np.einsum("ij,ij->i", e, radial)[:, None] * radial
+        fallback /= np.maximum(
+            np.linalg.norm(fallback, axis=1), 1e-300)[:, None]
         safe = (n > 1e-12)[:, None]
         u1 = np.where(safe, hz / np.maximum(n, 1e-300)[:, None], fallback)
         u2 = np.cross(radial, u1)

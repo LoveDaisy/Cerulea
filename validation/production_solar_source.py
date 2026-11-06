@@ -44,7 +44,8 @@ if str(ROOT) not in sys.path:
 from skycolor import cloud, presets, spectra  # noqa: E402
 from skycolor.rt import cloud as rtcloud  # noqa: E402
 from skycolor.atmosphere import Atmosphere  # noqa: E402
-from skycolor.constants import R_EARTH  # noqa: E402
+from skycolor.constants import N_STD_AIR, R_EARTH  # noqa: E402
+from skycolor.refraction import REFRACTIVITY_STD  # noqa: E402
 from skycolor.optics import species_extinction_weights  # noqa: E402
 from skycolor.rt import mc, multiple, single  # noqa: E402
 from skycolor.solar_source import (  # noqa: E402
@@ -120,10 +121,17 @@ def suite_source(out: Path) -> int:
     # -- analytic constant-index limits (plan 6.2) --------------------------
     for index, refracted in [(1.0, False), (1.000278, True)]:
         medium_wl = np.array([550.0])
+        # the density comes from the target index via Gladstone-Dale; the
+        # label used to be decoration while both builds ran at a fixed
+        # 2e20 density (n_inf 1.0000000022), so the non-unity case the
+        # plan names was never exercised (gen3-R3)
+        density = N_STD_AIR * (index - 1.0) / REFRACTIVITY_STD
         atmo = Atmosphere(medium_wl, aerosols=[], ozone_du=0.0, no2_column=0.0,
-                          air_profile=lambda z: np.full_like(np.asarray(z, float), 2.0e20),
+                          air_profile=lambda z: np.full_like(np.asarray(z, float), density),
                           refraction=refracted)
         field = SolarRayField(atmo._medium, refracted=refracted)
+        checks.add(f"constant-n[{index}] field n_inf == index",
+                   abs(float(field.n_inf) - index), 1e-12)
         cols = SolarSpeciesColumns(atmo._medium, field)
         true, slope = field.forward_with_slope(np.array([40.0]), np.array([20.0]))
         checks.add(f"constant-n[{index}] direction unbent [deg]",
@@ -138,8 +146,14 @@ def suite_source(out: Path) -> int:
         path = (-radius * np.sin(np.radians(apps))
                 + np.sqrt(np.maximum(cols.r_top ** 2 - impact ** 2, 0.0)))
         value = cols.columns(heights, apps)
-        rel = np.abs(value[:, 0] / (path * 2.0e20) - 1.0)
-        checks.add(f"constant-n[{index}] uniform column rel err", float(rel.max()),
+        if density == 0.0:
+            # vacuum: both sides are identically zero -- a relative check
+            # would be 0/0
+            worst = 0.0 if np.all(value[:, 0] == 0.0) else float("inf")
+        else:
+            rel = np.abs(value[:, 0] / (path * density) - 1.0)
+            worst = float(rel.max())
+        checks.add(f"constant-n[{index}] uniform column rel err", worst,
                    1e-8)
         if index == 1.0 or True:
             checks.deviation("uniform column 1e-8 budget at production quad",
