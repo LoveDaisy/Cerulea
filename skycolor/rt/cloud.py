@@ -474,30 +474,17 @@ class CloudIllumination:
 
     @property
     def beam_flux(self):
-        """Disk-integrated beam irradiance at the deck, ``(n_wl,)``."""
-        total = None
+        """Disk-integrated beam irradiance at the deck, ``(n_wl,)``.
+
+        An empty contribution set -- the deck fully inside Earth's shadow,
+        a normal twilight state -- is a zero spectrum on the optics
+        wavelength grid, not ``None`` or a scalar: consumers must be able
+        to do arithmetic on it without special-casing (gen3-R2).
+        """
+        total = np.zeros(len(self.optics.wl))
         for b in self.beams:
-            total = b.incident * 0 if total is None else total
-        if total is None:
-            total = 0.0
-        return sum((b.incident for b in self.beams),
-                   start=np.zeros_like(self.beams[0].incident)
-                   if self.beams else None)
-
-
-def shadow_height_km(sun_zenith_deg: float, ground_km: float = 0.0) -> float:
-    """Altitude of the centre beam's terminator above a spherical opaque ground.
-
-    A point at height ``z`` is sunlit when its solar ray misses the Earth,
-    i.e. when ``(R + z) sin(theta) > R + ground_km * 1000``.  The
-    terminator is at ``z = (r_ground / sin(theta) - R) / 1000`` km for
-    ``theta > 90``, and at ``ground_km`` for a sun above the horizon.
-    """
-    theta = np.radians(float(sun_zenith_deg))
-    if theta <= np.pi / 2.0:
-        return float(ground_km)
-    s = np.sin(theta)
-    return float(((R_EARTH + ground_km * 1e3) / max(s, 1e-9) - R_EARTH) / 1000.0)
+            total = total + b.incident
+        return total
 
 
 def illuminate_cloud(atmo, cloud: CloudLayer, sun_zenith_deg: float,
@@ -628,13 +615,19 @@ def illuminate_cloud(atmo, cloud: CloudLayer, sun_zenith_deg: float,
     else:
         geometry_name = "mixed"
 
-    # diagnostic: the centre beam's terminator height
+    # diagnostic: the centre beam's terminator height, from the unified
+    # source's occultation authority -- the same refracted root that
+    # classifies the beams (gen3-R2: the standalone r_ground/sin(theta)
+    # formula ignored refraction and disagreed with the beam classification;
+    # a whole-occluded column has no in-domain root and reports NaN)
     theta = np.radians(float(sun_zenith_deg))
     if theta <= np.pi / 2:
         z_shadow = float(atmo.z_bounds[0])
     else:
-        z_shadow = float((geometry.field.q_ground / max(np.sin(theta), 1e-9)
-                          - R_EARTH) / 1000.0)
+        try:
+            z_shadow = float(source.shadow_height(90.0 - float(sun_zenith_deg)))
+        except ValueError:
+            z_shadow = float("nan")
 
     return CloudIllumination(geometry=geometry_name, beams=tuple(beams),
                              sun_zenith_deg=float(sun_zenith_deg),

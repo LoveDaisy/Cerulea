@@ -259,12 +259,12 @@ def solve(
     from ..solar_source import SolarSource
 
     source = SolarSource(atmo, float(sun_zenith_deg), float(sun_azimuth_deg))
-    directions_toa, beam_w = source.disk()
     # direct irradiance incident on the ground: plain local per-beam sum at
     # the domain bottom (z_bounds[0]) — the same reference as the layer
     # sources, independent of the facade's elevation_km (this backend
     # declares ground = z_bounds[0] and does not read elevation_km)
     z0 = float(z_bounds[0])
+    up_hat = np.array([0.0, 0.0, 1.0])
     # BOA direct flux through the unified per-point ground seam: the same
     # contact-band adaptive evaluation the renderer and validation DNI use,
     # so every consumer agrees on the direct solar flux at one position
@@ -277,8 +277,16 @@ def solve(
     # gen2 R1: the detector-referred default made direct_down_boa scale
     # with an unrelated elevation_km)
     e_direct = f_sun * source.ground(x_ground, iw=None, local=True)[0]
-    up_hat = np.array([0.0, 0.0, 1.0])
-    incident = f_sun * np.sum(beam_w * np.maximum(directions_toa @ up_hat, 0.0))
+    # TOA incident flux through the same unified plane-flux kernel, at the
+    # model top on the observer's column, LOCAL at the point (the layer
+    # sources are local, so the TOA boundary must not carry an observer
+    # transfer either).  The kernel resolves the receiver-plane projection
+    # cut, so the public diagnostic no longer keeps the fixed-disk beam
+    # sum's ~+21% contact-band error and its near-horizon false zero
+    # (review gen3 R2); with a grazing sun it honestly carries the columns
+    # the rays traverse above the boundary instead of assuming vacuum.
+    x_toa = np.array([[0.0, 0.0, R_EARTH + float(z_bounds[-1]) * 1e3]])
+    incident = source.direct_irradiance(x_toa, up_hat, iw=None, local=True)[0]
     direct_down = e_direct.copy()
     mu_s = -float(np.cos(np.radians(float(sun_zenith_deg))))  # view-frame mu0 (diagnostics)
 

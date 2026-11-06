@@ -290,12 +290,41 @@ def test_output_shape_matches_solver(atmo, altostratus):
 # ---------------------------------------------------------------------------
 # 6. the sun below the horizon: red underlighting
 # ---------------------------------------------------------------------------
-def test_shadow_height():
-    assert rtcloud.shadow_height_km(0.0) == 0.0
-    assert rtcloud.shadow_height_km(60.0) == 0.0
-    # the dip of the horizon: 2 degrees -> about 3.9 km
-    assert rtcloud.shadow_height_km(92.0) == pytest.approx(3.9, abs=0.2)
-    assert rtcloud.shadow_height_km(96.0) > rtcloud.shadow_height_km(92.0)
+def test_fully_dark_deck_beam_flux_is_zero_spectrum(atmo, stratus):
+    """A deck fully inside Earth's shadow returns a zero (n_wl,) spectrum.
+
+    gen3-R2: the empty contribution set fell through to ``None``, so
+    ordinary twilight consumers (`beam_flux / pi`) hit a TypeError.  Fully
+    dark is a normal state, not a special case.
+    """
+    illum = rtcloud.illuminate_cloud(atmo, stratus, 110.0)
+    assert illum.geometry == "none" and len(illum.beams) == 0
+    assert illum.beam_flux.shape == (len(atmo.wl),)
+    assert np.all(illum.beam_flux == 0.0)
+    assert (illum.beam_flux / np.pi).shape == (len(atmo.wl),)
+    single = rtcloud.illuminate_cloud(atmo, stratus, 110.0)
+    assert single.beam_flux.shape == (len(atmo.wl),)
+
+
+def test_deck_shadow_diagnostic_matches_source(atmo, stratus):
+    """`shadow_km` is the unified source's occultation root, bit-for-bit.
+
+    gen3-R2: the standalone r_ground/sin(theta) formula ignored refraction
+    and reported 2.74 km where the authoritative root gives 0.163 km at
+    zenith 91 deg; the whole-column-occluded case has no in-domain root
+    and reports NaN.
+    """
+    from skycolor.solar_source import SolarSource
+    for zenith in (91.0, 96.0):
+        illum = rtcloud.illuminate_cloud(atmo, stratus, zenith)
+        src = SolarSource(atmo, zenith, 0.0)
+        assert illum.shadow_km == src.shadow_height(90.0 - zenith)
+    # raised ground below the stratus deck base (0.5 km): the authoritative
+    # root tracks the opaque bottom, not a fixed sea-level cone
+    raised = Atmosphere(WL, z_bounds_km=[0.3, 200.0])
+    illum_r = rtcloud.illuminate_cloud(raised, stratus, 91.0)
+    src_r = SolarSource(raised, 91.0, 0.0)
+    assert illum_r.shadow_km == src_r.shadow_height(-1.0)
 
 
 def test_high_clouds_stay_lit_longer(atmo, altostratus, cirrus):

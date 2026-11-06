@@ -113,11 +113,22 @@ declared in each module's ``CAPABILITIES``.
   (`|apparent centre . normal| < sin alpha`), the coarse per-beam
   `max(., 0)` truncation mis-integrates the partially incident disk, so
   those points enter the exact per-point grid with their lit interval
-  intersected against the plane's `apparent beam . normal = 0` root
-  (bisected with the same apparent map the beam integrand reads).  This
-  boundary is orthogonal to the earth-shadow band: a point can need it
-  while fully clear of occultation (raised observers, low sun over any
-  tilted plane).
+  intersected against the plane's `apparent beam . normal = 0` root,
+  bisected with the same apparent map the beam integrand reads.
+  This boundary is orthogonal to the earth-shadow band: a point can need
+  it while fully clear of occultation (raised observers, low sun over any
+  tilted plane).  Every flux consumer routes through the seam -- the SOS
+  BOA and TOA boundary diagnostics included (gen3-R2): a back-end that
+  sums the coarse disk itself re-introduces the truncation error and the
+  near-horizon false zero.
+* Position domain (gen3-R2): every Cartesian position kernel
+  (`scatter`, `ground`, `direct_irradiance`, and the band classification
+  under them) shares one domain check -- finite coordinates, radius
+  between the opaque ground and the model top, with only a +-1 m
+  rounding band snapping to the boundary (MC ground intersections).
+  Beyond it the query raises, matching the table's own rejection;
+  silent clipping used to reinterpret underground points as surface
+  scenes (plan 6.1: out-of-domain queries fail loudly).
 * Selection is per point -- the point's own geometry decides.  Batch
   composition, chunking and call-site grouping change execution cost only,
   never a value (review round 4, Major batch invariance).
@@ -127,7 +138,7 @@ declared in each module's ``CAPABILITIES``.
 | backend | solar side | retained approximation |
 |---|---|---|
 | `rt.single` | per-scattering-point `scatter` kernel; phase from the *apparent* beam direction | straight viewing rays; view-path optical depth from the shell quadrature with the aerosol `HorizontalField` applied to the view-side coefficients only (solar columns stay radial) |
-| `rt.multiple` (SOS) | per-LAYER disk quadrature: layers inside the contact band get the source's adaptive disk at their mid-point height, layers outside keep the production coarse disk; beams projected onto the Fourier source with their local azimuth factors (the disk spans only ~16'/sin(z) of local azimuth, so `cos(m d_az) ~ 1`); BOA direct flux through the unified `ground` seam; sun `T` is the raw physical extinction -- delta-M scales only the diffuse moments | plane-parallel diffuse transport; ground fixed at `z_bounds[0]`; layer sources project per layer (adaptive layers have their own beam counts) |
+| `rt.multiple` (SOS) | per-LAYER disk quadrature: layers inside the contact band get the source's adaptive disk at their mid-point height, layers outside keep the production coarse disk; beams projected onto the Fourier source with their local azimuth factors (the disk spans only ~16'/sin(z) of local azimuth, so `cos(m d_az) ~ 1`); BOA direct and TOA incident flux through the unified plane-flux seams (`ground` / `direct_irradiance`, both LOCAL at the boundary point); sun `T` is the raw physical extinction -- delta-M scales only the diffuse moments | plane-parallel diffuse transport; ground fixed at `z_bounds[0]`; layer sources project per layer (adaptive layers have their own beam counts) |
 | `rt.mc`, `rt.twilight` | deferred batched `scatter`/`ground` evaluation; the RNG stream, free paths and event classification are bit-identical to a run with the solar values blanked | straight-line photon transport; horizontally uniform atmosphere |
 | `rt.cloud` | per-beam classification (top entry / base entry / mid-deck column-shadow entry / blocked): the entry height is the vertical column's shadow root for that beam direction (`SolarSource.shadow_height`, exactly `R/cos(e)-R` in vacuum), the beam set is the adaptive disk at deck top, per-beam two-stream responses, `geometry="mixed"` when the disk straddles the boundary; partially lit decks evaluate the representative T/G/mu0 at the sunlit-segment MIDPOINT (plan 3.3 closure) while tau splits at the shadow root | plane-parallel homogeneous deck |
 | `render.ground_radiance` | `direct_irradiance` on the horizontal at the observer's ground | display-only; the retired `direct_transmittance` override still works but warns and cannot be combined with the new override |

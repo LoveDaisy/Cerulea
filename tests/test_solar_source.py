@@ -893,3 +893,36 @@ def test_flux_receiver_plane_boundary():
     src._flux_local_chunk(x, normals, np.array([0]), 16, 384, 1, None, o1, False)
     src._flux_local_chunk(x, normals, np.array([0]), 24, 768, 1, None, o2, False)
     assert float(o2[0]) == pytest.approx(float(o1[0]), rel=1e-3)
+
+
+def test_position_domain_contract_across_kernels():
+    """Out-of-domain Cartesian queries fail loudly on every position kernel.
+
+    gen3-R2: scatter/ground/direct_irradiance silently clipped out-of-model
+    heights onto the table's domain, so an underground point returned the
+    surface's nonzero illumination while vertex rejected the same query.
+    All position consumers now share one check: finite coordinates, radius
+    between the opaque ground and the model top, +-1 m rounding only.
+    """
+    atmo = _vacuum_atmo(np.array([550.0]))
+    src = SolarSource(atmo, 60.0)
+    up = np.array([0.0, 0.0, 1.0])
+    underground = np.array([[0.0, 0.0, R_EARTH - 1000.0]])
+    above = np.array([[0.0, 0.0, R_EARTH + 250.0e3]])
+    nan_pos = np.array([[np.nan, 0.0, R_EARTH]])
+    for pos in (underground, above, nan_pos):
+        with pytest.raises(ValueError):
+            src.direct_irradiance(pos, up, iw=0)
+        with pytest.raises(ValueError):
+            src.ground(pos, iw=0)
+        with pytest.raises(ValueError):
+            src.scatter(pos, np.array([[0.0, 0.0, -1.0]]), iw=0,
+                        ray_fraction=np.ones(1),
+                        aerosol_fractions=np.zeros((1, 0)))
+    # inside the rounding band the boundary snaps instead of raising
+    edge = src.direct_irradiance(np.array([[0.0, 0.0, R_EARTH - 0.5]]),
+                                 up, iw=0)
+    assert np.all(np.isfinite(edge))
+    surf = float(np.ravel(src.direct_irradiance(
+        np.array([[0.0, 0.0, R_EARTH]]), up, iw=0))[0])
+    assert surf > 0.0

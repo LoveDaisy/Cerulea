@@ -1301,6 +1301,31 @@ class SolarSource:
             self._disk_cache[key] = cached
         return cached
 
+    def _position_heights(self, x):
+        """Heights of Cartesian query points under one shared domain contract.
+
+        Every position-consuming kernel routes through here (gen3-R2):
+        coordinates must be finite and the radius must lie between the
+        opaque ground and the model top.  Only a +-1 m rounding band snaps
+        to the nearest boundary -- MC ground intersections land there;
+        anything beyond raises, matching the table's own query domain.
+        Silent clipping used to map an underground point onto the surface
+        scene and return nonzero illumination for it (plan 6.1:
+        out-of-domain queries fail loudly, they are not reinterpreted).
+        """
+        x = np.asarray(x, dtype=float)
+        if not np.all(np.isfinite(x)):
+            raise ValueError("query positions must be finite")
+        heights = (np.linalg.norm(x, axis=1) - R_EARTH) / 1e3
+        ground = float(self._medium.z_bounds[0])
+        top = float(self._medium.z_bounds[-1])
+        tol = 1e-3
+        if np.any(heights < ground - tol) or np.any(heights > top + tol):
+            raise ValueError(
+                "query position lies outside the model domain "
+                f"[{ground}, {top}] km (beyond the 1 m rounding band)")
+        return np.clip(heights, ground, top)
+
     def _classify_points(self, x):
         """Exact per-point band data — no rounding anywhere.
 
@@ -1311,8 +1336,7 @@ class SolarSource:
         """
         radius = np.linalg.norm(x, axis=1)
         radial = x / np.maximum(radius[:, None], 1e-300)
-        heights = np.clip((radius - R_EARTH) / 1e3,
-                          self._medium.z_bounds[0], self._medium.z_bounds[-1])
+        heights = self._position_heights(x)
         e_loc = np.degrees(np.arcsin(np.clip(radial @ self.sun_hat, -1.0, 1.0)))
         crit = self.geometry.critical_curve()(heights)
         in_band = np.abs(e_loc - crit) < self.radius_deg
@@ -1729,8 +1753,7 @@ class SolarSource:
         medium = self._medium
         radius = np.linalg.norm(x, axis=1)
         radial = x / radius[:, None]
-        height = np.clip((radius - R_EARTH) / 1e3,
-                         medium.z_bounds[0], medium.z_bounds[-1])
+        height = self._position_heights(x)
         true_mu = np.clip(radial @ directions.T, -1.0, 1.0)
         true_e = np.degrees(np.arcsin(true_mu))
         app, columns, gain, lit = self.geometry.ensure_table().query_fields(
@@ -1909,9 +1932,7 @@ class SolarSource:
             radial, u1, u2, e_loc, crit, n_r, n_az)
         true_e = np.degrees(np.arcsin(sin_e))
         medium = self._medium
-        radius = np.linalg.norm(x_chunk, axis=1)
-        height = np.clip((radius - R_EARTH) / 1e3,
-                         medium.z_bounds[0], medium.z_bounds[-1])
+        height = self._position_heights(x_chunk)
         app, columns, gain, lit = self.geometry.ensure_table().query_fields(
             height[:, None], true_e)
         ext = species_extinction_weights(medium)
