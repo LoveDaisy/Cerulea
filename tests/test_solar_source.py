@@ -1042,3 +1042,39 @@ def test_direct_flux_rotation_equivariant():
     # region's own vanishing measure.  The defect this pins swung the same
     # scene by 13-100%; the quadrature budget is 5e-3.
     assert f1 / f_inf == pytest.approx(f2 / f_inf, rel=1e-6), (f1, f2)
+
+
+def test_radial_beam_flux_limit_is_exact():
+    """A query point sitting exactly on a disk beam direction stays finite.
+
+    gen3-R4: one disk beam aligned with the query radial drove the shared
+    projection's horizontal denominator to ~1e-150 while its numerator
+    kept the dot-product cancellation residue -- direct_irradiance and
+    ground returned ~8.5e116 times the solar irradiance for a legal
+    vacuum scene.  The radial limit is now exact: the full centre-normal
+    plane still receives F_inf, and the horizontal plane receives
+    F_inf * dot(sun, radial).
+    """
+    from skycolor import spectra
+    vac = _vacuum_550()
+    f_inf = float(spectra.solar_irradiance(np.array([550.0]))[0])
+    src = SolarSource(vac, 60.0, 33.0)
+    d0 = src.disk()[0][0]
+    for offset in (0.0, 1e-6):        # exact coincidence and near-coincidence
+        direction = d0 + offset * np.array([0.0, 0.0, 1.0])
+        direction /= np.linalg.norm(direction)
+        x = (R_EARTH + 10000.0) * direction
+        radial = direction
+        direct = float(np.ravel(src.direct_irradiance(
+            x[None, :], src.sun_hat, iw=0, local=True))[0]) / f_inf
+        assert direct == pytest.approx(1.0, rel=1e-9), (offset, direct)
+        # ground() returns the normalised integral -- no F_inf multiply
+        ground = float(np.ravel(src.ground(x[None, :], iw=0, local=True))[0])
+        assert ground == pytest.approx(float(src.sun_hat @ radial), rel=1e-9), \
+            (offset, ground)
+    # a batch mixing the degenerate point with ordinary ones stays finite
+    x_ord = (R_EARTH + 10000.0) * src.sun_hat
+    batch = np.vstack([x[None, :], x_ord[None, :]])
+    out = src.direct_irradiance(batch, src.sun_hat, iw=0, local=True)
+    assert np.all(np.isfinite(out)) and np.all(out > 0.0)
+    assert np.all(out < 10.0 * f_inf)

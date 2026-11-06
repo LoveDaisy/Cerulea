@@ -1806,8 +1806,21 @@ class SolarSource:
                 n_dot_beam = np.einsum("bj,j->b", directions, normal)[None, :]
             else:                                      # per point (n, nb, 3)
                 n_dot_beam = np.einsum("nbj,j->nb", directions, normal)
-        cos_true = np.sqrt(np.maximum(1.0 - sin_true ** 2, 1e-300))
-        horizontal = (n_dot_beam - n_dot_radial * sin_true) / cos_true
+        cos_true = np.sqrt(np.maximum(1.0 - sin_true ** 2, 0.0))
+        # A beam within 1e-8 rad of the local vertical has no horizontal
+        # direction: sqrt(1 - sin_true^2) there is pure cancellation noise
+        # (sin_true rounds to +-1, the denominator dives to ~1e-150) while
+        # the numerator is the residue of two ~equal dot products (~1e-16),
+        # so the naive division amplified a single beam to ~1e116 times the
+        # solar irradiance at perfectly legal query points (gen3-R4).  The
+        # honest radial limit is exact -- the projection is
+        # sin(app) * (n . radial) alone -- and the discarded true
+        # horizontal term is bounded by cos(app) * 1e-8, far below every
+        # budget in this contract.
+        radial_lim = cos_true < 1e-8
+        horizontal = (n_dot_beam - n_dot_radial * sin_true) \
+            / np.where(radial_lim, 1.0, cos_true)
+        horizontal = np.where(radial_lim, 0.0, horizontal)
         return np.sin(app_rad) * n_dot_radial + np.cos(app_rad) * horizontal
 
     def _local_frame_basis(self, x):
