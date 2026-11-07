@@ -6,6 +6,7 @@ physical-check limits in [STATUS.md](../STATUS.md).
 
 | Document | Scope |
 |---|---|
+| [SOLAR_SOURCE.md](SOLAR_SOURCE.md) | The unified finite-disk solar source: contract, per-backend consumption and validation entry points |
 | [AEROSOL.md](AEROSOL.md) | Mie library, analytic moments, humidity growth and delta-M |
 | [MULTIPLE_SCATTERING.md](MULTIPLE_SCATTERING.md) | Plane-parallel successive-orders method |
 | [MC_REFERENCE.md](MC_REFERENCE.md) | Independent MC transport and estimator; shared-physics blind spots are declared in ARCHITECTURE |

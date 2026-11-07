@@ -212,3 +212,73 @@ def test_scalar_zenith_with_azimuth_array():
     assert np.all(ms > 0.0)
     # the sun-side value must differ from the anti-sun value
     assert abs(ms[0, 0] - ms[2, 0]) > 0.0
+
+
+def test_direct_beam_projection_supports_many_modes():
+    """The per-beam Fourier azimuth table must size itself by n_modes.
+
+    The round-4 reviewer's probe: the hardcoded 64-row table crashed with
+    IndexError for any legally configured n_modes > 64.
+    """
+    atmo = Atmosphere(WL550, ozone_du=300.0, aerosols=[],
+                      refraction=False, ground_albedo=0.0)
+    res = multiple.solve(atmo, 65.0, np.array([0.0, 45.0]),
+                         np.array([0.0, 90.0]), n_mu=64, n_modes=65,
+                         n_moments=65, max_orders=1, single_view=True)
+    assert np.all(np.isfinite(res.radiance))
+    assert np.all(res.radiance >= 0.0)
+
+
+# ---------------------------------------------------------------------------
+# gen3-R2: the public TOA incident flux shares the unified plane-flux seam
+# ---------------------------------------------------------------------------
+def _toa_cap_reference(e_c_deg, alpha_deg=16.0 / 60.0):
+    """Independent vacuum cap integral: analytic azimuth, quad radial.
+
+    For one (rho, phi) beam the plane projection is ``A + B cos(phi)``
+    with ``A = sin(e_c) cos(rho)``, ``B = cos(e_c) sin(rho)``; its
+    positive-part azimuth integral is analytic.  Normalised by the
+    centre-plane convention ``pi sin(alpha)^2``.
+    """
+    from scipy.integrate import quad
+    a = np.radians(alpha_deg)
+    e_c = np.radians(e_c_deg)
+
+    def radial(rho):
+        A = np.sin(e_c) * np.cos(rho)
+        B = np.cos(e_c) * np.sin(rho)
+        if B == 0.0:
+            az = 2.0 * np.pi * max(A, 0.0)
+        elif A >= B:
+            az = 2.0 * np.pi * A
+        elif A <= -B:
+            az = 0.0
+        else:
+            phi0 = np.arccos(-A / B)
+            az = 2.0 * (A * phi0 + B * np.sin(phi0))
+        return az * np.cos(rho) * np.sin(rho)
+
+    val, _ = quad(radial, 0.0, a, epsabs=1e-20, epsrel=1e-11, limit=200)
+    return val / (np.pi * np.sin(a) ** 2)
+
+
+def test_toa_incident_flux_resolves_plane_boundary():
+    """`incident_flux` reads the receiver-plane-aware kernel at the top.
+
+    gen3-R2: solve still summed the fixed coarse disk with per-beam max
+    truncation for this public diagnostic -- +20.7% at sun -0.2 deg and a
+    false zero at -0.25 deg against an independent cap integral.  The
+    seam now matches the same reference at all three angles.
+    """
+    vac = Atmosphere(np.array([550.0]), z_bounds_km=[0.0, 200.0],
+                     aerosols=[], ozone_du=0.0, no2_column=0.0,
+                     refraction=False,
+                     air_profile=lambda z: np.zeros_like(np.asarray(z, float)))
+    from skycolor import spectra
+    f_inf = float(spectra.solar_irradiance(np.array([550.0]))[0])
+    for e in (-0.25, -0.2, 0.0):
+        res = multiple.solve(vac, 90.0 - e, 45.0, 135.0, n_mu=6)
+        ker = float(np.ravel(res.incident_flux)[0]) / f_inf
+        ref = _toa_cap_reference(e)
+        assert ker > 0.0, (e, ker, ref)
+        assert abs(ker / ref - 1.0) < 2e-3, (e, ker, ref)

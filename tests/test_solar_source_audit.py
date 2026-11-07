@@ -15,12 +15,10 @@ import pytest
 from skycolor.atmosphere import Atmosphere
 from skycolor.constants import N_STD_AIR, R_EARTH
 from skycolor import refraction
-from skycolor.rt import mc
 
 # Audit tools are repository modules, not part of the installed library wheel.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from tools.audit_single_solar_source import InverseSolarMapping, radiance
-from tools.audit_solar_source import solar_source
+from tools.audit_single_solar_source import InverseSolarMapping
 from tools.radial_solar_mapping import RadialSolarMapping
 
 
@@ -104,40 +102,8 @@ def test_radial_mapping_matches_cartesian_rk_roots_and_gains(
     assert gain[0] == pytest.approx(rk_gain, abs=5e-5)
 
 
-def test_single_source_amplitude_multiplies_every_spectral_contribution(standard_air):
-    """Prescribe the original angle map and halve its source analytically."""
-    class HalfAmplitude:
-        @staticmethod
-        def apparent_elevation(true, height):
-            return refraction.geometry().apparent_elevation(true, height)
-
-        @staticmethod
-        def amplitude(true, height, app):
-            return np.full_like(app, 0.5)
-
-    prescription = HalfAmplitude()
-    original = radiance(standard_air, -6.0, "packaged", prescription, 3)
-    unchanged = radiance(standard_air, -6.0, "radial_attenuation", prescription, 3)
-    half = radiance(standard_air, -6.0, "radial_beam", prescription, 3)
-    assert np.any(original > 0)
-    np.testing.assert_array_equal(unchanged, original)
-    np.testing.assert_array_equal(half, original*0.5)
-
-
-def test_cloned_geometric_mc_is_bit_identical_and_solar_modes_keep_paths(standard_air):
-    """The only intervention is the solar next-event value, never sampling."""
-    original_tracer = mc._trace_wavelength
-    options = dict(n_photons=512, seed=13)
-    expected = mc.mc_radiance_split(standard_air, 96.0, [0.0], [0.0], **options)
-    fingerprints = []
-    for mode in ["geometric", "attenuation"]:
-        with solar_source(standard_air, mode) as provider:
-            actual = mc.mc_radiance_split(standard_air, 96.0, [0.0], [0.0], **options)
-        assert mc._trace_wavelength is original_tracer
-        assert provider.n_points > 0
-        fingerprints.append(provider.fingerprint.hexdigest())
-        if mode == "geometric":
-            assert expected.keys() == actual.keys()
-            for key in expected:
-                np.testing.assert_array_equal(actual[key], expected[key])
-    assert fingerprints[0] == fingerprints[1]
+# The inspect/exec ablation drivers below this line were retired with the
+# unified solar source: they anchored production internals that the unified
+# source replaced.  Historical evidence lives in
+# docs/twilight/SOLAR_SOURCE_AUDIT.md and
+# docs/twilight/UNIFIED_SOLAR_SOURCE_AUDIT.md.

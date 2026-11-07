@@ -110,7 +110,15 @@ class FiniteSolarSource:
                          self.atmo.z_bounds[0], self.atmo.z_bounds[-1])
         true_mu = np.clip(radial @ directions.T, -1, 1)
         true_e = np.degrees(np.arcsin(true_mu))
-        app, transmission, gain, lit = self.table.query(height[:, None], true_e, iw=iw)
+        # Every table this driver supports -- the real
+        # tools.point_solar_table.PointSolarTable and the analytic toy
+        # tables -- speaks the iw keyword convention and applies its own
+        # build-side extinction at readout.  Positional extinction arrays
+        # belong to the production skycolor PointSourceTable, which this
+        # experimental driver does not consume (review gen2 R1: guessing
+        # the protocol from atmosphere attributes broke the real table).
+        app, transmission, gain, lit = self.table.query(height[:, None],
+                                                        true_e, iw=iw)
         app = np.radians(app)
         local_n = self.table.mapping.refractive_index(height)
         # The solar table gain is LOCAL L. Propagate reduced L/n^2 to the

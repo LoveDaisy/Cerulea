@@ -67,17 +67,54 @@ def test_direct_beam_distinguishes_a_balloon_from_a_raised_surface(ground_km, ex
 
 
 @pytest.mark.parametrize("refraction", [False, True])
-def test_single_scattering_layer_inside_the_shadow_is_dark(refraction, monkeypatch):
-    """A weak layer at 36-37 km is sunlit over sea level, occulted over 2.4 km."""
-    # The density is tiny so attenuation/refraction are negligible.  Fix the
-    # apparent direction to the geometric one to isolate the occultation in
-    # both code paths without the packaged standard-atmosphere lookup table.
-    if refraction:
-        from skycolor import refraction as refr
-        monkeypatch.setattr(
-            refr, "geometry", lambda: SimpleNamespace(
-                apparent_elevation=lambda true_elev, z: np.asarray(true_elev)),
+def test_single_scattering_layer_and_the_plateau_shadow(refraction):
+    """Sea level is brighter than the plateau, and both go exactly dark deep.
+
+    The finite disk blurs the sharp sea/plateau contrast: at 36.5 km height
+    the two shadow boundaries sit only ~0.2 deg apart (sea -6.12 deg,
+    plateau -5.91 deg), less than the 0.53 deg disk, so at -6 deg both decks
+    are partially lit by the upper limb (sea more than plateau).  A whole
+    -disk-shadowed sun (-7 deg) leaves both exactly dark.  The original
+    centre-beam contrast survives in ``central_transmittance``, whose
+    contract is the centre ray only.
+    """
+
+    def layer_density(z):
+        z = np.asarray(z, dtype=float)
+        return np.where((z >= 36.0) & (z <= 37.0), 1e18, 0.0)
+
+    def build(ground_km):
+        return Atmosphere(
+            WL, aerosols=[], ozone_du=0.0, air_profile=layer_density,
+            z_bounds_km=np.array([ground_km, 35.9, 36.0, 36.5, 37.0, 37.1, 80.0]),
+            elevation_km=2.4, refraction=refraction,
         )
+
+    sea6 = single.sky_radiance(build(0.0), 96.0, [0.0], [0.0])[0, 0]
+    plateau6 = single.sky_radiance(build(2.4), 96.0, [0.0], [0.0])[0, 0]
+    assert sea6 > plateau6 > 0.0
+    assert single.sky_radiance(build(0.0), 97.0, [0.0], [0.0])[0, 0] == 0.0
+    assert single.sky_radiance(build(2.4), 97.0, [0.0], [0.0])[0, 0] == 0.0
+    # the centre-beam diagnostic keeps the sharp boundary *at the layer
+    # height* (the observer sits at 2.4 km in both scenes and is shadowed at
+    # -6 deg regardless of the ground below)
+    from skycolor.solar_source import SolarSource
+    sea_atmo = build(0.0)          # keep references: the source holds the
+    plateau_atmo = build(2.4)      # atmosphere weakly
+    t_sea = SolarSource(sea_atmo, 96.0, 0.0).central_transmittance(36.5)[0]
+    t_plateau = SolarSource(plateau_atmo, 96.0, 0.0).central_transmittance(36.5)[0]
+    assert t_sea > 0.0
+    assert t_plateau == 0.0
+
+
+@pytest.mark.parametrize("refraction", [False, True])
+def test_upper_limb_partially_lights_the_plateau_deck(refraction):
+    """At -6 deg the disk's upper limb crosses the plateau boundary.
+
+    The centre beam is blocked (the old whole-source semantics) but the
+    finite disk keeps a thin lit sliver, so the deck radiance is strictly
+    positive yet far below the sea-level value.
+    """
 
     def layer_density(z):
         z = np.asarray(z, dtype=float)
@@ -92,7 +129,7 @@ def test_single_scattering_layer_inside_the_shadow_is_dark(refraction, monkeypat
         )
         results.append(single.sky_radiance(atmo, 96.0, [0.0], [0.0])[0, 0])
     assert results[0] > 0.0
-    assert results[1] == 0.0
+    assert 0.0 < results[1] < results[0]
 
 
 @pytest.mark.parametrize("air_density", [0.0, N_STD_AIR])
@@ -118,20 +155,28 @@ def test_constant_index_shadow_matches_analytic_tangent(air_density):
 
 
 @pytest.mark.parametrize("refraction", [False, True])
-def test_sos_solar_source_has_the_same_shadow(refraction, monkeypatch):
-    """The source sampled by SOS obeys the same analytic opaque sphere."""
+def test_sos_solar_source_has_the_same_shadow(refraction):
+    """The unified source's per-beam tables obey the analytic opaque sphere.
+
+    In this vacuum the refractive index is exactly 1, so the source's
+    occultation boundary is the geometric ray/sphere intersection; a whole
+    -disk-shadowed sun (zenith 97) then gives transmittance exactly 1 or 0
+    per boundary node, equal to the independent ray/sphere test.
+    """
+    from skycolor.solar_source import SolarSource
+
     atmo = _vacuum(ground_km=2.4, refraction=refraction)
-    if refraction:
-        from skycolor import refraction as refr
-        # Build only the requested boundary nodes; interpolation cannot blur
-        # the geometric shadow in this zero-density limiting case.
-        tables = RefractionTables(atmo, alt_km=atmo.z_bounds)
-        monkeypatch.setattr(refr, "get_tables", lambda _: tables)
-    points = np.zeros((len(atmo.z_bounds), 3))
+    source = SolarSource(atmo, 97.0, 0.0)
+    geom = source.geometry
+    # the constant-index branch keeps the shadow exact (no interpolation)
+    assert geom.field.n.std() == 0.0
+    heights = np.asarray(atmo.z_bounds, dtype=float)
+    _, t_all, _, lit = source.vertex(heights, np.full(heights.shape, -7.0))
+    points = np.zeros((heights.size, 3))
     points[:, 2] = atmo.r_bounds
-    blocked = _ray_hits_solid(points, _solar_direction(96.0), R_EARTH + 2400.0)
-    result = multiple._sun_transmittance_boundaries(atmo, 96.0)
-    np.testing.assert_array_equal(result[:, 0], (~blocked).astype(float))
+    blocked = _ray_hits_solid(points, _solar_direction(97.0), R_EARTH + 2400.0)
+    np.testing.assert_array_equal((~blocked).astype(float), lit.astype(float))
+    np.testing.assert_array_equal(t_all[:, 0], (~blocked).astype(float))
 
 
 def test_cloud_point_and_deck_share_the_raised_ground_shadow():
@@ -149,35 +194,70 @@ def test_cloud_point_and_deck_share_the_raised_ground_shadow():
             tau=np.ones_like(wl), omega=np.full_like(wl, 0.9),
             g=np.full_like(wl, 0.5), f=np.full_like(wl, 0.25)),
     )
+    # Per-beam shadow heights at sun -6 deg over the 2.4 km plateau:
+    # (r_g/sin(theta)-r_g)/1000+2.4 for theta=96±16' spans ~8.3-19.4 km, all
+    # above the deck top (37 km is above... entries land mid-deck for the
+    # lowest beams and the deck is entirely shadowed only at deeper sun).
+    # The center-beam shadow height is 12.9 km: mid-deck illumination.
     high = cloud.illuminate_cloud(atmo, deck, 96.0)
-    assert high.geometry == "none"
+    assert high.geometry == "base"
+    assert all(36.0 <= b.z_entry_km <= 37.0
+               for b in high.beams if b.kind == "base")
+    high_deep = cloud.illuminate_cloud(atmo, deck, 110.0)
+    assert high_deep.geometry == "none"
     low = cloud.illuminate_cloud(_vacuum(ground_km=0.0), deck, 96.0)
     assert low.geometry == "base"
 
 
-def test_balloon_occultation_uses_ground_refractivity(monkeypatch):
+def test_balloon_occultation_uses_ground_refractivity():
     """A raised observer does not replace n_ground in the Bouguer boundary."""
     from skycolor import refraction as refr
-
-    monkeypatch.setattr(
-        refr, "geometry", lambda: SimpleNamespace(
-            apparent_elevation=lambda true_elev, z: np.asarray(true_elev)),
-    )
+    from skycolor.solar_source import SolarSource
 
     def density(z):
         z = np.asarray(z, dtype=float)
-        # The observer is above the refractive lower layer; the only
-        # scattering visible along the upward ray is the weak test layer.
-        return np.where(z < 1.0, N_STD_AIR,
-                        np.where((z >= 36.4) & (z <= 36.6), 1e18, 0.0))
+        # A smooth real-scale-height refractive profile plus the weak test
+        # layer: the observer sits above the refractive lower atmosphere and
+        # the only scattering visible along the upward ray is the thin layer.
+        # (Discontinuous test densities are genuine ducts/near-caustics for
+        # any refractive spline: n*r must keep increasing, which needs a
+        # scale height well above (n-1)*R ~ 1.8 km, and derivative jumps can
+        # fold the apparent<->true map.)
+        # the 3 km tail keeps n*r monotone (needs H > (n-1)*R ~ 1.8 km)
+        # while collapsing the upper-atmosphere density fast enough that the
+        # disk's upper limb cannot light anything above the test layer
+        return (N_STD_AIR * np.exp(-z / 3.0)
+                + np.where((z >= 36.4) & (z <= 36.6), 1e18, 0.0))
 
+    z_bounds = np.array([0.0, 0.5, 1.0, 2.4, 36.4, 36.6, 80.0])
     atmo = Atmosphere(
         WL, aerosols=[], ozone_du=0.0, air_profile=density,
-        z_bounds_km=np.array([0.0, 0.5, 1.0, 2.4, 36.4, 36.6, 80.0]),
+        z_bounds_km=z_bounds,
         elevation_km=2.4, refraction=True,
     )
-    # Given the supplied apparent direction, the invariant lies between
-    # n_observer*R and n_ground*R.  Only the latter is the opaque boundary.
+    # The centre beam's invariant at the layer lies between R and
+    # n_ground*R: only the *sea-level* refractivity makes it opaque.
     invariant = (R_EARTH + 36.5e3) * np.cos(np.radians(6.0))
     assert R_EARTH < invariant < (1 + refr.REFRACTIVITY_STD) * R_EARTH
-    np.testing.assert_array_equal(single.sky_radiance(atmo, 96.0, [0.0], [0.0]), [[0.0]])
+    source = SolarSource(atmo, 96.0, 0.0)
+    geom = source.geometry
+    assert geom.field.q_ground == pytest.approx(
+        (1 + refr.REFRACTIVITY_STD * float(atmo.n_air(np.array([0.0]))[0])
+         / N_STD_AIR) * R_EARTH, rel=1e-6)
+    # the shadow boundary at the layer height is exactly the ray whose
+    # invariant equals q_ground (anchored at sea level, not the observer)
+    lower = geom.field.grazing_apparent_elevation(np.array([36.5]))
+    r_layer = R_EARTH + 36.5e3
+    invariant = (float(geom.field.refractive_index(np.array([36.5]))[0])
+                 * r_layer * np.cos(np.radians(float(lower[0]) + 1e-6)))
+    assert invariant == pytest.approx(geom.field.q_ground, rel=1e-6)
+    # a whole-disk-shadowed sun leaves the deck exactly dark
+    atmo_deep = Atmosphere(
+        WL, aerosols=[], ozone_du=0.0, air_profile=density,
+        z_bounds_km=z_bounds,
+        elevation_km=2.4, refraction=True,
+    )
+    deep = single.sky_radiance(atmo_deep, 98.0, [0.0], [0.0])[0, 0]
+    # whole-disk-shadowed: exactly dark up to the table's numerical floor
+    # (the disk edge straddles the boundary within one height cell)
+    assert deep < 1e-9

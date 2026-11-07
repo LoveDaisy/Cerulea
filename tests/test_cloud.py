@@ -24,10 +24,12 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from skycolor import cloud, presets  # noqa: E402
+from skycolor import cloud, presets, spectra  # noqa: E402
 from skycolor.atmosphere import Atmosphere  # noqa: E402
 from skycolor.rt import cloud as rtcloud  # noqa: E402
 from skycolor.rt.solver import sky_radiance_total  # noqa: E402
+from skycolor.constants import R_EARTH as R_EARTH_M  # noqa: E402
+from skycolor.solar_source import SUN_RADIUS_DEG as SUN_R  # noqa: E402
 
 #: A small spectral grid keeps the (cached) Mie calculation and the
 #: clear-sky multiple-scattering solver cheap.
@@ -288,19 +290,54 @@ def test_output_shape_matches_solver(atmo, altostratus):
 # ---------------------------------------------------------------------------
 # 6. the sun below the horizon: red underlighting
 # ---------------------------------------------------------------------------
-def test_shadow_height():
-    assert rtcloud.shadow_height_km(0.0) == 0.0
-    assert rtcloud.shadow_height_km(60.0) == 0.0
-    # the dip of the horizon: 2 degrees -> about 3.9 km
-    assert rtcloud.shadow_height_km(92.0) == pytest.approx(3.9, abs=0.2)
-    assert rtcloud.shadow_height_km(96.0) > rtcloud.shadow_height_km(92.0)
+def test_fully_dark_deck_beam_flux_is_zero_spectrum(atmo, stratus):
+    """A deck fully inside Earth's shadow returns a zero (n_wl,) spectrum.
+
+    gen3-R2: the empty contribution set fell through to ``None``, so
+    ordinary twilight consumers (`beam_flux / pi`) hit a TypeError.  Fully
+    dark is a normal state, not a special case.
+    """
+    illum = rtcloud.illuminate_cloud(atmo, stratus, 110.0)
+    assert illum.geometry == "none" and len(illum.beams) == 0
+    assert illum.beam_flux.shape == (len(atmo.wl),)
+    assert np.all(illum.beam_flux == 0.0)
+    assert (illum.beam_flux / np.pi).shape == (len(atmo.wl),)
+    single = rtcloud.illuminate_cloud(atmo, stratus, 110.0)
+    assert single.beam_flux.shape == (len(atmo.wl),)
+
+
+def test_deck_shadow_diagnostic_matches_source(atmo, stratus):
+    """`shadow_km` is the unified source's occultation root, bit-for-bit.
+
+    gen3-R2: the standalone r_ground/sin(theta) formula ignored refraction
+    and reported 2.74 km where the authoritative root gives 0.163 km at
+    zenith 91 deg; the whole-column-occluded case has no in-domain root
+    and reports NaN.
+    """
+    from skycolor.solar_source import SolarSource
+    for zenith in (91.0, 96.0):
+        illum = rtcloud.illuminate_cloud(atmo, stratus, zenith)
+        src = SolarSource(atmo, zenith, 0.0)
+        assert illum.shadow_km == src.shadow_height(90.0 - zenith)
+    # raised ground below the stratus deck base (0.5 km): the authoritative
+    # root tracks the opaque bottom, not a fixed sea-level cone
+    raised = Atmosphere(WL, z_bounds_km=[0.3, 200.0])
+    illum_r = rtcloud.illuminate_cloud(raised, stratus, 91.0)
+    src_r = SolarSource(raised, 91.0, 0.0)
+    assert illum_r.shadow_km == src_r.shadow_height(-1.0)
 
 
 def test_high_clouds_stay_lit_longer(atmo, altostratus, cirrus):
     assert rtcloud.illuminate_cloud(atmo, altostratus, 92.0).geometry == "base"
     assert rtcloud.illuminate_cloud(atmo, cirrus, 93.0).geometry == "base"
-    # a low stratus is already in the Earth's shadow at the same sun angle
-    assert rtcloud.illuminate_cloud(atmo, cloud.get_preset("stratus"), 92.0).geometry == "none"
+    # per-beam shadow heights at zenith 92 deg span ~0.3-2.9 km around the
+    # stratus (0.5-1.5 km): the near-limb beams still reach it (base entry),
+    # while the whole disk misses only at deeper sun (zenith 97 deg puts
+    # every beam's shadow height above 20 km)
+    assert rtcloud.illuminate_cloud(atmo, cloud.get_preset("stratus"),
+                                    92.0).geometry == "base"
+    assert rtcloud.illuminate_cloud(atmo, cloud.get_preset("stratus"),
+                                    97.0).geometry == "none"
 
 
 def test_underlit_base_turns_red(atmo, altostratus):
@@ -317,21 +354,67 @@ def test_underlit_base_turns_red(atmo, altostratus):
     assert day[1] > 0.33                              # white-ish at noon
     assert sunset[0] > day[0] + 0.15                  # much redder
     assert sunset[0] > 0.5
-    # and it does eventually go dark
-    illum = rtcloud.illuminate_cloud(atmo, altostratus, 93.0)
+    # and it does eventually go dark (the whole disk below the boundary;
+    # at -6 deg the altostratus top's boundary is near -3.3 deg true)
+    illum = rtcloud.illuminate_cloud(atmo, altostratus, 96.0)
     assert illum.geometry == "none"
     assert np.all(rtcloud.cloud_radiance(illum, [0.0]) == 0.0)
 
 
 def test_underlit_deck_is_not_seen_through_its_shadow(atmo):
-    """A thick low deck cannot glow from below: the shadowed part blocks it."""
+    """A thick low deck cannot glow from below: the shadowed part blocks it.
+
+    Two regimes, both against the round-4 column-shadow semantics (the
+    round-3 perigee proxy put entries at geometrically meaningless heights):
+
+    * sun 1 deg below the horizon: refraction puts every production beam's
+      shadow root (0.04-0.36 km) below the stratus base, so the whole deck
+      is lit from below -- uniform base glow, no phantom sub-deck shadowing;
+    * sun 1.5 deg below: the roots (0.43-1.10 km) cut INSIDE the deck --
+      beams enter mid-deck, carry a shadowed sub-column (tau_below) and the
+      base glow is attenuated towards the horizon.  Each entry must sit on
+      the vertical column's lit/shadow boundary for that beam's own
+      direction.
+    """
+    from skycolor.solar_source import SolarSource
     low = cloud.get_preset("stratus")
-    illum = rtcloud.illuminate_cloud(atmo, low, 91.0)   # sun 1 degree below
+    up = np.array([0.0, 0.0, 1.0])
+
+    # -- regime 1: everything at or below the base ------------------------
+    illum = rtcloud.illuminate_cloud(atmo, low, 91.0)
     assert illum.geometry == "base"
-    assert illum.tau_below[I550] > 5.0                  # mostly shadowed
+    assert all(b.z_entry_km <= low.base_km + 1e-9 for b in illum.beams)
+    top_view = rtcloud.cloud_radiance(illum, [0.0])[0, I550]
+    low_view = rtcloud.cloud_radiance(illum, [85.0])[0, I550]
+    assert top_view > 0.0
+    assert top_view == low_view          # uniform illumination: no contrast
+
+    # -- regime 2: the boundary cuts the deck -----------------------------
+    illum = rtcloud.illuminate_cloud(atmo, low, 91.5)
+    assert illum.geometry == "base"
+    mid = [b for b in illum.beams if b.z_entry_km > low.base_km + 1e-9]
+    assert len(mid) >= len(illum.beams) // 2
+    assert max(float(np.max(b.tau_below)) for b in mid) > 5.0
     top_view = rtcloud.cloud_radiance(illum, [0.0])[0, I550]
     low_view = rtcloud.cloud_radiance(illum, [85.0])[0, I550]
     assert low_view < top_view                          # attenuated towards the horizon
+    assert top_view > 0.0
+
+    # -- boundary straddle, per beam direction ----------------------------
+    src = SolarSource(atmo, 91.5, 0.0)
+    src.geometry.ensure_table()
+    directions, _ = src.disk()
+    true_e = np.degrees(np.arcsin(np.clip(directions @ up, -1.0, 1.0)))
+    roots = np.array([src.shadow_height(float(e)) for e in true_e])
+    for b in mid:
+        matches = [e for e, r in zip(true_e, roots)
+                   if abs(r - b.z_entry_km) <= 5e-3]
+        assert matches, "entry height must equal a beam's column shadow root"
+        v_lo = src.vertex(np.array([b.z_entry_km - 0.02]),
+                          np.array([matches[0]]))
+        v_hi = src.vertex(np.array([b.z_entry_km + 0.02]),
+                          np.array([matches[0]]))
+        assert not bool(v_lo[3][0]) and bool(v_hi[3][0])
 
 
 def test_cloud_layer_is_frozen_and_replace_drops_optics():
@@ -347,3 +430,67 @@ def test_cloud_layer_is_frozen_and_replace_drops_optics():
     wl3 = np.array([450.0, 550.0, 650.0])
     fat, thin = layer.optics(wl3), slim.optics(wl3)
     np.testing.assert_allclose(thin.tau / fat.tau, 5.0 / 20.0, rtol=1e-12)
+
+
+def test_deck_lit_segment_matches_column_shadow():
+    """Ascending beams enter the deck at the COLUMN's shadow height.
+
+    Vacuum geometry makes the per-beam shadow height analytic,
+    ``R/cos(e_b) - R``; at sun -3 deg with a 5-12 km deck every production
+    beam's entry must land inside that band and carry light into the upper
+    deck.  (The round-3 perigee-based classification put every beam at the
+    deck base, evaluated the entry below the shadow boundary and zeroed the
+    whole deck -- losing the illumination the upper cloud genuinely
+    receives; review round 4, Major cloud lit-segment.)
+    """
+    atmo_vac = Atmosphere(WL, ozone_du=300.0, aerosols=[], refraction=False)
+    deck = cloud.CloudLayer(base_km=5.0, top_km=12.0, tau550=1.0)
+    illum = rtcloud.illuminate_cloud(atmo_vac, deck, 93.0)      # sun -3 deg
+    assert illum.geometry == "base"
+    beams = illum.beams
+    assert len(beams) == 16
+    # more negative beam elevation -> deeper-perigee ray -> higher shadow root
+    z_hi = (R_EARTH_M * (1.0 / np.cos(np.radians(-3.0 - SUN_R))) - R_EARTH_M) / 1e3
+    z_lo = (R_EARTH_M * (1.0 / np.cos(np.radians(-3.0 + SUN_R))) - R_EARTH_M) / 1e3
+    for b in beams:
+        assert z_lo - 0.01 <= b.z_entry_km <= z_hi + 0.01
+        assert float(np.max(b.incident)) > 0.0
+    # and the base really receives light: the radiance is not the zero deck
+    rad = rtcloud.cloud_radiance(illum, 60.0)
+    assert float(np.max(rad)) > 0.0
+
+
+def test_graze_entry_uses_midpoint_closure(atmo):
+    """Plan-declared midpoint closure for partially lit decks.
+
+    The shadow root splits tau_deck/tau_below (geometry), while the beam's
+    representative direction/T/G are evaluated at the MIDPOINT of the
+    sunlit segment -- the round-4 root sampling starved partially lit
+    decks by 27-54% (review round 5).  Every graze beam's entry triple
+    must equal the source's own vertex query at the sunlit midpoint.
+    """
+    from skycolor.solar_source import SolarSource
+    deck = cloud.CloudLayer(base_km=5.0, top_km=12.0, tau550=1.0)
+    illum = rtcloud.illuminate_cloud(atmo, deck, 93.0)      # sun -3 deg
+    src = SolarSource(atmo, 93.0, 0.0)
+    src.geometry.ensure_table()
+    dirs, _ = src.disk_for_column(deck.top_km)
+    up = np.array([0.0, 0.0, 1.0])
+    e_b = np.degrees(np.arcsin(np.clip(dirs @ up, -1.0, 1.0)))
+    roots = np.array([src.shadow_height(float(e)) for e in e_b])
+    checked = 0
+    for b in illum.beams:
+        if b.z_entry_km <= deck.base_km + 1e-9:
+            continue                     # base entry: evaluated at the base
+        matches = [e for e, r in zip(e_b, roots)
+                   if abs(r - b.z_entry_km) <= 5e-3]
+        assert matches, "entry height must equal a beam's column shadow root"
+        z_mid = 0.5 * (b.z_entry_km + deck.top_km)
+        v = src.vertex(np.array([z_mid]), np.array([matches[0]]))
+        np.testing.assert_allclose(b.transmittance_entry, v[1][0], rtol=1e-12)
+        np.testing.assert_allclose(b.gain_entry, v[2][0], rtol=1e-12)
+        f_inf = spectra.solar_irradiance(atmo.wl)
+        np.testing.assert_allclose(
+            b.incident, float(b.weight) * f_inf * v[1][0] * v[2][0], rtol=1e-12)
+        checked += 1
+    assert checked >= 8                 # the -3 deg deck is partially lit

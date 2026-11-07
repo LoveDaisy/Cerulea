@@ -60,19 +60,15 @@ import numpy as np
 from .. import spectra
 from ..cloud import CloudLayer, CloudOptics, delta_m
 from ..constants import R_EARTH
-from ..geometry import is_sunlit, path_lengths_sun
-from ..optics import (
-    shell_species_columns,
-    shell_species_weights,
-    species_extinction_weights,
-    tau_from_columns,
-)
+from ..solar_source import SolarSource
 
 #: standing approximations of this backend
 CAPABILITIES = {
     "geometry": "plane-parallel homogeneous deck, delta-Eddington two-stream",
+    "solar_source": "unified finite disk, per-beam top/base/mixed "
+                    "classification with per-beam two-stream responses",
     "horizontal_field": "inherited from the clear-sky solver for the clear part",
-    "refraction": "inherited from the clear-sky direct beam",
+    "refraction": "inherited from the unified solar source",
 }
 
 __all__ = [
@@ -357,169 +353,287 @@ def delta_eddington(tau, omega, g, mu0, f=0.0, ground_albedo=0.0, incident=1.0):
 def sun_transmittance_to_height(atmo, height_km: float, sun_zenith_deg: float):
     """Direct solar transmittance from space to ``height_km``.
 
-    The sun ray is traced through the spherical shells, so a point above the
+    Pure attenuation of the unified source's central beam; a point above the
     observer's horizon but below the observer's shadow boundary is handled
-    correctly.  Returns ``(transmittance, sunlit)`` where ``sunlit`` is a bool
-    telling whether the geometric ray misses the Earth.
+    correctly by the source's refracted geometry.  Returns ``(transmittance,
+    sunlit)`` where ``sunlit`` says whether the *centre* ray clears the
+    opaque ground (the disk's other beams are classified per beam by
+    :func:`illuminate_cloud`).
     """
-    r = R_EARTH + float(height_km) * 1e3
-    sza = np.radians(float(sun_zenith_deg))
-    c = np.cos(sza)
-    p = r * np.sin(sza)
-    lengths = path_lengths_sun(np.array([p]), np.array([c]), np.array([r]),
-                               atmo.r_bounds)[:, 0]
-    cols = shell_species_columns(lengths[:, None],
-                                 shell_species_weights(atmo, atmo.r_bounds))
-    tau = tau_from_columns(cols, species_extinction_weights(atmo))[0]
-    lit = bool(is_sunlit(np.array([p]), np.array([c]), r_earth=atmo.r_bounds[0])[0])
-    return (np.exp(-tau), lit) if lit else (np.zeros_like(tau), False)
+    source = SolarSource(atmo, float(sun_zenith_deg), 0.0)
+    t = np.asarray(source.central_transmittance(float(height_km)), dtype=float)
+    lit = bool(np.any(t > 0.0))
+    return (t, lit) if lit else (np.zeros_like(t), False)
+
+
+@dataclass
+class BeamIllumination:
+    """One disk beam's illumination of the deck.
+
+    Attributes
+    ----------
+    kind : {"top", "base"}
+        ``top``: the beam descends through the deck from the top (the sun is
+        above this beam's boundary at the deck top).  ``base``: the beam
+        ascends into the sunlit part from below (underlit deck, the red-base
+        case) or grazes into it at its perigee.
+    weight : float
+        The beam's disk weight (true-solid-angle normalisation).
+    mu0 : float
+        |cos| of the beam's apparent entry inclination.
+    transmittance_entry, gain_entry : ndarray ``(n_wl,)``
+        Unified-source column transmittance and local gain at the entry
+        height for this beam.
+    incident : ndarray ``(n_wl,)``
+        Disk-weighted beam irradiance normal to the beam at the entry
+        surface (``weight * F_inf * T_entry * G_entry``); the two-stream
+        fluxes are in absolute units after this.
+    tau_deck : ndarray ``(n_wl,)``
+        The deck optical depth this beam's two-stream worked on (the full
+        deck, or the sunlit fraction for a mid-deck perigee).
+    tau_below : ndarray ``(n_wl,)``
+        Shadowed part between the deck base and the beam's entry, seen by
+        the observer through the view angle (zero for top-entry beams).
+    two_stream : TwoStream
+        The beam's own response.
+    z_entry_km : float
+        Altitude where this beam enters the deck (top, base, or perigee).
+    """
+
+    kind: str
+    weight: float
+    mu0: float
+    transmittance_entry: np.ndarray
+    gain_entry: np.ndarray
+    incident: np.ndarray
+    tau_deck: np.ndarray
+    tau_below: np.ndarray
+    two_stream: TwoStream
+    z_entry_km: float
 
 
 @dataclass
 class CloudIllumination:
-    """How a cloud deck is lit, and what the two-stream makes of it.
+    """How a cloud deck is lit by the finite disk, beam by beam.
 
     Attributes
     ----------
-    geometry : {"top", "base", "none"}
-        ``top``: the sun is above the observer's horizon, the beam enters
-        through the cloud top.
-        ``base``: the sun is below the horizon but part of the deck is still
-        sunlit, because the Earth curves away underneath it; the beam enters
-        through the bottom of the *sunlit* part.  This is the red
-        underlighting case.
-        ``none``: the whole deck is inside the Earth's shadow.
-    z_entry_km : float
-        Altitude at which the beam enters the layer (the cloud top, or the
-        shadow boundary for an underlit deck).
-    tau_below : ndarray
-        Optical depth between the cloud base and ``z_entry_km``.  For an
-        underlit deck the light has to traverse this shadowed part of the deck
-        before it reaches the observer, so it is attenuated by
-        ``exp(-tau_below / mu_view)``.
+    geometry : {"top", "base", "mixed", "none"}
+        ``top``: every lit beam enters through the cloud top (the sun above
+        this deck's boundary).  ``base``: every lit beam enters from below
+        (the sun below the horizon with the deck above the shadow boundary
+        -- the red underlighting case).  ``mixed``: the centre is below the
+        boundary but part of the disk is above it, so top- and base-entry
+        beams coexist -- this is what sunset-lit decks look like through a
+        finite disk, and no single pseudo-beam may stand in for it.
+        ``none``: no beam of the disk reaches the deck.
+    beams : tuple of :class:`BeamIllumination`
+        One entry per unblocked disk beam; the radiance is their sum.
+    shadow_km : float
+        Altitude of the centre beam's terminator (diagnostic).
     """
 
     geometry: str
-    sun_zenith_deg: float
-    mu0: float
-    sunlit_top: bool
-    sunlit_base: bool
-    transmittance_top: np.ndarray
-    transmittance_base: np.ndarray
-    transmittance_entry: np.ndarray
-    beam_flux: np.ndarray
-    two_stream: TwoStream
-    optics: CloudOptics
-    z_entry_km: float = 0.0
-    tau_below: np.ndarray = field(default_factory=lambda: np.zeros(0))
+    beams: tuple = ()
+    sun_zenith_deg: float = 0.0
+    optics: CloudOptics | None = None
     shadow_km: float = 0.0
 
     @property
     def is_lit(self) -> bool:
         return self.geometry != "none"
 
+    # -- legacy single-beam views ------------------------------------------
+    # The pre-unified fields survive only where they mean exactly one thing:
+    # a single-beam illumination.  Multi-beam illuminations must aggregate
+    # over ``beams``; pretending one beam stands for the disk is precisely
+    # what the finite-disk source exists to prevent.
+    def _single(self, name):
+        if len(self.beams) != 1:
+            raise AttributeError(
+                f"{name} is only defined for single-beam illumination; this "
+                f"deck is lit by {len(self.beams)} disk beams ({self.geometry}) -- "
+                "aggregate over .beams")
+        return getattr(self.beams[0], name)
 
-def shadow_height_km(sun_zenith_deg: float, ground_km: float = 0.0) -> float:
-    """Altitude of the terminator above a spherical opaque ground.
+    @property
+    def mu0(self):
+        return self._single("mu0")
 
-    A point at height ``z`` is sunlit when its solar ray misses the Earth,
-    i.e. when ``(R + z) sin(theta) > R + ground_km * 1000``.  The
-    terminator is at ``z = (r_ground / sin(theta) - R) / 1000`` km for
-    ``theta > 90``, and at ``ground_km`` for a sun above the horizon.
-    """
-    theta = np.radians(float(sun_zenith_deg))
-    if theta <= np.pi / 2.0:
-        return float(ground_km)
-    s = np.sin(theta)
-    return float(((R_EARTH + ground_km * 1e3) / max(s, 1e-9) - R_EARTH) / 1000.0)
+    @property
+    def two_stream(self):
+        return self._single("two_stream")
+
+    @property
+    def tau_below(self):
+        return self._single("tau_below")
+
+    @property
+    def z_entry_km(self):
+        return self._single("z_entry_km")
+
+    @property
+    def beam_flux(self):
+        """Disk-integrated beam irradiance at the deck, ``(n_wl,)``.
+
+        An empty contribution set -- the deck fully inside Earth's shadow,
+        a normal twilight state -- is a zero spectrum on the optics
+        wavelength grid, not ``None`` or a scalar: consumers must be able
+        to do arithmetic on it without special-casing (gen3-R2).
+        """
+        total = np.zeros(len(self.optics.wl))
+        for b in self.beams:
+            total = total + b.incident
+        return total
 
 
 def illuminate_cloud(atmo, cloud: CloudLayer, sun_zenith_deg: float,
                      ground_albedo=None) -> CloudIllumination:
-    """Direct-beam illumination of ``cloud`` and the two-stream solution.
+    """Classify every disk beam against the deck and solve its two-stream.
 
-    The deck is treated as a single homogeneous slab.  With the sun above the
-    horizon the beam enters through the top and the ground below is
-    Lambertian.  With the sun below the horizon the deck is still partly
-    sunlit: the terminator cuts it at :func:`shadow_height_km`, so the layer is
-    split into a *shadowed* part below and a *lit* part above, and the beam
-    enters the bottom of the lit part.  That is the geometry that produces red
-    cloud bases after sunset -- the light is reddened by the long grazing path
-    through the atmosphere, the deck is lit while the ground is already dark.
+    The deck is a single homogeneous slab (retained approximation).  Each
+    beam of the unified finite-disk source gets its own classification from
+    the source's geometry:
 
-    If the terminator is above the cloud top the whole deck is in shadow and
-    ``geometry`` is ``"none"``; something else (the twilight sky, horizontal
-    transport from the still-lit part of the atmosphere) would be needed to
-    light it, and a plane-parallel model has neither.
+    * descends at the deck top (apparent elevation > 0): *top entry*; the
+      beam crosses the whole deck downward.
+    * ascends at the deck with its perigee below the base: *base entry*
+      (underlit; the mirrored two-stream).
+    * perigee inside the deck: the beam grazes into the sunlit part at its
+      perigee -- the per-beam generalisation of the historical midpoint
+      closure (entry at the perigee, two-stream on the sunlit fraction
+      above it, the shadowed fraction below it attenuates the view).
+    * blocked (the beam's own ray hits the opaque ground): no entry.
+
+    A deck lit from both sides at once reports ``geometry="mixed"``.
     """
     wl = np.asarray(atmo.wl, dtype=float)
     optics = cloud.optics(wl)
+    f_inf = spectra.solar_irradiance(wl)
     ag = (atmo.ground_albedo if ground_albedo is None
           else np.broadcast_to(np.asarray(ground_albedo, dtype=float), wl.shape))
-    t_top, lit_top = sun_transmittance_to_height(atmo, cloud.top_km, sun_zenith_deg)
-    t_base, lit_base = sun_transmittance_to_height(atmo, cloud.base_km, sun_zenith_deg)
-    mu = float(np.cos(np.radians(float(sun_zenith_deg))))
-    f0 = spectra.solar_irradiance(wl)
-    zeros = np.zeros_like(f0)
+    z_top = float(cloud.top_km)
+    z_base = float(cloud.base_km)
+    z_range = max(z_top - z_base, 1e-9)
 
-    z_shadow = shadow_height_km(sun_zenith_deg, ground_km=float(atmo.z_bounds[0]))
+    source = SolarSource(atmo, float(sun_zenith_deg), 0.0)
+    geometry = source.geometry
+    # the deck is a slab on the observer's vertical column, so its beam set
+    # is the source's own contact-band adaptive disk at deck top -- the same
+    # per-point contract every other consumer uses (review round 5: the
+    # fixed 2x8 disk mis-integrates partially occulted decks)
+    directions, weights = source.disk_for_column(z_top)
+    n_beam = directions.shape[0]
+    up = np.array([0.0, 0.0, 1.0])
+    true_e = np.degrees(np.arcsin(np.clip(directions @ up, -1.0, 1.0)))
 
-    if z_shadow >= cloud.top_km or abs(mu) < 1e-8:
-        # the whole deck is inside the Earth's shadow (or the sun is exactly
-        # on the horizon, where the beam crosses a horizontal slab over an
-        # infinite path and deposits nothing)
-        geometry = "none"
-        beam = zeros
-        t_entry = zeros
-        z_entry = float(cloud.base_km)
-        tau_below = optics.tau
-        ts = delta_eddington(optics.tau, optics.omega, optics.g, 0.0,
-                             f=optics.f, ground_albedo=0.0, incident=beam)
-    elif z_shadow <= cloud.base_km:
-        # the whole deck is sunlit: the beam comes from above if the sun is
-        # above the horizon, otherwise from below
-        z_entry = float(cloud.base_km if mu < 0.0 else cloud.top_km)
-        t_entry, _ = sun_transmittance_to_height(atmo, z_entry, sun_zenith_deg)
-        beam = f0 * t_entry
-        tau_below = np.zeros_like(f0)
-        if mu < 0.0:
-            geometry = "base"
-            ts = delta_eddington(optics.tau, optics.omega, optics.g, mu,
-                                 f=optics.f, ground_albedo=0.0, incident=beam)
+    # Per-beam lit segment from the unified source's occultation authority.
+    # The boundary that matters for a deck on the observer's vertical column
+    # is where the COLUMN enters Earth's shadow for that beam direction:
+    # ``source.shadow_height`` solves critical_true(z) = true elevation along
+    # the column (exactly R/cos(e) - R in vacuum).  A beam ascending at the
+    # deck top lights the column only above that shadow height -- the deck
+    # is entered at z_shadow when it straddles it, from the base when the
+    # whole deck sits above it, and never when the shadow height is above
+    # the top.  (The perigee of the deck-top ray is a different geometric
+    # quantity at a different horizontal position and must not be used as
+    # this boundary -- review round 4, Major cloud lit-segment.)  Descending
+    # beams (sun above the deck-top horizon) enter through the top.
+    app_top, t_top, gain_top, lit_top = source.vertex(
+        np.full(n_beam, z_top), true_e)
+    beams = []
+    for b in range(n_beam):
+        if not lit_top[b]:
+            continue
+        tau = optics.tau
+        if float(app_top[b]) > 1e-8:
+            # descending (sun above this deck's horizon): top entry, full deck
+            kind, z_entry = "top", z_top
+            mu0 = max(float(np.sin(np.radians(float(app_top[b])))), 1e-8)
+            t_entry, gain_entry = t_top[b], gain_top[b]
+            tau_deck, tau_below = tau, np.zeros_like(tau)
+            inc = weights[b] * f_inf * t_entry * gain_entry
+            ts = delta_eddington(tau_deck, optics.omega, optics.g, mu0,
+                                 f=optics.f, ground_albedo=ag, incident=inc)
         else:
-            geometry = "top"
-            ts = delta_eddington(optics.tau, optics.omega, optics.g, mu,
-                                 f=optics.f, ground_albedo=ag, incident=beam)
+            # ascending at the deck top: classify against the column's own
+            # shadow height for this beam direction
+            try:
+                z_sh = float(source.shadow_height(float(true_e[b])))
+            except ValueError:
+                # elevation >= 0: the column never occludes for this beam
+                # (the whole deck sits above the would-be root) -> base entry
+                z_sh = z_base - 1.0
+            if z_sh >= z_top:
+                continue                  # this beam lights only above the deck
+            if z_sh <= z_base:
+                # whole deck above the shadow height: base entry (underlit),
+                # full deck, no shadowed sub-layer
+                kind, z_entry = "base", z_base
+            else:
+                # z_base < shadow height < z_top: the beam grazes into the
+                # sunlit part at the shadow height (per-beam generalisation
+                # of the historical midpoint closure); still a base-kind
+                # entry (the light comes up from below the sunlit segment)
+                kind = "base"
+                z_entry = z_sh
+            # effective illumination of the sunlit sub-layer: the plan's
+            # declared midpoint closure -- tau_deck/tau_below split at the
+            # shadow root (pure geometry), while the beam's representative
+            # direction/T/G are evaluated at the midpoint of the sunlit
+            # part (the round-4 root sampling replaced this closure
+            # silently and starved partially lit decks by 27-54%; restored
+            # in round 5)
+            z_eval = 0.5 * (z_entry + z_top) if z_entry > z_base else z_entry
+            v = source.vertex(np.array([z_eval]), np.array([true_e[b]]))
+            if not bool(v[3][0]):
+                continue                  # unlit entry (defensive; zero light)
+            app_e, t_e, g_e = float(v[0][0]), v[1][0], v[2][0]
+            mu0 = max(float(abs(np.sin(np.radians(app_e)))), 1e-8)
+            t_entry, gain_entry = t_e, g_e
+            tau_deck = tau * (z_top - z_entry) / (z_top - z_base)
+            tau_below = tau * (z_entry - z_base) / (z_top - z_base)
+            inc = weights[b] * f_inf * t_entry * gain_entry
+            ts = delta_eddington(tau_deck, optics.omega, optics.g, -mu0,
+                                 f=optics.f, ground_albedo=0.0, incident=inc)
+        beams.append(BeamIllumination(
+            kind=kind, weight=float(weights[b]), mu0=mu0,
+            transmittance_entry=np.asarray(t_entry, dtype=float),
+            gain_entry=np.asarray(gain_entry, dtype=float),
+            incident=np.asarray(inc, dtype=float),
+            tau_deck=np.asarray(tau_deck, dtype=float),
+            tau_below=np.asarray(tau_below, dtype=float),
+            two_stream=ts, z_entry_km=float(z_entry)))
+
+    kinds = {b.kind for b in beams}
+    if not beams:
+        geometry_name = "none"
+    elif kinds == {"top"}:
+        geometry_name = "top"
+    elif kinds == {"base"}:
+        geometry_name = "base"
     else:
-        # the terminator cuts the deck: the part above it is lit from below,
-        # the part below it is in shadow.  The illumination is evaluated at
-        # the middle of the sunlit part, which is a 1-D closure: in reality
-        # the beam enters the lit part through its side, with a transmittance
-        # that varies strongly with height.
-        geometry = "base"
-        z_entry = z_shadow
-        z_lit_mid = 0.5 * (z_shadow + cloud.top_km)
-        t_entry, _ = sun_transmittance_to_height(atmo, z_lit_mid, sun_zenith_deg)
-        beam = f0 * t_entry
-        frac = float(np.clip((cloud.top_km - z_shadow) / (cloud.top_km - cloud.base_km),
-                             0.0, 1.0))
-        tau_below = optics.tau * (1.0 - frac)
-        ts = delta_eddington(optics.tau * frac, optics.omega, optics.g, mu,
-                             f=optics.f, ground_albedo=0.0, incident=beam)
+        geometry_name = "mixed"
 
-    return CloudIllumination(
-        geometry=geometry, sun_zenith_deg=float(sun_zenith_deg), mu0=abs(mu),
-        sunlit_top=lit_top, sunlit_base=lit_base,
-        transmittance_top=t_top, transmittance_base=t_base,
-        transmittance_entry=t_entry, beam_flux=beam, two_stream=ts,
-        optics=optics, z_entry_km=z_entry, tau_below=tau_below,
-        shadow_km=z_shadow,
-    )
+    # diagnostic: the centre beam's terminator height, from the unified
+    # source's occultation authority -- the same refracted root that
+    # classifies the beams (gen3-R2: the standalone r_ground/sin(theta)
+    # formula ignored refraction and disagreed with the beam classification;
+    # a whole-occluded column has no in-domain root and reports NaN)
+    theta = np.radians(float(sun_zenith_deg))
+    if theta <= np.pi / 2:
+        z_shadow = float(atmo.z_bounds[0])
+    else:
+        try:
+            z_shadow = float(source.shadow_height(90.0 - float(sun_zenith_deg)))
+        except ValueError:
+            z_shadow = float("nan")
+
+    return CloudIllumination(geometry=geometry_name, beams=tuple(beams),
+                             sun_zenith_deg=float(sun_zenith_deg),
+                             optics=optics, shadow_km=z_shadow)
 
 
-# ---------------------------------------------------------------------------
-# angular radiance model
-# ---------------------------------------------------------------------------
 def overcast_shape(mu_view):
     """CIE overcast sky: ``L = L_zenith (1 + 2 mu)/3``, horizon/zenith = 1/3.
 
@@ -534,27 +648,30 @@ def cloud_radiance(illum: CloudIllumination, view_zenith_deg,
                    isotropic_underlit: bool = True):
     """Radiance of the cloud base seen from below, ``(n_view, n_wl)``.
 
-    The observer is always underneath the deck, so the source is the
-    *downward diffuse flux at the base* in both cases: the transmitted light
-    for a deck lit from above, the light reflected back out of the base for an
-    underlit deck.  For a deck lit from above that flux is spread with the
-    overcast law; for an underlit deck it is spread isotropically (see the
-    module docstring for why the two-stream cannot say more than that).
+    Sum over the lit disk beams: a top-entry beam contributes its transmitted
+    base flux spread with the overcast law; a base-entry beam contributes the
+    light reflected back out of the base (isotropic by the 1-D closure), and
+    an underlit beam's contribution still crosses the shadowed part of the
+    deck below its entry, attenuated at the view angle.
     """
     view = np.atleast_1d(np.asarray(view_zenith_deg, dtype=float)).ravel()
     mu = np.clip(np.cos(np.radians(view)), 1e-6, 1.0)
-    ts = illum.two_stream
-    flux = ts.flux_down_base[None, :]
-    # light leaving an underlit deck still has to cross the shadowed part of
-    # the deck below the shadow boundary
-    below = np.exp(-np.asarray(illum.tau_below)[None, :] / mu[:, None])
-    if illum.geometry == "top":
-        return flux * overcast_shape(mu)[:, None]
-    if illum.geometry == "base":
-        if isotropic_underlit:
-            return np.broadcast_to(flux / np.pi, (view.size, flux.shape[1])) * below
-        return flux * overcast_shape(mu)[:, None] * below
-    return np.zeros((view.size, illum.optics.wl.size))
+    if not illum.beams:
+        return np.zeros((view.size, illum.optics.wl.size))
+    total = None
+    for b in illum.beams:
+        flux = b.two_stream.flux_down_base[None, :]
+        if b.kind == "top":
+            contribution = flux * overcast_shape(mu)[:, None]
+        else:
+            below = np.exp(-np.asarray(b.tau_below)[None, :] / mu[:, None])
+            if isotropic_underlit:
+                contribution = np.broadcast_to(
+                    flux / np.pi, (view.size, flux.shape[1])) * below
+            else:
+                contribution = flux * overcast_shape(mu)[:, None] * below
+        total = contribution if total is None else total + contribution
+    return total
 
 
 

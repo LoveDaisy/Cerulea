@@ -1,0 +1,163 @@
+{
+  "suite": "closure",
+  "git_head": "ca4e795c23af0a54dd20a7ad170bb4ec90d3e93b",
+  "seconds": 179.9754976250697,
+  "passed": false,
+  "checks": [
+    {
+      "name": "SS/MC clear g0 sza=30: |mean-SS| <= 4SE+1%",
+      "value": 0.17035542264407522,
+      "threshold": 1.0,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g0 sza=30: signability SE/|SS|",
+      "value": 0.012096286045982339,
+      "threshold": 0.05,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g0 sza=60: |mean-SS| <= 4SE+1%",
+      "value": 0.27983627923875803,
+      "threshold": 1.0,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g0 sza=60: signability SE/|SS|",
+      "value": 0.011127616424911873,
+      "threshold": 0.05,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g0 sun=0: |mean-SS| <= 4SE+1%",
+      "value": 0.44002629326681725,
+      "threshold": 1.0,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g0 sun=0: signability SE/|SS|",
+      "value": 0.016369118428407107,
+      "threshold": 0.05,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g2.4 sun=0: |mean-SS| <= 4SE+1%",
+      "value": 0.33701373351666236,
+      "threshold": 1.0,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g2.4 sun=0: signability SE/|SS|",
+      "value": 0.015743604725654347,
+      "threshold": 0.05,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g0 sun=-6: |mean-SS| <= 4SE+1%",
+      "value": 0.19737976686267597,
+      "threshold": 1.0,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g0 sun=-6: signability SE/|SS|",
+      "value": 0.040277810467310236,
+      "threshold": 0.05,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g2.4 sun=-6: |mean-SS| <= 4SE+1%",
+      "value": 0.34221966789372343,
+      "threshold": 1.0,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g2.4 sun=-6: signability SE/|SS|",
+      "value": 0.03747559488003268,
+      "threshold": 0.05,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g0 sun=-9: |mean-SS| <= 4SE+1%",
+      "value": 0.2008519330215346,
+      "threshold": 1.0,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g0 sun=-9: signability SE/|SS|",
+      "value": 0.5388718842788002,
+      "threshold": 0.05,
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g2.4 sun=-9: |mean-SS| <= 4SE+1%",
+      "value": 0.5938133751003232,
+      "threshold": 1.0,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g2.4 sun=-9: signability SE/|SS|",
+      "value": 0.530226243653978,
+      "threshold": 0.05,
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g0 sun=-12: |mean-SS| <= 4SE+1%",
+      "value": 0.28418259280254343,
+      "threshold": 1.0,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g0 sun=-12: signability SE/|SS|",
+      "value": 11.81445382470619,
+      "threshold": 0.05,
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g2.4 sun=-12: |mean-SS| <= 4SE+1%",
+      "value": 99.51962697676433,
+      "threshold": 1.0,
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "name": "SS/MC clear g2.4 sun=-12: signability SE/|SS|",
+      "value": 0.8910861885773034,
+      "threshold": 0.05,
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "name": "SOS single-view vs rt.single max rel",
+      "value": 0.003117503769600738,
+      "threshold": 0.02,
+      "passed": true,
+      "detail": "plane-parallel vs shell quadrature, same source"
+    },
+    {
+      "name": "cloud beam-sum linear identity",
+      "value": 0.0,
+      "threshold": 0.0,
+      "passed": true,
+      "detail": ""
+    }
+  ],
+  "deviations": []
+}
