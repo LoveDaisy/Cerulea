@@ -177,7 +177,7 @@ def _coarse_grid(n_zen, n_az):
     zen = np.concatenate([low, high])
     az = np.linspace(0.0, 180.0, n_az)
     zz, aa = np.meshgrid(zen, az, indexing="ij")
-    return zz.ravel(), aa.ravel()
+    return zz.ravel(), aa.ravel(), n_zen, n_az
 
 
 def _unit_vectors(zen_deg, az_deg, sun_zenith_deg, sun_azimuth_deg):
@@ -358,7 +358,7 @@ def multiple_scattered(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
         cfg.update(grid)
     wl = np.asarray(atmo.wl, dtype=float)
 
-    cz, ca = _coarse_grid(cfg["n_zen"], cfg["n_az"])
+    cz, ca, n_zen_run, n_az_run = _coarse_grid(cfg["n_zen"], cfg["n_az"])
     ms_c, err_c, wl_a, n_run = _mc_coarse(
         atmo, float(sun_zenith_deg), float(sun_azimuth_deg), cz, ca,
         cfg["n_anchor"], cfg["n_photons"], int(seed),
@@ -423,6 +423,7 @@ def multiple_scattered(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
             n_az=cfg["n_az"], n_anchor=cfg["n_anchor"],
             n_photons=cfg["n_photons"], anchor_wl=wl_a, bandwidth=None,
             n_anchor_run=n_run[0], n_photons_run=n_run[1],
+            n_zen_run=n_zen_run, n_az_run=n_az_run,
             coarse_zenith=cz, coarse_azimuth=ca,
             coarse_values=ms_c, coarse_errors=err_c)
     if n_anchor == 1:
@@ -465,6 +466,7 @@ def multiple_scattered(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
         n_zen=cfg["n_zen"], n_az=cfg["n_az"], n_anchor=cfg["n_anchor"],
         n_photons=cfg["n_photons"], anchor_wl=wl_a, bandwidth=bandwidth,
         n_anchor_run=n_run[0], n_photons_run=n_run[1],
+        n_zen_run=n_zen_run, n_az_run=n_az_run,
         coarse_zenith=cz, coarse_azimuth=ca,
         coarse_values=ms_c, coarse_errors=err_c,
     )

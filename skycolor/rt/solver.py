@@ -159,6 +159,7 @@ class _Request:
     single_runs: bool
     sos_runs: bool
     mc_runs: bool
+    cloud_runs: bool
     n_gauss: int
     chunk: int
     quality: str
@@ -264,6 +265,7 @@ def _resolve_request(
     if not single_r and not multiple_r:
         raise ValueError("solve() with single=False and multiple=False "
                          "computes nothing; enable at least one term")
+    cloud_runs = overlay and include_cloud
     if overlay and (external_clear or not include_clear):
         # the caller owns the clear field, or this is a cloud-only request:
         # no clear-sky kernel runs at all (historical semantics preserved)
@@ -363,7 +365,7 @@ def _resolve_request(
                     external_clear=external_clear,
                     single=single_r, multiple=multiple_r,
                     single_runs=single_runs, sos_runs=sos_runs,
-                    mc_runs=mc_runs,
+                    mc_runs=mc_runs, cloud_runs=cloud_runs,
                     n_gauss=n_gauss_r, chunk=chunk_r, quality=quality_r,
                     seed=seed_r, grid=grid_r, sos_kwargs=sos_kwargs)
 
@@ -439,19 +441,42 @@ def _check_horizontal_field(atmo, req: "_Request") -> None:
             "higher orders and the cloud two-stream assume a horizontally "
             "uniform atmosphere); use a request that includes the "
             "first-order term, or a uniform field")
-    if req.multiple:
-        kernel = ("the Monte Carlo multiple scattering"
-                  if req.approximation == SPHERICAL_MC
-                  else "the plane-parallel SOS multiple scattering")
+    if req.sos_runs or req.mc_runs or req.cloud_runs:
+        unsupported = []
+        if req.sos_runs:
+            unsupported.append("the plane-parallel SOS multiple scattering")
+        if req.mc_runs:
+            unsupported.append("the Monte Carlo multiple scattering")
+        if req.cloud_runs:
+            unsupported.append("the cloud two-stream deck")
         warnings.warn(
             f"a non-uniform aerosol HorizontalField affects the first-order "
-            f"term only; {kernel} assumes a horizontally uniform atmosphere",
+            f"term only; {' and '.join(unsupported)} assume a horizontally "
+            "uniform atmosphere",
             RuntimeWarning, stacklevel=3)
 
 
 # ---------------------------------------------------------------------------
 # the one clear-sky assembly (shared by every branch that needs one)
 # ---------------------------------------------------------------------------
+def _record_single_terms(atmo, req: "_Request",
+                         options: dict, effective: dict,
+                         approximations: dict) -> None:
+    """The one record of the spherical single term (request values in
+    ``options``, kernel-effective values in ``effective``, provenance in
+    ``approximations``), driven solely by ``req.single_runs`` -- both the
+    deterministic composition and the MC route come through here so the
+    two paths cannot drift apart again."""
+    if not req.single_runs:
+        return
+    options["n_gauss"] = int(req.n_gauss)
+    options["chunk"] = int(req.chunk)
+    effective["single"] = {"n_gauss": int(req.n_gauss),
+                           "chunk": int(req.chunk)}
+    approximations["single"] = _component(
+        "rt.single.sky_radiance", _SINGLE_CAPABILITIES, atmo.refraction)
+
+
 def _compose_clear(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
                    sun_azimuth_deg, req: "_Request",
                    options: dict, effective: dict, approximations: dict,
@@ -502,13 +527,7 @@ def _compose_clear(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
 
     # -- records: request values in options, kernel-returned effective
     #    values in effective, provenance in approximations
-    if req.single_runs:
-        options["n_gauss"] = int(req.n_gauss)
-        options["chunk"] = int(req.chunk)
-        effective["single"] = {"n_gauss": int(req.n_gauss),
-                               "chunk": int(req.chunk)}
-        approximations["single"] = _component(
-            "rt.single.sky_radiance", _SINGLE_CAPABILITIES, atmo.refraction)
+    _record_single_terms(atmo, req, options, effective, approximations)
     if sos is not None:
         options["sos"] = dict(req.sos_kwargs)
         diagnostics["orders"] = int(sos.orders)
@@ -729,15 +748,11 @@ def solve(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
         ss = _single(atmo, sun_zenith_deg, zen_b, az_b,
                      sun_azimuth_deg=sun_azimuth_deg, n_gauss=req.n_gauss,
                      chunk=req.chunk) if req.single_runs else None
+        _record_single_terms(atmo, req, options, effective, approximations)
         ms = None
         if req.mc_runs:
             options.update(quality=req.quality, seed=int(req.seed),
                            grid=dict(req.grid) if req.grid else None)
-            if req.single_runs:
-                options["n_gauss"] = int(req.n_gauss)
-                options["chunk"] = int(req.chunk)
-                effective["single"] = {"n_gauss": int(req.n_gauss),
-                                       "chunk": int(req.chunk)}
             ms, ms_err, info = _twilight.multiple_scattered(
                 atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
                 sun_azimuth_deg=sun_azimuth_deg, quality=req.quality,
@@ -749,7 +764,7 @@ def solve(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
             effective["mc"] = dict(
                 quality=req.quality, seed=req.seed,
                 grid=dict(req.grid) if req.grid else None,
-                n_zen=info["n_zen"], n_az=info["n_az"],
+                n_zen_run=info["n_zen_run"], n_az_run=info["n_az_run"],
                 n_anchor_run=info["n_anchor_run"],
                 n_photons_run=info["n_photons_run"],
                 bandwidth=info["bandwidth"])
@@ -764,10 +779,6 @@ def solve(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
                                                  view_azimuth_deg)
             stderr = np.zeros((zen.size, int(np.asarray(atmo.wl).size)))
             options["mc_run"] = False
-        if req.single_runs:
-            approximations["single"] = _component(
-                "rt.single.sky_radiance", _SINGLE_CAPABILITIES,
-                atmo.refraction)
         total = None
         if ss is not None:
             total = ss

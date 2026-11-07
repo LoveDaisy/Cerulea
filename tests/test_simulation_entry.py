@@ -720,3 +720,64 @@ def test_view_domain_is_the_public_sky_domain(atmo7, monkeypatch):
         with pytest.raises(ValueError, match="view_zenith_deg"):
             solve(atmo7, 60.0, bad, 90.0)
     assert calls["n"] == base               # rejections ran zero kernels
+
+
+# ---------------------------------------------------------------------------
+# 10. review round 2: one single-term record, kernel-run grid sizes
+# ---------------------------------------------------------------------------
+def test_mc_single_only_records_its_settings(atmo7, monkeypatch):
+    """spherical-mc with the higher orders off: the single term still runs,
+    so its settings are recorded (options + effective) and the kernel
+    receives exactly them; the zero-stderr compatibility stays."""
+    import skycolor.rt.solver as solver
+    seen = {}
+    real_single = solver._single
+
+    def spy_single(*a, **k):
+        seen.update(n_gauss=k.get("n_gauss"), chunk=k.get("chunk"))
+        return real_single(*a, **k)
+
+    monkeypatch.setattr(solver, "_single", spy_single)
+    res = solve(atmo7, 60.0, VZA, 90.0, approximation="spherical-mc",
+                multiple=False, single_config=SingleConfig(n_gauss=2, chunk=64))
+    assert seen == {"n_gauss": 2, "chunk": 64}
+    assert res.options["n_gauss"] == 2 and res.options["chunk"] == 64
+    assert res.effective["single"] == {"n_gauss": 2, "chunk": 64}
+    assert res.options["mc_run"] is False
+    assert np.all(res.stderr == 0.0)
+
+
+def test_mc_effective_grid_sizes_are_what_ran():
+    """_coarse_grid clamps the angular sizes (min 2 each): effective
+    reports the grid the engine built, consistent with coarse_zenith."""
+    tiny = dict(n_zen=1, n_az=1, n_anchor=1, n_photons=1.0)
+    res = solve(presets.clear(WL7), 60.0, VZA, 90.0,
+                approximation="spherical-mc", mc_config=MCConfig(grid=tiny))
+    mc_eff = res.effective["mc"]
+    assert mc_eff["n_zen_run"] == 2 and mc_eff["n_az_run"] == 2
+    assert mc_eff["n_zen_run"] * mc_eff["n_az_run"] == \
+        len(res.diagnostics["coarse_zenith"])
+    assert len(res.diagnostics["coarse_azimuth"]) == \
+        len(res.diagnostics["coarse_zenith"])
+    # requested values stay in info/diagnostics
+    assert res.diagnostics["n_zen"] == 1 and res.diagnostics["n_az"] == 1
+
+
+def test_cloud_overlay_warns_for_field_even_without_higher_orders(atmo7):
+    """The cloud two-stream is another field-blind component: an overlay
+    over a single-only clear base still emits the one partial-support
+    warning, while a plain single-only clear request stays silent."""
+    from skycolor.aerosol import HinterlandAerosol, shared
+    from skycolor.atmosphere import AerosolLayer, ExponentialProfile, \
+        RadialSplitField
+
+    het = presets.clear(WL7)
+    het.aerosols = [AerosolLayer(shared(HinterlandAerosol), aod550=0.05,
+                                 profile=ExponentialProfile(1.5),
+                                 horizontal=RadialSplitField(radius_km=20.0))]
+    with pytest.warns(RuntimeWarning, match="cloud two-stream"):
+        solve(het, 45.0, ZEN_C, 90.0,
+              cloud_layer=cloud.get_preset("stratus"), multiple=False)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        solve(het, 60.0, VZA, 90.0, multiple=False)   # pure single: silent
