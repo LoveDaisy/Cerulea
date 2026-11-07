@@ -14,12 +14,32 @@ detection capability and without any numerical change in `skycolor/`
 production behaviour (golden bit-identical; same seeds, grids, budgets,
 tolerances).
 
-**Final measured acceptance (Step 4)**:
+**Final measured acceptance** (2026-11-08, sequential runs, load recorded in
+`scratchpad/task-fast-validation-suite/probes/formal/`):
 
-| entry point | run 1 | run 2 | exit | tests / failure set |
-|---|---|---|---|---|
-| `uv run pytest -q` | TBD | TBD | TBD | TBD |
-| `uv run python -m validation.run_all` | TBD | TBD | TBD | TBD |
+| entry point | runs (wall s) | verdict |
+|---|---|---|
+| `uv run python -m validation.run_all` | 240.02 / **241.13, 239.98** (formal pair) | **达标**: both ≤ 300 s, exit=1, 2 PASS/4 FAIL/0 SKIP, `results.json` bitwise identical to the committed baseline across all runs |
+| `uv run pytest -q` | formal pair **293.70 ✓ / 352.15 ✗**; further runs 287.71 ✓, 293.22 ✓, 350.84 ✗, 354.11 ✗ | **未达「连续两次」**: bimodal ~290 s / ~352 s |
+
+pytest variance findings (documented for the owner decision, plan §7):
+
+* Fast and slow runs burn the **same total CPU** (~2330 s user+sys) — the
+  +59 s of the slow regime is idle stall, not compute.
+* Ruled out and fixed en route: a scheduler bug (module weight counted once
+  per collected test), serial-measured weights (per-test cost inflates
+  1.3–2.5× under 12-way contention; the weights table is regenerated from a
+  full `--durations=0` listing of a parallel run), xdist worker startup
+  (measured 1.2 s with 12 workers) and per-test channel overhead (≤10 ms).
+* Ruled out as the slow regime's cause: external CPU load (slow runs also
+  happen at load average 1.2), swap growth during the run (constant in a
+  sampled 294 s run), worker count (n=8 → 368 s, n=16 → 324 s, both worse).
+* Predicted bin loads under the final schedule: 218.6 s ± 0.4 on 12 bins,
+  largest indivisible group 112.9 s — the schedule is at its floor; the
+  residual bimodality is machine-state (memory compression / page-cache /
+  scheduling), not measurable from userspace.
+* Independently: one heavy MC test peaks at 1.89 GB RSS; the machine hosts
+  concurrent agent sessions (swap already ~5.5 GB used at idle).
 
 ## What was slow, and why
 
@@ -133,4 +153,6 @@ git diff -- skycolor tests/data/golden*  # production tree must be empty
 ```
 
 Run results of the two double acceptances are recorded at the top of this
-file and in `scratchpad/task-fast-validation-suite/probes/` (session-local).
+file and in `scratchpad/task-fast-validation-suite/probes/formal/`
+(session-local; the tracked evidence in `validation/data/fast_validation_suite/`
+holds the baseline and probe data this design rests on).
