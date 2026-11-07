@@ -1,0 +1,422 @@
+[
+  {
+    "check": "check3",
+    "seconds": 148.2665906669572,
+    "result": {
+      "key": "check3",
+      "title": "CIE 110-1994 clear-sky luminance distribution",
+      "metrics": [
+        {
+          "name": "horizon sun-side / zenith, h=45deg",
+          "model": 8.81523527413475,
+          "reference": 3.6516212662326524,
+          "unit": "",
+          "tolerance": 40.0,
+          "dev": 141.40606682437675,
+          "dev_kind": "rel_pct",
+          "note": ""
+        },
+        {
+          "name": "horizon anti-solar / zenith, h=45deg",
+          "model": 3.3734869429571357,
+          "reference": 2.0048381664333865,
+          "unit": "",
+          "tolerance": 25.0,
+          "dev": 68.26729455966911,
+          "dev_kind": "rel_pct",
+          "note": ""
+        },
+        {
+          "name": "RMS dev, theta<=60deg, h=45deg",
+          "model": 10.539972948299642,
+          "reference": 0.0,
+          "unit": "%",
+          "tolerance": 20.0,
+          "dev": 10.539972948299642,
+          "dev_kind": "abs",
+          "note": ""
+        },
+        {
+          "name": "RMS dev, 60-75deg, h=45deg",
+          "model": 32.57144245729692,
+          "reference": 0.0,
+          "unit": "%",
+          "tolerance": 25.0,
+          "dev": 32.57144245729692,
+          "dev_kind": "abs",
+          "note": ""
+        },
+        {
+          "name": "RMS dev, 75-90deg horizon, h=45deg",
+          "model": 74.17916565772781,
+          "reference": 0.0,
+          "unit": "%",
+          "tolerance": 30.0,
+          "dev": 74.17916565772781,
+          "dev_kind": "abs",
+          "note": ""
+        },
+        {
+          "name": "RMS dev, whole sky, h=45deg",
+          "model": 35.23430481909276,
+          "reference": 0.0,
+          "unit": "%",
+          "tolerance": 15.0,
+          "dev": 35.23430481909276,
+          "dev_kind": "abs",
+          "note": ""
+        },
+        {
+          "name": "horizon sun-side / zenith, h=30deg",
+          "model": 22.582739787298728,
+          "reference": 8.350092925297648,
+          "unit": "",
+          "tolerance": 50.0,
+          "dev": 170.44896373406218,
+          "dev_kind": "rel_pct",
+          "note": ""
+        },
+        {
+          "name": "horizon sun-side / zenith, h=60deg",
+          "model": 3.5110019323233277,
+          "reference": 1.5969089196126816,
+          "unit": "",
+          "tolerance": 50.0,
+          "dev": 119.86237844891589,
+          "dev_kind": "rel_pct",
+          "note": ""
+        }
+      ],
+      "verdict": "FAIL",
+      "summary": "h=45deg: sun-side horizon/zenith 8.82 vs CIE 3.65 (+141%); anti-solar 3.37 vs 2.00; RMS 10.5% (theta<=60deg), 74.2% (horizon band).",
+      "details": {
+        "table": [
+          {
+            "elevation": 30.0,
+            "lz_model": 1356.8619890688585,
+            "horizon_sun_model": 22.582739787298728,
+            "horizon_sun_cie": 8.350092925297648,
+            "horizon_anti_model": 4.761575045035725,
+            "horizon_anti_cie": 3.1413791783677474,
+            "rms_upper": 9.378610567618,
+            "rms_mid": 28.695985171769177,
+            "rms_horizon": 68.55319742353518,
+            "rms_all": 32.33242180144017,
+            "max_abs": 170.44896373406218
+          },
+          {
+            "elevation": 45.0,
+            "lz_model": 1989.508343897231,
+            "horizon_sun_model": 8.81523527413475,
+            "horizon_sun_cie": 3.6516212662326524,
+            "horizon_anti_model": 3.3734869429571357,
+            "horizon_anti_cie": 2.0048381664333865,
+            "rms_upper": 10.539972948299642,
+            "rms_mid": 32.57144245729692,
+            "rms_horizon": 74.17916565772781,
+            "rms_all": 35.23430481909276,
+            "max_abs": 141.40606682437675
+          },
+          {
+            "elevation": 60.0,
+            "lz_model": 3270.028077513482,
+            "horizon_sun_model": 3.5110019323233277,
+            "horizon_sun_cie": 1.5969089196126816,
+            "horizon_anti_model": 2.04261643387582,
+            "horizon_anti_cie": 1.1430055987082228,
+            "rms_upper": 9.350403438901182,
+            "rms_mid": 31.888592286435966,
+            "rms_horizon": 75.30537032338945,
+            "rms_all": 35.35591730732954,
+            "max_abs": 119.86237844891588
+          }
+        ],
+        "attribution": {
+          "pristine": {
+            "zenith_luminance": 1245.8028900228483,
+            "horizon_sun": 10.153074881286638,
+            "horizon_anti": 10.124604992168189
+          },
+          "clear_uniform": {
+            "zenith_luminance": 2003.6617436270772,
+            "horizon_sun": 7.135188089742242,
+            "horizon_anti": 5.704100084719705
+          }
+        },
+        "note": "The sun-side horizon is about 2x the CIE value at h=45deg. Turning the aerosol off (pristine) makes it larger, not smaller, so the dominant cause is the missing multiple scattering, not the aerosol profile; the forward-scattering aerosol aureole adds a secondary excess at low elevations."
+      },
+      "error": null
+    }
+  },
+  {
+    "check": "check4",
+    "seconds": 25.45706162508577,
+    "result": {
+      "key": "check4",
+      "title": "Sky chromaticity vs measured spectra",
+      "metrics": [
+        {
+          "name": "mean delta x, horizon",
+          "model": 0.29954518807785635,
+          "reference": 0.29126272069096204,
+          "unit": "xy",
+          "tolerance": 0.02,
+          "dev": 0.008282467386894305,
+          "dev_kind": "abs",
+          "note": ""
+        },
+        {
+          "name": "mean delta y, horizon",
+          "model": 0.32391846498543136,
+          "reference": 0.3127535356004388,
+          "unit": "xy",
+          "tolerance": 0.02,
+          "dev": 0.011164929384992625,
+          "dev_kind": "abs",
+          "note": ""
+        },
+        {
+          "name": "RMS delta xy, horizon",
+          "model": 0.018414202754464964,
+          "reference": 0.0,
+          "unit": "xy",
+          "tolerance": 0.02,
+          "dev": 0.018414202754464964,
+          "dev_kind": "abs",
+          "note": ""
+        },
+        {
+          "name": "RMS delta u'v', horizon",
+          "model": 0.010513820145311702,
+          "reference": 0.0,
+          "unit": "u'v'",
+          "tolerance": 0.02,
+          "dev": 0.010513820145311702,
+          "dev_kind": "abs",
+          "note": ""
+        }
+      ],
+      "verdict": "PASS",
+      "summary": "horizon xy: model (0.300,0.324) vs measured (0.291,0.313); RMS dxy=0.0184, du'v'=0.0105.",
+      "details": {
+        "n_cases": 76,
+        "n_timestamps": 13,
+        "measured_mean_xy": [
+          0.2912627206909619,
+          0.31275353560043867
+        ],
+        "model_mean_xy": [
+          0.2995451880778562,
+          0.3239184649854313
+        ],
+        "rms_xy": 0.018414202754464964,
+        "rms_uv": 0.010513820145311702,
+        "aod_sensitivity": {
+          "0.02": 0.013812680096878511,
+          "0.05": 0.018414202754464964,
+          "0.1": 0.03612745554663265
+        },
+        "zenith_xy": {
+          "30.0": [
+            0.26129567060896486,
+            0.27400772411082935
+          ],
+          "45.0": [
+            0.26770438526215523,
+            0.28063795446264395
+          ],
+          "60.0": [
+            0.2785627793270098,
+            0.29316712373220405
+          ]
+        },
+        "note": "All SKYSPECTRA Berlin patches are at 6 deg elevation; this is a horizon check. No open measured zenith spectrum was found in the timebox. The measured horizon is whitish (x~0.29, y~0.31); the model with AOD550=0.05 is slightly yellower by (dx,dy)=(+0.008,+0.012). AOD 0.02 matches best; AOD 0.10 is 0.025 off. The model zenith is x~0.26-0.27, y~0.27-0.29, at the blue end of the expected range."
+      },
+      "error": null
+    }
+  },
+  {
+    "check": "check5",
+    "seconds": 50.69661791692488,
+    "result": {
+      "key": "check5",
+      "title": "Twilight zenith luminance (Patat et al. 2006)",
+      "metrics": [
+        {
+          "name": "zenith luminance, h=-3deg (extrapolated ref)",
+          "model": 13.574441417104767,
+          "reference": 40.0889,
+          "unit": "cd/m2",
+          "tolerance": 0.5,
+          "dev": -0.4703021722180168,
+          "dev_kind": "abs",
+          "note": ""
+        },
+        {
+          "name": "zenith luminance, h=-6deg",
+          "model": 0.2742981499358553,
+          "reference": 0.516445,
+          "unit": "cd/m2",
+          "tolerance": 0.5,
+          "dev": -0.27480119870710606,
+          "dev_kind": "abs",
+          "note": ""
+        },
+        {
+          "name": "zenith luminance, h=-9deg",
+          "model": 0.00046941735570174597,
+          "reference": 0.0171168,
+          "unit": "cd/m2",
+          "tolerance": 0.5,
+          "dev": -1.5618634335468211,
+          "dev_kind": "abs",
+          "note": ""
+        },
+        {
+          "name": "zenith luminance, h=-12deg",
+          "model": 4.878523502313327e-07,
+          "reference": 0.00145957,
+          "unit": "cd/m2",
+          "tolerance": 0.5,
+          "dev": -3.4759365267490727,
+          "dev_kind": "abs",
+          "note": ""
+        },
+        {
+          "name": "zenith luminance, h=-18deg",
+          "model": 0.0,
+          "reference": 0.000180727,
+          "unit": "cd/m2",
+          "tolerance": 0.5,
+          "dev": -8.257023039528608,
+          "dev_kind": "abs",
+          "note": ""
+        }
+      ],
+      "verdict": "FAIL",
+      "summary": "zenith L: -6deg 0.274 vs 0.516; -9deg 0.00047 vs 0.017; -12deg 5e-07 vs 0.0015 cd/m2.",
+      "details": {
+        "model": {
+          "-3": 13.574441417104767,
+          "-6": 0.2742981499358553,
+          "-9": 0.00046941735570174597,
+          "-12": 4.878523502313327e-07,
+          "-18": 0.0
+        },
+        "model_pristine": {
+          "-3": 15.304139229228845,
+          "-6": 0.30613514089947985,
+          "-9": 0.0005656401947607847,
+          "-12": 5.213258895850032e-07,
+          "-18": 0.0
+        },
+        "reference": {
+          "-3": 40.0889,
+          "-6": 0.516445,
+          "-9": 0.0171168,
+          "-12": 0.00145957,
+          "-18": 0.000180727
+        },
+        "reference_mag_arcsec2": {
+          "-3": 8.576,
+          "-6": 13.301,
+          "-9": 17.0,
+          "-12": 19.673,
+          "-18": 21.941
+        },
+        "floor": 1e-12,
+        "note": "At -6 deg the single-scattering model is within 10% of the measured Paranal value.  At -9 deg it is ~24x too dark, and at -12/-18 deg it is exactly zero because the zenith line of sight is entirely in the Earth's shadow.  The missing multiple scattering is the cause; at -18 deg the reference is the natural night sky, which the model does not include at all."
+      },
+      "error": null
+    }
+  },
+  {
+    "check": "check6",
+    "seconds": 431.52864633407444,
+    "result": {
+      "key": "check6",
+      "title": "Twilight against Koomen et al. (1952)",
+      "metrics": [
+        {
+          "name": "zenith luminance, h=-6deg",
+          "model": 0.3564371158769639,
+          "reference": 0.645835,
+          "unit": "cd/m2",
+          "tolerance": 0.17609125905568124,
+          "dev": -0.25813865631566,
+          "dev_kind": "abs",
+          "note": "deterministic"
+        },
+        {
+          "name": "zenith luminance, h=-9deg",
+          "model": 0.018718885134967292,
+          "reference": 0.0161459,
+          "unit": "cd/m2",
+          "tolerance": 0.3292245072791287,
+          "dev": 0.06421772098702755,
+          "dev_kind": "abs",
+          "note": "engine"
+        },
+        {
+          "name": "zenith luminance, h=-12deg",
+          "model": 0.0009705290668272957,
+          "reference": 0.00129167,
+          "unit": "cd/m2",
+          "tolerance": 0.6894710340130112,
+          "dev": -0.12414302607419085,
+          "dev_kind": "abs",
+          "note": "engine"
+        }
+      ],
+      "verdict": "FAIL",
+      "summary": "model/Koomen: -6deg 0.55, -9deg 1.16, -12deg 0.75; model/Patat at -6deg 0.69.",
+      "details": {
+        "model_at_2p4km": 0.34595976965640596,
+        "engine_l6": 0.4947465466954956,
+        "engine_l6_err": 0.021593000514860794,
+        "model": {
+          "+0": 149.64388945823208,
+          "-3": 17.850442848645518,
+          "-6": 0.3564371158769639,
+          "-9": 0.018718885134967292,
+          "-12": 0.0009705290668272957,
+          "-15": 4.801625126393855e-06
+        },
+        "model_pristine": {
+          "+0": 152.75028446443753,
+          "-3": 18.666259425833715,
+          "-6": 0.36906470712295947,
+          "-9": null,
+          "-12": null,
+          "-15": null
+        },
+        "engine_error": {
+          "+0": null,
+          "-3": null,
+          "-6": null,
+          "-9": 0.005562192432385932,
+          "-12": 0.0006729319140411904,
+          "-15": 3.89076106455939e-06
+        },
+        "koomen": {
+          "+0": 161.459,
+          "-3": 21.5278,
+          "-6": 0.645835,
+          "-9": 0.0161459,
+          "-12": 0.00129167,
+          "-15": 0.000430556
+        },
+        "patat": {
+          "+0": 8006.150606049907,
+          "-3": 40.08886452476711,
+          "-6": 0.5164446175191805,
+          "-9": 0.017116846478579997,
+          "-12": 0.0014595660584469606,
+          "-15": 0.0003202017900686286
+        },
+        "split": -8.0
+      },
+      "error": null
+    }
+  }
+]

@@ -23,8 +23,20 @@ skycolor = "skycolor.cli:main"
 dev = [
     "pytest>=8,<9",
     "matplotlib>=3.8,<4",
-    "netCDF4>=1.6,<2",   # only needed by tools/build_data.py
+    "netCDF4>=1.6,<2", # only needed by tools/build_data.py
+    "pytest-xdist>=3.6,<4",
 ]
+
+[tool.pytest.ini_options]
+# The version-controlled test suite lives in tests/.  Without an explicit
+# testpath, pytest also collects scratchpad/ experiment snapshots whose
+# duplicate module basenames collide and abort collection with exit code 2
+# (65 collection errors on 2026-11-08; see validation/FAST_SUITE.md).
+testpaths = ["tests"]
+# Default entry point: measured-cost parallel scheduling (12 workers,
+# module-level groups; see tests/conftest.py and validation/FAST_SUITE.md).
+# `-n 0` runs serially and is for equivalence diagnostics only.
+addopts = "-n 12 --dist=loadgroup"
 
 [tool.setuptools.packages.find]
 include = ["skycolor*"]

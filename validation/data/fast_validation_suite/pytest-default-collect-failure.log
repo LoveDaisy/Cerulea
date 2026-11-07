@@ -1,0 +1,525 @@
+
+==================================== ERRORS ====================================
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task6/tests/test_aerosol.py _
+import file mismatch:
+imported module 'test_aerosol' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_aerosol.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task6/tests/test_aerosol.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task6/tests/test_aerosol_grid_invariance.py _
+import file mismatch:
+imported module 'test_aerosol_grid_invariance' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_aerosol_grid_invariance.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task6/tests/test_aerosol_grid_invariance.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task6/tests/test_atmosphere.py _
+import file mismatch:
+imported module 'test_atmosphere' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_atmosphere.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task6/tests/test_atmosphere.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task6/tests/test_cloud.py _
+import file mismatch:
+imported module 'test_cloud' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_cloud.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task6/tests/test_cloud.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task6/tests/test_color.py _
+import file mismatch:
+imported module 'test_color' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_color.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task6/tests/test_color.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task6/tests/test_extension_scenarios.py _
+import file mismatch:
+imported module 'test_extension_scenarios' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_extension_scenarios.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task6/tests/test_extension_scenarios.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task6/tests/test_geometry.py _
+import file mismatch:
+imported module 'test_geometry' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_geometry.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task6/tests/test_geometry.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task6/tests/test_golden_equivalence.py _
+import file mismatch:
+imported module 'test_golden_equivalence' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_golden_equivalence.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task6/tests/test_golden_equivalence.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task6/tests/test_mc.py _
+import file mismatch:
+imported module 'test_mc' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_mc.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task6/tests/test_mc.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task6/tests/test_multiple.py _
+import file mismatch:
+imported module 'test_multiple' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_multiple.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task6/tests/test_multiple.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task6/tests/test_optics.py _
+import file mismatch:
+imported module 'test_optics' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_optics.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task6/tests/test_optics.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task6/tests/test_profiles.py _
+import file mismatch:
+imported module 'test_profiles' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_profiles.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task6/tests/test_profiles.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task6/tests/test_raised_ground.py _
+import file mismatch:
+imported module 'test_raised_ground' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_raised_ground.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task6/tests/test_raised_ground.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task6/tests/test_refraction.py _
+import file mismatch:
+imported module 'test_refraction' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_refraction.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task6/tests/test_refraction.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task6/tests/test_render.py _
+import file mismatch:
+imported module 'test_render' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_render.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task6/tests/test_render.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task6/tests/test_result.py _
+import file mismatch:
+imported module 'test_result' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_result.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task6/tests/test_result.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task6/tests/test_single.py _
+import file mismatch:
+imported module 'test_single' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_single.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task6/tests/test_single.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task6/tests/test_solar_source_audit.py _
+import file mismatch:
+imported module 'test_solar_source_audit' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_solar_source_audit.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task6/tests/test_solar_source_audit.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task6/tests/test_spectra.py _
+import file mismatch:
+imported module 'test_spectra' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_spectra.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task6/tests/test_spectra.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task6/tests/test_twilight.py _
+import file mismatch:
+imported module 'test_twilight' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_twilight.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task6/tests/test_twilight.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task6/tests/test_unified_solar_source_math.py _
+import file mismatch:
+imported module 'test_unified_solar_source_math' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_unified_solar_source_math.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task6/tests/test_unified_solar_source_math.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task7/tests/test_aerosol.py _
+import file mismatch:
+imported module 'test_aerosol' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_aerosol.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task7/tests/test_aerosol.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task7/tests/test_aerosol_grid_invariance.py _
+import file mismatch:
+imported module 'test_aerosol_grid_invariance' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_aerosol_grid_invariance.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task7/tests/test_aerosol_grid_invariance.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task7/tests/test_atmosphere.py _
+import file mismatch:
+imported module 'test_atmosphere' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_atmosphere.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task7/tests/test_atmosphere.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task7/tests/test_cloud.py _
+import file mismatch:
+imported module 'test_cloud' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_cloud.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task7/tests/test_cloud.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task7/tests/test_color.py _
+import file mismatch:
+imported module 'test_color' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_color.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task7/tests/test_color.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task7/tests/test_extension_scenarios.py _
+import file mismatch:
+imported module 'test_extension_scenarios' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_extension_scenarios.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task7/tests/test_extension_scenarios.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task7/tests/test_geometry.py _
+import file mismatch:
+imported module 'test_geometry' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_geometry.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task7/tests/test_geometry.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task7/tests/test_golden_equivalence.py _
+import file mismatch:
+imported module 'test_golden_equivalence' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_golden_equivalence.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task7/tests/test_golden_equivalence.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task7/tests/test_mc.py _
+import file mismatch:
+imported module 'test_mc' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_mc.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task7/tests/test_mc.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task7/tests/test_multiple.py _
+import file mismatch:
+imported module 'test_multiple' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_multiple.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task7/tests/test_multiple.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task7/tests/test_optics.py _
+import file mismatch:
+imported module 'test_optics' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_optics.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task7/tests/test_optics.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task7/tests/test_profiles.py _
+import file mismatch:
+imported module 'test_profiles' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_profiles.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task7/tests/test_profiles.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task7/tests/test_raised_ground.py _
+import file mismatch:
+imported module 'test_raised_ground' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_raised_ground.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task7/tests/test_raised_ground.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task7/tests/test_refraction.py _
+import file mismatch:
+imported module 'test_refraction' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_refraction.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task7/tests/test_refraction.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task7/tests/test_render.py _
+import file mismatch:
+imported module 'test_render' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_render.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task7/tests/test_render.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task7/tests/test_result.py _
+import file mismatch:
+imported module 'test_result' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_result.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task7/tests/test_result.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task7/tests/test_single.py _
+import file mismatch:
+imported module 'test_single' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_single.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task7/tests/test_single.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task7/tests/test_solar_source_audit.py _
+import file mismatch:
+imported module 'test_solar_source_audit' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_solar_source_audit.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task7/tests/test_solar_source_audit.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task7/tests/test_spectra.py _
+import file mismatch:
+imported module 'test_spectra' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_spectra.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task7/tests/test_spectra.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task7/tests/test_twilight.py _
+import file mismatch:
+imported module 'test_twilight' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_twilight.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task7/tests/test_twilight.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_ ERROR collecting scratchpad/explore-project-value-audit/snapshots/task7/tests/test_unified_solar_source_math.py _
+import file mismatch:
+imported module 'test_unified_solar_source_math' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_unified_solar_source_math.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task7/tests/test_unified_solar_source_math.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+____________________ ERROR collecting tests/test_aerosol.py ____________________
+import file mismatch:
+imported module 'test_aerosol' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_aerosol.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/tests/test_aerosol.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+____________ ERROR collecting tests/test_aerosol_grid_invariance.py ____________
+import file mismatch:
+imported module 'test_aerosol_grid_invariance' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_aerosol_grid_invariance.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/tests/test_aerosol_grid_invariance.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+__________________ ERROR collecting tests/test_atmosphere.py ___________________
+import file mismatch:
+imported module 'test_atmosphere' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_atmosphere.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/tests/test_atmosphere.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_____________________ ERROR collecting tests/test_cloud.py _____________________
+import file mismatch:
+imported module 'test_cloud' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_cloud.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/tests/test_cloud.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_____________________ ERROR collecting tests/test_color.py _____________________
+import file mismatch:
+imported module 'test_color' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_color.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/tests/test_color.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+____________ ERROR collecting tests/test_cssp_observation_inputs.py ____________
+import file mismatch:
+imported module 'test_cssp_observation_inputs' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_cssp_observation_inputs.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/tests/test_cssp_observation_inputs.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+______________ ERROR collecting tests/test_extension_scenarios.py ______________
+import file mismatch:
+imported module 'test_extension_scenarios' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_extension_scenarios.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/tests/test_extension_scenarios.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+___________________ ERROR collecting tests/test_geometry.py ____________________
+import file mismatch:
+imported module 'test_geometry' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_geometry.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/tests/test_geometry.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+______________ ERROR collecting tests/test_golden_equivalence.py _______________
+import file mismatch:
+imported module 'test_golden_equivalence' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_golden_equivalence.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/tests/test_golden_equivalence.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+______________________ ERROR collecting tests/test_mc.py _______________________
+import file mismatch:
+imported module 'test_mc' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_mc.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/tests/test_mc.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+___________________ ERROR collecting tests/test_multiple.py ____________________
+import file mismatch:
+imported module 'test_multiple' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_multiple.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/tests/test_multiple.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+____________________ ERROR collecting tests/test_optics.py _____________________
+import file mismatch:
+imported module 'test_optics' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_optics.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/tests/test_optics.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+___________________ ERROR collecting tests/test_profiles.py ____________________
+import file mismatch:
+imported module 'test_profiles' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_profiles.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/tests/test_profiles.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_________________ ERROR collecting tests/test_raised_ground.py _________________
+import file mismatch:
+imported module 'test_raised_ground' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_raised_ground.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/tests/test_raised_ground.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+__________________ ERROR collecting tests/test_refraction.py ___________________
+import file mismatch:
+imported module 'test_refraction' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_refraction.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/tests/test_refraction.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+____________________ ERROR collecting tests/test_render.py _____________________
+import file mismatch:
+imported module 'test_render' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_render.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/tests/test_render.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+____________________ ERROR collecting tests/test_result.py _____________________
+import file mismatch:
+imported module 'test_result' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_result.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/tests/test_result.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+____________________ ERROR collecting tests/test_single.py _____________________
+import file mismatch:
+imported module 'test_single' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_single.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/tests/test_single.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+_________________ ERROR collecting tests/test_solar_source.py __________________
+import file mismatch:
+imported module 'test_solar_source' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/task6/tests/test_solar_source.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/tests/test_solar_source.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+______________ ERROR collecting tests/test_solar_source_audit.py _______________
+import file mismatch:
+imported module 'test_solar_source_audit' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_solar_source_audit.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/tests/test_solar_source_audit.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+____________________ ERROR collecting tests/test_spectra.py ____________________
+import file mismatch:
+imported module 'test_spectra' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_spectra.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/tests/test_spectra.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+___________________ ERROR collecting tests/test_twilight.py ____________________
+import file mismatch:
+imported module 'test_twilight' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_twilight.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/tests/test_twilight.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+___________ ERROR collecting tests/test_unified_solar_source_math.py ___________
+import file mismatch:
+imported module 'test_unified_solar_source_math' has this __file__ attribute:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/scratchpad/explore-project-value-audit/snapshots/main/tests/test_unified_solar_source_math.py
+which is not the same as the test file we want to collect:
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/tests/test_unified_solar_source_math.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+=========================== short test summary info ============================
+ERROR scratchpad/explore-project-value-audit/snapshots/task6/tests/test_aerosol.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task6/tests/test_aerosol_grid_invariance.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task6/tests/test_atmosphere.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task6/tests/test_cloud.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task6/tests/test_color.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task6/tests/test_extension_scenarios.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task6/tests/test_geometry.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task6/tests/test_golden_equivalence.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task6/tests/test_mc.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task6/tests/test_multiple.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task6/tests/test_optics.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task6/tests/test_profiles.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task6/tests/test_raised_ground.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task6/tests/test_refraction.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task6/tests/test_render.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task6/tests/test_result.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task6/tests/test_single.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task6/tests/test_solar_source_audit.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task6/tests/test_spectra.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task6/tests/test_twilight.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task6/tests/test_unified_solar_source_math.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task7/tests/test_aerosol.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task7/tests/test_aerosol_grid_invariance.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task7/tests/test_atmosphere.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task7/tests/test_cloud.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task7/tests/test_color.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task7/tests/test_extension_scenarios.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task7/tests/test_geometry.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task7/tests/test_golden_equivalence.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task7/tests/test_mc.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task7/tests/test_multiple.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task7/tests/test_optics.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task7/tests/test_profiles.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task7/tests/test_raised_ground.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task7/tests/test_refraction.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task7/tests/test_render.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task7/tests/test_result.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task7/tests/test_single.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task7/tests/test_solar_source_audit.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task7/tests/test_spectra.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task7/tests/test_twilight.py
+ERROR scratchpad/explore-project-value-audit/snapshots/task7/tests/test_unified_solar_source_math.py
+ERROR tests/test_aerosol.py
+ERROR tests/test_aerosol_grid_invariance.py
+ERROR tests/test_atmosphere.py
+ERROR tests/test_cloud.py
+ERROR tests/test_color.py
+ERROR tests/test_cssp_observation_inputs.py
+ERROR tests/test_extension_scenarios.py
+ERROR tests/test_geometry.py
+ERROR tests/test_golden_equivalence.py
+ERROR tests/test_mc.py
+ERROR tests/test_multiple.py
+ERROR tests/test_optics.py
+ERROR tests/test_profiles.py
+ERROR tests/test_raised_ground.py
+ERROR tests/test_refraction.py
+ERROR tests/test_render.py
+ERROR tests/test_result.py
+ERROR tests/test_single.py
+ERROR tests/test_solar_source.py
+ERROR tests/test_solar_source_audit.py
+ERROR tests/test_spectra.py
+ERROR tests/test_twilight.py
+ERROR tests/test_unified_solar_source_math.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 65 errors during collection !!!!!!!!!!!!!!!!!!!
+65 errors in 0.85s

@@ -1,0 +1,17 @@
+[
+  {
+    "mode": "pytest",
+    "seconds": 1570.230481875129,
+    "exitcode": 0
+  },
+  {
+    "mode": "small",
+    "seconds": 113.94033470796421,
+    "exitcode": 0
+  },
+  {
+    "mode": "checks",
+    "seconds": 656.4923630829435,
+    "exitcode": 0
+  }
+]

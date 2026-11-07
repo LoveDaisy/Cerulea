@@ -1,0 +1,166 @@
+{
+  "exitcode": 0,
+  "files": {
+    "tests/test_aerosol.py": {
+      "seconds": 15.13012895337306,
+      "calls": 89,
+      "failed": 0,
+      "build_seconds": 0.0,
+      "builds": 0
+    },
+    "tests/test_aerosol_grid_invariance.py": {
+      "seconds": 8.833962663309649,
+      "calls": 16,
+      "failed": 0,
+      "build_seconds": 0.0,
+      "builds": 0
+    },
+    "tests/test_atmosphere.py": {
+      "seconds": 5.528499664505944,
+      "calls": 14,
+      "failed": 0,
+      "build_seconds": 0.0,
+      "builds": 0
+    },
+    "tests/test_cloud.py": {
+      "seconds": 72.73240333376452,
+      "calls": 30,
+      "failed": 0,
+      "build_seconds": 19.04090820788406,
+      "builds": 3
+    },
+    "tests/test_color.py": {
+      "seconds": 0.0020422518718987703,
+      "calls": 6,
+      "failed": 0,
+      "build_seconds": 0.0,
+      "builds": 0
+    },
+    "tests/test_cssp_observation_inputs.py": {
+      "seconds": 8.074931790819392,
+      "calls": 58,
+      "failed": 0,
+      "build_seconds": 0.0,
+      "builds": 0
+    },
+    "tests/test_extension_scenarios.py": {
+      "seconds": 129.2748784578871,
+      "calls": 8,
+      "failed": 0,
+      "build_seconds": 77.44009341718629,
+      "builds": 7
+    },
+    "tests/test_geometry.py": {
+      "seconds": 0.0033830008469522,
+      "calls": 18,
+      "failed": 0,
+      "build_seconds": 0.0,
+      "builds": 0
+    },
+    "tests/test_golden_equivalence.py": {
+      "seconds": 100.47197187296115,
+      "calls": 7,
+      "failed": 0,
+      "build_seconds": 49.39868149883114,
+      "builds": 4
+    },
+    "tests/test_mc.py": {
+      "seconds": 159.08042604196817,
+      "calls": 6,
+      "failed": 0,
+      "build_seconds": 79.84869195800275,
+      "builds": 8
+    },
+    "tests/test_multiple.py": {
+      "seconds": 134.01097158435732,
+      "calls": 14,
+      "failed": 0,
+      "build_seconds": 130.9762247093022,
+      "builds": 14
+    },
+    "tests/test_optics.py": {
+      "seconds": 0.006482709664851427,
+      "calls": 5,
+      "failed": 0,
+      "build_seconds": 0.0,
+      "builds": 0
+    },
+    "tests/test_profiles.py": {
+      "seconds": 84.23547754250467,
+      "calls": 4,
+      "failed": 0,
+      "build_seconds": 55.125313290860504,
+      "builds": 5
+    },
+    "tests/test_raised_ground.py": {
+      "seconds": 77.3239387080539,
+      "calls": 16,
+      "failed": 0,
+      "build_seconds": 8.4721108332742,
+      "builds": 17
+    },
+    "tests/test_refraction.py": {
+      "seconds": 60.09762379107997,
+      "calls": 18,
+      "failed": 0,
+      "build_seconds": 0.0,
+      "builds": 0
+    },
+    "tests/test_render.py": {
+      "seconds": 0.0015862919390201569,
+      "calls": 3,
+      "failed": 0,
+      "build_seconds": 0.0,
+      "builds": 0
+    },
+    "tests/test_result.py": {
+      "seconds": 123.62730429065414,
+      "calls": 12,
+      "failed": 0,
+      "build_seconds": 39.47624004189856,
+      "builds": 3
+    },
+    "tests/test_single.py": {
+      "seconds": 16.217970085097477,
+      "calls": 5,
+      "failed": 0,
+      "build_seconds": 15.93682249984704,
+      "builds": 2
+    },
+    "tests/test_solar_source.py": {
+      "seconds": 144.90175612387247,
+      "calls": 34,
+      "failed": 0,
+      "build_seconds": 32.0457775418181,
+      "builds": 17
+    },
+    "tests/test_solar_source_audit.py": {
+      "seconds": 0.0833290871232748,
+      "calls": 9,
+      "failed": 0,
+      "build_seconds": 0.0,
+      "builds": 0
+    },
+    "tests/test_spectra.py": {
+      "seconds": 0.0055935445707291365,
+      "calls": 8,
+      "failed": 0,
+      "build_seconds": 0.0,
+      "builds": 0
+    },
+    "tests/test_twilight.py": {
+      "seconds": 429.39228508411907,
+      "calls": 15,
+      "failed": 0,
+      "build_seconds": 43.19422658206895,
+      "builds": 4
+    },
+    "tests/test_unified_solar_source_math.py": {
+      "seconds": 0.04163883067667484,
+      "calls": 18,
+      "failed": 0,
+      "build_seconds": 0.0,
+      "builds": 0
+    }
+  }
+}
