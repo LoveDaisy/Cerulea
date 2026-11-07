@@ -17,11 +17,13 @@ completed work and proposed next scopes are in [ROADMAP.md](ROADMAP.md).
 | Refraction | On by default; two-branch solar columns and occlusion at the model's opaque bottom |
 | Clouds | One homogeneous plane-parallel deck, delta-Eddington; per-beam top/base/mixed illumination from the unified source |
 | Horizontal heterogeneity | Radial aerosol field, first order only |
+| Request entry | `rt.solver.solve`: four finite approximations (spherical-single / plane-sos / hybrid-sos / spherical-mc), capability/support checks before kernels, per-component arrays plus effective settings; the three legacy entry points are thin forwarders |
 | Colour and cameras | CIE 1931 → Bradford → tone mapping; panorama, fisheye, perspective |
 
 Frozen `Medium` and `Scene` define the atmosphere and observing scenario;
 `Atmosphere` is their facade. Shared species/column algebra lives in `optics`.
-Explicit `rt.solver.solve` dispatch returns `SkyResult`; all spectral fields can
+`rt.solver.solve` is the single authoritative composition and returns a
+`SkyResult`; all spectral fields can
 use the same renderer. `at_altitude` truncates the domain without renormalising
 columns, and solar occlusion uses the same `r_bounds[0]` bottom. Contracts and
 shared-physics validation blind spots: [ARCHITECTURE.md](ARCHITECTURE.md).
@@ -77,9 +79,12 @@ These backends have not replaced production defaults.
 
 ## Remaining limits
 
-- Production solar prescriptions differ between backends; inverse-angle tables
-  are sparse and refracted disk angular gain is absent. The experimental source
-  addresses these contracts; production integration remains proposed work.
+- Production backends share the unified finite-disk solar source
+  (`physics/SOLAR_SOURCE.md` §Known deviations records the adjudicated
+  residuals). Remaining inverse-angle table sparsity and refracted disk
+  angular gain are tracked there; the entry consolidation
+  (task-simulation-entry) made `rt.solver.solve` the single composition
+  of single+SOS/MC/cloud.
 - Absolute twilight validation needs matched solar-axis metadata, site atmospheres
   and instrument responses. Patat's total V-band sky includes night background.
   The limited filter-only conversion changes present −6° spectra by 0.5–0.7%;

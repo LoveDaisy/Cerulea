@@ -4,6 +4,15 @@
 first-order term of `skycolor.rt.single`.  This note describes the method, the
 approximations, and the validation numbers obtained on branch `feat/ms`.
 
+The plane first-order component is formally reachable through
+`multiple.solve(..., single_view=True)` (`SOSResult.radiance_single`);
+`rt.solver.solve(approximation="plane-sos")` returns both plane terms from
+one SOS run.  `SOSResult` reports the effective discretisation actually used
+(`n_mu` / `n_modes` / `n_moments_eff`, `tol`, `max_orders`, `delta_m`); the
+defaults quoted below are the *request* values — effective values may be
+clamped (even `n_mu`, truncated modes/moments) and are the authoritative
+record.
+
 ## Method
 
 The solver is a **successive orders of scattering (SOS)** solver:

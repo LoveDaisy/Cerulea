@@ -34,6 +34,14 @@ radiance, stderr = twilight_radiance(
 Both arrays are `(n_view, n_wl)` in W m⁻² sr⁻¹ nm⁻¹ and the view angles
 broadcast against each other, exactly like `rt.solver.sky_radiance_total`.
 
+The wrapper is a thin format adapter over
+`rt.solver.solve(approximation="spherical-mc")`; the composition itself
+lives in the solver.  `stderr` is a composite MC error estimate: per-anchor
+statistics are smoothed across anchors/wavelength and carry a 3 % floor
+(`MS_BIAS`) — it is not a pure sample SE and not a total physical error.
+`coarse_errors` in the diagnostics are the pre-smoothing per-anchor
+statistics.
+
 The figure is produced by `experiments/twilight_nocturnal.py`
 (`figures/11_twilight_deep.png`): the zenith brightness from 0 to −18° for the
 deterministic model, the engine and the Patat fit, plus fisheye renders at −9°
