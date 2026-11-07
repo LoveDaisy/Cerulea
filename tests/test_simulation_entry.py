@@ -480,3 +480,59 @@ def test_overlay_honors_sos_config(atmo7, stratus):
                 sos_config=SOSConfig(n_mu=8, max_orders=3, tol=0.5))
     assert res.effective["sos"]["n_mu"] == 8
     assert res.effective["sos"]["max_orders"] == 3
+
+
+# ---------------------------------------------------------------------------
+# 8. H3 invariants: media/caching/restriction/render seam through the entry
+# ---------------------------------------------------------------------------
+def test_same_medium_reentry_is_stable(atmo7):
+    """Repeated solve() calls on one medium are bitwise identical (no
+    per-call drift from shared caches), for a deterministic and an MC
+    route."""
+    r1 = solve(atmo7, 65.0, VZA, 90.0)
+    r2 = solve(atmo7, 65.0, VZA, 90.0)
+    assert np.array_equal(r1.radiance, r2.radiance)
+    m1 = solve(atmo7, 96.0, ZEN_TW, AZ_TW, approximation="spherical-mc",
+               mc_config=MCConfig(quality="low", seed=0, grid=TINY))
+    m2 = solve(atmo7, 96.0, ZEN_TW, AZ_TW, approximation="spherical-mc",
+               mc_config=MCConfig(quality="low", seed=0, grid=TINY))
+    assert np.array_equal(m1.radiance, m2.radiance)
+    assert np.array_equal(m1.stderr, m2.stderr)
+
+
+def test_independent_construction_same_result():
+    """Two independently built (equal) media give bitwise equal results."""
+    a1 = presets.clear(WL7, aod=0.05)
+    a2 = presets.clear(WL7, aod=0.05)
+    r1 = solve(a1, 65.0, VZA, 90.0)
+    r2 = solve(a2, 65.0, VZA, 90.0)
+    assert np.array_equal(r1.radiance, r2.radiance)
+    assert r1.diagnostics["orders"] == r2.diagnostics["orders"]
+
+
+def test_restrict_column_consistency(atmo7):
+    """Solving on a wavelength-restricted medium reproduces the restricted
+    columns of the full-grid solve bit-for-bit (no re-normalisation on the
+    restriction path).  Deterministic routes only: the MC anchor grid is a
+    function of the wavelength count, so a restricted MC run is a different
+    problem by design."""
+    idx = [0, 2, 4, 6]
+    full = solve(atmo7, 65.0, VZA, 90.0).radiance
+    sub = solve(atmo7._restrict(idx), 65.0, VZA, 90.0).radiance
+    assert np.array_equal(sub, full[:, idx])
+    full_ss = solve(atmo7, 65.0, VZA, 90.0, multiple=False).radiance
+    sub_ss = solve(atmo7._restrict(idx), 65.0, VZA, 90.0, multiple=False).radiance
+    assert np.array_equal(sub_ss, full_ss[:, idx])
+
+
+def test_render_default_path_reaches_the_entry(atmo7):
+    """render.sky_radiance_grid (no radiance_field) is bit-identical to the
+    authoritative entry -- the display layer rides the thin wrapper."""
+    from skycolor import render
+
+    zen = np.array([0.0, 30.0, 60.0, 90.0])
+    az = np.array([0.0, 45.0, 90.0, 135.0])
+    Z, A = np.meshgrid(zen, az, indexing="ij")
+    grid = render.sky_radiance_grid(atmo7, 65.0, Z, A)
+    direct = solve(atmo7, 65.0, Z.ravel(), A.ravel()).radiance
+    assert np.array_equal(grid.reshape(-1, WL7.size), direct)

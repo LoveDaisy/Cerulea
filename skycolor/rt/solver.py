@@ -147,7 +147,6 @@ class _Request:
     overlay: bool
     single: bool
     multiple: bool
-    mc_runs: bool
     sos_runs: bool
     n_gauss: int
     chunk: int
@@ -303,7 +302,7 @@ def _resolve_request(
 
     return _Request(approximation=base_approx, overlay=overlay,
                     single=single_r, multiple=multiple_r,
-                    mc_runs=mc_runs, sos_runs=sos_runs,
+                    sos_runs=sos_runs,
                     n_gauss=n_gauss_r, chunk=chunk_r, quality=quality_r,
                     seed=seed_r, grid=grid_r, sos_kwargs=sos_kwargs)
 
