@@ -119,13 +119,17 @@ def cie110_diffuse_illuminance(solar_elevation_deg, turbidity, n_zen=181, n_az=1
 # ---------------------------------------------------------------------------
 # model
 # ---------------------------------------------------------------------------
-def model_case(elevation_deg, aod550=0.05, ozone_du=300.0, wl=C.WL_COARSE,
-               n_zen=73, n_az=144):
+def direct_case(elevation_deg, aod550=0.05, ozone_du=300.0, wl=C.WL_COARSE):
+    """Direct-beam-only model case from the unified finite-disk solar source.
+
+    Returns ``dict(dni=..., e_dni=..., e_horiz=..., atmo=...)``: the DNI
+    illuminance, the spectral DNI on the plane normal to the apparent sun
+    centre, the spectral direct flux on the horizontal plane, and the
+    atmosphere used.  No diffuse sky is solved here — consumers that also
+    need DHI/GHI use :func:`model_case`, which calls this helper for the
+    direct part.
+    """
     atmo = C.atmosphere("clear", wl, aod=aod550, ozone_du=ozone_du)
-    # DNI: the unified source's flux on the plane normal to the apparent sun
-    # centre; GHI: the source's flux on the horizontal plane (plan 6.4).
-    # Both are exact disk integrals -- the legacy F*T*sin(true elevation)
-    # decomposition ignored the disk geometry and the refraction shift.
     from skycolor.solar_source import SolarSource
     import skycolor.geometry as _g
 
@@ -142,14 +146,26 @@ def model_case(elevation_deg, aod550=0.05, ozone_du=300.0, wl=C.WL_COARSE,
             np.array([0.0]), np.array([elev_true]))[0])
         n_plane = _g.sun_vector(0.0, app_c)
         e_dni = source.direct_irradiance(xg, n_plane)[0]
-    e_ghi = source.direct_irradiance(xg, np.array([0.0, 0.0, 1.0]))[0]
+    e_horiz = source.direct_irradiance(xg, np.array([0.0, 0.0, 1.0]))[0]
     dni_il = float(C.illuminance(e_dni, wl))
+    return dict(dni=dni_il, e_dni=e_dni, e_horiz=e_horiz, atmo=atmo)
+
+
+def model_case(elevation_deg, aod550=0.05, ozone_du=300.0, wl=C.WL_COARSE,
+               n_zen=73, n_az=144):
+    """Full (direct + diffuse) model case at one solar elevation.
+
+    The direct beam comes from :func:`direct_case`; the diffuse sky is the
+    full solver on an ``n_zen`` x ``n_az`` grid.  GHI is the horizontal
+    direct flux plus the diffuse illuminance.
+    """
+    d = direct_case(elevation_deg, aod550, ozone_du, wl)
     z, a = C.sky_grid(n_zen, n_az)
-    rad = C.sky_radiance(atmo, 90.0 - elevation_deg, z.ravel(), a.ravel())
+    rad = C.sky_radiance(d["atmo"], 90.0 - elevation_deg, z.ravel(), a.ravel())
     rad = rad.reshape(z.shape + (len(wl),))
     dhi_il = C.horizontal_illuminance(rad, z, a, wl)
-    ghi_il = float(C.illuminance(e_ghi, wl)) + dhi_il
-    return dict(dni=dni_il, dhi=dhi_il, ghi=ghi_il, e_dni=e_dni, atmo=atmo)
+    ghi_il = float(C.illuminance(d["e_horiz"], wl)) + dhi_il
+    return dict(dni=d["dni"], dhi=dhi_il, ghi=ghi_il, e_dni=d["e_dni"], atmo=d["atmo"])
 
 
 def run():
@@ -163,7 +179,11 @@ def run():
     g173_vis = float(np.trapezoid(
         dni_g[(wl_g >= 400) & (wl_g <= 700)], wl_g[(wl_g >= 400) & (wl_g <= 700)]
     ))
-    g173_model = model_case(48.19, aod550=0.0734, ozone_du=343.8, wl=np.arange(400., 701., 1.))
+    # The ASTM case consumes only direct-beam quantities (DNI and its
+    # spectrum) -- the former full model_case call also solved a 73x144
+    # diffuse sky whose results entered no metric, detail, CSV or figure.
+    g173_model = direct_case(48.19, aod550=0.0734, ozone_du=343.8,
+                             wl=np.arange(400., 701., 1.))
     dni_klx = g173_model["dni"] / 1000.0
     metrics.append(C.Metric(
         "DNI illuminance, AM1.5 (48.19deg)", dni_klx, g173_klx, unit="klx",

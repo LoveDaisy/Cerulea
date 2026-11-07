@@ -101,17 +101,51 @@ def patat_fit(h):
     return 1.08e5 * 10.0 ** (-0.4 * m_v)
 
 
-def model_luminance(h, kind="clear", wl=None):
-    """Zenith luminance and (for the engine) its 1-sigma statistical error."""
+def engine_point(h, kind="clear", wl=None):
+    """One spherical-engine twilight point: ``(radiance, error)`` arrays.
+
+    The single authoritative Monte-Carlo call of this check: the ``clear``
+    (or named) preset, the zenith direction, ``quality="low"`` and ``seed=0``
+    are the frozen regression budgets.  Standalone runs compute points right
+    here; ``run_all`` dispatches exactly :func:`engine_depths` to its worker
+    pool and injects the results, so each point is computed once by this
+    same code path either way.
+    """
+    wl = C.WL_COARSE if wl is None else np.asarray(wl, dtype=float)
+    atmo = C.atmosphere(kind, wl)
+    return twilight_radiance(atmo, 90.0 - float(h),
+                             np.array([0.0]), np.array([0.0]),
+                             quality="low", seed=0)
+
+
+def engine_depths():
+    """Solar elevations whose engine points a full ``run()`` needs.
+
+    Depths below the split come from the Koomen table; -6 deg is the
+    supplemental engine point printed for comparison with the deterministic
+    value.  ``run_all`` dispatches exactly these depths to its pool.
+    """
+    hs = [float(r["sun_elevation_deg"]) for r in load_koomen()]
+    return sorted({h for h in hs if h < SPLIT} | {-6.0})
+
+
+def model_luminance(h, kind="clear", wl=None, engine=None):
+    """Zenith luminance and (for the engine) its 1-sigma statistical error.
+
+    ``engine`` optionally supplies precomputed engine arrays for points
+    below :data:`SPLIT`: it is called as ``engine(h)`` and must return what
+    :func:`engine_point` would for the same point.
+    """
     wl = C.WL_COARSE if wl is None else np.asarray(wl, dtype=float)
     atmo = C.atmosphere(kind, wl)
     if h >= SPLIT:
         rad = sky_radiance_total(atmo, 90.0 - float(h),
                                  np.array([0.0]), np.array([0.0]))
         return float(C.luminance(rad[0][None, :], wl)[0]), None
-    rad, err = twilight_radiance(atmo, 90.0 - float(h),
-                                 np.array([0.0]), np.array([0.0]),
-                                 quality="low", seed=0)
+    if engine is not None:
+        rad, err = engine(float(h))
+    else:
+        rad, err = engine_point(h, kind, wl)
     return (float(C.luminance(rad[0][None, :], wl)[0]),
             float(C.luminance(err[0][None, :], wl)[0]))
 
@@ -126,7 +160,30 @@ def ratio_text(model, ref, err=None):
     return f"{r:.2f} [{lo:.1f}-{(model + err) / ref:.1f}]"
 
 
-def run():
+def run(engine_points=None):
+    """Run the check; optionally consume precomputed engine points.
+
+    ``engine_points`` (used by ``run_all``) maps each depth from
+    :func:`engine_depths` to the ``(radiance, error)`` arrays that
+    :func:`engine_point` returns.  When ``None``, every engine point is
+    computed locally by the same helper (standalone semantics).
+    """
+
+    def engine(h, kind="clear", wl=None):
+        """Engine arrays for this run: injected when run_all dispatched them.
+
+        Only (clear, WL_COARSE) points are dispatched to the pool; anything
+        else -- never the case today -- is computed locally by the same
+        helper rather than silently consuming foreign arrays.
+        """
+        wl_arr = C.WL_COARSE if wl is None else np.asarray(wl, dtype=float)
+        dispatched = (kind == "clear"
+                      and wl_arr.shape == C.WL_COARSE.shape
+                      and np.array_equal(wl_arr, C.WL_COARSE))
+        if engine_points is not None and dispatched:
+            return engine_points[float(h)]
+        return engine_point(h, kind, wl_arr)
+
     koomen = load_koomen()
     hs = [float(r["sun_elevation_deg"]) for r in koomen]
     ref = [float(r["zenith_luminance_cd_m2"]) for r in koomen]
@@ -135,7 +192,7 @@ def run():
     model_pristine = {}
     engine_err = {}
     for h in hs:
-        model[h], engine_err[h] = model_luminance(h, "clear")
+        model[h], engine_err[h] = model_luminance(h, "clear", engine=engine)
         if h >= SPLIT:
             model_pristine[h], _ = model_luminance(h, "pristine")
         else:
@@ -250,10 +307,7 @@ def run():
 
     # the engine at -6 deg, so the printed engine ratios are computed, not
     # copied from another run
-    atmo_l6 = C.atmosphere("clear", C.WL_COARSE)
-    rad_e6, err_e6 = twilight_radiance(
-        atmo_l6, 96.0, np.array([0.0]), np.array([0.0]),
-        quality="low", seed=0)
+    rad_e6, err_e6 = engine(-6.0)
     engine_l6 = float(C.luminance(rad_e6[0][None, :], C.WL_COARSE)[0])
     engine_l6_err = float(C.luminance(err_e6[0][None, :], C.WL_COARSE)[0])
 
