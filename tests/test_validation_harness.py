@@ -6,7 +6,9 @@ results is verified by real runs against the committed baseline (see
 
 * pytest scheduling: the LPT packing used by ``tests/conftest.py`` must be
   deterministic, cover every collected test exactly once, tolerate unknown
-  tests, and work for any worker count.
+  tests, and work for any worker count — and the collection hook must
+  actually attach the groups in real runs: in xdist workers, during
+  controller-side ``--collect-only`` collection, and nowhere when serial.
 * validation restructuring: atmosphere reuse is keyed and read-only,
   check2's ASTM path genuinely skips the diffuse solve while h=30/60 keep
   it, and check6's engine-point injection consumes exactly the dispatched
@@ -14,7 +16,11 @@ results is verified by real runs against the committed baseline (see
 """
 from __future__ import annotations
 
+import json
+import os
 import pathlib
+import subprocess
+import sys
 
 import numpy as np
 import pytest
@@ -100,6 +106,142 @@ def test_assign_bins_separates_the_two_heaviest_groups():
     nodeids = [path if path in nodes else f"{path}::test_a" for _s, path in heaviest]
     bins = scheduling.assign_bins(nodeids, 2)
     assert bins[nodeids[0]] != bins[nodeids[1]]
+
+
+# ---------------------------------------------------------------------------
+# scheduling hook integration: the hook must engage in real runs
+# ---------------------------------------------------------------------------
+# A pure-function test of ``assign_bins`` cannot prove the conftest hook
+# consumes it: past defects lived exactly in that interface (a module key
+# lookup that crashed collect-only, and a worker-detection path that silenced
+# the whole schedule in real xdist workers).  These tests build a tiny
+# project that *copies the real conftest.py and scheduling.py*, schedule it
+# against a synthetic weights table (``scheduling.WEIGHTS_ENV``), and assert
+# on what actually executed in pytest subprocesses.
+_MINI_WEIGHTS = {
+    "modules": {"test_mini_a.py": 5.0},
+    "nodes": {
+        "test_mini_hot.py::test_heavy_one": 100.0,
+        "test_mini_hot.py::test_heavy_two": 90.0,
+    },
+}
+# test_mini_b.py is deliberately absent from the table: unknown modules and
+# parametrized nodeids must still be scheduled (DEFAULT_WEIGHT_S path).
+
+_RECORDER = '''\
+def _record(request):
+    marker = request.node.get_closest_marker("xdist_group")
+    worker = getattr(request.config, "workerinput", {}).get("workerid", "serial")
+    group = marker.args[0] if marker else "-"
+    # xdist rewrites item._nodeid with a "@binN" scheduling suffix under
+    # loadgroup; record the real nodeid, the suffix is asserted separately.
+    nodeid = request.node.nodeid.rsplit("@", 1)[0]
+    with (request.config.rootpath / "results.tsv").open("a") as fh:
+        fh.write(f"{nodeid}\\t{worker}\\t{group}\\n")
+'''
+
+
+def _mini_project(root: pathlib.Path) -> pathlib.Path:
+    """Materialise the synthetic project wired to the real hook code."""
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "conftest.py").write_text((TESTS_DIR / "conftest.py").read_text())
+    (root / "scheduling.py").write_text((TESTS_DIR / "scheduling.py").read_text())
+    weights = root / "mini_weights.json"
+    weights.write_text(json.dumps(_MINI_WEIGHTS))
+    (root / "test_mini_a.py").write_text(
+        _RECORDER
+        + "\n\n"
+        + "\n\n".join(
+            f"def test_{name}(request):\n    _record(request)"
+            for name in ("alpha", "beta", "gamma")
+        )
+        + "\n"
+    )
+    (root / "test_mini_b.py").write_text(
+        "import pytest\n\n\n"
+        + _RECORDER
+        + "\n\n"
+        + '@pytest.mark.parametrize("case", ["x", "y"])\n'
+        + "def test_case(request, case):\n    _record(request)\n"
+    )
+    (root / "test_mini_hot.py").write_text(
+        _RECORDER
+        + "\n\n"
+        + "\n\n".join(
+            f"def test_{name}(request):\n    _record(request)"
+            for name in ("heavy_one", "heavy_two")
+        )
+        + "\n"
+    )
+    return weights
+
+
+def _run_mini(root: pathlib.Path, weights: pathlib.Path, *args: str):
+    env = dict(os.environ, **{scheduling.WEIGHTS_ENV: str(weights)})
+    return subprocess.run(
+        [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", *args],
+        cwd=root, env=env, capture_output=True, text=True, timeout=180,
+    )
+
+
+def _read_results(root: pathlib.Path):
+    out = {}
+    for line in (root / "results.tsv").read_text().splitlines():
+        nodeid, worker, group = line.split("\t")
+        assert nodeid not in out, f"executed twice: {nodeid}"
+        out[nodeid] = (worker, group)
+    return out
+
+
+_MINI_NODEIDS = {
+    "test_mini_a.py::test_alpha",
+    "test_mini_a.py::test_beta",
+    "test_mini_a.py::test_gamma",
+    "test_mini_b.py::test_case[x]",
+    "test_mini_b.py::test_case[y]",
+    "test_mini_hot.py::test_heavy_one",
+    "test_mini_hot.py::test_heavy_two",
+}
+
+
+def test_hook_groups_are_attached_in_real_xdist_workers(tmp_path):
+    weights = _mini_project(tmp_path)
+    proc = _run_mini(tmp_path, weights, "-n", "2", "--dist=loadgroup")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    records = _read_results(tmp_path)
+    assert set(records) == _MINI_NODEIDS, "every test executed exactly once"
+    # The hook engaged inside the workers: every executed test carries a bin.
+    assert all(group != "-" for _worker, group in records.values())
+    # Worker-side grouping matches the packing function bit for bit.
+    expected = scheduling.assign_bins(sorted(records), 2, weights_path=weights)
+    for nodeid, (_worker, group) in records.items():
+        assert group == f"bin{expected[nodeid]}", nodeid
+    hot = {n: g for n, (_w, g) in records.items() if "test_mini_hot" in n}
+    assert len(set(hot.values())) == 2, "hot nodes must land in separate bins"
+    for prefix in ("test_mini_a", "test_mini_b"):
+        groups = {g for n, (_w, g) in records.items() if n.startswith(prefix)}
+        workers = {w for n, (w, _g) in records.items() if n.startswith(prefix)}
+        assert len(groups) == 1 and len(workers) == 1, prefix  # module = 1 group
+    assert len({w for w, _g in records.values()}) >= 2, "both workers used"
+
+
+def test_hook_attaches_no_groups_when_serial(tmp_path):
+    weights = _mini_project(tmp_path)
+    proc = _run_mini(tmp_path, weights)  # no -n: plain serial invocation
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    records = _read_results(tmp_path)
+    assert set(records) == _MINI_NODEIDS
+    assert all(group == "-" for _worker, group in records.values())
+    assert all(worker == "serial" for worker, _group in records.values())
+
+
+def test_collect_only_with_default_parallel_addopts_exits_zero(tmp_path):
+    # Regression: the hook once looked module keys up in the nodeid-keyed
+    # bin map, crashing exactly this controller-side collect-only path.
+    weights = _mini_project(tmp_path)
+    proc = _run_mini(tmp_path, weights, "-n", "2", "--collect-only")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "INTERNALERROR" not in proc.stderr
 
 
 # ---------------------------------------------------------------------------
