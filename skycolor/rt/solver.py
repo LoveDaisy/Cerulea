@@ -683,7 +683,11 @@ def solve(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
             f"base (observer elevation {float(atmo.elevation_km)} km vs base "
             f"{float(cloud_layer.base_km)} km); inside/above-deck "
             "viewing is not supported")
-    if req.sos_runs:
+    if req.sos_runs or overlay:
+        # plane terms and the cloud deck are both "view from the model
+        # bottom" constructions (plan section 3.4); the overlay check is
+        # unconditional so the support domain cannot depend on which clear
+        # kernels happen to run
         _require_bottom_observer(atmo)
     _check_horizontal_field(atmo, req)
 
@@ -706,13 +710,13 @@ def solve(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
         options.update(cloud=cloud_layer.describe(),
                        include_clear=bool(include_clear),
                        include_cloud=bool(include_cloud))
+        if ground_albedo is not None:
+            options["ground_albedo_override"] = True
         if req.external_clear:
             options["clear_radiance"] = "external"
             clear_field = clear_radiance
             ss = ms = None
         else:
-            if ground_albedo is not None:
-                options["ground_albedo_override"] = True
             clear_field, ss, ms, _ = _compose_clear(
                 atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
                 sun_azimuth_deg, req, options, effective, approximations,

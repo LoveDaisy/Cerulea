@@ -781,3 +781,38 @@ def test_cloud_overlay_warns_for_field_even_without_higher_orders(atmo7):
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         solve(het, 60.0, VZA, 90.0, multiple=False)   # pure single: silent
+
+
+# ---------------------------------------------------------------------------
+# 11. review round 3: cloud observer at the model bottom, albedo record
+# ---------------------------------------------------------------------------
+def test_cloud_requests_require_the_model_bottom_observer(atmo7, stratus):
+    """Plan 3.4: the deck composition is a view from the model bottom,
+    below the cloud base -- on every cloud path, whatever clear kernels
+    the execution plan runs.  at_altitude stations still qualify."""
+    raised = presets.clear(WL7)
+    raised.elevation_km = 0.2          # below the 0.5 km base, off the bottom
+    zeros = np.zeros((ZEN_C.size, WL7.size))
+    for kwargs in (dict(multiple=False),                  # no SOS runs
+                   dict(clear_radiance=zeros),            # external clear
+                   dict(include_clear=False)):            # cloud-only
+        with pytest.raises(ValueError, match="model bottom"):
+            solve(raised, 45.0, ZEN_C, 90.0, cloud_layer=stratus, **kwargs)
+        with pytest.raises(ValueError, match="model bottom"):
+            sky_radiance_with_cloud(raised, stratus, 45.0, ZEN_C, 90.0,
+                                    **({"clear_radiance": zeros}
+                                       if "clear_radiance" in kwargs else {}))
+    station = presets.clear(WL7).at_altitude(0.2)   # truncated == bottom
+    res = solve(station, 45.0, ZEN_C, 90.0, cloud_layer=stratus,
+                include_clear=False)
+    assert np.all(res.components["clear"] == 0.0)
+
+
+def test_external_clear_still_records_ground_albedo_override(atmo7, stratus):
+    """The override record follows the deck kernel's inputs, not the clear
+    field's provenance."""
+    res = solve(atmo7, 45.0, ZEN_C, 90.0, cloud_layer=stratus,
+                clear_radiance=np.zeros((ZEN_C.size, WL7.size)),
+                ground_albedo=0.8)
+    assert res.options["ground_albedo_override"] is True
+    assert res.options["clear_radiance"] == "external"
