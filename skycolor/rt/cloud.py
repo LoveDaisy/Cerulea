@@ -78,6 +78,7 @@ __all__ = [
     "sun_transmittance_to_height",
     "illuminate_cloud",
     "cloud_radiance",
+    "apply_cloud_overlay",
     "sky_radiance_with_cloud",
     "overcast_shape",
 ]
@@ -676,8 +677,65 @@ def cloud_radiance(illum: CloudIllumination, view_zenith_deg,
 
 
 # ---------------------------------------------------------------------------
-# the drop-in replacement for rt.solver.sky_radiance_total
+# the local deck-overlay operator and the legacy full wrapper
 # ---------------------------------------------------------------------------
+def apply_cloud_overlay(
+    atmo,
+    cloud_layer: CloudLayer,
+    sun_zenith_deg: float,
+    view_zenith_deg,
+    clear_radiance,
+    ground_albedo=None,
+    include_clear: bool = True,
+    include_cloud: bool = True,
+):
+    """Local overlay operator: compose a *precomputed* clear field with a deck.
+
+    This is the cloud composition with the clear-sky computation removed.
+    The caller supplies ``clear_radiance`` -- production goes through
+    ``rt.solver.solve`` (the one authoritative clear orchestration); tests
+    and tools may hand in any precomputed field whose provenance they know.
+    This function never reaches back into the solver, which is what keeps
+    the dependency one-way and the clear combination single-source.
+
+    Returns
+    -------
+    (total, components)
+        ``total = clear_radiance * transmittance + cloud_term`` (``total =
+        cloud_term`` when ``include_clear`` is false -- the excluded term is
+        still recorded in the components but not summed into the total).
+        ``components`` carries the trans-attenuated clear field (``clear``),
+        the cloud term, the view ``transmittance``, the beam ``illumination``
+        and the deck ``optics``.
+    """
+    view = np.atleast_1d(np.asarray(view_zenith_deg, dtype=float)).ravel()
+    n_view = view.size
+    wl = np.asarray(atmo.wl, dtype=float)
+
+    if clear_radiance is None:
+        # cloud-only request without a clear field: the overlay sees zero
+        clear_radiance = np.zeros((n_view, len(wl)))
+    clear_radiance = np.asarray(clear_radiance, dtype=float)
+
+    optics = cloud_layer.optics(wl)
+    mu_view = np.clip(np.cos(np.radians(view)), 1e-6, 1.0)
+    tau_view = optics.tau[None, :] / mu_view[:, None]
+    trans = np.exp(-tau_view)
+
+    illum = illuminate_cloud(atmo, cloud_layer, sun_zenith_deg,
+                             ground_albedo=ground_albedo)
+    cloud_term = cloud_radiance(illum, view) if include_cloud else np.zeros_like(clear_radiance)
+
+    total = clear_radiance * trans + cloud_term
+    if not include_clear:
+        total = cloud_term
+
+    components = dict(clear=clear_radiance * trans, cloud=cloud_term,
+                      illumination=illum, optics=optics,
+                      transmittance=trans)
+    return total, components
+
+
 def sky_radiance_with_cloud(
     atmo,
     cloud_layer: CloudLayer,
@@ -696,9 +754,15 @@ def sky_radiance_with_cloud(
 ):
     """Total sky radiance with a cloud deck, ``(n_view, n_wl)``.
 
-    Drop-in replacement for :func:`skycolor.rt.solver.sky_radiance_total`::
+    Thin forwarder kept for the historical signature::
 
         L = L_clear * exp(-tau_cloud / mu_view) + L_cloud
+
+    Without a precomputed ``clear_radiance`` the clear field comes from the
+    authoritative entry (:func:`rt.solver.solve`, ``method="clear"``);
+    the deck composition itself is the local operator
+    :func:`apply_cloud_overlay`.  There is no second clear-sky
+    implementation behind this wrapper.
 
     Parameters
     ----------
@@ -711,47 +775,31 @@ def sky_radiance_with_cloud(
     multiple : bool
         Passed to the clear-sky solver.
     clear_radiance : ndarray, optional
-        Pre-computed ``(n_view, n_wl)`` clear-sky field, to avoid re-running
-        the multiple-scattering solver for every call.
+        Pre-computed ``(n_view, n_wl)`` clear-sky field; when given, no
+        clear-sky computation runs and its provenance stays the caller's.
     ground_albedo : float or ndarray, optional
         Overrides ``atmo.ground_albedo`` for the cloud-ground coupling.
+    include_clear, include_cloud : bool
+        Exclude either term from the total (excluded terms still appear in
+        the components when ``return_components=True``).
     return_components : bool
-        Also return a dict with the clear and cloud terms and the diagnostics.
+        Also return the component dict.
 
     Returns
     -------
     ndarray ``(n_view, n_wl)``, or ``(radiance, components)``.
     """
-    from .solver import sky_radiance_total
-
-    view = np.atleast_1d(np.asarray(view_zenith_deg, dtype=float)).ravel()
-    n_view = view.size
-    wl = np.asarray(atmo.wl, dtype=float)
-
     if clear_radiance is None and include_clear:
-        clear_radiance = sky_radiance_total(
+        from .solver import solve
+
+        clear_radiance = solve(
             atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
-            sun_azimuth_deg=sun_azimuth_deg, multiple=multiple,
-            n_gauss=n_gauss, chunk=chunk)
-    if clear_radiance is None:
-        clear_radiance = np.zeros((n_view, len(wl)))
-    clear_radiance = np.asarray(clear_radiance, dtype=float)
-
-    optics = cloud_layer.optics(wl)
-    mu_view = np.clip(np.cos(np.radians(view)), 1e-6, 1.0)
-    tau_view = optics.tau[None, :] / mu_view[:, None]
-    trans = np.exp(-tau_view)
-
-    illum = illuminate_cloud(atmo, cloud_layer, sun_zenith_deg,
-                             ground_albedo=ground_albedo)
-    cloud_term = cloud_radiance(illum, view) if include_cloud else np.zeros_like(clear_radiance)
-
-    total = clear_radiance * trans + cloud_term
-    if not include_clear:
-        total = cloud_term
-
+            sun_azimuth_deg=sun_azimuth_deg, method="clear",
+            multiple=multiple, n_gauss=n_gauss, chunk=chunk).radiance
+    total, components = apply_cloud_overlay(
+        atmo, cloud_layer, sun_zenith_deg, view_zenith_deg, clear_radiance,
+        ground_albedo=ground_albedo, include_clear=include_clear,
+        include_cloud=include_cloud)
     if return_components:
-        return total, dict(clear=clear_radiance * trans, cloud=cloud_term,
-                           illumination=illum, optics=optics,
-                           transmittance=trans)
+        return total, components
     return total

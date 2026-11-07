@@ -58,7 +58,7 @@ from ..atmosphere import UniformField
 from . import multiple as _multiple
 from . import twilight as _twilight
 from .cloud import CAPABILITIES as _CLOUD_CAPABILITIES
-from .cloud import sky_radiance_with_cloud as _sky_radiance_with_cloud
+from .cloud import apply_cloud_overlay as _apply_cloud_overlay
 from .multiple import CAPABILITIES as _SOS_CAPABILITIES
 from .result import SkyResult
 from .single import CAPABILITIES as _SINGLE_CAPABILITIES
@@ -392,6 +392,10 @@ def solve(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
           method: str | None = None,
           approximation: str | None = None,
           cloud_layer=None,
+          clear_radiance=None,
+          ground_albedo=None,
+          include_clear: bool = True,
+          include_cloud: bool = True,
           single: bool | None = None,
           multiple: bool | None = None,
           n_gauss: int | None = None,
@@ -415,8 +419,22 @@ def solve(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
     approximation : one of the four canonical names, optional
         Defaults to ``hybrid-sos`` (the historical clear combination).
     cloud_layer : CloudLayer, optional
-        Cloud overlay (legacy ``method="cloud"``).  Requires ``cloud_layer``
-        when that alias is used.
+        Cloud overlay over the ``hybrid-sos`` clear base (legacy alias:
+        ``method="cloud"``).  The deck composition always includes the clear
+        single scattering: an explicit ``single=False`` is rejected (use
+        ``include_clear=False`` for a cloud-only total).  The observer must
+        sit below the cloud base (the composition models the view from
+        underneath the deck).
+    clear_radiance : ndarray, optional
+        Precomputed ``(n_view, n_wl)`` clear field for the overlay.  When
+        given, no clear-sky kernel runs and the result records its
+        provenance as ``"external"`` -- no scattering decomposition is
+        claimed for it.
+    ground_albedo : optional
+        Overrides ``atmo.ground_albedo`` for the cloud-ground coupling only.
+    include_clear, include_cloud : bool
+        Exclude either term from the overlay total (excluded terms are
+        still recorded in ``components``).
     single, multiple : bool, optional
         Order selection; ``None`` (not given) resolves to the approximation
         default (both orders, except ``spherical-single`` which is
@@ -433,12 +451,14 @@ def solve(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
     ------
     ValueError
         Unknown method/approximation/quality/grid key; ``method="cloud"``
-        without ``cloud_layer``; disagreeing ``method``/``approximation``;
+        without ``cloud_layer``; a ``cloud_layer`` together with a
+        contradicting method alias or approximation; overlay parameters
+        without a ``cloud_layer``; ``single=False`` on an overlay request;
         the same numerical setting given twice; settings for kernels the
         request does not run; an observer off the model bottom on any
-        plane-parallel request (use ``atmosphere.at_altitude``); a
-        non-uniform aerosol ``HorizontalField`` on ``plane-sos`` (no
-        component applies it).
+        plane-parallel request (use ``atmosphere.at_altitude``); an observer
+        not below the cloud base on an overlay request; a non-uniform aerosol
+        ``HorizontalField`` on ``plane-sos`` (no component applies it).
 
     Returns
     -------
@@ -450,6 +470,33 @@ def solve(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
                            n_gauss, chunk, quality, seed, grid,
                            single_config, sos_config, mc_config)
 
+    # -- overlay request validation (before any kernel runs) ------------------
+    if req.overlay and cloud_layer is None:
+        raise ValueError("method='cloud' requires cloud_layer")
+    if cloud_layer is not None and method in ("clear", "twilight"):
+        raise ValueError(f"method={method!r} contradicts a cloud_layer "
+                         "request; drop the method alias or use "
+                         "method='cloud'")
+    if cloud_layer is None and (clear_radiance is not None
+                                or ground_albedo is not None
+                                or not include_clear or not include_cloud):
+        raise ValueError(
+            "clear_radiance/ground_albedo/include_clear/include_cloud "
+            "configure the cloud overlay; pass cloud_layer or drop them")
+    if cloud_layer is not None and req.approximation != HYBRID_SOS:
+        raise ValueError(
+            f"the cloud overlay composes with approximation="
+            f"{HYBRID_SOS!r} (or an explicit precomputed clear field), "
+            f"not {req.approximation!r}")
+    overlay = cloud_layer is not None
+    if overlay and single is False:
+        # plan section 3.4: the deck composition always includes the clear
+        # single scattering; the flag is no longer silently ignored
+        raise ValueError(
+            "the cloud composition always includes the clear single term; "
+            "single=False is not supported -- use include_clear=False for "
+            "a cloud-only total")
+
     options: dict = dict(sun_zenith_deg=float(sun_zenith_deg),
                          sun_azimuth_deg=float(sun_azimuth_deg),
                          single=bool(req.single), multiple=bool(req.multiple),
@@ -460,24 +507,70 @@ def solve(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
     stderr = None
     components = None
 
-    if req.overlay:
-        # -- cloud overlay (legacy composition; consolidated in the solver in
-        #    a later step -- the numbers and the options bookkeeping are the
-        #    historical ones)
-        if cloud_layer is None:
-            raise ValueError("method='cloud' requires cloud_layer")
-        options.pop("single")   # the deck composition always includes it
-        options.update(n_gauss=int(req.n_gauss), chunk=int(req.chunk),
-                       cloud=cloud_layer.describe())
-        total, components = _sky_radiance_with_cloud(
-            atmo, cloud_layer, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
-            sun_azimuth_deg=sun_azimuth_deg, multiple=req.multiple,
-            n_gauss=req.n_gauss, chunk=req.chunk, return_components=True)
-        approximations["single"] = _component(
-            "rt.single.sky_radiance", _SINGLE_CAPABILITIES)
-        approximations["multiple"] = _component(
-            "rt.multiple.solve", _SOS_CAPABILITIES)
-        approximations["cloud"] = _component("rt.cloud", _CLOUD_CAPABILITIES)
+    if overlay:
+        # -- cloud overlay over this solver's own hybrid-sos clear base
+        # (or over the caller's precomputed field, whose provenance stays
+        # the caller's and is honestly recorded as unknown)
+        z_obs = float(atmo.elevation_km)
+        if z_obs >= float(cloud_layer.base_km):
+            raise ValueError(
+                "the deck composition models the view from below the cloud "
+                f"base (observer elevation {z_obs} km vs base "
+                f"{float(cloud_layer.base_km)} km); inside/above-deck "
+                "viewing is not supported")
+        external_clear = clear_radiance is not None
+        options.update(cloud=cloud_layer.describe(),
+                       include_clear=bool(include_clear),
+                       include_cloud=bool(include_cloud))
+        if external_clear:
+            options["clear_radiance"] = "external"
+        if ground_albedo is not None:
+            options["ground_albedo_override"] = True
+        if external_clear:
+            clear_field = clear_radiance
+        else:
+            if req.multiple:
+                _require_bottom_observer(atmo)
+            _check_horizontal_field(atmo, HYBRID_SOS, req.multiple)
+            ss = _single(atmo, sun_zenith_deg, view_zenith_deg,
+                         view_azimuth_deg, sun_azimuth_deg=sun_azimuth_deg,
+                         n_gauss=req.n_gauss, chunk=req.chunk)
+            ms = None
+            sos = None
+            if req.multiple:
+                sos = _multiple.solve(atmo, sun_zenith_deg, view_zenith_deg,
+                                      view_azimuth_deg,
+                                      sun_azimuth_deg=sun_azimuth_deg,
+                                      **req.sos_kwargs)
+                ms = sos.radiance
+                diagnostics["orders"] = int(sos.orders)
+                diagnostics["converged"] = bool(sos.converged)
+                effective["sos"] = {
+                    "n_mu": int(sos.n_mu_eff), "n_modes": int(sos.n_modes_eff),
+                    "n_moments": int(sos.n_moments_eff), "tol": float(sos.tol),
+                    "max_orders": int(sos.max_orders),
+                    "delta_m": bool(sos.delta_m),
+                    "orders_run": int(sos.orders),
+                    "converged": bool(sos.converged)}
+                approximations["multiple"] = _component(
+                    "rt.multiple.solve", _SOS_CAPABILITIES)
+            clear_field = ss if ms is None else ss + ms
+            options.update(n_gauss=int(req.n_gauss), chunk=int(req.chunk))
+            effective["single"] = {"n_gauss": int(req.n_gauss),
+                                   "chunk": int(req.chunk)}
+            approximations["single"] = _component(
+                "rt.single.sky_radiance", _SINGLE_CAPABILITIES)
+        total, components = _apply_cloud_overlay(
+            atmo, cloud_layer, sun_zenith_deg, view_zenith_deg, clear_field,
+            ground_albedo=ground_albedo, include_clear=include_clear,
+            include_cloud=include_cloud)
+        if not external_clear:
+            # keep the un-occluded clear components inspectable; they are
+            # recorded as-is and are NOT additional sums into the total
+            components["single"] = ss
+            components["multiple"] = ms
+        approximations["cloud"] = _component(
+            "rt.cloud.apply_cloud_overlay", _CLOUD_CAPABILITIES)
         return SkyResult(radiance=total, wl=atmo.wl,
                          method="cloud", options=options, stderr=stderr,
                          components=components, diagnostics=diagnostics,
@@ -485,32 +578,53 @@ def solve(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
                          approximations=approximations, effective=effective)
 
     if req.approximation == SPHERICAL_MC:
-        # -- spherical single + spherical straight-line MC split term.
-        #    (Routing note: this goes through the twilight engine's own
-        #    entry today; the consolidation into single + multiple_scattered
-        #    is the next step and keeps these numbers bit-identical.)
-        options.update(quality=req.quality, seed=int(req.seed),
-                       grid=dict(req.grid) if req.grid else None)
+        # -- spherical single + spherical straight-line MC split term,
+        #    assembled here (the twilight wrapper is a format adapter on
+        #    top of this exact composition)
         _check_horizontal_field(atmo, req.approximation, req.multiple)
-        total, err, info = _twilight.twilight_radiance(
-            atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
-            sun_azimuth_deg=sun_azimuth_deg, quality=req.quality,
-            seed=req.seed, single=req.single, multiple=req.multiple,
-            grid=req.grid, return_info=True)
-        stderr = err
-        diagnostics.update(info)
+        # the twilight contract broadcasts scalar/array zenith+azimuth via
+        # _as_directions before the single call; replicating it keeps the
+        # wrapper's historical input handling (plain array entry points of
+        # the deterministic combos pass their view angles through as before)
+        zen_b, az_b, _ = _twilight._as_directions(view_zenith_deg,
+                                                  view_azimuth_deg)
+        ss = _single(atmo, sun_zenith_deg, zen_b, az_b,
+                     sun_azimuth_deg=sun_azimuth_deg, n_gauss=req.n_gauss,
+                     chunk=req.chunk) if req.single else None
+        ms = None
         if req.multiple:
+            options.update(quality=req.quality, seed=int(req.seed),
+                           grid=dict(req.grid) if req.grid else None)
+            ms, ms_err, info = _twilight.multiple_scattered(
+                atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
+                sun_azimuth_deg=sun_azimuth_deg, quality=req.quality,
+                seed=req.seed, grid=req.grid)
+            diagnostics.update(info)
             effective["mc"] = dict(
                 quality=req.quality, seed=req.seed,
                 grid=dict(req.grid) if req.grid else None,
                 n_zen=info["n_zen"], n_az=info["n_az"],
                 n_anchor=info["n_anchor"], n_photons=info["n_photons"],
                 bandwidth=info["bandwidth"])
+            stderr = ms_err
             approximations["multiple"] = _component(
                 "rt.twilight.multiple_scattered", _MC_CAPABILITIES)
+        else:
+            # MC combination with the higher orders off: legacy-compatible
+            # zero error arrays, honestly marked as "MC did not run"
+            zen, _, _ = _twilight._as_directions(view_zenith_deg,
+                                                 view_azimuth_deg)
+            stderr = np.zeros((zen.size, int(np.asarray(atmo.wl).size)))
+            options["mc_run"] = False
         if req.single:
             approximations["single"] = _component(
                 "rt.single.sky_radiance", _SINGLE_CAPABILITIES)
+        total = None
+        if ss is not None:
+            total = ss
+        if ms is not None:
+            total = ms if total is None else total + ms
+        components = {"single": ss, "multiple": ms}
         return SkyResult(radiance=total, wl=atmo.wl, method="twilight",
                          options=options, stderr=stderr, components=components,
                          diagnostics=diagnostics, approximation=req.approximation,

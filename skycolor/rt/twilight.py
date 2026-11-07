@@ -87,7 +87,6 @@ import warnings
 import numpy as np
 
 from . import mc as _mc
-from .single import sky_radiance as _single
 
 #: standing approximations of this backend
 CAPABILITIES = {
@@ -469,9 +468,13 @@ def twilight_radiance(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
                       return_info=False):
     """Total spectral sky radiance in twilight, with a statistical error bar.
 
-    This is the production entry point of the spherical twilight engine.  It
-    returns the exact spherical first-order term plus a Monte Carlo estimate of
-    all higher orders; see the module docstring for the estimator design.
+    Thin format adapter over the authoritative entry
+    (:func:`rt.solver.solve`, ``approximation="spherical-mc"``): the
+    composition (one :func:`rt.single.sky_radiance` call plus one
+    :func:`multiple_scattered` call, added in that order) lives in the
+    solver; this wrapper only preserves the historical ``(radiance,
+    stderr)`` / ``(radiance, stderr, info)`` return formats and the legacy
+    empty-request behaviour (zero arrays, no kernel run).
 
     Parameters
     ----------
@@ -490,6 +493,8 @@ def twilight_radiance(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
         Seed of the Monte Carlo; results are reproducible for a given seed.
     single, multiple : bool
         Include the deterministic first-order / the Monte Carlo higher orders.
+        The historical empty request (both off) still returns zero arrays
+        here; the authoritative entry rejects it.
     grid : dict, optional
         Advanced override of the quality preset (keys ``n_zen``, ``n_az``,
         ``n_anchor``, ``n_photons``); mainly useful for tests and cheap
@@ -498,7 +503,7 @@ def twilight_radiance(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
     Returns
     -------
     radiance, stderr : ndarray ``(n_view, n_wl)``
-        Spectral radiance and its 1-sigma statistical uncertainty, in
+        Spectral radiance and its 1-sigma uncertainty, in
         W m^-2 sr^-1 nm^-1.  With ``return_info=True`` a third element is
         appended: the Monte Carlo ``info`` dict (anchor wavelengths,
         ``undetected_wl``, grid, coarse field).
@@ -506,33 +511,35 @@ def twilight_radiance(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
     Notes
     -----
     * Above about -4 degrees solar elevation the deterministic model
-      (:func:`skycolor.rt.solver.sky_radiance_total`) is faster and more
-      accurate; use this function for the deep twilight where that model
-      fails.
-    * ``stderr`` covers the Monte Carlo part only.  The first-order term is
-      deterministic (up to its own quadrature) and carries no statistical
-      error.
+      (:func:`skycolor.rt.solver.solve`, the ``hybrid-sos`` default) is
+      faster and more accurate; use this combination for the deep twilight
+      where that model fails.
+    * ``stderr`` is a *composite* estimate: the MC standard error propagated
+      through the angular smoother and wavelength interpolation, with the
+      smoother's systematic resolution bias (3 % floor, ``MS_BIAS``) added
+      in quadrature.  It is not a pure sample standard error and not the
+      total physical error of the model; the first-order term is
+      deterministic and carries none of it.  The raw per-anchor MC
+      statistics are in ``info["coarse_errors"]``.
     * The Monte Carlo models a *horizontally uniform* atmosphere, as
       ``rt.multiple`` does; a non-uniform aerosol ``HorizontalField`` affects
       the first-order term only.
     """
-    zen, az, _ = _as_directions(view_zenith_deg, view_azimuth_deg)
-    n_view = zen.size
-    n_wl = len(atmo.wl)
-    total = np.zeros((n_view, n_wl))
-    err = np.zeros((n_view, n_wl))
-    info: dict = {}
+    if not single and not multiple:
+        zen, _, _ = _as_directions(view_zenith_deg, view_azimuth_deg)
+        zeros = np.zeros((zen.size, len(atmo.wl)))
+        if return_info:
+            return zeros, zeros.copy(), {}
+        return zeros, zeros.copy()
 
-    if single:
-        total += _single(atmo, sun_zenith_deg, zen, az,
-                         sun_azimuth_deg=sun_azimuth_deg)
+    from .solver import solve
+
+    kwargs = {}
     if multiple:
-        ms, ms_err, info = multiple_scattered(
-            atmo, sun_zenith_deg, zen, az, sun_azimuth_deg=sun_azimuth_deg,
-            quality=quality, seed=seed, grid=grid,
-        )
-        total += ms
-        err += ms_err
+        kwargs.update(quality=quality, seed=seed, grid=grid)
+    res = solve(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
+                sun_azimuth_deg=sun_azimuth_deg, method="twilight",
+                single=bool(single), multiple=bool(multiple), **kwargs)
     if return_info:
-        return total, err, info
-    return total, err
+        return res.radiance, res.stderr, res.diagnostics
+    return res.radiance, res.stderr

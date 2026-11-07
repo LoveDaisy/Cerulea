@@ -28,14 +28,16 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from skycolor import presets  # noqa: E402
+from skycolor import cloud, presets  # noqa: E402
 from skycolor.rt import multiple, single, twilight  # noqa: E402
+from skycolor.rt.cloud import apply_cloud_overlay, sky_radiance_with_cloud  # noqa: E402
 from skycolor.rt.solver import (  # noqa: E402
     MCConfig, SOSConfig, SingleConfig, solve, sky_radiance_total,
 )
 
 WL7 = np.array([400.0, 450.0, 500.0, 550.0, 600.0, 650.0, 700.0])
 VZA = np.array([0.0, 30.0, 60.0, 85.0])
+ZEN_C = np.array([0.0, 30.0, 60.0])
 ZEN_TW = np.array([0.0, 30.0, 70.0])
 AZ_TW = np.array([0.0, 180.0, 90.0])
 TINY = dict(n_zen=6, n_az=8, n_anchor=3, n_photons=6.0e5)
@@ -44,6 +46,11 @@ TINY = dict(n_zen=6, n_az=8, n_anchor=3, n_photons=6.0e5)
 @pytest.fixture(scope="module")
 def atmo7():
     return presets.clear(WL7)
+
+
+@pytest.fixture(scope="module")
+def stratus():
+    return cloud.get_preset("stratus")
 
 
 # ---------------------------------------------------------------------------
@@ -290,3 +297,186 @@ def test_default_options_bookkeeping_superset(atmo7):
     res = solve(atmo7, 80.0, 60.0, 120.0)
     assert {"sun_zenith_deg", "sun_azimuth_deg", "single", "multiple",
             "n_gauss", "chunk"} <= set(res.options)
+
+
+# ---------------------------------------------------------------------------
+# 6. MC consolidation: the solver assembles single + multiple_scattered
+# ---------------------------------------------------------------------------
+def test_mc_route_matches_direct_composition(atmo7):
+    res = solve(atmo7, 96.0, ZEN_TW, AZ_TW, approximation="spherical-mc",
+                mc_config=MCConfig(quality="low", seed=0, grid=TINY))
+    ss = single.sky_radiance(atmo7, 96.0, ZEN_TW, AZ_TW)
+    ms, err, _ = twilight.multiple_scattered(atmo7, 96.0, ZEN_TW, AZ_TW,
+                                             quality="low", seed=0, grid=TINY)
+    assert np.array_equal(res.components["single"], ss)
+    assert np.array_equal(res.components["multiple"], ms)
+    assert np.array_equal(res.radiance, ss + ms)
+    assert np.array_equal(res.stderr, err)
+
+
+def test_mc_route_calls_kernels_exactly_once(atmo7, monkeypatch):
+    import skycolor.rt.solver as solver
+
+    calls = {"single": 0, "mc": 0}
+    real_ms = twilight.multiple_scattered
+
+    def spy_ms(*a, **k):
+        calls["mc"] += 1
+        return real_ms(*a, **k)
+
+    def spy_single(*a, **k):
+        calls["single"] += 1
+        return single.sky_radiance(*a, **k)
+
+    monkeypatch.setattr(solver._twilight, "multiple_scattered", spy_ms)
+    monkeypatch.setattr(solver, "_single", spy_single)
+    # the full twilight wrapper must NOT be re-entered by the solver
+    monkeypatch.setattr(solver._twilight, "twilight_radiance",
+                        lambda *a, **k: pytest.fail(
+                            "solver must compose the MC route itself"))
+    solve(atmo7, 96.0, ZEN_TW, AZ_TW, approximation="spherical-mc",
+          mc_config=MCConfig(quality="low", seed=0, grid=TINY))
+    assert calls == {"single": 1, "mc": 1}
+
+
+def test_mc_single_only_keeps_legacy_zero_error(atmo7):
+    res = solve(atmo7, 96.0, ZEN_TW, AZ_TW, approximation="spherical-mc",
+                multiple=False)
+    ref = single.sky_radiance(atmo7, 96.0, ZEN_TW, AZ_TW)
+    assert np.array_equal(res.radiance, ref)
+    assert np.all(res.stderr == 0.0)
+    assert res.options["mc_run"] is False
+    assert res.components["multiple"] is None
+
+
+def test_twilight_wrapper_scalar_array_broadcast(atmo7):
+    """scalar zenith + array azimuth keeps the historical wrapper contract
+    and is bitwise identical to the explicit array request."""
+    r0, e0 = twilight.twilight_radiance(atmo7, 96.0, 30.0,
+                                        np.array([0.0, 180.0, 90.0]),
+                                        quality="low", grid=TINY, seed=0)
+    r1, e1 = twilight.twilight_radiance(
+        atmo7, 96.0, np.array([30.0, 30.0, 30.0]),
+        np.array([0.0, 180.0, 90.0]), quality="low", grid=TINY, seed=0)
+    assert np.array_equal(r0, r1)
+    assert np.array_equal(e0, e1)
+
+
+# ---------------------------------------------------------------------------
+# 7. cloud consolidation: local operator + solver overlay
+# ---------------------------------------------------------------------------
+def test_solve_overlay_matches_wrapper_bitwise(atmo7, stratus):
+    res = solve(atmo7, 45.0, ZEN_C, 135.0, cloud_layer=stratus)
+    ref = sky_radiance_with_cloud(atmo7, stratus, 45.0, ZEN_C, 135.0)
+    assert np.array_equal(res.radiance, ref)
+    comps = res.components
+    assert np.array_equal(res.radiance, comps["clear"] + comps["cloud"])
+    # raw un-occluded clear sub-components are recorded, not summed
+    ss = single.sky_radiance(atmo7, 45.0, ZEN_C, 135.0)
+    ms = multiple.solve(atmo7, 45.0, ZEN_C, 135.0).radiance
+    assert np.array_equal(comps["single"], ss)
+    assert np.array_equal(comps["multiple"], ms)
+
+
+def test_apply_cloud_overlay_never_computes_clear(atmo7, stratus):
+    """The local operator composes a caller-supplied field; hand it a field
+    of NaN sentinels and verify they flow through untouched (no kernel)."""
+    nan_field = np.full((ZEN_C.size, WL7.size), np.nan)
+    total, comps = apply_cloud_overlay(atmo7, stratus, 45.0, ZEN_C, nan_field,
+                                       include_clear=True)
+    assert np.all(np.isnan(comps["clear"]))
+    # trans/cloud parts are finite: the NaNs only ride the clear column
+    assert np.all(np.isfinite(comps["cloud"]))
+    assert np.all(np.isfinite(comps["transmittance"]))
+    # the NaN sentinels propagate into the total exactly where the clear
+    # field enters it (clear*trans), nowhere else
+    assert np.all(np.isnan(total) == np.broadcast_to(
+        np.isnan(nan_field * comps["transmittance"]), total.shape))
+
+
+def test_external_clear_is_not_recomputed(atmo7, stratus, monkeypatch):
+    import skycolor.rt.solver as solver
+
+    def boom(*a, **k):
+        raise AssertionError("no clear kernel may run for an external field")
+
+    pre = solve(atmo7, 45.0, ZEN_C, 135.0, cloud_layer=stratus)
+    ext = pre.components["single"] + pre.components["multiple"]
+    monkeypatch.setattr(solver, "_single", boom)
+    monkeypatch.setattr(solver._multiple, "solve", boom)
+    res = solve(atmo7, 45.0, ZEN_C, 135.0, cloud_layer=stratus,
+                clear_radiance=ext)
+    assert np.array_equal(res.radiance, pre.radiance)
+    assert res.options["clear_radiance"] == "external"
+    # unknown provenance: no scattering decomposition claimed
+    assert "single" not in res.approximations
+    assert "multiple" not in res.approximations
+    assert "single" not in res.components
+    assert "multiple" not in res.components
+
+
+def test_solver_overlay_does_not_route_through_the_wrapper(atmo7, stratus,
+                                                           monkeypatch):
+    """No solve -> legacy cloud wrapper -> solve cycle: patching the wrapper
+    to fail must not affect the solver's overlay route."""
+    import skycolor.rt.cloud as rtcloud
+
+    monkeypatch.setattr(rtcloud, "sky_radiance_with_cloud",
+                        lambda *a, **k: pytest.fail(
+                            "solver overlay must not call the wrapper"))
+    solve(atmo7, 45.0, ZEN_C, 135.0, cloud_layer=stratus)
+
+
+def test_cloud_observer_domain(atmo7, stratus):
+    above = presets.clear(WL7)
+    above.elevation_km = 2.0        # above the stratus base (0.5 km)
+    with pytest.raises(ValueError, match="cloud base"):
+        solve(above, 45.0, 30.0, 0.0, cloud_layer=stratus)
+    with pytest.raises(ValueError, match="cloud base"):
+        solve(above, 45.0, 30.0, 0.0, cloud_layer=stratus,
+              clear_radiance=np.zeros((1, WL7.size)))
+
+
+def test_overlay_request_validation(atmo7, stratus):
+    with pytest.raises(ValueError, match="contradicts"):
+        solve(atmo7, 45.0, 30.0, 0.0, method="clear", cloud_layer=stratus)
+    with pytest.raises(ValueError, match="contradicts"):
+        solve(atmo7, 45.0, 30.0, 0.0, method="twilight", cloud_layer=stratus)
+    with pytest.raises(ValueError, match="composes with"):
+        solve(atmo7, 45.0, 30.0, 0.0, approximation="spherical-mc",
+              cloud_layer=stratus)
+    with pytest.raises(ValueError, match="pass cloud_layer"):
+        solve(atmo7, 45.0, 30.0, 0.0, ground_albedo=0.3)
+    with pytest.raises(ValueError, match="pass cloud_layer"):
+        solve(atmo7, 45.0, 30.0, 0.0, include_cloud=False)
+
+
+def test_include_switches_and_ground_override(atmo7, stratus):
+    res_c = solve(atmo7, 45.0, ZEN_C, 90.0, cloud_layer=stratus)
+    res_nc = solve(atmo7, 45.0, ZEN_C, 90.0, cloud_layer=stratus,
+                   include_cloud=False)
+    assert np.array_equal(res_nc.radiance, res_c.components["clear"])
+    res_ncl = solve(atmo7, 45.0, ZEN_C, 90.0, cloud_layer=stratus,
+                    include_clear=False)
+    assert np.array_equal(res_ncl.radiance, res_c.components["cloud"])
+    # excluded terms are still recorded, never silently dropped
+    assert np.array_equal(res_ncl.components["clear"], res_c.components["clear"])
+    res_g = solve(atmo7, 45.0, ZEN_C, 90.0, cloud_layer=stratus,
+                  ground_albedo=0.3)
+    assert not np.array_equal(res_g.radiance, res_c.radiance)
+    assert res_g.options["ground_albedo_override"] is True
+
+
+def test_tau0_deck_reduces_to_clear(atmo7):
+    zero = cloud.get_preset("stratus", tau550=0.0)
+    res = solve(atmo7, 45.0, ZEN_C, 90.0, cloud_layer=zero)
+    ref = solve(atmo7, 45.0, ZEN_C, 90.0)      # hybrid-sos clear
+    assert np.all(res.components["transmittance"] == 1.0)
+    assert np.array_equal(res.radiance, ref.radiance)
+
+
+def test_overlay_honors_sos_config(atmo7, stratus):
+    res = solve(atmo7, 45.0, ZEN_C, 90.0, cloud_layer=stratus,
+                sos_config=SOSConfig(n_mu=8, max_orders=3, tol=0.5))
+    assert res.effective["sos"]["n_mu"] == 8
+    assert res.effective["sos"]["max_orders"] == 3
