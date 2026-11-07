@@ -156,3 +156,9 @@ Run results of the two double acceptances are recorded at the top of this
 file and in `scratchpad/task-fast-validation-suite/probes/formal/`
 (session-local; the tracked evidence in `validation/data/fast_validation_suite/`
 holds the baseline and probe data this design rests on).
+
+Owner adjudication (2026-11-08, `issue.md` §裁决记录): the windowed evidence
+is accepted — the slow regime (~352 s ≈ 5.9 min vs ~290 s ≈ 4.9 min fast) is
+kernel-side wait stall, not compute (both regimes burn the same ~2330 s total
+CPU); any suite stably exceeding 6 min counts as a regression and is
+escalated.
