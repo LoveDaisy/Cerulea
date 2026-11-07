@@ -1,0 +1,184 @@
+[
+  {
+    "check": "check1",
+    "seconds": 0.9627335830591619,
+    "result": {
+      "key": "check1",
+      "title": "Rayleigh optical depth vs Bodhaine et al. (1999)",
+      "metrics": [
+        {
+          "name": "tau_R(550 nm), vertical",
+          "model": 0.09676237506969981,
+          "reference": 0.09706523794391267,
+          "unit": "",
+          "tolerance": 2.0,
+          "dev": -0.3120199163245852,
+          "dev_kind": "rel_pct",
+          "note": ""
+        },
+        {
+          "name": "max |dev|, 300-400 nm",
+          "model": 1.0328713145043797,
+          "reference": 0.0,
+          "unit": "%",
+          "tolerance": 2.0,
+          "dev": 1.0328713145043797,
+          "dev_kind": "abs",
+          "note": ""
+        },
+        {
+          "name": "max |dev|, 400-700 nm",
+          "model": 0.545032026394259,
+          "reference": 0.0,
+          "unit": "%",
+          "tolerance": 1.0,
+          "dev": 0.545032026394259,
+          "dev_kind": "abs",
+          "note": ""
+        },
+        {
+          "name": "RMS dev, 300-700 nm",
+          "model": 0.48381817791908144,
+          "reference": 0.0,
+          "unit": "%",
+          "tolerance": 1.0,
+          "dev": 0.48381817791908144,
+          "dev_kind": "abs",
+          "note": ""
+        }
+      ],
+      "verdict": "PASS",
+      "summary": "tau_R(550) = 0.09676 vs 0.09707 (-0.31 %); worst deviation over 300-700 nm is 1.03 % at 300 nm.",
+      "details": {
+        "table_consistency_max_rel": 9.134749532235809e-05,
+        "tau_300_model": 1.2038421833380828,
+        "tau_300_ref": 1.216406092939943,
+        "tau_550_model": 0.09676237506969981,
+        "tau_550_ref": 0.09706523794391267,
+        "sigma_550_model_m2": 4.50704034836627e-31
+      },
+      "error": null
+    }
+  },
+  {
+    "check": "check2",
+    "seconds": 5332.194329582853,
+    "result": {
+      "key": "check2",
+      "title": "Clear-sky direct and diffuse illuminance",
+      "metrics": [
+        {
+          "name": "DNI illuminance, AM1.5 (48.19deg)",
+          "model": 101.84274790272703,
+          "reference": 97.1420059834979,
+          "unit": "klx",
+          "tolerance": 10.0,
+          "dev": 4.839041433865051,
+          "dev_kind": "rel_pct",
+          "note": ""
+        },
+        {
+          "name": "DNI, 400-700 nm, AM1.5",
+          "model": 394.72802266565805,
+          "reference": 374.81496500000003,
+          "unit": "W/m2",
+          "tolerance": 10.0,
+          "dev": 5.3127701733195245,
+          "dev_kind": "rel_pct",
+          "note": ""
+        },
+        {
+          "name": "DNI spectral RMS, 400-700 nm",
+          "model": 6.488620524563706,
+          "reference": 0.0,
+          "unit": "%",
+          "tolerance": 10.0,
+          "dev": 6.488620524563706,
+          "dev_kind": "abs",
+          "note": ""
+        },
+        {
+          "name": "DHI illuminance, h=30deg (CIE 110, T=2.2)",
+          "model": 9.756497912124939,
+          "reference": 6.92328590950953,
+          "unit": "klx",
+          "tolerance": 25.0,
+          "dev": 40.92293803328026,
+          "dev_kind": "rel_pct",
+          "note": ""
+        },
+        {
+          "name": "DHI illuminance, h=60deg (CIE 110, T=2.2)",
+          "model": 11.579720486270455,
+          "reference": 7.9385476853619,
+          "unit": "klx",
+          "tolerance": 25.0,
+          "dev": 45.86698909200495,
+          "dev_kind": "rel_pct",
+          "note": ""
+        },
+        {
+          "name": "DNI illuminance, h=30deg (Bird)",
+          "model": 94.70999341329959,
+          "reference": 91.18175581351514,
+          "unit": "klx",
+          "tolerance": 15.0,
+          "dev": 3.8694556474657014,
+          "dev_kind": "rel_pct",
+          "note": ""
+        },
+        {
+          "name": "DNI illuminance, h=60deg (Bird)",
+          "model": 109.43560628160282,
+          "reference": 103.58729514244891,
+          "unit": "klx",
+          "tolerance": 15.0,
+          "dev": 5.645780335427771,
+          "dev_kind": "rel_pct",
+          "note": ""
+        }
+      ],
+      "verdict": "FAIL",
+      "summary": "DNI: 94.7/101.8/109.4 klx at h=30/48.19/60 vs 91.2/97.1/103.6; DHI: 9.8/11.6 klx vs CIE 6.9/7.9.",
+      "details": {
+        "g173_klx": 97.1420059834979,
+        "g173_visible": 374.81496500000003,
+        "model_am15_dni_klx": 101.84274790272703,
+        "model_am15_visible": 394.72802266565805,
+        "spectral_rms": 6.488620524563706,
+        "cie_dhi_klx": {
+          "30.0": 6.92328590950953,
+          "60.0": 7.9385476853619
+        },
+        "turbidity": 2.2,
+        "model": {
+          "30.0": {
+            "dni": 94.70999341329959,
+            "dhi": 9.756497912124939,
+            "ghi": 57.15100631815227
+          },
+          "60.0": {
+            "dni": 109.43560628160282,
+            "dhi": 11.579720486270455,
+            "ghi": 106.36253169470469
+          }
+        },
+        "bird": {
+          "30.0": {
+            "dni": 91.18175581351514,
+            "dhi": 8.100478527587152
+          },
+          "60.0": {
+            "dni": 103.58729514244891,
+            "dhi": 9.99170671918749
+          }
+        },
+        "bird_dhi_klx": {
+          "30.0": 8.100478527587152,
+          "60.0": 9.99170671918749
+        }
+      },
+      "error": null
+    }
+  }
+]

@@ -14,6 +14,7 @@ Conventions (see ``docs/ARCHITECTURE.md``):
 """
 from __future__ import annotations
 
+import functools
 import json
 import math
 import pathlib
@@ -184,8 +185,29 @@ def atmosphere(kind="clear", wl=WL_COARSE, aod=0.05, ozone_du=300.0):
     ``"pristine"`` (Rayleigh + ozone only) or ``"clear_uniform"`` (the
     ``clear`` aerosol with a height-independent profile, used to separate the
     effect of the vertical aerosol profile).
+
+    Identical parameter sets reuse the same process-local instance: the
+    spectral construction is by far the most expensive part of a check and
+    the checks ask for the same few atmospheres over and over.  The reuse is
+    bounded (16 entries), in-memory only, and entirely outside the production
+    cache paths.  The returned object is therefore **shared and read-only**:
+    mutating ``wl``, ``aerosols`` or any other attribute would leak into
+    every other consumer of the same parameters (``at_altitude`` returns an
+    independent truncated object and never writes back).  Tests can drop the
+    reused instances with :func:`clear_atmosphere_cache`.
     """
-    wl = np.asarray(wl, dtype=float)
+    wl_arr = np.asarray(wl, dtype=float)
+    return _atmosphere_cached(str(kind), wl_arr.tobytes(), wl_arr.shape,
+                              float(aod), float(ozone_du))
+
+
+def _atmosphere_cached(kind, wl_bytes, wl_shape, aod, ozone_du):
+    """Authoritative constructor behind the validation atmosphere reuse.
+
+    Arguments arrive cache-key-normalised (bytes + shape instead of an
+    array) so the hash is content based, not identity based.
+    """
+    wl = np.frombuffer(wl_bytes, dtype=float).reshape(wl_shape).copy()
     if kind == "pristine":
         return presets.pristine(wl, ozone_du=ozone_du)
     if kind == "clear":
@@ -201,6 +223,16 @@ def atmosphere(kind="clear", wl=WL_COARSE, aod=0.05, ozone_du=300.0):
             aerosols=[AerosolLayer(HinterlandAerosol(), aod, ExponentialProfile(20.0))],
         )
     return presets.PRESETS[kind](wl)
+
+
+#: Working set of the six checks (a handful of parameter sets plus the
+#: figure grids); 16 entries covers it without unbounded growth.
+_atmosphere_cached = functools.lru_cache(maxsize=16)(_atmosphere_cached)
+
+
+def clear_atmosphere_cache():
+    """Drop all reused validation atmospheres (test and diagnostic hook)."""
+    _atmosphere_cached.cache_clear()
 
 
 # ---------------------------------------------------------------------------

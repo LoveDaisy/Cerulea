@@ -45,6 +45,22 @@ baseline and distinguish existing physical failures from regressions. Passing
 software tests and passing physical checks are different claims. Updating golden
 files or physical results requires independent attribution, not just better fit.
 
+### Test-suite execution profile
+
+The default `uv run pytest -q` runs on 12 xdist workers scheduled by
+measured-cost bins, and `validation.run_all` runs the six checks on one
+8-worker pool. Measured numbers, the scheduling design, the frozen
+regression budgets and the current acceptance evidence live in
+[validation/FAST_SUITE.md](../validation/FAST_SUITE.md) — read it before
+changing test structure, photon budgets or validation dispatch. Diagnostics:
+
+```bash
+uv run pytest -n 0 -q ...      # serial equivalence run (no scheduling)
+uv run pytest -q --durations=0 # per-test wall times under the real schedule
+# refresh tests/data/scheduling_weights.json after material cost shifts:
+uv run python tools/make_scheduling_weights.py <durations-log>
+```
+
 ## Commit and merge locally
 
 Commit the task's relevant files on its topic branch after verification. Before

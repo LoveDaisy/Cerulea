@@ -1,0 +1,39 @@
+{
+  "pytest_count": 413,
+  "scheduled_count": 413,
+  "unique_scheduled_count": 413,
+  "coverage_equal": true,
+  "validation_comparison": {
+    "check1": {
+      "verdict_equal": true,
+      "metrics_same_count": true,
+      "numeric_fields_equal": true
+    },
+    "check2": {
+      "verdict_equal": true,
+      "metrics_same_count": true,
+      "numeric_fields_equal": true
+    },
+    "check3": {
+      "verdict_equal": true,
+      "metrics_same_count": true,
+      "numeric_fields_equal": true
+    },
+    "check4": {
+      "verdict_equal": true,
+      "metrics_same_count": true,
+      "numeric_fields_equal": true
+    },
+    "check5": {
+      "verdict_equal": true,
+      "metrics_same_count": true,
+      "numeric_fields_equal": true
+    },
+    "check6": {
+      "verdict_equal": true,
+      "metrics_same_count": true,
+      "numeric_fields_equal": true
+    }
+  },
+  "measurement_note": "one sample per candidate, not two final command runs"
+}
