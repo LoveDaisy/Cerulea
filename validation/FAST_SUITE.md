@@ -3,7 +3,11 @@
 Status: implemented 2026-11-08 (task `fast-validation-suite`, branch
 `task/fast-validation-suite` off main `6bdb1f8`).  Measured on the reference
 development machine (macOS arm64, 12 cores, 32 GiB, Python 3.12.11,
-NumPy 2.5.4; `environment-pytest.json`).
+NumPy 2.5.4; `environment-pytest.json`).  Revised later the same day after
+code review: the scheduling hook initially never engaged in real xdist
+workers (xdist nulls `numprocesses` there) and crashed default
+`--collect-only`; fixed, covered by real-subprocess integration tests, and
+re-accepted — the second formal pair below is the authoritative one.
 
 ## Goal and acceptance criteria
 
@@ -14,18 +18,24 @@ detection capability and without any numerical change in `skycolor/`
 production behaviour (golden bit-identical; same seeds, grids, budgets,
 tolerances).
 
-**Final measured acceptance** (2026-11-08, sequential runs, load recorded in
-`scratchpad/task-fast-validation-suite/probes/formal/`):
+**Final measured acceptance** (2026-11-08, sequential runs):
 
 | entry point | runs (wall s) | verdict |
 |---|---|---|
-| `uv run python -m validation.run_all` | 240.02 / **241.13, 239.98** (formal pair) | **达标**: both ≤ 300 s, exit=1, 2 PASS/4 FAIL/0 SKIP, `results.json` bitwise identical to the committed baseline across all runs |
-| `uv run pytest -q` | formal pair **293.70 ✓ / 352.15 ✗**; further runs 287.71 ✓, 293.22 ✓, 350.84 ✗, 354.11 ✗ | **未达「连续两次」**: bimodal ~290 s / ~352 s |
+| `uv run pytest -q` | **formal pair, schedule engaged (post-fix): 257.26 ✓ / 256.01 ✓** (`formal2-pytest-run{1,2}.log`) | **达标**: both ≤ 300 s strictly, exit=0, 436 passed |
+| `uv run python -m validation.run_all` | 240.02 probe; **241.13 / 239.98** formal pair (`formal-runall-run{1,2}.log`) | **达标**: both ≤ 300 s, exit=1, 2 PASS/4 FAIL/0 SKIP, `results.json` bitwise identical to the committed baseline across all runs |
 
-pytest variance findings (documented for the owner decision, plan §7):
+The first pytest pair (293.70 ✓ / 352.15 ✗, `formal-pytest-run{1,2}.log`) is
+kept as historical evidence of the **ungrouped** path: it predates the
+scheduling fix, and code review established that those runs executed plain
+per-test load distribution — the LPT bins never reached the controller
+scheduler (see below).  Its numbers do not describe the current entry point.
 
-* Fast and slow runs burn the **same total CPU** (~2330 s user+sys) — the
-  +59 s of the slow regime is idle stall, not compute.
+pytest variance findings on the pre-fix (ungrouped) path — historical,
+documented because they motivated the owner adjudication:
+
+* Fast and slow runs burned the **same total CPU** (~2330 s user+sys) — the
+  +59 s of the slow regime was idle stall, not compute.
 * Ruled out and fixed en route: a scheduler bug (module weight counted once
   per collected test), serial-measured weights (per-test cost inflates
   1.3–2.5× under 12-way contention; the weights table is regenerated from a
@@ -34,12 +44,14 @@ pytest variance findings (documented for the owner decision, plan §7):
 * Ruled out as the slow regime's cause: external CPU load (slow runs also
   happen at load average 1.2), swap growth during the run (constant in a
   sampled 294 s run), worker count (n=8 → 368 s, n=16 → 324 s, both worse).
-* Predicted bin loads under the final schedule: 218.6 s ± 0.4 on 12 bins,
-  largest indivisible group 112.9 s — the schedule is at its floor; the
-  residual bimodality is machine-state (memory compression / page-cache /
-  scheduling), not measurable from userspace.
 * Independently: one heavy MC test peaks at 1.89 GB RSS; the machine hosts
-  concurrent agent sessions (swap already ~5.5 GB used at idle).
+  concurrent agent sessions.
+
+After the scheduling fix the engaged path measured **257.26 / 256.01 s** —
+strictly under the 300 s line twice in a row, so the windowed acceptance the
+owner granted (see the adjudication note at the bottom of this file) is no
+longer needed for the current pair; the adjudication's regression clause
+(any suite stably exceeding 6 min is escalated) remains the standing guard.
 
 ## What was slow, and why
 
@@ -76,11 +88,29 @@ pytest variance findings (documented for the owner decision, plan §7):
 * `pytest-xdist` (dev dependency, uv-locked) runs the default entry point
   with `-n 12 --dist=loadgroup`.
 * `tests/conftest.py` reproduces the measured LPT binning: one scheduling
-  group per test module, except `test_twilight.py` where each nodeid is its
-  own group (its 15 tests span 20–90 s each).  Measured wall-second weights
-  live in `tests/data/scheduling_weights.json`; tests absent from the table
-  get a nonzero default weight and are still scheduled (collection is the
-  single source of truth — no persisted whitelist of nodeids).
+  group per test module; modules whose parallel-measured cost exceeds
+  ~100 s (and `test_twilight.py` always) are split into per-nodeid groups,
+  because one indivisible multi-hundred-second module would set the
+  wall-clock floor of the whole run (`tests/data/scheduling_weights.json`,
+  schema `{modules, nodes}`).  Tests absent from the table get a nonzero
+  default weight and are still scheduled (collection is the single source
+  of truth — no persisted whitelist of nodeids).
+* The hook attaches the bin marks **tryfirst** inside each xdist worker.
+  xdist's own worker-side hook then encodes each bin into the reported
+  collection as a `nodeid@binN` suffix — the *only* channel the
+  controller's `LoadGroupScheduling` sees, since distributed runs block
+  controller-side collection entirely.  The pre-fix hook read
+  `config.option.numprocesses`, which xdist nulls in workers, so nothing
+  was ever marked and `--dist=loadgroup` silently degraded to per-test
+  load distribution; it now reads `config.workerinput["workercount"]` in
+  workers and the option only on controller/serial paths (`-n 0` marks
+  nothing).
+* Real-subprocess integration tests (`tests/test_validation_harness.py`)
+  copy the real hook files into a synthetic project and assert on what
+  actually executed: worker-side marking, one module = one group on one
+  worker, hot nodes split across bins, every test executed exactly once,
+  serial runs carry no groups, and default `--collect-only` exits 0 (it
+  used to crash with a `KeyError` on the pre-fix hook).
 * `-n 0` runs serially for equivalence diagnostics; it is **not** an
   alternative acceptance path.
 
@@ -152,13 +182,21 @@ uv run python -m validation.check6_second_dataset # standalone vs pool compariso
 git diff -- skycolor tests/data/golden*  # production tree must be empty
 ```
 
-Run results of the two double acceptances are recorded at the top of this
-file and in `scratchpad/task-fast-validation-suite/probes/formal/`
-(session-local; the tracked evidence in `validation/data/fast_validation_suite/`
-holds the baseline and probe data this design rests on).
+Tracked evidence in `validation/data/fast_validation_suite/`: the two
+formal acceptance pairs and their memory/load samples
+(`formal*-pytest-run*.log`, `formal-runall-run*.log`,
+`memory-sample-during-pytest-formal2-run*.log`), the executed scheduling
+plan (`scheduling-assignment-final.json`: 436 nodeids → 12 bins,
+predicted 218.3–218.6 s per bin), and the baseline/probe data this design
+rests on.  Session-local scratchpad copies under
+`scratchpad/task-fast-validation-suite/probes/formal/` are not tracked.
 
-Owner adjudication (2026-11-08, `issue.md` §裁决记录): the windowed evidence
-is accepted — the slow regime (~352 s ≈ 5.9 min vs ~290 s ≈ 4.9 min fast) is
-kernel-side wait stall, not compute (both regimes burn the same ~2330 s total
-CPU); any suite stably exceeding 6 min counts as a regression and is
-escalated.
+Owner adjudication (2026-11-08, `issue.md` §裁决记录), applying to the
+pre-fix pair: windowed evidence was accepted on the strength that both
+regimes burned the same total CPU (~2330 s) and the slow regime was read
+as kernel-side wait — an attribution made on the **ungrouped** path and
+not carried over as a settled claim about the current schedule.  The
+standing clauses: windowed acceptance may be revoked by the user, and any
+suite stably exceeding 6 min counts as a regression and is escalated.
+The post-fix pair (257.26 / 256.01 s) passes strictly, so the windowed
+interpretation is not exercised by the current acceptance evidence.

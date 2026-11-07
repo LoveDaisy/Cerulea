@@ -17,10 +17,9 @@ uv sync        # 从 uv.lock 重建 .venv；不要 pip install 进环境
 ### 测试
 
 ```bash
-uv run pytest -q                      # 全量测试（433 项）：12-worker xdist，
-                                      # 实测 LPT 分箱；好窗口约 4.9 min，
-                                      # 机器内存/缓存争抢重的窗口约 5.9 min，
-                                      # 详见 validation/FAST_SUITE.md
+uv run pytest -q                      # 全量测试（436 项）：12-worker xdist，
+                                      # 实测 LPT 分箱（正式对子 257.3/256.0 s，
+                                      # 严格 ≤300 s）；详见 validation/FAST_SUITE.md
 uv run pytest -n 0 -q ...             # 串行等价诊断（约 26 min），不作为验收口径
 uv run python -m validation.run_all   # 六项物理校验，单池 8 worker，实测约 4 min；
                                       # 既有物理 FAIL 预期 exit=1

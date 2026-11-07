@@ -1,0 +1,21 @@
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [ 16%]
+........................................................................ [ 33%]
+........................................................................ [ 49%]
+........................................................................ [ 66%]
+........................................................................ [ 82%]
+........................................................................ [ 99%]
+....                                                                     [100%]
+=============================== warnings summary ===============================
+tests/test_result.py::test_ground_radiance_direct_transmittance_override@bin11
+  /Users/zhangjiajie/Codes/sky-color-sim-wt-12/tests/test_result.py:167: DeprecationWarning: direct_transmittance is deprecated by the unified solar source; pass direct_irradiance instead (it carries the disk geometry)
+    dark0, E_zero = render.ground_radiance(atmo7, dome, 60.0,
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+436 passed, 1 warning in 257.26s (0:04:17)
+real 257.41
+user 2063.71
+sys 352.56
+run1 exit=0

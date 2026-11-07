@@ -1,0 +1,835 @@
+{
+  "generated": "2026-11-08",
+  "entry": "uv run pytest -q (default addopts: -n 12 --dist=loadgroup)",
+  "mechanism": "conftest hook attaches xdist_group marks in each xdist worker (tryfirst, before xdist encodes nodeid@binN suffixes); controller LoadGroupScheduling groups by that suffix",
+  "n_collected": 436,
+  "predicted_load_summary": {
+    "max_bin_s": 218.63,
+    "min_bin_s": 218.35,
+    "mean_bin_s": 218.40583333333333
+  },
+  "bins": {
+    "bin0": {
+      "n_tests": 105,
+      "predicted_s": 218.35999999999999,
+      "groups": [
+        {
+          "key": "tests/test_aerosol.py",
+          "weight_s": 21.1,
+          "n_tests": 89
+        },
+        {
+          "key": "tests/test_mc.py::test_thin_atmosphere_matches_single_scattering",
+          "weight_s": 8.93,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_raised_ground.py",
+          "weight_s": 5.0,
+          "n_tests": 5
+        },
+        {
+          "key": "tests/test_raised_ground.py::test_upper_limb_partially_lights_the_plateau_deck[False]",
+          "weight_s": 0.56,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_raised_ground.py::test_sos_solar_source_has_the_same_shadow[False]",
+          "weight_s": 0.16,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_refraction.py::test_refraction_matches_saemundsson[80.0]",
+          "weight_s": 0.13,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_result.py::test_solve_rejects_empty_request_and_records_cloud_options",
+          "weight_s": 16.76,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_solar_source.py::test_scatter_contact_band_meets_budget",
+          "weight_s": 1.62,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_solar_source.py::test_table_build_independent_of_query_order",
+          "weight_s": 36.09,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_solar_source.py::test_build_anchors_match_grid_values",
+          "weight_s": 0.44,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_solar_source.py::test_direct_irradiance_coarse_matches_ground_and_analytic",
+          "weight_s": 0.28,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_solar_source.py::test_flux_receiver_plane_boundary",
+          "weight_s": 14.38,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_twilight.py::test_multiple_scattering_grows_towards_twilight",
+          "weight_s": 112.91,
+          "n_tests": 1
+        }
+      ]
+    },
+    "bin1": {
+      "n_tests": 25,
+      "predicted_s": 218.63,
+      "groups": [
+        {
+          "key": "tests/test_cloud.py::test_zero_tau_reduces_exactly_to_clear_sky",
+          "weight_s": 12.71,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_cloud.py::test_deck_shadow_diagnostic_matches_source",
+          "weight_s": 21.59,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_geometry.py",
+          "weight_s": 5.0,
+          "n_tests": 18
+        },
+        {
+          "key": "tests/test_multiple.py::test_smooth_and_nonnegative",
+          "weight_s": 16.09,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_result.py::test_clear_matches_legacy_entry",
+          "weight_s": 17.31,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_solar_source.py::test_chunk_respects_element_budget",
+          "weight_s": 4.09,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_twilight.py::test_broadcasts_scalar_zenith",
+          "weight_s": 36.56,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_twilight.py::test_anchor_wavelengths_are_used_verbatim",
+          "weight_s": 105.28,
+          "n_tests": 1
+        }
+      ]
+    },
+    "bin10": {
+      "n_tests": 35,
+      "predicted_s": 218.55,
+      "groups": [
+        {
+          "key": "tests/test_cloud.py::test_graze_entry_uses_midpoint_closure",
+          "weight_s": 16.88,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_golden_equivalence.py::test_mc_split",
+          "weight_s": 63.18,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_mc.py::test_no_nans_no_negatives_and_error_scaling",
+          "weight_s": 57.32,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_multiple.py::test_empty_atmosphere_is_exactly_zero",
+          "weight_s": 3.89,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_multiple.py::test_zenith_magnitude_clear_sky",
+          "weight_s": 15.41,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_optics.py",
+          "weight_s": 5.0,
+          "n_tests": 5
+        },
+        {
+          "key": "tests/test_refraction.py::test_refracted_path_matches_ray_trace",
+          "weight_s": 7.61,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_result.py::test_cloud_components_decomposition",
+          "weight_s": 17.74,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_validation_harness.py",
+          "weight_s": 31.52,
+          "n_tests": 23
+        }
+      ]
+    },
+    "bin11": {
+      "n_tests": 26,
+      "predicted_s": 218.36,
+      "groups": [
+        {
+          "key": "tests/test_cloud.py::test_moments_are_normalised_and_match_g",
+          "weight_s": 0.03,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_cloud.py::test_spectral_optical_depth_is_grey",
+          "weight_s": 2.45,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_extension_scenarios.py::test_balloon_and_plateau_are_distinct_constructions",
+          "weight_s": 28.47,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_multiple.py::test_energy_conservation_thin_rayleigh_only",
+          "weight_s": 15.41,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_multiple.py::test_ms_ss_increases_towards_horizon",
+          "weight_s": 17.88,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_profiles.py",
+          "weight_s": 5.0,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_refraction.py::test_refraction_matches_saemundsson[5.0]",
+          "weight_s": 0.28,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_refraction.py::test_refraction_matches_saemundsson[10.0]",
+          "weight_s": 0.35,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_refraction.py::test_restrict_preserves_custom_air_profile",
+          "weight_s": 0.01,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_result.py::test_twilight_matches_legacy_entry",
+          "weight_s": 62.44,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_result.py::test_ground_radiance_direct_transmittance_override",
+          "weight_s": 0.25,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_single.py",
+          "weight_s": 60.77,
+          "n_tests": 5
+        },
+        {
+          "key": "tests/test_solar_source.py::test_source_rejects_swapped_medium",
+          "weight_s": 16.99,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_solar_source.py::test_ground_local_accounting_is_observer_invariant",
+          "weight_s": 8.02,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_spectra.py",
+          "weight_s": 0.01,
+          "n_tests": 8
+        }
+      ]
+    },
+    "bin2": {
+      "n_tests": 13,
+      "predicted_s": 218.35999999999996,
+      "groups": [
+        {
+          "key": "tests/test_extension_scenarios.py",
+          "weight_s": 5.0,
+          "n_tests": 4
+        },
+        {
+          "key": "tests/test_multiple.py::test_first_order_matches_single_scattering",
+          "weight_s": 16.03,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_multiple.py::test_scalar_zenith_with_azimuth_array",
+          "weight_s": 17.14,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_raised_ground.py::test_cloud_point_and_deck_share_the_raised_ground_shadow",
+          "weight_s": 101.16,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_refraction.py::test_apparent_elevation_monotonic_and_signed",
+          "weight_s": 11.26,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_result.py::test_clear_diagnostics_orders_and_convergence",
+          "weight_s": 26.69,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_result.py::test_twilight_warns_on_horizontal_field",
+          "weight_s": 36.87,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_solar_source.py::test_refraction_off_is_same_contract_at_n_one",
+          "weight_s": 0.01,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_solar_source.py::test_shadow_height_matches_vacuum_analytic[-0.5]",
+          "weight_s": 0.03,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_solar_source.py::test_position_domain_contract_across_kernels",
+          "weight_s": 4.17,
+          "n_tests": 1
+        }
+      ]
+    },
+    "bin3": {
+      "n_tests": 74,
+      "predicted_s": 218.36,
+      "groups": [
+        {
+          "key": "tests/test_cloud.py::test_albedo_matches_monte_carlo",
+          "weight_s": 0.03,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_cssp_observation_inputs.py",
+          "weight_s": 12.96,
+          "n_tests": 58
+        },
+        {
+          "key": "tests/test_golden_equivalence.py::test_twilight",
+          "weight_s": 37.19,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_raised_ground.py::test_constant_index_shadow_matches_analytic_tangent[2.546899e+25]",
+          "weight_s": 0.96,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_raised_ground.py::test_sos_solar_source_has_the_same_shadow[True]",
+          "weight_s": 0.28,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_raised_ground.py::test_balloon_occultation_uses_ground_refractivity",
+          "weight_s": 6.64,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_refraction.py::test_refraction_matches_saemundsson[45.0]",
+          "weight_s": 0.25,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_solar_source.py::test_shadow_height_matches_vacuum_analytic[-10.0]",
+          "weight_s": 0.03,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_solar_source.py::test_real_point_solar_table_feeds_finite_source",
+          "weight_s": 93.69,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_solar_source.py::test_local_zenith_frame_plane_flux_analytic",
+          "weight_s": 0.51,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_solar_source.py::test_radial_beam_flux_limit_is_exact",
+          "weight_s": 0.37,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_twilight.py::test_single_only_matches_deterministic",
+          "weight_s": 17.32,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_twilight.py",
+          "weight_s": 5.0,
+          "n_tests": 3
+        },
+        {
+          "key": "tests/test_twilight.py::test_negative_radiance_impossible_and_multiple_positive",
+          "weight_s": 26.99,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_twilight.py::test_error_scales_as_one_over_sqrt_n",
+          "weight_s": 16.14,
+          "n_tests": 1
+        }
+      ]
+    },
+    "bin4": {
+      "n_tests": 35,
+      "predicted_s": 218.36,
+      "groups": [
+        {
+          "key": "tests/test_cloud.py::test_presets_are_plausible",
+          "weight_s": 0.17,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_cloud.py::test_delta_fraction_is_the_second_moment",
+          "weight_s": 0.49,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_cloud.py::test_albedo_reference_value_tau_10",
+          "weight_s": 0.04,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_cloud.py::test_thick_cloud_has_overcast_luminance_distribution",
+          "weight_s": 12.99,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_cloud.py::test_underlit_deck_is_not_seen_through_its_shadow",
+          "weight_s": 1.45,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_cloud.py::test_cloud_layer_is_frozen_and_replace_drops_optics",
+          "weight_s": 0.64,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_cloud.py::test_deck_lit_segment_matches_column_shadow",
+          "weight_s": 6.67,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_golden_equivalence.py::test_clear_direction",
+          "weight_s": 26.99,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_multiple.py::test_energy_conservation[0.0]",
+          "weight_s": 17.32,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_multiple.py::test_toa_incident_flux_resolves_plane_boundary",
+          "weight_s": 0.32,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_refraction.py",
+          "weight_s": 5.0,
+          "n_tests": 3
+        },
+        {
+          "key": "tests/test_result.py::test_cloud_matches_legacy_entry",
+          "weight_s": 16.17,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_result.py::test_twilight_diagnostics_trace_grid",
+          "weight_s": 37.38,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_solar_source.py::test_shadow_height_matches_vacuum_analytic[-1.0]",
+          "weight_s": 0.03,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_twilight.py::test_ground_albedo_increases_the_sky",
+          "weight_s": 92.65,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_unified_solar_source_math.py",
+          "weight_s": 0.05,
+          "n_tests": 18
+        }
+      ]
+    },
+    "bin5": {
+      "n_tests": 46,
+      "predicted_s": 218.35999999999999,
+      "groups": [
+        {
+          "key": "tests/test_aerosol_grid_invariance.py",
+          "weight_s": 13.2,
+          "n_tests": 16
+        },
+        {
+          "key": "tests/test_cloud.py::test_delta_m_preserves_similarity_parameter",
+          "weight_s": 0.1,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_cloud.py::test_fully_dark_deck_beam_flux_is_zero_spectrum",
+          "weight_s": 0.55,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_extension_scenarios.py::test_absorbing_constituent_reaches_all_backends",
+          "weight_s": 78.82,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_extension_scenarios.py::test_shared_preset_redefinition_is_isolated",
+          "weight_s": 39.5,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_mc.py::test_single_scattering_part_in_a_thick_atmosphere",
+          "weight_s": 32.15,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_mc.py::test_multiple_scattering_magnitude",
+          "weight_s": 20.32,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_multiple.py::test_energy_conservation[1.0]",
+          "weight_s": 16.22,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_raised_ground.py::test_constant_index_shadow_matches_analytic_tangent[0.0]",
+          "weight_s": 0.96,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_refraction.py::test_refraction_matches_saemundsson[2.0]",
+          "weight_s": 0.39,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_solar_source.py",
+          "weight_s": 5.0,
+          "n_tests": 9
+        },
+        {
+          "key": "tests/test_solar_source.py::test_table_holdout_against_direct_field",
+          "weight_s": 10.63,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_solar_source.py::test_shadow_height_matches_vacuum_analytic[-3.0]",
+          "weight_s": 0.03,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_solar_source.py::test_narrow_crescent_scatter_matches_independent_cap_integral",
+          "weight_s": 0.33,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_solar_source_audit.py",
+          "weight_s": 0.16,
+          "n_tests": 9
+        }
+      ]
+    },
+    "bin6": {
+      "n_tests": 17,
+      "predicted_s": 218.36,
+      "groups": [
+        {
+          "key": "tests/test_cloud.py::test_mie_large_parameter_limits",
+          "weight_s": 0.04,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_cloud.py::test_cloud_attenuates_the_clear_sky",
+          "weight_s": 0.62,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_golden_equivalence.py::test_dome",
+          "weight_s": 16.59,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_mc.py::test_energy_conservation_conservative_atmosphere",
+          "weight_s": 76.78,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_raised_ground.py::test_mc_solar_beam_respects_the_opaque_bottom[30.0-2.4]",
+          "weight_s": 0.01,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_raised_ground.py::test_single_scattering_layer_and_the_plateau_shadow[False]",
+          "weight_s": 1.12,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_refraction.py::test_horizon_refraction",
+          "weight_s": 0.3,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_refraction.py::test_refraction_matches_saemundsson[30.0]",
+          "weight_s": 0.23,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_refraction.py::test_delta_m_identity_for_small_particles",
+          "weight_s": 0.01,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_refraction.py::test_refraction_cache_identity",
+          "weight_s": 13.73,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_result.py",
+          "weight_s": 5.0,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_result.py::test_render_field_matches_direct_backend_call",
+          "weight_s": 19.08,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_solar_source.py::test_restrict_shares_geometry_and_altitude_does_not",
+          "weight_s": 0.01,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_solar_source.py::test_table_wavelength_slices_identical",
+          "weight_s": 9.88,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_solar_source.py::test_direct_flux_rotation_equivariant",
+          "weight_s": 0.46,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_twilight.py::test_shapes_and_units",
+          "weight_s": 39.85,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_twilight.py::test_identical_seed_is_reproducible",
+          "weight_s": 34.65,
+          "n_tests": 1
+        }
+      ]
+    },
+    "bin7": {
+      "n_tests": 29,
+      "predicted_s": 218.35,
+      "groups": [
+        {
+          "key": "tests/test_atmosphere.py",
+          "weight_s": 8.78,
+          "n_tests": 14
+        },
+        {
+          "key": "tests/test_cloud.py::test_cloud_is_brighter_than_clear_sky_in_daylight",
+          "weight_s": 0.15,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_cloud.py::test_output_shape_matches_solver",
+          "weight_s": 14.69,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_golden_equivalence.py::test_sos_diagnostics",
+          "weight_s": 0.13,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_golden_equivalence.py::test_cloud",
+          "weight_s": 16.39,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_golden_equivalence.py::test_altitude_truncated_baseline",
+          "weight_s": 18.83,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_mc.py::test_ground_albedo_increases_the_diffuse_sky",
+          "weight_s": 35.54,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_raised_ground.py::test_single_scattering_layer_and_the_plateau_shadow[True]",
+          "weight_s": 1.27,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_raised_ground.py::test_upper_limb_partially_lights_the_plateau_deck[True]",
+          "weight_s": 0.71,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_refraction.py::test_delta_m_scales_coarse_aerosol",
+          "weight_s": 75.87,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_render.py",
+          "weight_s": 5.0,
+          "n_tests": 3
+        },
+        {
+          "key": "tests/test_result.py::test_default_paths_do_not_warn",
+          "weight_s": 40.18,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_solar_source.py::test_flux_kernels_batch_invariant",
+          "weight_s": 0.32,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_solar_source.py::test_scatter_frame_equivariant_and_batch_invariant",
+          "weight_s": 0.49,
+          "n_tests": 1
+        }
+      ]
+    },
+    "bin8": {
+      "n_tests": 17,
+      "predicted_s": 218.47,
+      "groups": [
+        {
+          "key": "tests/test_cloud.py",
+          "weight_s": 5.0,
+          "n_tests": 9
+        },
+        {
+          "key": "tests/test_cloud.py::test_high_clouds_stay_lit_longer",
+          "weight_s": 72.03,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_extension_scenarios.py::test_one_display_path_for_clear_and_cloud",
+          "weight_s": 44.89,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_multiple.py::test_optically_thick_horizon_converges",
+          "weight_s": 16.27,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_profiles.py::test_profile_reaches_single_and_sos",
+          "weight_s": 34.13,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_profiles.py::test_twilight_single_uses_same_profile",
+          "weight_s": 15.31,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_refraction.py::test_horizon_dip",
+          "weight_s": 4.63,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_solar_source.py::test_shared_table_config_is_not_mutable",
+          "weight_s": 6.74,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_twilight.py::test_error_is_reported_not_optimistic",
+          "weight_s": 19.47,
+          "n_tests": 1
+        }
+      ]
+    },
+    "bin9": {
+      "n_tests": 14,
+      "predicted_s": 218.35,
+      "groups": [
+        {
+          "key": "tests/test_cloud.py::test_underlit_base_turns_red",
+          "weight_s": 13.0,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_color.py",
+          "weight_s": 5.0,
+          "n_tests": 6
+        },
+        {
+          "key": "tests/test_multiple.py::test_horizon_headline_value",
+          "weight_s": 17.58,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_multiple.py::test_twilight_is_positive_and_bounded",
+          "weight_s": 16.17,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_multiple.py::test_direct_beam_projection_supports_many_modes",
+          "weight_s": 6.81,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_profiles.py::test_twilight_ms_sees_injected_profile",
+          "weight_s": 71.5,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_refraction.py::test_shadow_threshold",
+          "weight_s": 4.45,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_twilight.py::test_mirror_symmetry_about_the_solar_meridian",
+          "weight_s": 56.78,
+          "n_tests": 1
+        },
+        {
+          "key": "tests/test_twilight.py::test_daytime_total_matches_deterministic_model",
+          "weight_s": 27.06,
+          "n_tests": 1
+        }
+      ]
+    }
+  }
+}
