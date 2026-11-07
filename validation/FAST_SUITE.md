@@ -22,7 +22,7 @@ tolerances).
 
 | entry point | runs (wall s) | verdict |
 |---|---|---|
-| `uv run pytest -q` | **formal pair, schedule engaged (post-fix): 257.26 ✓ / 256.01 ✓** (`formal2-pytest-run{1,2}.log`) | **达标**: both ≤ 300 s strictly, exit=0, 436 passed |
+| `uv run pytest -q` | **formal pair, schedule engaged (post-fix): 257.41 ✓ / 256.22 ✓ outer wall** (`formal2-pytest-run{1,2}.log`; pytest-internal 257.26 / 256.01) | **达标**: both ≤ 300 s strictly, exit=0, 436 passed |
 | `uv run python -m validation.run_all` | 240.02 probe; **241.13 / 239.98** formal pair (`formal-runall-run{1,2}.log`) | **达标**: both ≤ 300 s, exit=1, 2 PASS/4 FAIL/0 SKIP, `results.json` bitwise identical to the committed baseline across all runs |
 
 The first pytest pair (293.70 ✓ / 352.15 ✗, `formal-pytest-run{1,2}.log`) is
@@ -47,7 +47,9 @@ documented because they motivated the owner adjudication:
 * Independently: one heavy MC test peaks at 1.89 GB RSS; the machine hosts
   concurrent agent sessions.
 
-After the scheduling fix the engaged path measured **257.26 / 256.01 s** —
+After the scheduling fix the engaged path measured **257.41 / 256.22 s
+outer wall** (startup, collection, scheduling and report writing included;
+pytest-internal 257.26 / 256.01) —
 strictly under the 300 s line twice in a row, so the windowed acceptance the
 owner granted (see the adjudication note at the bottom of this file) is no
 longer needed for the current pair; the adjudication's regression clause
@@ -198,5 +200,6 @@ as kernel-side wait — an attribution made on the **ungrouped** path and
 not carried over as a settled claim about the current schedule.  The
 standing clauses: windowed acceptance may be revoked by the user, and any
 suite stably exceeding 6 min counts as a regression and is escalated.
-The post-fix pair (257.26 / 256.01 s) passes strictly, so the windowed
+The post-fix pair (257.41 / 256.22 s outer wall) passes strictly, so the
+windowed
 interpretation is not exercised by the current acceptance evidence.

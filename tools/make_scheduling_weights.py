@@ -12,7 +12,10 @@ per-test cost inflates under 12-way contention:
     uv run python tools/make_scheduling_weights.py /tmp/durations.txt
 
 Parsing follows pytest's ``--durations`` listing: one line per
-setup/call/teardown phase, whose seconds are summed per nodeid.  Phases
+setup/call/teardown phase, whose seconds are summed per nodeid.  Under
+``--dist=loadgroup`` the reported nodeid carries xdist's ``@binN``
+scheduling suffix; it is stripped here so the regenerated table is keyed
+exactly like the next run's collection (see ``_raw_nodeid``).  Phases
 below 5 ms are hidden by pytest (use ``-vv`` to include them); their total
 weight is negligible.
 """
@@ -29,6 +32,22 @@ WEIGHTS_PATH = ROOT / "tests" / "data" / "scheduling_weights.json"
 
 _LINE = re.compile(r"^\s*([0-9.]+)s\s+(?:call|setup|teardown)\s+(\S+)")
 _HEADER = re.compile(r"=+ slowest(?: (\d+))? durations =+")
+_SCHED_SUFFIX = re.compile(r"@bin\d+$")
+
+
+def _raw_nodeid(nodeid):
+    """Strip xdist's loadgroup scheduling suffix (``nodeid@binN``).
+
+    The duration report and the next run's collection use different
+    identities for the same test: under ``--dist=loadgroup`` xdist appends
+    the bin to the reported nodeid, while collection looks weights up by
+    the raw nodeid.  Keying the table on suffixed ids would silently
+    unschedule every hot node on the next run.  A parametrized nodeid
+    always ends in ``]``, so a trailing ``@bin<digits>`` can only be the
+    scheduling suffix; ``@`` characters inside parameter values and
+    unsuffixed (serial) reports pass through untouched.
+    """
+    return _SCHED_SUFFIX.sub("", nodeid, count=1)
 
 #: Modules whose measured total exceeds this many seconds are scheduled as
 #: individual nodeids (``nodes`` in the weights table); anything lighter
@@ -55,7 +74,7 @@ def parse_durations(text):
             continue
         m = _LINE.match(line)
         if m:
-            seconds, nodeid = float(m.group(1)), m.group(2)
+            seconds, nodeid = float(m.group(1)), _raw_nodeid(m.group(2))
             totals[nodeid] = totals.get(nodeid, 0.0) + seconds
     if header_n is not None and len(totals) < header_n:
         raise SystemExit(

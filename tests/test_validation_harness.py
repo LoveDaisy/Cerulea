@@ -16,6 +16,7 @@ results is verified by real runs against the committed baseline (see
 """
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import pathlib
@@ -30,6 +31,20 @@ from validation import check6_second_dataset as c6
 from validation import common as C
 
 TESTS_DIR = pathlib.Path(__file__).parent
+
+
+def _load_weights_tool():
+    """Import ``tools/make_scheduling_weights.py`` by path (no package)."""
+    spec = importlib.util.spec_from_file_location(
+        "make_scheduling_weights",
+        TESTS_DIR.parent / "tools" / "make_scheduling_weights.py",
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+WEIGHTS_TOOL = _load_weights_tool()
 
 
 # ---------------------------------------------------------------------------
@@ -242,6 +257,54 @@ def test_collect_only_with_default_parallel_addopts_exits_zero(tmp_path):
     proc = _run_mini(tmp_path, weights, "-n", "2", "--collect-only")
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert "INTERNALERROR" not in proc.stderr
+
+
+def test_weights_refresh_round_trips_loadgroup_report_ids(tmp_path):
+    # Regression: the durations report under --dist=loadgroup carries xdist's
+    # "@binN" suffix on every nodeid, while the next collection looks the
+    # table up by raw nodeids — parsing the report verbatim silently
+    # unscheduled every hot node on the first refresh.
+    suffixed = (
+        "======= slowest durations =======\n"
+        "1.00s setup     tests/test_twilight.py::test_deep@bin0\n"
+        "120.00s call    tests/test_twilight.py::test_deep@bin0\n"
+        "0.50s teardown  tests/test_twilight.py::test_deep@bin0\n"
+        "110.00s call    tests/test_twilight.py::test_deep2@bin1\n"
+        "3.00s call      tests/test_light.py::test_a@bin1\n"
+        "2.00s call      tests/test_light.py::test_b@bin1\n"
+        "1.00s call      tests/test_params.py::test_case[x@y]@bin0\n"
+    )
+    totals = WEIGHTS_TOOL.parse_durations(suffixed)
+    # phases of one suffixed id aggregate onto the raw nodeid
+    assert totals["tests/test_twilight.py::test_deep"] == pytest.approx(121.5)
+    assert "tests/test_twilight.py::test_deep@bin0" not in totals
+    # a legitimate '@' inside a parameter value survives, the suffix goes
+    assert "tests/test_params.py::test_case[x@y]" in totals
+    assert "tests/test_params.py::test_case[x@y]@bin0" not in totals
+    # unsuffixed (serial) input parses to the same identity
+    serial = WEIGHTS_TOOL.parse_durations(
+        suffixed.replace("@bin0", "").replace("@bin1", ""))
+    assert serial == totals
+
+    # round trip: the regenerated table must serve the *next* collection,
+    # whose nodeids carry no suffix
+    modules, nodes = WEIGHTS_TOOL.build(totals)
+    table = tmp_path / "regenerated.json"
+    table.write_text(json.dumps({"modules": modules, "nodes": nodes}))
+    bins = scheduling.assign_bins(sorted(totals), 2, weights_path=table)
+    assert set(bins) == set(totals)
+    hot_bins = {
+        bins["tests/test_twilight.py::test_deep"],
+        bins["tests/test_twilight.py::test_deep2"],
+    }
+    assert len(hot_bins) == 2, "hot nodes must stay individually scheduled"
+    assert nodes["tests/test_twilight.py::test_deep"] == pytest.approx(121.5)
+
+    # a parameter value that itself ends in "@bin<digits>" is not a suffix:
+    # a real nodeid always closes the bracket, so the id must pass through
+    tricky = WEIGHTS_TOOL.parse_durations(
+        "5.00s call      tests/test_t2.py::test_case[v@bin0]\n")
+    assert "tests/test_t2.py::test_case[v@bin0]" in tricky
 
 
 # ---------------------------------------------------------------------------
