@@ -86,7 +86,14 @@ def test_clear_diagnostics_orders_and_convergence(atmo81):
     assert isinstance(res.diagnostics["orders"], int)
     assert res.diagnostics["orders"] > 0
     assert isinstance(res.diagnostics["converged"], bool)
-    assert res.stderr is None and res.components is None
+    assert res.stderr is None
+    # the clear combination formally provides its components; the total is
+    # their exact sum and no kernel ran twice
+    comps = res.components
+    assert set(comps) == {"single", "multiple"}
+    assert np.array_equal(res.radiance,
+                          comps["single"] + comps["multiple"])
+    assert res.approximation == "hybrid-sos"
     assert res.options["sun_zenith_deg"] == 65.0
 
 
