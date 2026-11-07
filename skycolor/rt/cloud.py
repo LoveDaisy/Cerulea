@@ -758,10 +758,13 @@ def sky_radiance_with_cloud(
 
         L = L_clear * exp(-tau_cloud / mu_view) + L_cloud
 
-    Without a precomputed ``clear_radiance`` the clear field comes from the
-    authoritative entry (:func:`rt.solver.solve`, ``method="clear"``);
-    the deck composition itself is the local operator
-    :func:`apply_cloud_overlay`.  There is no second clear-sky
+    Every request goes through the authoritative entry as one cloud
+    request (:func:`rt.solver.solve` with ``cloud_layer=``): the solver
+    runs its own clear composition when needed, the deck composition
+    itself is the local operator :func:`apply_cloud_overlay`, and the
+    support-domain checks (observer below the cloud base, angle domain,
+    horizontal-field applicability) hold identically on this wrapper and
+    on :func:`rt.solver.solve`.  There is no second clear-sky or deck
     implementation behind this wrapper.
 
     Parameters
@@ -773,33 +776,44 @@ def sky_radiance_with_cloud(
     view_zenith_deg, view_azimuth_deg : array_like
     sun_azimuth_deg : float
     multiple : bool
-        Passed to the clear-sky solver.
+        Order selection of the clear base (``multiple=False`` computes a
+        single-scattering-only clear field under the deck).
     clear_radiance : ndarray, optional
         Pre-computed ``(n_view, n_wl)`` clear-sky field; when given, no
-        clear-sky computation runs and its provenance stays the caller's.
+        clear-sky kernel runs (the solver records the provenance as
+        ``"external"``) and ``n_gauss``/``chunk`` have no consumer -- they
+        keep their historical no-op behaviour here.
     ground_albedo : float or ndarray, optional
         Overrides ``atmo.ground_albedo`` for the cloud-ground coupling.
     include_clear, include_cloud : bool
-        Exclude either term from the total (excluded terms still appear in
-        the components when ``return_components=True``).
+        Exclude either term from the total (``include_clear=False`` is a
+        cloud-only request: no clear-sky kernel runs, matching the
+        historical wrapper that skipped the clear solve).
     return_components : bool
-        Also return the component dict.
+        Also return the component dict (the solver's cloud decomposition:
+        ``clear``/``cloud``/``illumination``/``optics``/``transmittance``,
+        plus the un-occluded clear ``single``/``multiple`` sub-fields when
+        the solver computed them).
 
     Returns
     -------
     ndarray ``(n_view, n_wl)``, or ``(radiance, components)``.
     """
-    if clear_radiance is None and include_clear:
-        from .solver import solve
+    from .solver import solve
 
-        clear_radiance = solve(
-            atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
-            sun_azimuth_deg=sun_azimuth_deg, method="clear",
-            multiple=multiple, n_gauss=n_gauss, chunk=chunk).radiance
-    total, components = apply_cloud_overlay(
-        atmo, cloud_layer, sun_zenith_deg, view_zenith_deg, clear_radiance,
-        ground_albedo=ground_albedo, include_clear=include_clear,
-        include_cloud=include_cloud)
+    clear_runs_here = clear_radiance is None and include_clear
+    res = solve(
+        atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
+        sun_azimuth_deg=sun_azimuth_deg,
+        cloud_layer=cloud_layer,
+        clear_radiance=clear_radiance,
+        ground_albedo=ground_albedo,
+        include_clear=include_clear,
+        include_cloud=include_cloud,
+        multiple=multiple,
+        # n_gauss/chunk configure the spherical single kernel only; with no
+        # clear single term to run they keep their historical silent no-op
+        **({"n_gauss": n_gauss, "chunk": chunk} if clear_runs_here else {}))
     if return_components:
-        return total, components
-    return total
+        return res.radiance, res.components
+    return res.radiance

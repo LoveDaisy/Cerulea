@@ -451,16 +451,39 @@ def test_overlay_request_validation(atmo7, stratus):
         solve(atmo7, 45.0, 30.0, 0.0, include_cloud=False)
 
 
-def test_include_switches_and_ground_override(atmo7, stratus):
+def test_include_switches_and_ground_override(atmo7, stratus, monkeypatch):
     res_c = solve(atmo7, 45.0, ZEN_C, 90.0, cloud_layer=stratus)
     res_nc = solve(atmo7, 45.0, ZEN_C, 90.0, cloud_layer=stratus,
                    include_cloud=False)
     assert np.array_equal(res_nc.radiance, res_c.components["clear"])
+    # cloud-only request: no clear-sky kernel runs at all (the historical
+    # wrapper skipped the clear solve; the formal entry now shares that
+    # execution plan), the excluded clear term is recorded as zeros
+    import skycolor.rt.solver as solver
+    calls = {"sos": 0, "single": 0}
+    real_solve = multiple.solve
+
+    def spy_solve(*a, **k):
+        calls["sos"] += 1
+        return real_solve(*a, **k)
+
+    monkeypatch.setattr(solver._multiple, "solve", spy_solve)
+    monkeypatch.setattr(solver, "_single",
+                        lambda *a, **k: calls.__setitem__(
+                            "single", calls["single"] + 1))
     res_ncl = solve(atmo7, 45.0, ZEN_C, 90.0, cloud_layer=stratus,
                     include_clear=False)
+    assert calls == {"sos": 0, "single": 0}
     assert np.array_equal(res_ncl.radiance, res_c.components["cloud"])
-    # excluded terms are still recorded, never silently dropped
-    assert np.array_equal(res_ncl.components["clear"], res_c.components["clear"])
+    assert np.all(res_ncl.components["clear"] == 0.0)
+    assert res_ncl.effective == {} and "sos" not in res_ncl.approximations
+    # the wrapper forwards to the same cloud request: identical numbers and
+    # identical zero clear-kernel work
+    tot_w, comp_w = sky_radiance_with_cloud(
+        atmo7, stratus, 45.0, ZEN_C, 90.0, include_clear=False,
+        return_components=True)
+    assert np.array_equal(tot_w, res_ncl.radiance)
+    assert np.all(comp_w["clear"] == 0.0)
     res_g = solve(atmo7, 45.0, ZEN_C, 90.0, cloud_layer=stratus,
                   ground_albedo=0.3)
     assert not np.array_equal(res_g.radiance, res_c.radiance)
@@ -536,3 +559,164 @@ def test_render_default_path_reaches_the_entry(atmo7):
     grid = render.sky_radiance_grid(atmo7, 65.0, Z, A)
     direct = solve(atmo7, 65.0, Z.ravel(), A.ravel()).radiance
     assert np.array_equal(grid.reshape(-1, WL7.size), direct)
+
+
+# ---------------------------------------------------------------------------
+# 9. review round 1: single execution plan, honest records, uniform domains
+# ---------------------------------------------------------------------------
+def test_wrapper_routes_every_cloud_request_through_solve(atmo7, stratus,
+                                                          monkeypatch):
+    """The legacy cloud wrapper forwards the *cloud request* itself, so the
+    support domain cannot differ between the two entry points."""
+    import skycolor.rt.solver as solver
+
+    # normal request: identical numbers through both entries
+    res = solve(atmo7, 45.0, ZEN_C, 90.0, cloud_layer=stratus)
+    tot = sky_radiance_with_cloud(atmo7, stratus, 45.0, ZEN_C, 90.0)
+    assert np.array_equal(tot, res.radiance)
+    # precomputed clear: also one solve call (overlay only), same numbers
+    res_ext = solve(atmo7, 45.0, ZEN_C, 90.0, cloud_layer=stratus,
+                    clear_radiance=np.zeros((ZEN_C.size, WL7.size)))
+    tot_ext = sky_radiance_with_cloud(
+        atmo7, stratus, 45.0, ZEN_C, 90.0,
+        clear_radiance=np.zeros((ZEN_C.size, WL7.size)))
+    assert np.array_equal(tot_ext, res_ext.radiance)
+    assert res_ext.options["clear_radiance"] == "external"
+    # an observer inside the deck is rejected on the wrapper too -- the old
+    # external-clear path used to bypass the cloud-base check entirely
+    above = presets.clear(WL7)
+    above.elevation_km = 2.0
+    with pytest.raises(ValueError, match="cloud base"):
+        sky_radiance_with_cloud(above, stratus, 45.0, 30.0, 0.0,
+                                clear_radiance=np.zeros((1, WL7.size)))
+
+
+def test_settings_for_kernels_that_will_not_run_are_rejected(atmo7, stratus):
+    """Applicability follows the execution plan, not a switch: plane-sos
+    evaluates its first order inside the SOS run, and an external-clear /
+    cloud-only request runs no clear kernel at all."""
+    with pytest.raises(ValueError, match="single-scattering kernel"):
+        solve(atmo7, 60.0, VZA, 90.0, approximation="plane-sos", n_gauss=9)
+    with pytest.raises(ValueError, match="single-scattering kernel"):
+        solve(atmo7, 60.0, VZA, 90.0, approximation="plane-sos",
+              single_config=SingleConfig(chunk=17))
+    with pytest.raises(ValueError, match="single-scattering kernel"):
+        solve(atmo7, 45.0, ZEN_C, 90.0, cloud_layer=stratus,
+              clear_radiance=np.zeros((ZEN_C.size, WL7.size)),
+              single_config=SingleConfig(n_gauss=9))
+    with pytest.raises(ValueError, match="SOS kernel"):
+        solve(atmo7, 45.0, ZEN_C, 90.0, cloud_layer=stratus,
+              clear_radiance=np.zeros((ZEN_C.size, WL7.size)),
+              sos_config=SOSConfig(n_mu=8))
+    with pytest.raises(ValueError, match="SOS kernel"):
+        solve(atmo7, 45.0, ZEN_C, 90.0, cloud_layer=stratus,
+              include_clear=False, sos_config=SOSConfig(n_mu=8))
+
+
+def test_mc_records_actual_single_settings(atmo7):
+    """spherical-mc with a non-default single config: the request values
+    land in options AND the effective record."""
+    res = solve(atmo7, 60.0, VZA, 90.0, approximation="spherical-mc",
+                single_config=SingleConfig(n_gauss=2, chunk=64),
+                mc_config=MCConfig(grid=dict(TINY)))
+    assert res.options["n_gauss"] == 2 and res.options["chunk"] == 64
+    assert res.effective["single"] == {"n_gauss": 2, "chunk": 64}
+
+
+def test_mc_effective_reports_what_ran_not_what_was_asked():
+    """Anchor dedup and per-direction photon rounding are engine facts:
+    a single-wavelength model collapses n_anchor=5 to one anchor, and a
+    2x2 coarse grid rounds n_photons=1 up to one path per direction."""
+    wl1 = np.array([550.0])
+    tiny2 = dict(n_zen=2, n_az=2, n_anchor=5, n_photons=1.0)
+    res = solve(presets.clear(wl1), 60.0, VZA, 90.0,
+                approximation="spherical-mc", mc_config=MCConfig(grid=tiny2))
+    mc_eff = res.effective["mc"]
+    assert mc_eff["n_anchor_run"] == 1          # unique indices <= n_wl
+    assert mc_eff["n_photons_run"] == 2 * 2 * 1  # per_dir floor of 1 x n_dir
+    # the *requested* preset values stay visible in diagnostics/info
+    assert res.diagnostics["n_anchor"] == 5
+    assert res.diagnostics["n_photons"] == 1.0
+
+
+def test_sos_records_optics_and_transport_moment_counts(atmo7):
+    """delta-M optics are built from the requested moments before the
+    transport truncation (2*n_mu cap); both numbers affect the result and
+    are recorded separately, and the raw request stays in options."""
+    res = solve(atmo7, 60.0, VZA, 90.0,
+                sos_config=SOSConfig(n_mu=4, n_moments=32))
+    assert res.options["sos"] == {"n_mu": 4, "n_moments": 32}
+    sos_eff = res.effective["sos"]
+    assert sos_eff["n_moments_optics"] == 32    # optics built with 32
+    assert sos_eff["n_moments"] == 8            # transport truncated to 2*n_mu
+    assert sos_eff["n_mu"] == 4
+
+
+def test_refraction_state_recorded_not_assumed(atmo7):
+    """The per-component record carries the actual solar-side refraction
+    switch; a result must not claim a refraction treatment that did not
+    happen."""
+    on = solve(atmo7, 60.0, VZA, 90.0)
+    assert on.options["refraction"] is True
+    assert on.approximations["single"]["source_refraction"] is True
+    atmo_nr = presets.clear(WL7)
+    atmo_nr.refraction = False
+    off = solve(atmo_nr, 60.0, VZA, 90.0)
+    assert off.options["refraction"] is False
+    assert off.approximations["single"]["source_refraction"] is False
+    assert off.approximations["multiple"]["source_refraction"] is False
+
+
+def test_horizontal_field_unused_by_the_plan_is_rejected(atmo7, monkeypatch):
+    """hybrid/mc with the higher orders only (single term off) applies the
+    field in no component: reject before any kernel runs."""
+    from skycolor.aerosol import HinterlandAerosol, shared
+    from skycolor.atmosphere import AerosolLayer, ExponentialProfile, \
+        RadialSplitField
+
+    het = presets.clear(WL7)
+    het.aerosols = [AerosolLayer(shared(HinterlandAerosol), aod550=0.05,
+                                 profile=ExponentialProfile(1.5),
+                                 horizontal=RadialSplitField(radius_km=20.0))]
+    import skycolor.rt.solver as solver
+    calls = {"n": 0}
+    real_single = solver._single
+
+    def spy_single(*a, **k):
+        calls["n"] += 1
+        return real_single(*a, **k)
+
+    monkeypatch.setattr(solver, "_single", spy_single)
+    with pytest.raises(ValueError, match="no spherical single term"):
+        solve(het, 60.0, VZA, 90.0, single=False)          # hybrid, SOS only
+    with pytest.raises(ValueError, match="no spherical single term"):
+        solve(het, 60.0, VZA, 90.0, approximation="spherical-mc",
+              single=False)
+    assert calls["n"] == 0                                 # zero kernel work
+    # an external clear field consumes the field in no component either
+    with pytest.raises(ValueError, match="no spherical single term"):
+        solve(het, 45.0, ZEN_C, 90.0,
+              cloud_layer=cloud.get_preset("stratus"),
+              clear_radiance=np.zeros((ZEN_C.size, WL7.size)))
+
+
+def test_view_domain_is_the_public_sky_domain(atmo7, monkeypatch):
+    """[0, 90] deg exactly: the horizon keeps the kernel clipping, anything
+    below it fails before any kernel runs."""
+    import skycolor.rt.solver as solver
+    calls = {"n": 0}
+    real_single = solver._single
+
+    def spy_single(*a, **k):
+        calls["n"] += 1
+        return real_single(*a, **k)
+
+    monkeypatch.setattr(solver, "_single", spy_single)
+    ok = solve(atmo7, 60.0, np.array([0.0, 45.0, 90.0]), 90.0)
+    assert ok.radiance.shape == (3, WL7.size)
+    base = calls["n"]                       # the legal request ran once
+    for bad in (np.array([90.0, 120.0]), np.array([-5.0]),
+                np.array([np.nan]), np.array([np.inf])):
+        with pytest.raises(ValueError, match="view_zenith_deg"):
+            solve(atmo7, 60.0, bad, 90.0)
+    assert calls["n"] == base               # rejections ran zero kernels

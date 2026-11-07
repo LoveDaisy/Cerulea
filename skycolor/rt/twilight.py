@@ -283,6 +283,11 @@ def _mc_coarse(atmo, sun_zenith_deg, sun_azimuth_deg, zen, az_rel, n_anchor,
     ms : ndarray ``(n_anchor, n_dir)``
     err : ndarray ``(n_anchor, n_dir)``
     wl_anchor : ndarray ``(n_anchor,)``
+    n_run : tuple ``(n_anchor_run, n_photons_run)``
+        What actually ran: the anchor list collapses to unique grid indices
+        (a single-wavelength model yields one anchor regardless of the
+        requested count) and the per-anchor photon budget is rounded to a
+        whole number of per-direction paths (minimum one per direction).
     """
     wl = np.asarray(atmo.wl, dtype=float)
     n_wl = wl.size
@@ -303,6 +308,8 @@ def _mc_coarse(atmo, sun_zenith_deg, sun_azimuth_deg, zen, az_rel, n_anchor,
 
     per_dir = max(1, int(round(float(n_photons) / n_dir)))
     total = per_dir * n_dir
+    # what actually ran, for the callers' effective-settings records
+    n_run = (int(anchors.size), int(total))
     n_block = max(1, int(np.ceil(total / _MAX_BLOCK)))
     for k, iw in enumerate(anchors):
         sub = _sub_atmosphere(atmo, [iw])
@@ -323,7 +330,7 @@ def _mc_coarse(atmo, sun_zenith_deg, sun_azimuth_deg, zen, az_rel, n_anchor,
             acc_v += res["multiple_err"][:, 0] ** 2
         ms[k] = acc_m / acc_w
         err[k] = np.sqrt(acc_v) / acc_w
-    return ms, err, wl[anchors]
+    return ms, err, wl[anchors], n_run
 
 
 # ---------------------------------------------------------------------------
@@ -352,7 +359,7 @@ def multiple_scattered(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
     wl = np.asarray(atmo.wl, dtype=float)
 
     cz, ca = _coarse_grid(cfg["n_zen"], cfg["n_az"])
-    ms_c, err_c, wl_a = _mc_coarse(
+    ms_c, err_c, wl_a, n_run = _mc_coarse(
         atmo, float(sun_zenith_deg), float(sun_azimuth_deg), cz, ca,
         cfg["n_anchor"], cfg["n_photons"], int(seed),
     )
@@ -415,6 +422,7 @@ def multiple_scattered(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
             undetected_wl=np.asarray(undetected), n_zen=cfg["n_zen"],
             n_az=cfg["n_az"], n_anchor=cfg["n_anchor"],
             n_photons=cfg["n_photons"], anchor_wl=wl_a, bandwidth=None,
+            n_anchor_run=n_run[0], n_photons_run=n_run[1],
             coarse_zenith=cz, coarse_azimuth=ca,
             coarse_values=ms_c, coarse_errors=err_c)
     if n_anchor == 1:
@@ -456,6 +464,7 @@ def multiple_scattered(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
         undetected_wl=np.asarray(undetected),
         n_zen=cfg["n_zen"], n_az=cfg["n_az"], n_anchor=cfg["n_anchor"],
         n_photons=cfg["n_photons"], anchor_wl=wl_a, bandwidth=bandwidth,
+        n_anchor_run=n_run[0], n_photons_run=n_run[1],
         coarse_zenith=cz, coarse_azimuth=ca,
         coarse_values=ms_c, coarse_errors=err_c,
     )

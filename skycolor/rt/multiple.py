@@ -118,6 +118,14 @@ class SOSResult:
         The angular discretisation *after* the kernel's clamps (even node
         count, moments capped at ``2 * n_mu``, modes capped by moments) --
         what actually ran, not what was requested.
+    n_moments_optics : int or None
+        Moment count used to build the delta-M layer optics.  With
+        ``delta_m=True`` the optics are built from the *requested*
+        ``n_moments`` before the transport truncation is applied, so this
+        can differ from ``n_moments_eff`` (the moments the order recursion
+        actually used); both numbers affect the result and are recorded
+        separately.  ``None`` when ``delta_m=False`` (the raw layer optics
+        carry no moment truncation).
     tol : float
         Convergence threshold passed to the order recursion.
     max_orders : int
@@ -138,6 +146,7 @@ class SOSResult:
     n_mu_eff: int = 0
     n_modes_eff: int = 0
     n_moments_eff: int = 0
+    n_moments_optics: int | None = None
     tol: float = 0.0
     max_orders: int = 0
     delta_m: bool = False
@@ -281,6 +290,7 @@ def solve(
     # the optical depth and the moments is the standard cure (Wiscombe 1977);
     # without it the multiple-scattering field of a dusty sky is wrong.
     props = atmo.delta_m_properties(n_moments) if delta_m else atmo.layer_properties()
+    n_moments_optics = int(n_moments) if delta_m else None
     beta_ext = np.maximum(props["beta_ext"], 0.0)
     beta_sca = np.maximum(props["beta_sca"], 0.0)
     dz = np.diff(z_bounds) * 1000.0
@@ -342,7 +352,8 @@ def solve(
             orders=0,
             converged=True,
             n_mu_eff=n_mu_eff, n_modes_eff=n_modes_eff,
-            n_moments_eff=n_moments_eff, tol=float(tol),
+            n_moments_eff=n_moments_eff,
+            n_moments_optics=n_moments_optics, tol=float(tol),
             max_orders=int(max_orders), delta_m=bool(delta_m),
         )
 
@@ -561,7 +572,8 @@ def solve(
         orders=orders,
         converged=converged,
         n_mu_eff=n_mu_eff, n_modes_eff=n_modes_eff,
-        n_moments_eff=n_moments_eff, tol=float(tol),
+        n_moments_eff=n_moments_eff,
+        n_moments_optics=n_moments_optics, tol=float(tol),
         max_orders=int(max_orders), delta_m=bool(delta_m),
     )
 

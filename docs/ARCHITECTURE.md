@@ -273,28 +273,53 @@ only for `wl` metadata (and the ground).
 
 Previously silently ignored or silently miscomputed; numbers inside the
 supported domains are unchanged (bitwise frozen-baseline evidence in the
-task log):
+task log).  Applicability of every setting and support check now follows
+the request's *execution plan* -- which kernels actually run:
 
-1. Elevated observer + any plane term (plane-sos / hybrid-sos /
-   spherical-mc): the plane field was solved at the domain bottom regardless
-   of the observer → `ValueError`.  Use `spherical-single`, or
-   `at_altitude(z0)` for a truncated site.
+1. Elevated observer + a plane-parallel term (``plane-sos``; ``hybrid-sos``
+   with the SOS higher orders enabled): the plane field was solved at the
+   domain bottom regardless of the observer → `ValueError`.  Use
+   `spherical-single`, `spherical-mc` (both evaluate the observer at its
+   actual elevation), ``hybrid-sos`` with ``multiple=False``, or
+   `at_altitude(z0)` for a raised station.
 2. Cloud request with `single=False`: silently ignored → `ValueError`
    (cloud-only totals use `include_clear=False`).
-3. Observer inside/above the cloud deck: unchecked → `ValueError`.
-4. plane-sos with a heterogeneous horizontal field: the field was silently
-   unused → `ValueError`.
-5. Unknown `quality`/`grid` keys, explicit settings for a kernel that will
-   not run, disagreeing `method`/`approximation`, the same setting given
-   through both the legacy and grouped channels: silently ignored or
-   undefined → `ValueError` before any kernel runs.
-6. The legacy `sky_radiance_total` wrapper keeps its lenient behaviour
+3. Observer inside/above the cloud deck: unchecked on the external-clear
+   path → `ValueError` on every cloud entry point.
+4. `plane-sos` with a heterogeneous horizontal field: silently unused
+   input → `ValueError`; likewise any request whose execution plan runs
+   no spherical single term (higher orders only, external clear,
+   cloud-only) — the field would apply to no output component.
+5. Unknown `quality`/`grid` keys, explicit settings for a kernel the
+   request will not run (e.g. `n_gauss`/`SingleConfig` on `plane-sos`,
+   whose first order comes from the SOS run; single/SOS settings with an
+   external clear field or a cloud-only request), disagreeing
+   `method`/`approximation`, the same setting given through both the
+   legacy and grouped channels: silently ignored or undefined →
+   `ValueError` before any kernel runs.
+6. View zenith outside `[0, 90]` degrees (or non-finite): the single
+   kernel returned broken geometry, SOS clipped such rays onto the
+   horizon → `ValueError` (the horizon at exactly 90° keeps the existing
+   clipping approximation).
+7. Cloud-only requests (`include_clear=False`, no external field): the
+   formal entry used to run the whole clear solve and discard it → no
+   clear kernel runs (the historical wrapper semantics), the excluded
+   term is recorded as zeros.
+8. Result records: `options` keeps the *request* values (`sos` kwargs,
+   single `n_gauss`/`chunk` including on the MC route, `refraction`,
+   `quality`/`seed`/`grid`); `effective` keeps what the kernels *ran*
+   with (clamped SOS discretisation split into transport `n_moments` vs
+   optics `n_moments_optics`, MC `n_anchor_run`/`n_photons_run` after
+   anchor dedup and photon rounding); per-component provenance records
+   the actual `source_refraction` switch instead of assuming it.
+9. The legacy `sky_radiance_total` wrapper keeps its lenient behaviour
    (`single=False` silently drops `n_gauss`/`chunk`); the formal `solve`
-   is strict.
-7. spherical-mc routing runs the single term with the wrapper default
-   `chunk=512` (the old twilight path used the kernel default 128); arrays
-   are bitwise unchanged, only the memory blocking differs.
-8. `spherical-single` with explicit `multiple=True` → `ValueError`.
+   is strict.  The cloud wrapper now forwards the cloud request itself,
+   so checks 2/3/4/6 hold identically on both entry points.
+10. spherical-mc routing runs the single term with the wrapper default
+   `chunk=512` (the old twilight path used the kernel default 128);
+   arrays are bitwise unchanged, only the memory blocking differs.
+11. `spherical-single` with explicit `multiple=True` → `ValueError`.
 
 ## Validation targets
 
