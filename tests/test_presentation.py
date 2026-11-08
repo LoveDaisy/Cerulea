@@ -1017,3 +1017,122 @@ def test_presentation_rejects_non_monotonic_grid(atmo7):
     with pytest.raises(ValueError, match="finite"):
         render.presentation_from_result(
             result, np.array([0.0, np.nan, 90.0]), az, 20.0, 0.0)
+
+
+# ---------------------------------------------------------------------------
+# 7. review round 3: per-parameter sentinel, shared grid invariant,
+#    half-dome domain, run-state honesty (R3 fixes)
+# ---------------------------------------------------------------------------
+def test_grid_settings_forward_per_parameter_with_true_sentinel(atmo7,
+                                                                monkeypatch):
+    """Mixed flat/grouped settings merge at the entry (no phantom conflict
+    from injected defaults); an explicit default value still conflicts with
+    a grouped one (no swallowed conflict)."""
+    import skycolor.rt.solver as solver
+    from skycolor import render
+    from skycolor.rt.solver import SingleConfig
+
+    seen = {}
+    real = solver.solve
+
+    def spy(atmo, sun_zen, vzen, vaz, sun_azimuth_deg=0.0, **k):
+        seen.update(k)
+        return real(atmo, sun_zen, vzen, vaz, sun_azimuth_deg=sun_azimuth_deg,
+                    **k)
+
+    monkeypatch.setattr(solver, "solve", spy)
+    zen = np.array([0.0, 60.0, 90.0])
+    az = np.array([0.0, 120.0])
+    Z, A = np.meshgrid(zen, az, indexing="ij")
+    # legal mix: flat n_gauss + grouped chunk -> both reach the entry
+    res = render.sky_radiance_grid(atmo7, 60.0, Z, A, n_gauss=9,
+                                   approximation="spherical-single",
+                                   single_config=SingleConfig(chunk=17))
+    assert seen.get("n_gauss") == 9
+    assert seen.get("single_config") == SingleConfig(chunk=17)
+    assert res.shape == (3, 2, WL7.size)
+    # explicit default value still conflicts with the grouped channel
+    with pytest.raises(ValueError, match="twice"):
+        render.sky_radiance_grid(atmo7, 60.0, Z, A, n_gauss=3,
+                                 approximation="spherical-single",
+                                 single_config=SingleConfig(n_gauss=9))
+    with pytest.raises(ValueError, match="twice"):
+        render.sky_radiance_grid(atmo7, 60.0, Z, A, chunk=512,
+                                 approximation="spherical-single",
+                                 single_config=SingleConfig(chunk=13))
+    # legacy explicit values keep flowing in the legacy path
+    seen.clear()
+    render.sky_radiance_grid(atmo7, 60.0, Z, A, n_gauss=9, chunk=17)
+    assert seen.get("n_gauss") == 9 and seen.get("chunk") == 17
+
+
+def test_external_field_binding_shares_the_grid_invariant(atmo7, monkeypatch):
+    """The external-field entry enforces the same axes invariant *before*
+    sampling: single-node and constant axes are rejected, the field is
+    never called."""
+    from skycolor import render
+
+    calls = {"n": 0}
+
+    def field(zen, azr):
+        calls["n"] += 1
+        return np.zeros((np.asarray(zen).size, WL7.size))
+
+    with pytest.raises(ValueError, match="at least two"):
+        render.presentation_from_field(field, atmo7, 20.0, 0.0,
+                                       n_zenith=1, n_azimuth=3)
+    with pytest.raises(ValueError, match="strictly increasing"):
+        render.presentation_from_field(field, atmo7, 20.0, 0.0, n_zenith=3,
+                                       n_azimuth=3, min_zenith_deg=90.0)
+    assert calls["n"] == 0
+
+
+def test_binding_enforces_the_half_dome_domain(atmo7):
+    """The display layer's supported input is the regular half dome: a
+    full-circle azimuth layout is refused at binding instead of doubling
+    the ground diffuse integral downstream."""
+    from skycolor import render
+    from skycolor.rt.solver import solve
+
+    zen = np.linspace(0.0, 90.0, 3)
+    az_full = np.array([0.0, 90.0, 180.0, 270.0, 360.0])
+    Z, A = np.meshgrid(zen, az_full, indexing="ij")
+    result = solve(atmo7, 70.0, Z.ravel(), A.ravel())
+    with pytest.raises(ValueError, match="half-dome"):
+        render.presentation_from_result(result, zen, az_full, 20.0, 0.0)
+    with pytest.raises(ValueError, match="half-dome"):
+        render.presentation_from_result(result, zen - 10.0,
+                                        az_full[:3], 20.0, 0.0)
+    # the isotropic anchor on an accepted half dome: E = pi L exactly
+    import dataclasses
+
+    az = np.linspace(0.0, 180.0, 7)
+    Z2, A2 = np.meshgrid(zen, az, indexing="ij")
+    result2 = solve(atmo7, 70.0, Z2.ravel(), A2.ravel())
+    ones = np.ones_like(result2.radiance)
+    pres = render.presentation_from_result(
+        dataclasses.replace(result2, radiance=ones), zen, az, 20.0, 0.0,
+        ground_albedo=1.0, ground_direct_irradiance=np.zeros(WL7.size),
+        ground_supported=True)
+    e_diff = render.hemispherical_irradiance(pres.radiance, pres.zenith,
+                                             pres.azimuth_rel)
+    np.testing.assert_allclose(e_diff, np.pi, rtol=1e-3)
+
+
+def test_summary_zero_stderr_without_run_metadata():
+    """A zero stderr with no execution record must not claim the term ran."""
+    from skycolor import render
+    from skycolor.rt.result import SkyResult
+
+    bare = SkyResult(radiance=np.zeros((1, 3)), wl=np.array([400.0, 500.0, 600.0]),
+                     method="twilight", approximation="spherical-mc",
+                     stderr=np.zeros((1, 3)))
+    text = render.format_result_summary(bare)
+    assert "run state not recorded" in text
+    assert "although the Monte Carlo term ran" not in text
+    # with an execution record the "ran" statement is warranted
+    ran = SkyResult(radiance=np.zeros((1, 3)), wl=np.array([400.0, 500.0, 600.0]),
+                    method="twilight", approximation="spherical-mc",
+                    effective={"mc": {"n_photons_run": 100}},
+                    stderr=np.zeros((1, 3)))
+    assert "although the Monte Carlo term ran" in render.format_result_summary(ran)

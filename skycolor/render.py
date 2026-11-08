@@ -85,23 +85,22 @@ def sky_dome(atmo, sun_zenith_deg: float, n_zenith: int = 46, n_azimuth: int = 9
                 sun_zenith_deg=sun_zenith_deg)
 
 
-def sky_radiance_grid(atmo, sun_zenith_deg, Z, A, n_gauss=3, chunk=512,
+def sky_radiance_grid(atmo, sun_zenith_deg, Z, A, n_gauss=None, chunk=None,
                       sun_azimuth_deg=0.0, multiple=None, radiance_field=None,
                       *, approximation=None, cloud_layer=None,
                       single_config=None, sos_config=None, mc_config=None):
     """Radiance on an explicit (zenith, relative azimuth) meshgrid.
 
     Without ``radiance_field`` a thin forwarder to one :func:`rt.solver.solve`
-    request (the historical ndarray shape is the reshaped result).  Legacy
-    calls (no keyword-only solver option given) keep the historical request
-    shape exactly: ``multiple`` defaults to True and the single-kernel
-    settings 3/512 go through as before.  Giving any solver option switches
-    to pass-through mode: only explicitly set values are forwarded and the
-    entry point's own defaults/validation decide the rest -- no backend
-    alias or combination is parsed here.  With a field, the field is
-    consulted instead (its coordinate convention is unchanged: absolute
-    view azimuth is the caller's business, the grid is relative to the
-    sun).
+    request (the historical ndarray shape is the reshaped result).  ``None``
+    means "not provided" for every optional setting: legacy calls (no
+    keyword-only solver option given) get the historical defaults 3/512
+    filled, while in new-options mode each explicitly given value -- true
+    sentinel semantics, no default-value sniffing -- is forwarded on its
+    own so the authoritative entry merges or rejects it (applicability,
+    flat-vs-grouped conflicts).  With a field, the field is consulted
+    instead (its coordinate convention is unchanged: absolute view azimuth
+    is the caller's business, the grid is relative to the sun).
     """
     if radiance_field is not None:
         given = [name for name, val in
@@ -127,22 +126,18 @@ def sky_radiance_grid(atmo, sun_zenith_deg, Z, A, n_gauss=3, chunk=512,
     if new_options:
         if multiple is not None:
             kwargs["multiple"] = multiple
-        # Explicit legacy settings must reach the entry in this mode too --
-        # dropping them would silently change the request.  Only values
-        # equal to the wrapper's historical defaults stay unforwarded (the
-        # sentinel limitation of positional defaults: 3/512 explicit is
-        # indistinguishable from 3/512 default, and the kernel defaults are
-        # the same numbers anyway).  The solver then merges or rejects them
-        # (applicability, flat-vs-grouped conflicts) instead of this wrapper.
-        if n_gauss != 3 or chunk != 512:
-            kwargs.update(n_gauss=n_gauss, chunk=chunk)
+        if n_gauss is not None:
+            kwargs["n_gauss"] = n_gauss
+        if chunk is not None:
+            kwargs["chunk"] = chunk
         kwargs.update(approximation=approximation, cloud_layer=cloud_layer,
                       single_config=single_config, sos_config=sos_config,
                       mc_config=mc_config)
     else:
         kwargs.update(single=True,
                       multiple=True if multiple is None else bool(multiple),
-                      n_gauss=n_gauss, chunk=chunk)
+                      n_gauss=3 if n_gauss is None else n_gauss,
+                      chunk=512 if chunk is None else chunk)
     res = solve(atmo, sun_zenith_deg, np.ravel(Z),
                 np.ravel(A) + sun_azimuth_deg,
                 sun_azimuth_deg=sun_azimuth_deg, **kwargs)
@@ -280,22 +275,37 @@ class SkyPresentation:
         return 90.0 - self.sun_elevation_deg
 
 
-def _check_grid(zenith, azimuth_rel, radiance, n_wl) -> np.ndarray:
-    """Validate grid/field shape compatibility, return the 3-D reshape.
+def _check_axes(zenith, azimuth_rel):
+    """The grid invariant shared by both binding entries: at least two
+    finite, strictly increasing nodes per axis, within the supported
+    regular half-dome domain (zenith [0, 90], relative azimuth [0, 180]).
 
-    Each axis needs at least two finite, strictly increasing nodes: the
-    camera interpolation (``sample_dome``) clips and bisects on them, so a
-    descending, duplicated or single-node axis would bind fine and then
-    silently produce a wrong sky.
+    The domain is the display layer's own contract -- ``sample_dome``
+    mirrors absolute azimuths onto 0..180 and
+    :func:`hemispherical_irradiance` integrates the half circle and doubles
+    it, so a full-circle layout would bind fine and then silently double
+    the ground diffuse light.  Full-dome reconstruction is out of scope.
     """
-    zen = np.asarray(zenith, dtype=float).ravel()
-    az = np.asarray(azimuth_rel, dtype=float).ravel()
-    for name, axis in (("zenith", zen), ("azimuth_rel", az)):
-        if (axis.size < 2 or not np.all(np.isfinite(axis))
-                or not np.all(np.diff(axis) > 0)):
+    for name, axis, lo, hi in (("zenith", zenith, 0.0, 90.0),
+                               ("azimuth_rel", azimuth_rel, 0.0, 180.0)):
+        a = np.asarray(axis, dtype=float).ravel()
+        if (a.size < 2 or not np.all(np.isfinite(a))
+                or not np.all(np.diff(a) > 0)):
             raise ValueError(
                 f"{name} grid must have at least two finite, strictly "
-                f"increasing nodes for interpolation; got {axis}")
+                f"increasing nodes for interpolation; got {a}")
+        if a[0] < lo - 1e-9 or a[-1] > hi + 1e-9:
+            raise ValueError(
+                f"{name} grid spans [{a[0]}, {a[-1]}] but the supported "
+                f"regular half-dome domain is [{lo}, {hi}] degrees; "
+                "full-circle layouts are not a supported camera input")
+    return (np.asarray(zenith, dtype=float).ravel(),
+            np.asarray(azimuth_rel, dtype=float).ravel())
+
+
+def _check_grid(zenith, azimuth_rel, radiance, n_wl) -> np.ndarray:
+    """Validate grid/field shape compatibility, return the 3-D reshape."""
+    zen, az = _check_axes(zenith, azimuth_rel)
     rad = np.asarray(radiance, dtype=float)
     n_view = zen.size * az.size
     if rad.ndim == 2:
@@ -411,8 +421,10 @@ def presentation_from_field(field, atmo, sun_elevation_deg: float,
     the retired ``ground_direct_transmittance`` passed at display time),
     otherwise :func:`render_result` with ``ground=True`` raises.
     """
-    zen = np.linspace(min_zenith_deg, 90.0, n_zenith)
-    az = np.linspace(0.0, 180.0, n_azimuth)
+    # the same grid invariant as the result-binding entry, checked *before*
+    # the field is sampled (an external field can cost a full solve)
+    zen, az = _check_axes(np.linspace(min_zenith_deg, 90.0, n_zenith),
+                          np.linspace(0.0, 180.0, n_azimuth))
     Z, A = np.meshgrid(zen, az, indexing="ij")
     rad = np.asarray(field(np.ravel(Z), np.ravel(A)), dtype=float)
     wl = np.asarray(atmo.wl, dtype=float).ravel()
@@ -716,14 +728,21 @@ def format_result_summary(source) -> str:
         elif not finite.size:
             lines.append("mc stderr: no finite values -- statistics unknown")
         elif not np.any(finite):
-            # the engine ran and recorded its budget, but every coarse
-            # direction came back undetected: the zeros are absence of
-            # evidence, not a zero-variance estimate
-            lines.append(
-                "mc stderr: identically zero although the Monte Carlo term "
-                "ran -- the statistical uncertainty is not determinable from "
-                "zeros; treat the higher-order term as unresolved at this "
-                "budget (budget is not tail coverage)")
+            # zeros are absence of evidence, not a zero-variance estimate;
+            # whether the term actually ran is only claimed when recorded
+            ran_evidenced = (opt.get("mc_run") is True or "mc" in effective
+                             or "n_photons" in d)
+            if ran_evidenced:
+                lines.append(
+                    "mc stderr: identically zero although the Monte Carlo "
+                    "term ran -- the statistical uncertainty is not "
+                    "determinable from zeros; treat the higher-order term "
+                    "as unresolved at this budget (budget is not tail "
+                    "coverage)")
+            else:
+                lines.append(
+                    "mc stderr: identically zero (run state not recorded; "
+                    "zero stderr does not imply zero uncertainty)")
         else:
             lines.append(
                 "mc stderr (W m-2 sr-1 nm-1): median {:.3e}, max {:.3e} -- "
