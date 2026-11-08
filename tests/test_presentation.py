@@ -1143,11 +1143,13 @@ def test_summary_zero_stderr_without_run_metadata():
 # ---------------------------------------------------------------------------
 # 8. review round 4: full-span half dome (R4 fix)
 # ---------------------------------------------------------------------------
-def test_binding_requires_full_span_half_dome(atmo7):
+def test_binding_requires_full_span_half_dome(atmo7, monkeypatch):
     """A cropped layout lying inside the domain but not covering 0..180 /
     0..90 is refused: cameras would clamp the missing sky onto the edge and
     the ground integral would halve.  The isotropic anchor (L=1, albedo=1,
-    no direct light -> ground spectrum exactly 1) pins the accepted shape."""
+    no direct light -> ground spectrum exactly 1) sits at the *actual
+    consumer*: the ground pixels render_result hands to color.render_rgb,
+    spy-captured before tone mapping."""
     import dataclasses
 
     from skycolor import render
@@ -1170,8 +1172,12 @@ def test_binding_requires_full_span_half_dome(atmo7):
         render.presentation_from_field(field, atmo7, 20.0, 0.0,
                                        n_zenith=3, n_azimuth=5,
                                        min_zenith_deg=30.0)
-    # accepted shape: the ground spectrum entering the colour mapping is
-    # exactly albedo/pi * (pi*L + 0) = 1 -- the full dome, integrated once
+    # accepted shape: the analytic anchor sits at the *actual consumer* --
+    # render_result's ground pixels, spy-captured from the spectrum handed
+    # to color.render_rgb before tone mapping.  With L=1, albedo=1 and zero
+    # direct light, Lg = albedo/pi * (0 + pi*L) = 1 per wavelength, so a
+    # path that drops, double-counts or bypasses the diffuse ground light
+    # cannot pass here; the helper-level integral is cross-checked above.
     full = render.presentation_from_result(
         dataclasses.replace(result, radiance=ones), zen, az, 20.0, 0.0,
         ground_albedo=1.0, ground_direct_irradiance=np.zeros(WL7.size),
@@ -1179,6 +1185,16 @@ def test_binding_requires_full_span_half_dome(atmo7):
     e_diff = render.hemispherical_irradiance(full.radiance, full.zenith,
                                              full.azimuth_rel)
     np.testing.assert_allclose(e_diff, np.pi, rtol=1e-3)
-    lg = np.asarray(full.ground_albedo, float) / np.pi * (
-        np.zeros(WL7.size) + e_diff)
-    np.testing.assert_allclose(lg, 1.0, rtol=1e-3)
+    captured = {}
+
+    def _spy_render_rgb(rad, wl, **kwargs):
+        captured["rad"] = np.asarray(rad, dtype=float)
+        return np.zeros(np.asarray(rad).shape[:2] + (3,))
+
+    monkeypatch.setattr(render.color, "render_rgb", _spy_render_rgb)
+    render.render_result(full, camera="panorama", size=(8, 8),
+                         ground=True, sun_disk=False)
+    _, el = render.panorama_grid(8, 8)
+    ground_px = captured["rad"][el < 0.0]
+    assert ground_px.size > 0
+    np.testing.assert_allclose(ground_px, 1.0, rtol=1e-3)
