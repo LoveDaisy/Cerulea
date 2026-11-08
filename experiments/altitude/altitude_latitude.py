@@ -18,7 +18,12 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from common import FIG, WL, chromaticity_of, save, strip
+from pathlib import Path
+
+from experiments.common import WL, chromaticity_of, save, strip
+
+THEME = Path(__file__).resolve().parent          # experiments/<theme>
+FIG = THEME / "figures"      # theme-owned figure output (not the root candidates)
 from skycolor import color, render
 from skycolor.geometry import sun_position
 from skycolor.presets import clear
@@ -48,9 +53,9 @@ def altitude_panel():
     ax2.semilogy(alts, lums, "s--", color="tab:red", label="zenith luminance")
     ax2.set_ylabel("zenith luminance [cd m$^{-2}$]")
     ax.set_title("the sky from a mountain (sun 60° up)")
-    save(fig, "05_altitude.png")
+    save(fig, FIG / "05_altitude.png")
     render.save_png(np.concatenate(imgs, axis=1), FIG / "05_altitude_views.png")
-    print("  figures -> 05_altitude*.png")
+    print(f"  figure -> {FIG / '05_altitude*.png'}")
 
 
 def twilight_duration(lat, date, lo=-6.0, hi=0.0):
@@ -80,7 +85,7 @@ def latitude_panel():
     ax.set_title("why twilight lasts longer near the poles")
     ax.legend(fontsize=8)
     ax.grid(alpha=0.3)
-    save(fig, "05_twilight_duration.png")
+    save(fig, FIG / "05_twilight_duration.png")
 
 
 def main():

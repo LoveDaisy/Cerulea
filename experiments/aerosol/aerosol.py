@@ -11,7 +11,13 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from common import FIG, OUT, WL, chromaticity_of, save, strip
+from pathlib import Path
+
+from experiments.common import WL, chromaticity_of, save, strip
+
+THEME = Path(__file__).resolve().parent          # experiments/<theme>
+FIG = THEME / "figures"      # theme-owned figure output (not the root candidates)
+OUT = THEME / "out"          # theme-owned numeric output (gitignored)
 from skycolor import color, presets, render
 from skycolor.aerosol import (
     AngstromAerosol,
@@ -74,7 +80,7 @@ def main():
     axes[1].legend()
     axes[1].grid(alpha=0.3)
     axes[1].set_title("brightness vs aerosol loading")
-    save(fig, "03_aerosol_loading.png")
+    save(fig, FIG / "03_aerosol_loading.png")
     plt.close(fig)
 
     # ---- aerosol type comparison ------------------------------------------
@@ -88,7 +94,7 @@ def main():
                                                 n_azimuth=25)["radiance"][0, 0])
         print(f"  {name:22s} zenith xy = ({xy[0]:.3f}, {xy[1]:.3f})  Lv={L:.0f} cd/m2")
     render.save_png(strip(imgs), FIG / "03_aerosol_types.png")
-    print("  figure -> figures/03_aerosol_types.png")
+    print(f"  figure -> {FIG / '03_aerosol_types.png'}")
 
     # ---- pictures of increasing haze --------------------------------------
     imgs = []
@@ -100,8 +106,9 @@ def main():
                                         reference_percentile=92, n_zenith=40,
                                         n_azimuth=61))
     render.save_png(np.concatenate(imgs, axis=1), FIG / "03_haze_progression.png")
-    print("  figure -> figures/03_haze_progression.png")
+    print(f"  figure -> {FIG / '03_haze_progression.png'}")
 
+    OUT.mkdir(parents=True, exist_ok=True)
     np.savez(OUT / "03_aerosol.npz", aod=AODS, zen_xy=np.array(zen_xy),
              hor_xy=np.array(hor_xy), hor_sun_xy=np.array(hor_sun_xy), lum=lum)
     print("done")

@@ -297,7 +297,7 @@ def run(engine_points=None):
     axr.grid(alpha=0.3)
     axr.legend(fontsize=7.5, loc="upper center", ncol=3)
 
-    fig.savefig(C.ROOT / "figures" / "13_twilight_datasets.png", dpi=150)
+    fig.savefig(C.FIG / "13_twilight_datasets.png", dpi=150)
     plt.close(fig)
 
     # -- the model's own altitude response, for the interpretation ------------

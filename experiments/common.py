@@ -1,29 +1,36 @@
-"""Shared helpers for the experiment scripts."""
+"""Shared helpers for the experiment themes.
+
+Themes own their output: every script derives its ``figures/`` and ``out/``
+directories from its own ``__file__`` (see the ``FIG``/``OUT`` pattern in the
+theme scripts), and :func:`save` takes an explicit destination path -- there
+is no global root-figures default and no import-time directory creation.
+Production-representative figures are written to the root ``figures/`` only
+by explicit choice (task-4 curation), never by these helpers' defaults.
+"""
 from __future__ import annotations
 
 import pathlib
-import sys
 
 import numpy as np
 
+from skycolor import color
+from skycolor.constants import WL_COARSE
+
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
-
-from skycolor import color, render  # noqa: E402
-from skycolor.constants import WL_COARSE  # noqa: E402
-
-FIG = ROOT / "figures"
-OUT = ROOT / "experiments" / "out"
-FIG.mkdir(exist_ok=True)
-OUT.mkdir(parents=True, exist_ok=True)
 
 WL = WL_COARSE
 
 
-def save(fig, name):
-    path = FIG / name
+def save(fig, path):
+    """Save a matplotlib figure to an explicit destination path."""
+    path = pathlib.Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=140, bbox_inches="tight")
-    print(f"  figure -> {path.relative_to(ROOT)}")
+    try:
+        shown = path.relative_to(ROOT)
+    except ValueError:
+        shown = path
+    print(f"  figure -> {shown}")
     return path
 
 

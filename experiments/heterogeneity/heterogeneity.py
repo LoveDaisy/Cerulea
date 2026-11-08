@@ -25,7 +25,13 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from common import FIG, OUT, WL, chromaticity_of, save, strip
+from pathlib import Path
+
+from experiments.common import WL, chromaticity_of, save, strip
+
+THEME = Path(__file__).resolve().parent          # experiments/<theme>
+FIG = THEME / "figures"      # theme-owned figure output (not the root candidates)
+OUT = THEME / "out"          # theme-owned numeric output (gitignored)
 from skycolor import color, render
 from skycolor.aerosol import HazeAerosol
 from skycolor.atmosphere import (
@@ -50,19 +56,26 @@ def build(wl, aod, field):
     return Atmosphere(wl, aerosols=[lay])
 
 
-def main():
+def main(quick: bool = False):
+    """Horizon colour vs haze distribution; ``--quick`` coarsens geometry."""
     sun_el = 12.0
     imgs = []
+    cases = CASES if not quick else dict(list(CASES.items())[:2])
     fig, ax = plt.subplots(figsize=(6.4, 4.6))
-    for name, (aod, field) in CASES.items():
+    for name, (aod, field) in cases.items():
         atmo = build(WL, aod, field)
-        dome = render.sky_dome(atmo, 90.0 - sun_el, n_zenith=44, n_azimuth=61)
+        dome = render.sky_dome(atmo, 90.0 - sun_el,
+                               n_zenith=20 if quick else 44,
+                               n_azimuth=25 if quick else 61)
         elev = 90.0 - dome["zenith"]
         xy, Lv = chromaticity_of(dome["radiance"])
         # average over azimuth
         ax.plot(elev, xy[..., 0].mean(axis=1), label=f"{name}  (x)")
-        img = render.render_scene(atmo, sun_el, 0.0, camera="panorama", size=(620, 250),
-                                  reference_percentile=92, n_zenith=44, n_azimuth=61)
+        img = render.render_scene(atmo, sun_el, 0.0, camera="panorama",
+                                  size=(300, 120) if quick else (620, 250),
+                                  reference_percentile=92,
+                                  n_zenith=20 if quick else 44,
+                                  n_azimuth=25 if quick else 61)
         imgs.append(img)
         print(f"  {name:26s} zenith x={xy[0, 0, 0]:.3f}  horizon(88deg) x={xy[-1].mean(axis=0)[0]:.3f}")
     ax.set_xlabel("elevation [deg]")
@@ -70,11 +83,16 @@ def main():
     ax.set_title("how the horizon colour depends on where the haze is")
     ax.legend(fontsize=7)
     ax.grid(alpha=0.3)
-    save(fig, "04_heterogeneity_curve.png")
+    save(fig, FIG / "04_heterogeneity_curve.png")
     render.save_png(strip(imgs), FIG / "04_heterogeneity_panorama.png")
-    print("  figure -> figures/04_heterogeneity_panorama.png")
+    print(f"  figure -> {FIG / '04_heterogeneity_panorama.png'}")
     print("done")
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--quick", action="store_true",
+                    help="coarser geometry and two cases for a bounded smoke run")
+    main(quick=ap.parse_args().quick)

@@ -19,10 +19,17 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from common import FIG, OUT, WL, chromaticity_of, save
+from pathlib import Path
+
+from experiments.common import WL, chromaticity_of, save
+
+THEME = Path(__file__).resolve().parent          # experiments/<theme>
+FIG = THEME / "figures"      # theme-owned figure output (not the root candidates)
+OUT = THEME / "out"          # theme-owned numeric output (gitignored)
 from skycolor import cloud, color, presets, render
 from skycolor.rt.cloud import (delta_eddington, illuminate_cloud,
                                sky_radiance_with_cloud)
+from skycolor.rt.solver import sky_radiance_total
 
 #: Monte-Carlo reference albedos (conservative layer, mu0 = 1, black ground).
 #: 2e5-4e5 photons, 1 sigma <= 0.001; see docs/physics/CLOUD.md.
@@ -106,7 +113,7 @@ def figure_comparison(atmo):
         row = []
         for elev in elevations:
             img = _cloud_panorama(atmo, layer, elev, exposure=exposure,
-                                  sun_disk=(layer is None))
+                                  sun_disk=(layer is None and elev > 0.0))
             row.append(img)
             if layer is not None:
                 prof = sky_radiance_with_cloud(atmo, layer, 90.0 - elev,
@@ -135,7 +142,7 @@ def figure_comparison(atmo):
                  "(panorama, sun at azimuth 0, shared exposure, no chromatic adaptation)",
                  fontsize=10)
     ax.tick_params(length=0)
-    save(fig, "10_cloud_clear_vs_overcast.png")
+    save(fig, FIG / "10_cloud_clear_vs_overcast.png")
     plt.close(fig)
     return exposure
 
@@ -166,7 +173,7 @@ def figure_fisheye(atmo):
     axes[1].legend(fontsize=8)
     axes[1].grid(alpha=0.3)
     axes[1].set_title("overcast luminance distribution", fontsize=9)
-    save(fig, "10_cloud_overcast_fisheye.png")
+    save(fig, FIG / "10_cloud_overcast_fisheye.png")
     plt.close(fig)
 
 
@@ -228,7 +235,7 @@ def figure_sunset(atmo):
                  "cloud-base chromaticity (x,y) inset; each panel exposed for its own sky",
                  fontsize=10)
     ax.tick_params(length=0)
-    save(fig, "10_cloud_sunset_sequence.png")
+    save(fig, FIG / "10_cloud_sunset_sequence.png")
     plt.close(fig)
     return notes
 
@@ -315,7 +322,7 @@ def figure_albedo(atmo):
     ax.grid(alpha=0.3)
 
     fig.tight_layout()
-    save(fig, "10_cloud_albedo_and_sunset.png")
+    save(fig, FIG / "10_cloud_albedo_and_sunset.png")
     plt.close(fig)
 
 
@@ -345,6 +352,7 @@ def main(parts=("09", "fisheye", "sunset", "albedo")):
              (1.0 - optics.omega[0] * optics.f[0])))
     for t, r in zip(taus, res.albedo):
         print(f"    tau={t:6.1f}  R={r:.4f}")
+    OUT.mkdir(parents=True, exist_ok=True)
     np.savez(OUT / "10_clouds.npz", wl=wl, tau=taus, albedo=res.albedo,
              mc_tau=MC_TAU, mc_g0=MC_G0, mc_g085=MC_G085,
              stratus_g=optics.g, stratus_f=optics.f)

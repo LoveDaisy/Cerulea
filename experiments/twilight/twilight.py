@@ -13,7 +13,13 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from common import FIG, OUT, WL, chromaticity_of, save, strip
+from pathlib import Path
+
+from experiments.common import WL, chromaticity_of, save, strip
+
+THEME = Path(__file__).resolve().parent          # experiments/<theme>
+FIG = THEME / "figures"      # theme-owned figure output (not the root candidates)
+OUT = THEME / "out"          # theme-owned numeric output (gitignored)
 from skycolor import color, presets, render
 
 #: Clear-sky zenith luminance in the V band, from the empirical fit of
@@ -23,9 +29,14 @@ PATAT_2006 = {-3.0: 0.0, -6.0: 0.516, -9.0: 0.0171, -12.0: 0.00146, -18.0: 0.000
 LIT = [(k, v / 2, v * 2) for k, v in PATAT_2006.items() if v > 0]
 
 
-def main():
+def main(quick: bool = False):
+    """Twilight luminance/colour sweep; ``--quick`` coarsens geometry only.
+
+    The spectral grid stays ``WL`` on purpose: the chromaticity helpers
+    integrate over it, and geometry (solve/render counts) dominates cost.
+    """
     atmo = presets.clear(WL, aod=0.08)
-    depressions = np.arange(0.0, 18.01, 0.25)
+    depressions = np.arange(0.0, 18.01, 1.0 if quick else 0.25)
     elevations = -depressions
     zen_lum, zen_xy = [], []
     hor_lum = {0: [], 90: [], 180: []}
@@ -64,7 +75,7 @@ def main():
     axes[1].legend(fontsize=8)
     axes[1].set_title("horizon brightness through twilight")
     axes[1].grid(True, alpha=0.25)
-    save(fig, "02_twilight_luminance.png")
+    save(fig, FIG / "02_twilight_luminance.png")
     plt.close(fig)
 
     fig, ax = plt.subplots(figsize=(6, 5))
@@ -75,12 +86,13 @@ def main():
     ax.set_ylabel("y")
     ax.set_title("zenith colour through twilight")
     ax.grid(alpha=0.3)
-    save(fig, "02_twilight_zenith_xy.png")
+    save(fig, FIG / "02_twilight_zenith_xy.png")
     plt.close(fig)
 
     imgs = []
-    for se in [-1, -2, -3, -4, -5, -6, -7, -8, -10]:
-        rgb = render.render_scene(atmo, se, 0.0, camera="fisheye", size=(330,),
+    fisheye_size = (120,) if quick else (330,)
+    for se in ([-2, -6, -10] if quick else [-1, -2, -3, -4, -5, -6, -7, -8, -10]):
+        rgb = render.render_scene(atmo, se, 0.0, camera="fisheye", size=fisheye_size,
                                   reference_percentile=99.5, n_zenith=40,
                                   n_azimuth=61, sun_disk=False)
         imgs.append(rgb)
@@ -92,8 +104,9 @@ def main():
         second = second + [np.zeros_like(imgs[0])] * (half - len(second))
     rows.append(np.concatenate(second, axis=1))
     render.save_png(strip(rows, gap=6), FIG / "02_twilight_fisheye.png")
-    print("  figure -> figures/02_twilight_fisheye.png")
+    print(f"  figure -> {FIG / '02_twilight_fisheye.png'}")
 
+    OUT.mkdir(parents=True, exist_ok=True)
     np.savez(OUT / "02_twilight.npz", depressions=depressions, zen_lum=zen_lum,
              zen_xy=np.array(zen_xy),
              **{f"hor_{k}": np.array(v) for k, v in hor_lum.items()})
@@ -101,4 +114,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--quick", action="store_true",
+                    help="coarser geometry for a bounded smoke run")
+    main(quick=ap.parse_args().quick)

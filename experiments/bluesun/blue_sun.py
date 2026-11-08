@@ -18,7 +18,13 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from common import FIG, OUT, save
+from pathlib import Path
+
+from experiments.common import save
+
+THEME = Path(__file__).resolve().parent          # experiments/<theme>
+FIG = THEME / "figures"      # theme-owned figure output (not the root candidates)
+OUT = THEME / "out"          # theme-owned numeric output (gitignored)
 from skycolor import color
 from skycolor.aerosol import AngstromAerosol, LogNormalMode, MieAerosol
 from skycolor.atmosphere import AerosolLayer, Atmosphere, ExponentialProfile
@@ -88,7 +94,7 @@ def main():
     axes[1].set_title("colour of the direct beam (sun 50° up, AOD 1.0)")
     axes[1].legend(fontsize=7)
     axes[1].grid(alpha=0.3)
-    save(fig, "09_blue_sun.png")
+    save(fig, FIG / "09_blue_sun.png")
 
     # spectra for the most anomalous case
     fig, ax = plt.subplots(figsize=(6.4, 4.4))
@@ -112,8 +118,9 @@ def main():
     ax.set_title("extinction spectra: Mie ripples vs a power law")
     ax.legend(fontsize=8)
     ax.grid(alpha=0.3)
-    save(fig, "09_blue_sun_spectra.png")
+    save(fig, FIG / "09_blue_sun_spectra.png")
 
+    OUT.mkdir(parents=True, exist_ok=True)
     np.savez(OUT / "09_blue_sun.npz", radii=radii, sigmas=sigmas, ratio=ratio)
     best = np.unravel_index(np.nanargmin(ratio), ratio.shape)
     print(f"most anomalous: r={radii[best[0]]:.2f} µm σg={sigmas[best[1]]:.2f} "

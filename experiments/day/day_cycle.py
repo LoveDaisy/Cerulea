@@ -13,7 +13,13 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from common import FIG, OUT, WL, chromaticity_of, save, strip
+from pathlib import Path
+
+from experiments.common import WL, chromaticity_of, save, strip
+
+THEME = Path(__file__).resolve().parent          # experiments/<theme>
+FIG = THEME / "figures"      # theme-owned figure output (not the root candidates)
+OUT = THEME / "out"          # theme-owned numeric output (gitignored)
 from skycolor import color, presets, render
 
 # ---------------------------------------------------------------------------
@@ -49,9 +55,11 @@ def draw_cie(ax):
     ax.set_aspect("equal")
 
 
-def main():
+def main(quick: bool = False):
+    """Day-cycle colour sweep; ``--quick`` coarsens geometry only (spectral
+    grid stays ``WL`` -- the chromaticity helpers integrate over it)."""
     atmo = presets.clear(WL, aod=0.08)
-    elevations = np.arange(-18.0, 71.0, 1.0)
+    elevations = np.arange(-18.0, 71.0, 3.0 if quick else 1.0)
     dirs = {"zenith": (1.0, 0.0), "horizon, sun side": (88.0, 0.0),
             "horizon, anti-solar": (88.0, 180.0)}
     traj = {k: [] for k in dirs}
@@ -85,19 +93,25 @@ def main():
     axes[1].legend(fontsize=7)
     axes[1].grid(True, alpha=0.3)
     axes[1].set_title("sky luminance")
-    save(fig, "01_day_cycle_chromaticity.png")
+    save(fig, FIG / "01_day_cycle_chromaticity.png")
     plt.close(fig)
 
     # visual strip
     imgs = []
-    for se in [60, 40, 20, 10, 5, 2, 0, -2, -4, -6, -10]:
-        rgb = render.render_scene(atmo, se, 0.0, camera="panorama", size=(620, 210),
-                                  reference_percentile=92, sun_disk=True,
+    pano_size = (300, 100) if quick else (620, 210)
+    for se in ([20, 5, 0, -6] if quick else [60, 40, 20, 10, 5, 2, 0, -2, -4, -6, -10]):
+        # the sun-disk marker requires a visible source (the presentation
+        # contract refuses an explicit disk at or below the horizon); at
+        # sunset elevations the disk is genuinely occluded, so drop the
+        # marker instead of the panel
+        rgb = render.render_scene(atmo, se, 0.0, camera="panorama", size=pano_size,
+                                  reference_percentile=92, sun_disk=se > 0.0,
                                   n_zenith=40, n_azimuth=61)
         imgs.append(rgb)
     render.save_png(strip(imgs), FIG / "01_day_cycle_panorama.png")
-    print("  figure -> figures/01_day_cycle_panorama.png")
+    print(f"  figure -> {FIG / '01_day_cycle_panorama.png'}")
 
+    OUT.mkdir(parents=True, exist_ok=True)
     np.savez(OUT / "01_day_cycle.npz", elevations=elevations,
              **{f"xy_{k.replace(' ', '_')}": np.array(v) for k, v in traj.items()},
              **{f"lum_{k.replace(' ', '_')}": np.array(v) for k, v in lum.items()})
@@ -105,4 +119,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--quick", action="store_true",
+                    help="coarser geometry for a bounded smoke run")
+    main(quick=ap.parse_args().quick)

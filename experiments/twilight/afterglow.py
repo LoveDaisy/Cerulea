@@ -16,7 +16,13 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from common import FIG, OUT, WL, chromaticity_of, row, save
+from pathlib import Path
+
+from experiments.common import WL, chromaticity_of, row, save
+
+THEME = Path(__file__).resolve().parent          # experiments/<theme>
+FIG = THEME / "figures"      # theme-owned figure output (not the root candidates)
+OUT = THEME / "out"          # theme-owned numeric output (gitignored)
 from skycolor import presets, render
 from skycolor.aerosol import AngstromAerosol
 from skycolor.atmosphere import AerosolLayer, Atmosphere, ExponentialProfile, GaussianProfile
@@ -59,11 +65,11 @@ def main():
     axes[1].set_ylabel("luminance [cd m$^{-2}$]")
     axes[1].set_title("brightness")
     axes[1].grid(alpha=0.3)
-    save(fig, "08_afterglow_curve.png")
+    save(fig, FIG / "08_afterglow_curve.png")
 
     grid = np.concatenate([row(imgs[:3]), row(imgs[3:])], axis=0)
     render.save_png(grid, FIG / "08_afterglow_gallery.png")
-    print("  figure -> figures/08_afterglow_gallery.png")
+    print(f"  figure -> {FIG / '08_afterglow_gallery.png'}")
 
     # a volcano: a strong stratospheric layer at 22 km
     volc = scene(22.0, aod=0.35)
@@ -78,8 +84,9 @@ def main():
                                         reference_percentile=96, n_zenith=44, n_azimuth=61))
     render.save_png(np.concatenate([row(imgs[:4]), row(imgs[4:])], axis=0),
                     FIG / "08_volcanic_twilight.png")
-    print("  figure -> figures/08_volcanic_twilight.png")
+    print(f"  figure -> {FIG / '08_volcanic_twilight.png'}")
 
+    OUT.mkdir(parents=True, exist_ok=True)
     np.savez(OUT / "08_afterglow.npz", alts=ALTS, aod=LAYER_AOD, sun_elev=sun_elev)
     print("done")
 
