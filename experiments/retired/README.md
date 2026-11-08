@@ -47,7 +47,8 @@
 
 - 代码（@ `afaae17`）：`experiments/06_gallery.py`、`experiments/07_timelapse.py`
 - 退休理由：重复展示编排；不为一张候选图维护完整画廊/动画工作流。
-- 旧图见根 `figures/`（生产候选池，任务4甄别）与本目录 `figures/`（退休图，Step 5 落位）。
+- 旧图去向：`06_gallery_*.png`、`06_hero_*.png`、`07_sunset.gif` 留在根 `figures/`
+  （生产候选池，任务4甄别）；`07_sunset_ends.png`（GIF 首尾帧中间图）在本目录 `figures/`。
 
 ## 历史廓线与深暮光图（profiles / twilight figures）
 
@@ -55,6 +56,19 @@
   `twilight_figure.py`、`twilight_nocturnal.py`
 - 已知限制：`twilight_figure.py` 硬编码旧 M10 数值，其输出不能当作当前模型精度图。
 - 生产侧真实保障另存：默认套件 `tests/test_profiles.py`。
+- 旧图去向：`12_profile_sensitivity.png`、`11_twilight_deep.png` 在本目录 `figures/`；
+  `14_twilight_altitude_audit.png`、`15_solar_source_audit.png`（审计专题）同。
+
+## 本目录 figures/
+
+| 图 | 内容与限制 |
+|---|---|
+| `07_sunset_ends.png` | timelapse GIF 首尾帧中间图 |
+| `10_cloud_albedo_and_sunset.png` | 验证与生产混合图；整体按历史验证/研究用途保存，任务4需要时拆选重画 |
+| `11_twilight_deep.png` | 深暮光引擎比较（旧 M10 硬编码数值 + 统计限制），ROADMAP M19 |
+| `12_profile_sensitivity.png` | 历史廓线敏感性（`docs/twilight/PROFILES.md` 冻结期有效） |
+| `14_twilight_altitude_audit.png` | 海拔审计图（域截断语义曾变更，不作当前海拔结论） |
+| `15_solar_source_audit.png` | 太阳源审计研究图（生产采用证据在 `validation/production_solar_source`） |
 
 ## task-7 深暮光参考（deep twilight reference）
 

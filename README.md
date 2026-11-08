@@ -95,7 +95,7 @@ skycolor/
   render.py       sky dome, cameras (panorama / fisheye / perspective), images
   presets.py      named scenarios
 tools/build_data.py   rebuilds the packaged data tables from data_raw/
-experiments/          scripts that produce the figures (01..12 and named scripts)
+experiments/          phenomenon themes (thin production-entry scripts; cssp & retired topics)
 validation/           six independent checks against published references
 tests/                regression and mechanism tests
 docs/                 project overview, architecture and development guide

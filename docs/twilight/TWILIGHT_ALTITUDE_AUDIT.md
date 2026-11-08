@@ -113,7 +113,7 @@ SOS 的高阶减量较小，净结果仍增亮约 2.7%。光路/源项的额外�
 每 anchor 4 million 路径、6×8 个方向；4 组的经验 t 区间约 0.899–1.011，单独还不能
 裁定小幅变暗。此复查没有证明深暮光的插值偏差小，也没有沿用单次引擎误差条作真值。
 
-![确定性分量与直接 MC 对比](../../figures/14_twilight_altitude_audit.png)
+![确定性分量与直接 MC 对比](../../experiments/retired/figures/14_twilight_altitude_audit.png)
 
 ## 5. 仍然存在的传输近似
 

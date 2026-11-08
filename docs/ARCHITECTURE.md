@@ -289,7 +289,7 @@ instead of silently pairing the custom sky with the clear beam.
 | `refraction._Profile` / `_trace` in data pipeline | `refractive_profile` / `trace_ray(..., profile=...)` |
 | mutating a shared aerosol | `aerosol.replace(**kw)` (shared instances are frozen) |
 | `at_altitude` (double-scaled rescaling) | truncation at the site (Step 3c) |
-| `experiments/clouds.py` display helpers | `render.sky_dome` / `render_scene` with `radiance_field`; the deck ground-beam helper lives in `rt.cloud.ground_direct_irradiance` (experiments forward to it) |
+| `experiments/clouds/clouds.py` display helpers | `render.sky_dome` / `render_scene` with `radiance_field`; the deck ground-beam helper lives in `rt.cloud.ground_direct_irradiance` (experiments forward to it) |
 | CLI `--elevation` | unchanged semantics (site altitude); values follow the truncation fix |
 | CLI `--time` (chart ignored it; `refraction=True` ephemeris angle) | both subcommands consume `--time` through `scene.resolve_sun`: naive means UTC, explicit offsets convert before the ephemeris reads clock fields, and the resolved direction is pre-refraction (the source applies refraction once) |
 

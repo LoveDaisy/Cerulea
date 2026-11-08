@@ -257,7 +257,7 @@ The model reproduces the classical limits:
 > gives 0.85 for `g = 0`, 0.74 for `g = 0.5`, **0.69 for `g = 0.6`** and 0.40
 > for the `g = 0.86` of a real water cloud; 0.7 is reached at `τ = 30` for
 > `g = 0.86`. All of these sit on the published two-stream curves, and the
-> Monte-Carlo points in `figures/10_cloud_albedo_and_sunset.png` lie on the
+> Monte-Carlo points in `experiments/retired/figures/10_cloud_albedo_and_sunset.png` (moved out of the root candidate pool) lie on the
 > `g = 0` and `g = 0.85` curves. The "0.7 at τ = 10" figure therefore implies
 > a moderately forward-scattering phase function (`g ≈ 0.6`), not the `g ≈
 > 0.86` of a droplet distribution; the model's own numbers are quoted above
@@ -355,7 +355,7 @@ neither.
 
 ### 6.3 Why clouds are white and sunsets are red
 
-`figures/10_cloud_albedo_and_sunset.png` makes both statements quantitative:
+`experiments/retired/figures/10_cloud_albedo_and_sunset.png` (historical mixed figure) makes both statements quantitative:
 the albedo curves with Monte-Carlo points, the deck's zenith luminance through
 sunset against the clear-sky reference, and the cloud-base spectrum at four sun
 elevations. The last panel is the clearest summary: the spectrum at noon is
@@ -422,7 +422,7 @@ structure. Each one is a picture you have seen.
 ```bash
 uv sync
 uv run pytest tests/test_cloud.py -q        # 25 tests, ~6 s
-uv run python experiments/clouds.py         # figures 09/10, ~2 min
+uv run python -m experiments.clouds.clouds   # figures 09/10, ~2 min (主题目录输出)
 ```
 
 Timings on the reference machine (81 wavelengths, 1960 view directions):
@@ -443,11 +443,11 @@ a cloudy sky is the cost of the clear-sky solver it attenuates.
 | `skycolor/cloud.py` | `CloudLayer`, Mie core, moments, delta-M, presets |
 | `skycolor/rt/cloud.py` | two-stream solver, illumination geometry, angular model, `sky_radiance_with_cloud` |
 | `tests/test_cloud.py` | 25 acceptance tests |
-| `experiments/clouds.py` | figures 09/10 |
+| `experiments/clouds/clouds.py` | figures 09/10 |
 | `figures/10_cloud_clear_vs_overcast.png` | clear vs overcast, five sun elevations |
 | `figures/10_cloud_overcast_fisheye.png` | overcast fisheye and the (1+2cos θ)/3 law |
 | `figures/10_cloud_sunset_sequence.png` | altostratus and cirrus through sunset |
-| `figures/10_cloud_albedo_and_sunset.png` | albedo validation, when the deck stays lit, cloud-base spectra |
+| `experiments/retired/figures/10_cloud_albedo_and_sunset.png` | albedo validation, when the deck stays lit, cloud-base spectra |
 
 ### Interface
 
@@ -464,5 +464,5 @@ rad = sky_radiance_with_cloud(atmo, cloud_layer, sun_zenith_deg,
 
 Passing `clear_radiance` reuses a clear-sky field that has already been
 computed (the multiple-scattering solve is the expensive part).
-`experiments/clouds.py` shows how to build a full sky dome with it and feed
+`experiments/clouds/clouds.py` shows how to build a full sky dome with it and feed
 `render`'s cameras and colour pipeline without touching `render.py`.

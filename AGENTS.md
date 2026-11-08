@@ -34,8 +34,8 @@ uv run python -m skycolor.cli render --sun-elevation 3 --camera perspective \
     --size 1200x520 --pitch 14 --hfov 100 --preset clear --aod 0.05 \
     --yaw 180 --out sunset.png
 
-# 生成实验图（figures/，脚本从仓库根目录运行）
-uv run python experiments/01_day_cycle.py
+# 生成实验图（写各主题目录 figures/，仓库根目录运行）
+uv run python -m experiments.day.day_cycle --quick
 ```
 
 ### 代码格式化
@@ -72,12 +72,12 @@ uv run python experiments/01_day_cycle.py
 │   ├── presets.py       # 命名场景
 │   └── data/            # 提交在仓库里的数据表（离线可运行）
 ├── validation/          # check1..6 + common.py + 各轮 addendum
-├── experiments/         # 生成 figures/ 的脚本（01..12）
+├── experiments/         # 现象研究主题（薄调用生产入口）+ cssp/retired 主题
 ├── tests/               # 测试套件
 ├── docs/                # 项目入口：STATUS / ROADMAP / ARCHITECTURE / DEVELOPMENT / SUMMARY.zh
 │   ├── physics/         # 通用散射、气溶胶、折射与云方法
 │   └── twilight/        # 暮光引擎、审计链与历史廓线实验
-├── tools/               # build_data.py、twilight_benchmark.py
+├── tools/               # build_data.py、perf_bench.py、benchmark/make_scheduling_weights 窄维护
 ├── figures/             # 提交在仓库里的结果图
 └── scratchpad/          # 本地任务管理（gitignore，不进 git）
 ```

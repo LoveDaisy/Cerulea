@@ -324,7 +324,7 @@ From 3 km the zenith gets darker and deeper blue (less air above), the horizon
 is depressed, and the whole sky gains contrast.  The twilight altitude
 dependence is sensitive to the diffuse-field approximation (see §4.9);
 the daytime altitude behaviour is not affected by the twilight chord fix.
-`at_altitude` now truncates the model at the site; rerunning `experiments/05`
+`at_altitude` now truncates the model at the site; rerunning `experiments.altitude.altitude_latitude`
 uses this consistent ground. Existing figures retain their recorded baseline.
 
 ## 5. Limitations

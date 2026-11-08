@@ -134,7 +134,7 @@ limb darkening。低分辨率（12/8点Gauss）5/9日面节点结果为海平面
 高站0.295800/0.295877；提高至24/16点Gauss与17日面节点为上表结果。该联合精化显示
 数值差别远小于24.7%的处方效应，但不是有限日面模型误差已被消除的证明。
 
-![MC与一次太阳源消融](../../figures/15_solar_source_audit.png)
+![MC与一次太阳源消融](../../experiments/retired/figures/15_solar_source_audit.png)
 
 ## 5. 已解决的命题、仍未签发的结论
 

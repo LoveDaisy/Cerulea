@@ -148,7 +148,7 @@ Probe evidence: subprocess shards with the same grouping measured 254.56 s
   propagate (never disguised as a physical FAIL or a "successful" partial
   run).  `checkN.run()` and standalone commands are unchanged entry points.
 * check1–5 write mutually distinct figure/CSV paths; check6's
-  `figures/13_twilight_datasets.png` is written only by the parent.
+  `validation/figures/13_twilight_datasets.png` is written only by the parent.
 
 Candidate wall clock (probe adapter, same budgets/seeds/grids): **239.17 s**
 with every metric's name/model/reference/tolerance/dev/dev_kind/unit
