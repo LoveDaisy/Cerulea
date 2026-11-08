@@ -1,16 +1,20 @@
-"""Command line interface: ``python -m skycolor``."""
+"""Command line interface: ``python -m skycolor``.
+
+Both subcommands go through one shared preparation: the solar input is
+resolved by :func:`skycolor.scene.resolve_sun` (time or numbers, always the
+pre-refraction direction), then one authoritative solve produces the result
+each output format consumes.  Request errors exit non-zero with the solver's
+message instead of silently falling back to a default path.
+"""
 from __future__ import annotations
 
 import argparse
-import datetime as dt
-import json
 import sys
 
 import numpy as np
 
 from . import color, presets, render
-from .constants import WL_COARSE, WL_DEFAULT
-from .geometry import sun_position
+from .scene import resolve_sun
 
 
 def _build_atmo(args):
@@ -25,19 +29,15 @@ def _build_atmo(args):
     return atmo, wl
 
 
-def _sun_from_time(args):
-    when = dt.datetime.fromisoformat(args.time)
-    az, el = sun_position(args.latitude, args.longitude, when, refraction=True)
-    return az, el
+def _resolved_sun(args):
+    """The one solar input contract of both subcommands (pre-refraction)."""
+    return resolve_sun(args.sun_elevation, args.sun_azimuth, time=args.time,
+                       latitude=args.latitude, longitude=args.longitude)
 
 
 def cmd_render(args):
     atmo, wl = _build_atmo(args)
-    if args.time:
-        sun_az, sun_el = _sun_from_time(args)
-    else:
-        sun_el = args.sun_elevation
-        sun_az = args.sun_azimuth
+    sun_az, sun_el = _resolved_sun(args)
     size = tuple(int(v) for v in args.size.split("x"))
     rgb = render.render_scene(
         atmo, sun_el, sun_az, camera=args.camera, size=size,
@@ -54,7 +54,8 @@ def cmd_render(args):
 def cmd_chart(args):
     """Print the chromaticity and luminance of a few sky directions."""
     atmo, wl = _build_atmo(args)
-    dome = render.sky_dome(atmo, 90.0 - args.sun_elevation,
+    sun_az, sun_el = _resolved_sun(args)
+    dome = render.sky_dome(atmo, 90.0 - sun_el,
                            n_zenith=args.n_zenith, n_azimuth=args.n_azimuth)
     rows = [("zenith", 0, 0), ("45deg sun-side", 45, 0), ("45deg anti-solar", 45, 180),
             ("horizon sun-side", 88, 0), ("horizon anti-solar", 88, 180)]
@@ -75,9 +76,13 @@ def main(argv=None):
         p.add_argument("--preset", default="clear", choices=sorted(presets.PRESETS))
         p.add_argument("--aod", type=float, default=0.1, help="aerosol optical depth at 550 nm")
         p.add_argument("--elevation", type=float, default=0.0, help="observer altitude [km]")
-        p.add_argument("--sun-elevation", type=float, default=10.0)
-        p.add_argument("--sun-azimuth", type=float, default=180.0)
-        p.add_argument("--time", default=None, help="ISO UTC time; overrides sun position")
+        p.add_argument("--sun-elevation", type=float, default=None,
+                       help="sun elevation [deg] (default 10 without --time)")
+        p.add_argument("--sun-azimuth", type=float, default=None,
+                       help="sun azimuth [deg, from north] (default 180 without --time)")
+        p.add_argument("--time", default=None,
+                       help="ISO time (naive = UTC, offsets honoured); "
+                            "overrides numeric sun position")
         p.add_argument("--latitude", type=float, default=39.9)
         p.add_argument("--longitude", type=float, default=116.4)
         p.add_argument("--wl-min", type=float, default=380.0)
@@ -107,7 +112,14 @@ def main(argv=None):
     c.set_defaults(func=cmd_chart)
 
     args = ap.parse_args(argv)
-    return args.func(args)
+    try:
+        code = args.func(args)
+    except ValueError as exc:
+        # a rejected request is a normal outcome, not a traceback: exit
+        # non-zero with the solver's own explanation
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    return 0 if code is None else code
 
 
 if __name__ == "__main__":
