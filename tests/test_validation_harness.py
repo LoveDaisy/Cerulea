@@ -401,7 +401,10 @@ def _fast_check6(monkeypatch, tmp_path):
     monkeypatch.setattr(c6, "sky_radiance_total", _zero)
     fig_dir = tmp_path / "figures"
     fig_dir.mkdir()
-    monkeypatch.setattr(C, "ROOT", tmp_path)
+    # check6 writes through validation.common.FIG (research-boundary Step 4
+    # moved it off C.ROOT): patch the module attribute the write actually
+    # reads, so the stub-physics run can never touch the tracked figure
+    monkeypatch.setattr(C, "FIG", fig_dir)
     return fig_dir
 
 

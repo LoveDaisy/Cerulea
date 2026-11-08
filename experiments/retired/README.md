@@ -4,13 +4,20 @@
 生产内核。复跑一律在固定历史树进行：`git worktree add <dir> <SHA>` 后按该树的
 `uv.lock` 建环境，用下表逐字命令。历史代码与结论的长期保全（tag/分支）由 owner 负责。
 
-## 冻结引用
+## 冻结引用（两级版本语义）
 
-| 引用 | SHA | 内容 |
+**代码冻结 SHA** = 退休代码最后的主树副本（读代码用）。**复跑库 SHA** = 该工具链
+实际可运行的匹配库版本——两者不同：`afaae17` 的 `skycolor/rt/mc.py` 已被 task-6
+整合提交 `a15d87c`（merge `6bdb1f8`）重写，源码注入替换在其文本上
+`compile` 即 `SyntaxError`（line 193，2026-11-08 实测复现）；而审计基线 `5ac0c74`
+的 mc.py 文本上同样替换**编译通过**（同日实测）。不要用代码冻结 SHA 复跑注入链。
+
+| 引用 | SHA | 角色 |
 |---|---|---|
-| 主树退休基线 | `afaae17` | 本任务删除前最后包含全部退休工具/脚本的提交（分支 `scrum/simulation-architecture`） |
-| task-7 深暮光参考 | `dda8673` | branch `task/deep-twilight-reference`；执行器/汇总器/二次候选/mc 诊断与原内核 |
-| task-12 快套件基线 | `5ac0c74` | 2026-11-05 审查基线 main（576 路径） |
+| 代码冻结基线 | `afaae17` | 退休 tools/experiments 的最后主树副本（仅读代码） |
+| 太阳源/注入链复跑树 | `5ac0c74` | 审计基线 main：含全套审计期工具与数据包；`unified_solar_transport` 的源码替换在该库文本编译通过（实测） |
+| 曲率复跑 checkpoint | `2756b2f` | 包 README 记录的 checkpoint；运行时源 = 该源 + `source-binding-guard.patch` 反向应用（包内 hash 验证） |
+| task-7 深暮光 | `dda8673` | 执行器/汇总器/二次候选与原内核（本任务在自身固定树 `--verify-only` 全绿实测） |
 
 ## 曲率传播（curved transport audit）
 
@@ -19,9 +26,11 @@
   `summarize_curved_transport.py`
 - 数据：`validation/data/curved_transport_audit/`（在位冻结，含源码快照
   `snapshots/*.py`、`source-binding-guard.patch`、hash manifest）
-- 复跑：固定树内按该树 `validation/data/curved_transport_audit/README.md` 的命令；
-  已有可信长预算记录（`logs/`、`raw/*.jsonl`），不重启 ensemble。
-- 已知限制：源码改写（patch）只在其记录的库版本成立；不随当前 `rt/mc.py` 运行。
+- 复跑：**checkpoint `2756b2f`** 的固定树 + 将 `source-binding-guard.patch` 反向应用
+  （还原运行时源，包内 `runtime-source-provenance.json` hash 验证），再按该树
+  `validation/data/curved_transport_audit/README.md` 的命令执行；已有可信长预算记录
+  （`logs/`、`raw/*.jsonl`），不重启 ensemble。
+- 已知限制：只在其记录的 checkpoint+patch 组合成立；不随当前 `rt/mc.py` 运行。
 
 ## 太阳源审计链（solar source audits）
 
@@ -30,6 +39,8 @@
   `unified_solar_transport.py`、`check_solar_disk_mc.py`、`check_solar_etendue.py`、
   `probe_solar_refraction.py`、`run_unified_solar_audit.py`、`summarize_solar_source.py`、
   `summarize_unified_source.py`、`summarize_bandpass_audit.py`
+- 复跑树：**`5ac0c74`**（审计基线 main）。`afaae17` 的 mc.py 已含 task-6 重写，
+  注入替换在该文本编译失败（`SyntaxError`，实测）；`5ac0c74` 编译通过（实测）。
 - 数据：`validation/data/solar_source_audit/`、`unified_solar_source_audit/`、
   `twilight_reference_audit/`（在位冻结；源表与源码 hash 可回查）
 - 生产采用证据（不受退休影响）：`validation/production_solar_source.py --suite source`
@@ -80,7 +91,7 @@
 - 数据：`validation/data/deep_twilight_reference/`（在位冻结；manifest 锚定。
   已知偏差：main 合入版 `README.md` 为 salvage 合并改写版，与 manifest 固定 hash 不同；
   数据文件 81/82 逐位一致，见任务 `verification/baseline.md`）
-- 复跑（固定树内）：
+- 复跑（固定树 `dda8673` 内，本任务已实测全绿）：
 
   ```bash
   uv run python tools/summarize_deep_twilight_reference.py \

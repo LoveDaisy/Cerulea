@@ -1,15 +1,17 @@
 """Research-area boundary regression for the default suite.
 
-Structural checks only -- the *runtime* isolation proof (a minimal tree with
-no research paths present, running production/tests/validation) lives in the
-task verification records.  These tests pin the invariants that keep it true:
+Production-side invariants only: these hold whether or not the research
+areas exist on disk (the minimal acceptance tree deliberately excludes
+them).  Assertions about research-directory *layout* (theme scripts, CSSP
+test location, retired README) live in the theme-local
+``experiments/tests/test_layout_contracts.py``, which runs explicitly and is
+never collected by the default suite.
 
 * the production package never imports tools/experiments;
 * default validation never imports tools;
 * the default test collection stays inside ``tests/`` and contains no
   research-theme modules;
-* experiment themes own their outputs (no import-time side effects, no root
-  ``figures`` defaults), and check6 writes into ``validation/figures``.
+* check6 writes into ``validation/figures``.
 """
 from __future__ import annotations
 
@@ -22,25 +24,6 @@ REPO = Path(__file__).resolve().parents[1]
 TESTS_DIR = REPO / "tests"
 
 RESEARCH_TOPS = {"tools", "experiments"}
-
-ACTIVE_THEMES = {
-    "day": "day_cycle",
-    "twilight": "twilight",
-    "aerosol": "aerosol",
-    "heterogeneity": "heterogeneity",
-    "altitude": "altitude_latitude",
-    "bluesun": "blue_sun",
-    "clouds": "clouds",
-}
-
-# The minimal acceptance tree (task-research-boundary Step 6) deliberately
-# excludes the research areas: production, the default suite and validation
-# must run without them.  The absence itself is the stronger structural
-# proof there, so the file-presence assertions below skip in that tree;
-# the AST-import scans stay unconditional (they scan whatever source exists).
-FULL_TREE = (REPO / "experiments").is_dir()
-NEEDS_FULL_TREE = pytest.mark.skipif(
-    not FULL_TREE, reason="minimal acceptance tree: research areas intentionally absent")
 
 
 def _imports_of(path: Path) -> set[str]:
@@ -73,33 +56,11 @@ def test_default_test_modules_stay_out_of_research_areas(path):
     assert not overlap, f"{path.relative_to(REPO)} imports {sorted(overlap)}"
 
 
-@NEEDS_FULL_TREE
-def test_research_theme_tests_live_outside_default_collection():
-    # the CSSP suite is theme-local; nothing under tests/ may shadow it
+def test_default_collection_never_shadows_research_modules():
+    # the CSSP suite is theme-local: the default suite must not carry a copy
     assert not (TESTS_DIR / "test_cssp_observation_inputs.py").exists()
-    assert (REPO / "experiments/cssp/tests/test_cssp_observation_inputs.py").exists()
     config = (REPO / "pyproject.toml").read_text()
     assert 'testpaths = ["tests"]' in config
-
-
-@NEEDS_FULL_TREE
-def test_experiments_common_has_no_import_side_effects():
-    src = (REPO / "experiments/common.py").read_text()
-    header = src.split("def save", 1)[0]
-    assert "mkdir" not in header, "common must not create directories on import"
-    assert "FIG =" not in header and "OUT =" not in header, \
-        "common must not carry a global root-figures default"
-    # save() takes an explicit destination path
-    assert "def save(fig, path)" in src
-
-
-@pytest.mark.parametrize("theme,module", sorted(ACTIVE_THEMES.items()))
-@NEEDS_FULL_TREE
-def test_theme_scripts_own_their_outputs(theme, module):
-    src = (REPO / "experiments" / theme / f"{module}.py").read_text()
-    assert "THEME = Path(__file__).resolve().parent" in src
-    assert 'from common import' not in src, "old repo-root import must be gone"
-    assert "save(fig, \"" not in src, "save() calls must pass an explicit path"
 
 
 def test_check6_writes_into_validation_figures():
@@ -108,12 +69,8 @@ def test_check6_writes_into_validation_figures():
     assert 'C.ROOT / "figures"' not in src
 
 
-@NEEDS_FULL_TREE
 def test_research_tools_are_retired_from_active_trees():
     for retired in ["tools/point_solar_table.py", "tools/unified_solar_transport.py",
                     "experiments/twilight_figure.py",
                     "experiments/06_gallery.py", "experiments/07_timelapse.py"]:
         assert not (REPO / retired).exists(), retired
-    # frozen entry points remain readable as documentation
-    assert (REPO / "experiments/retired/README.md").exists()
-    assert (REPO / "experiments/cssp/README.md").exists()
