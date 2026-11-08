@@ -19,10 +19,11 @@ import sys
 import numpy as np
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
+REPO_ROOT = Path(__file__).resolve().parents[3]
+THEME_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(THEME_DIR))
 
-from tools.cssp_observation_inputs import (  # noqa: E402
+from cssp_observation_inputs import (  # noqa: E402
     CSSP, DRL, KN38,
     REPLAY_MEDIAN_REL_TOLERANCE,
     acquisition_items,
@@ -70,9 +71,9 @@ from tools.cssp_observation_inputs import (  # noqa: E402
     write_json,
 )
 
-PACKET = ROOT / "validation/data/cssp_observation_inputs"
-OLD_FEASIBILITY = ROOT / "validation/data/cssp_observation_feasibility"
-OLD_MATCHED = ROOT / "validation/data/matched_twilight_observations"
+PACKET = REPO_ROOT / "validation/data/cssp_observation_inputs"
+OLD_FEASIBILITY = REPO_ROOT / "validation/data/cssp_observation_feasibility"
+OLD_MATCHED = REPO_ROOT / "validation/data/matched_twilight_observations"
 
 
 # ---------------------------------------------------------------------------
@@ -668,7 +669,7 @@ def test_window_verdicts_independent_of_raw_sample_set(tmp_path):
     Synthetic dusk session evaluated twice - once with a raw pick subset,
     once without - must produce identical window verdicts and moon flags.
     """
-    from tools.cssp_observation_inputs import build_conditions
+    from cssp_observation_inputs import build_conditions
     # Synthetic MICA table: sun descending -5 deg per 5 min across the span.
     base = datetime(2014, 7, 12, 20, 0)
     lines = []
@@ -1055,7 +1056,7 @@ def test_build_force_acceptance_failure_preserves_previous_packet(
         tmp_path, monkeypatch):
     """r05 Major: acceptance runs inside staging, so a packet that fails
     verification never replaces the previous packet."""
-    import tools.cssp_observation_inputs as cssp
+    import cssp_observation_inputs as cssp
     out = tmp_path / "packet"
     shutil.copytree(PACKET, out)
     before = _packet_hashes(out)
@@ -1073,7 +1074,7 @@ def test_build_force_acceptance_failure_preserves_previous_packet(
 def test_build_force_build_exception_preserves_previous_packet(
         tmp_path, monkeypatch):
     """An exception during the staged build withdraws only the staging."""
-    import tools.cssp_observation_inputs as cssp
+    import cssp_observation_inputs as cssp
     out = tmp_path / "packet"
     shutil.copytree(PACKET, out)
     before = _packet_hashes(out)
@@ -1093,7 +1094,7 @@ def test_build_force_swap_failure_restores_previous_packet(
         tmp_path, monkeypatch):
     """r05 Major: the swap itself is recoverable - a rename failure restores
     the previous packet in full instead of losing both copies."""
-    import tools.cssp_observation_inputs as cssp
+    import cssp_observation_inputs as cssp
     out = tmp_path / "packet"
     shutil.copytree(PACKET, out)
     before = _packet_hashes(out)
@@ -1122,7 +1123,7 @@ def test_build_force_acceptance_exception_preserves_packet_and_cleans_staging(
     """r02 Minor: acceptance RAISING (corrupt staged records, not merely a
     failed report) must also withdraw the staging and leave the previous
     packet byte-identical."""
-    import tools.cssp_observation_inputs as cssp
+    import cssp_observation_inputs as cssp
     out = tmp_path / "packet"
     shutil.copytree(PACKET, out)
     before = _packet_hashes(out)

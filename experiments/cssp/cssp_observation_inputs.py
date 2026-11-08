@@ -42,7 +42,7 @@ import sys
 
 import numpy as np
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]  # experiments/cssp/ -> experiments/ -> repo root
 
 DEFAULT_PACKET = ROOT / "validation/data/cssp_observation_inputs"
 OLD_MATCHED = ROOT / "validation/data/matched_twilight_observations"
