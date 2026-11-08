@@ -318,7 +318,18 @@ supported domains are unchanged:
    `render_scene`) warn visibly on SOS non-convergence, MC undetected
    wavelengths and the statistical nature of MC stderr; CLI products print
    `format_result_summary` instead (result fields only, unknowns stay
-   unknown).
+   unknown).  An MC result that ran but came back all-undetected is
+   reported as "ran, statistics not determinable from zeros" -- never as
+   "no MC term ran".
+6. An external `radiance_field` and a solver choice (`approximation`,
+   `cloud_layer`, grouped configs, explicit order selection) are mutually
+   exclusive: silently ignored → `ValueError` at every public entry
+   (`solve_dome` / `render_scene` / `sky_radiance_grid`); the legacy
+   `sky_dome` field forwarding injects no solver settings and is not
+   misflagged.  `render_scene`'s retired `ground_direct_transmittance`
+   converts once at the wrapper boundary when given alone (same deprecated
+   formula, one warning) and errors when given together with
+   `ground_direct_irradiance`.
 
 ### Semantics tightened by the entry consolidation
 

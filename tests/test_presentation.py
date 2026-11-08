@@ -700,3 +700,176 @@ def test_carrier_path_stays_silent_and_offers_summary(atmo7):
         _warnings.simplefilter("error")
         pres = render.solve_dome(atmo7, 20.0, 0.0, n_zenith=3, n_azimuth=3)
     assert "converged=yes" in render.format_result_summary(pres)
+
+
+# ---------------------------------------------------------------------------
+# 5. review round 1: wrapper-boundary semantics (R1 fixes)
+# ---------------------------------------------------------------------------
+def test_summary_partial_mc_diagnostics_do_not_crash():
+    """MC diagnostics present but undetected_wl missing/None: report the
+    undetected state as unknown instead of crashing on a list attribute."""
+    from skycolor import render
+    from skycolor.rt.result import SkyResult
+
+    wl = np.array([400.0, 500.0, 600.0])
+    missing = SkyResult(radiance=np.zeros((1, 3)), wl=wl, method="twilight",
+                        approximation="spherical-mc",
+                        diagnostics={"n_photons": 1.0e5})
+    text = render.format_result_summary(missing)
+    assert "mc undetected wavelengths: unknown" in text
+    explicit_none = SkyResult(radiance=np.zeros((1, 3)), wl=wl,
+                              method="twilight", approximation="spherical-mc",
+                              diagnostics={"n_photons": 1.0e5,
+                                           "undetected_wl": None})
+    assert "mc undetected wavelengths: unknown" in \
+        render.format_result_summary(explicit_none)
+
+
+def test_summary_mc_ran_but_all_undetected_is_not_reported_as_not_run():
+    """A real engine state (rt.twilight returns zero stderr when every
+    anchor is undetected): the summary must not claim 'no MC term ran'."""
+    from skycolor import render
+    from skycolor.rt.result import SkyResult
+
+    res = SkyResult(radiance=np.zeros((2, 3)), wl=np.array([400.0, 500.0, 600.0]),
+                    method="twilight", approximation="spherical-mc",
+                    diagnostics={"n_photons": 1.0e4,
+                                 "undetected_wl": np.array([400.0, 500.0, 600.0])},
+                    stderr=np.zeros((2, 3)))
+    text = render.format_result_summary(res)
+    assert "although the Monte Carlo term ran" in text
+    assert "not determinable from zeros" in text
+    assert "no Monte Carlo term ran" not in text
+    assert "unresolved" in text
+
+
+def test_summary_mc_not_run_and_non_finite_states():
+    from skycolor import render
+    from skycolor.rt.result import SkyResult
+
+    wl = np.array([400.0, 500.0, 600.0])
+    not_run = SkyResult(radiance=np.zeros((1, 3)), wl=wl, method="twilight",
+                        approximation="spherical-mc",
+                        options={"mc_run": False}, stderr=np.zeros((1, 3)))
+    assert "no Monte Carlo term ran" in render.format_result_summary(not_run)
+    broken = SkyResult(radiance=np.zeros((1, 3)), wl=wl, method="twilight",
+                       approximation="spherical-mc",
+                       stderr=np.full((1, 3), np.nan))
+    assert "no finite values" in render.format_result_summary(broken)
+
+
+def test_convenience_warns_on_mc_even_with_zero_stderr(monkeypatch):
+    """The MC statistics caveat fires whenever the MC term ran -- a zero
+    stderr is absence of evidence, not a tight estimate."""
+    import skycolor.rt.result as result_mod
+    from skycolor import render
+
+    res = result_mod.SkyResult(radiance=np.zeros((1, 3)),
+                               wl=np.array([400.0, 500.0, 600.0]),
+                               method="twilight", approximation="spherical-mc",
+                               options={"mc_run": True}, stderr=np.zeros((1, 3)))
+    with pytest.warns(RuntimeWarning, match="Monte Carlo statistical"):
+        render._warn_result_limits(res)
+
+
+def test_render_scene_default_sun_disk_is_auto():
+    """The convenience entry shares render_result's single marker policy:
+    unseen suns and external fields never force a ValueError, thick clouds
+    default to no disk."""
+    from skycolor import cloud, presets, render
+
+    atmo = presets.clear(WL7)
+    # twilight, source below the horizon: renders without any argument
+    img = render.render_scene(atmo, -3.0, approximation="spherical-single",
+                              ground=False, size=(8, 4), n_zenith=3,
+                              n_azimuth=3)
+    assert img.shape == (4, 8, 3)
+    # external field without bound solar geometry: renders
+    field = lambda zen, azr: np.zeros((np.asarray(zen).size, WL7.size))  # noqa: E731
+    img = render.render_scene(atmo, 20.0, ground=False, size=(8, 4),
+                              n_zenith=3, n_azimuth=3, radiance_field=field)
+    assert img.shape == (4, 8, 3)
+    # thick deck: the auto default equals an explicit off
+    deck = cloud.get_preset("stratus")
+    auto = render.render_scene(atmo, 20.0, size=(8, 4), n_zenith=3,
+                               n_azimuth=3, cloud_layer=deck)
+    off = render.render_scene(atmo, 20.0, size=(8, 4), n_zenith=3,
+                              n_azimuth=3, cloud_layer=deck, sun_disk=False)
+    assert np.array_equal(auto, off)
+
+
+def test_external_field_with_explicit_true_marker_still_raises():
+    from skycolor import presets, render
+
+    atmo = presets.clear(WL7)
+    field = lambda zen, azr: np.zeros((np.asarray(zen).size, WL7.size))  # noqa: E731
+    with pytest.raises(ValueError, match="apparent solar"):
+        render.render_scene(atmo, 20.0, ground=False, size=(8, 4),
+                            n_zenith=3, n_azimuth=3, radiance_field=field,
+                            sun_disk=True)
+
+
+def test_legacy_transmittance_override_survives_on_production_path(atmo7):
+    """The retired override works on the plain (no radiance_field) scene:
+    converted once at the wrapper boundary to the bound irradiance, one
+    deprecation warning, both-given still rejected."""
+    from skycolor import render
+    from skycolor.spectra import solar_irradiance
+
+    T = np.full(WL7.size, 0.5)
+    with pytest.warns(DeprecationWarning, match="deprecated"):
+        img = render.render_scene(atmo7, 20.0, size=(8, 4), n_zenith=3,
+                                  n_azimuth=3, sun_disk=False,
+                                  ground_direct_transmittance=T)
+    # the conversion equals binding the historical formula directly
+    pres = render.solve_dome(atmo7, 20.0, 0.0, n_zenith=3, n_azimuth=3)
+    cosz = max(np.cos(np.radians(pres.sun_zenith_deg)), 0.0)
+    pres = render._dc_replace(pres, ground_direct_irradiance=(
+        solar_irradiance(pres.wl) * T * cosz))
+    ref = render.render_result(pres, size=(8, 4), sun_disk=False)
+    assert np.array_equal(img, ref)
+    with pytest.raises(ValueError, match="not both"):
+        render.render_scene(atmo7, 20.0, size=(8, 4), n_zenith=3,
+                            n_azimuth=3, ground_direct_transmittance=T,
+                            ground_direct_irradiance=np.zeros(WL7.size))
+
+
+def test_external_field_rejects_solver_options(atmo7, monkeypatch):
+    """Plan 3.2 enforced: an external field and solver choices are mutually
+    exclusive at every public entry -- rejected before any sampling, and the
+    legacy sky_dome forwarding is not misflagged by its internal defaults."""
+    from skycolor import render
+
+    calls = {"n": 0}
+
+    def field(zen, azr):
+        calls["n"] += 1
+        return np.zeros((np.asarray(zen).size, WL7.size))
+
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        render.solve_dome(atmo7, 20.0, radiance_field=field,
+                          approximation="spherical-mc")
+    from skycolor import cloud as _cloud
+
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        render.render_scene(atmo7, 20.0, size=(8, 4), n_zenith=3,
+                            n_azimuth=3, radiance_field=field,
+                            cloud_layer=_cloud.get_preset("stratus"))
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        zen = np.linspace(0.0, 90.0, 3)
+        az = np.linspace(0.0, 180.0, 3)
+        Z, A = np.meshgrid(zen, az, indexing="ij")
+        render.sky_radiance_grid(atmo7, 70.0, Z, A, radiance_field=field,
+                                 approximation="spherical-single")
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        zen = np.linspace(0.0, 90.0, 3)
+        az = np.linspace(0.0, 180.0, 3)
+        Z, A = np.meshgrid(zen, az, indexing="ij")
+        render.sky_radiance_grid(atmo7, 70.0, Z, A, radiance_field=field,
+                                 multiple=False)
+    assert calls["n"] == 0        # rejected before the field is sampled
+    # the legacy sky_dome field forwarding still works (nothing injected)
+    dome = render.sky_dome(atmo7, 70.0, n_zenith=3, n_azimuth=3,
+                           radiance_field=field)
+    assert dome["radiance"].shape == (3, 3, WL7.size)
+    assert calls["n"] == 1

@@ -67,11 +67,17 @@ def sky_dome(atmo, sun_zenith_deg: float, n_zenith: int = 46, n_azimuth: int = 9
     produced the field (a cloudy sky, an experiment, a validation harness).
     With a field given, ``atmo`` is used only for the ``wl`` metadata.
     """
-    pres = solve_dome(atmo, 90.0 - float(sun_zenith_deg), 0.0,
-                      n_zenith=n_zenith, n_azimuth=n_azimuth,
-                      min_zenith_deg=min_zenith_deg, multiple=multiple,
-                      single_config=_single_config(n_gauss, chunk),
-                      radiance_field=radiance_field)
+    if radiance_field is not None:
+        # the legacy external-field forwarding: no solver settings are
+        # injected here, so the field path stays purely a sampling seam
+        pres = presentation_from_field(radiance_field, atmo,
+                                       90.0 - float(sun_zenith_deg), 0.0,
+                                       n_zenith, n_azimuth, min_zenith_deg)
+    else:
+        pres = solve_dome(atmo, 90.0 - float(sun_zenith_deg), 0.0,
+                          n_zenith=n_zenith, n_azimuth=n_azimuth,
+                          min_zenith_deg=min_zenith_deg, multiple=multiple,
+                          single_config=_single_config(n_gauss, chunk))
     if pres.result is not None:
         _warn_result_limits(pres.result)
     return dict(zenith=pres.zenith, azimuth_rel=pres.azimuth_rel,
@@ -98,6 +104,16 @@ def sky_radiance_grid(atmo, sun_zenith_deg, Z, A, n_gauss=3, chunk=512,
     sun).
     """
     if radiance_field is not None:
+        given = [name for name, val in
+                 (("approximation", approximation), ("cloud_layer", cloud_layer),
+                  ("multiple", multiple), ("single_config", single_config),
+                  ("sos_config", sos_config), ("mc_config", mc_config))
+                 if val is not None]
+        if given:
+            raise ValueError(
+                f"{', '.join(given)} configure the solver, but "
+                "radiance_field replaces the solve; the two are mutually "
+                "exclusive -- drop them, or drop radiance_field")
         rad = np.asarray(radiance_field(np.ravel(Z), np.ravel(A)), dtype=float)
         return rad.reshape(np.shape(Z) + (rad.shape[-1],))
 
@@ -470,6 +486,19 @@ def solve_dome(atmo, sun_elevation_deg: float, sun_azimuth_deg: float = 0.0,
     beam).
     """
     if radiance_field is not None:
+        # plan 3.2: an external field and a solver choice are mutually
+        # exclusive -- options silently riding along would never reach a
+        # kernel, so say so instead of ignoring them
+        given = [name for name, val in
+                 (("approximation", approximation), ("cloud_layer", cloud_layer),
+                  ("single", single), ("multiple", multiple),
+                  ("single_config", single_config), ("sos_config", sos_config),
+                  ("mc_config", mc_config)) if val is not None]
+        if given:
+            raise ValueError(
+                f"{', '.join(given)} configure the solver, but "
+                "radiance_field replaces the solve; the two are mutually "
+                "exclusive -- drop them, or drop radiance_field")
         return presentation_from_field(
             radiance_field, atmo, sun_elevation_deg, sun_azimuth_deg,
             n_zenith, n_azimuth, min_zenith_deg,
@@ -609,21 +638,40 @@ def format_result_summary(source) -> str:
                 mc_eff.get("n_zen_run", "unknown"),
                 mc_eff.get("n_az_run", "unknown"),
                 mc_eff.get("seed", "unknown")))
-        und = d.get("undetected_wl")
-        und = [] if und is None else np.asarray(und, dtype=float).ravel()
-        if und.size:
-            shown = ", ".join(f"{float(w):.0f}" for w in und[:8])
-            more = " ..." if und.size > 8 else ""
-            lines.append(
-                f"mc undetected wavelengths: {und.size} [{shown}{more}] nm -- "
-                "no Monte Carlo contribution detected; report as unresolved, "
-                "not zero")
+        if "undetected_wl" in d:
+            und = d.get("undetected_wl")
+            if und is None:
+                lines.append("mc undetected wavelengths: unknown")
+            else:
+                und_arr = np.asarray(und, dtype=float).ravel()
+                if und_arr.size:
+                    shown = ", ".join(f"{float(w):.0f}" for w in und_arr[:8])
+                    more = " ..." if und_arr.size > 8 else ""
+                    lines.append(
+                        f"mc undetected wavelengths: {und_arr.size} "
+                        f"[{shown}{more}] nm -- no Monte Carlo contribution "
+                        "detected; report as unresolved, not zero")
+        else:
+            # the engine recorded its budget but no undetected list at all:
+            # the undetected state itself is unknown
+            lines.append("mc undetected wavelengths: unknown")
     stderr = getattr(result, "stderr", None)
     if stderr is not None:
         arr = np.asarray(stderr, dtype=float)
         finite = arr[np.isfinite(arr)]
-        if (opt.get("mc_run", True) is False) or not finite.size or not np.any(finite):
+        if opt.get("mc_run", True) is False:
             lines.append("mc stderr: identically zero (no Monte Carlo term ran)")
+        elif not finite.size:
+            lines.append("mc stderr: no finite values -- statistics unknown")
+        elif not np.any(finite):
+            # the engine ran and recorded its budget, but every coarse
+            # direction came back undetected: the zeros are absence of
+            # evidence, not a zero-variance estimate
+            lines.append(
+                "mc stderr: identically zero although the Monte Carlo term "
+                "ran -- the statistical uncertainty is not determinable from "
+                "zeros; treat the higher-order term as unresolved at this "
+                "budget (budget is not tail coverage)")
         else:
             lines.append(
                 "mc stderr (W m-2 sr-1 nm-1): median {:.3e}, max {:.3e} -- "
@@ -661,8 +709,10 @@ def _warn_result_limits(result) -> None:
     stderr = getattr(result, "stderr", None)
     if stderr is not None:
         opt = getattr(result, "options", None) or {}
-        arr = np.asarray(stderr, dtype=float)
-        if (opt.get("mc_run", True) is not False) and np.any(arr > 0):
+        # every real Monte Carlo result carries the statistical caveat,
+        # whatever the sampled values look like: a zero stderr is absence of
+        # evidence at this budget, not a tight estimate
+        if opt.get("mc_run", True) is not False:
             warnings.warn(
                 "higher orders are a Monte Carlo statistical estimate: stderr "
                 "is a composite (smoother + interpolation + bias floor), not "
@@ -820,7 +870,7 @@ def ground_radiance(atmo, dome, sun_zenith_deg, ground_albedo=None,
 def render_scene(atmo, sun_elevation_deg: float, sun_azimuth_deg: float = 0.0,
                  camera: str = "panorama", size=(1000, 500), exposure=None,
                  tonemap: str = "aces", adaptation=None,
-                 reference_percentile: float = 92.0, sun_disk=True,
+                 reference_percentile: float = 92.0, sun_disk=None,
                  ground: bool = True, n_zenith: int = 50, n_azimuth: int = 91,
                  hfov_deg: float = 90.0, pitch_deg: float = 0.0, yaw_deg: float = 0.0,
                  white_xy=None, preserve_chromaticity: bool = True,
@@ -834,20 +884,44 @@ def render_scene(atmo, sun_elevation_deg: float, sun_azimuth_deg: float = 0.0,
     one sampling of ``radiance_field``) and delegates to
     :func:`render_result`; the ndarray return contract is unchanged.  The
     keyword-only solver options (``approximation``/``cloud_layer``/grouped
-    configs) pass through item by item -- no backend combination is
-    assembled here.  ``radiance_field`` / ``ground_direct_irradiance`` keep
-    their seam meaning: a non-default field usually needs a matching ground
-    irradiance (a cloudy sky also attenuates the direct beam), otherwise
-    the ground display fails loudly instead of pairing the custom sky with
-    the clear beam.  ``ground_direct_transmittance`` is the retired
-    override; see :func:`render_result`.
+    configs) pass through item by item and are mutually exclusive with
+    ``radiance_field`` (rejected, not ignored).  ``sun_disk`` shares
+    :func:`render_result`'s single three-state policy -- the wrapper does
+    not keep its own: ``None`` (default) is the auto rule (draw only for a
+    sunlit solver-prepared clear sky), ``False`` disables, ``True`` forces
+    and requires the bound apparent geometry.  ``ground_direct_irradiance``
+    keeps its seam meaning; ``ground_direct_transmittance`` is the retired
+    override -- given alone it is converted to the bound irradiance at this
+    boundary (same deprecated formula, one warning), given together with
+    ``ground_direct_irradiance`` it is an error.
     """
+    import warnings
+
+    if ground_direct_irradiance is not None and ground_direct_transmittance is not None:
+        raise ValueError(
+            "pass either ground_direct_irradiance or the deprecated "
+            "ground_direct_transmittance, not both")
     pres = solve_dome(atmo, sun_elevation_deg, sun_azimuth_deg,
                       n_zenith=n_zenith, n_azimuth=n_azimuth,
                       approximation=approximation, cloud_layer=cloud_layer,
                       single_config=single_config, sos_config=sos_config,
                       mc_config=mc_config, radiance_field=radiance_field,
                       ground_direct_irradiance=ground_direct_irradiance)
+    if ground_direct_transmittance is not None:
+        # the retired centre-beam override, converted once at the
+        # preparation boundary so the pure display layer sees one bound
+        # irradiance (same formula as the historical ground_radiance path)
+        from .spectra import solar_irradiance
+
+        warnings.warn(
+            "ground_direct_transmittance is deprecated by the unified solar "
+            "source; bind ground_direct_irradiance instead (it carries the "
+            "disk geometry)", DeprecationWarning, stacklevel=2)
+        T = np.asarray(ground_direct_transmittance, dtype=float)
+        cosz = max(np.cos(np.radians(pres.sun_zenith_deg)), 0.0)
+        pres = _dc_replace(
+            pres, ground_direct_irradiance=solar_irradiance(pres.wl) * T * cosz)
+        ground_direct_transmittance = None     # consumed; not re-checked below
     if pres.result is not None:
         _warn_result_limits(pres.result)
     return render_result(pres, camera=camera, size=size, exposure=exposure,
