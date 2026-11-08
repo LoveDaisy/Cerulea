@@ -277,14 +277,18 @@ class SkyPresentation:
 
 def _check_axes(zenith, azimuth_rel):
     """The grid invariant shared by both binding entries: at least two
-    finite, strictly increasing nodes per axis, within the supported
-    regular half-dome domain (zenith [0, 90], relative azimuth [0, 180]).
+    finite, strictly increasing nodes per axis, *spanning* the supported
+    regular half dome (zenith 0..90, relative azimuth 0..180).
 
     The domain is the display layer's own contract -- ``sample_dome``
     mirrors absolute azimuths onto 0..180 and
     :func:`hemispherical_irradiance` integrates the half circle and doubles
-    it, so a full-circle layout would bind fine and then silently double
-    the ground diffuse light.  Full-dome reconstruction is out of scope.
+    it, so a full-circle layout would silently double the ground diffuse
+    light and a *cropped* layout would clamp the missing sky onto its edge
+    and halve the same integral.  Both bindings therefore require the axes
+    to cover the full half dome end to end; a partial result stays
+    numerically consumable via the raw ``SkyResult``, not as a camera or
+    ground display dome.  Full-dome reconstruction is out of scope.
     """
     for name, axis, lo, hi in (("zenith", zenith, 0.0, 90.0),
                                ("azimuth_rel", azimuth_rel, 0.0, 180.0)):
@@ -294,11 +298,19 @@ def _check_axes(zenith, azimuth_rel):
             raise ValueError(
                 f"{name} grid must have at least two finite, strictly "
                 f"increasing nodes for interpolation; got {a}")
-        if a[0] < lo - 1e-9 or a[-1] > hi + 1e-9:
+        tol = 1e-6
+        if a[0] < lo - tol or a[-1] > hi + tol:
             raise ValueError(
                 f"{name} grid spans [{a[0]}, {a[-1]}] but the supported "
                 f"regular half-dome domain is [{lo}, {hi}] degrees; "
                 "full-circle layouts are not a supported camera input")
+        if abs(a[0] - lo) > tol or abs(a[-1] - hi) > tol:
+            raise ValueError(
+                f"{name} grid covers only [{a[0]}, {a[-1]}]; the display "
+                f"binding requires the full half dome ({lo}..{hi} degrees). "
+                "A cropped layout is a partial result: consume it "
+                "numerically via the raw SkyResult instead of presenting "
+                "it as a complete sky")
     return (np.asarray(zenith, dtype=float).ravel(),
             np.asarray(azimuth_rel, dtype=float).ravel())
 

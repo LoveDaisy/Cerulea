@@ -260,9 +260,11 @@ def test_presentation_from_result_rejects_mismatch(atmo7):
     Z, A = np.meshgrid(zen, az, indexing="ij")
     result = solve(atmo7, 70.0, Z.ravel(), A.ravel(), sun_azimuth_deg=50.0)
     with pytest.raises(ValueError, match="view rows"):
-        render.presentation_from_result(result, zen[:-1], az, 20.0, 50.0)
+        render.presentation_from_result(result, np.linspace(0.0, 90.0, 4),
+                                        az, 20.0, 50.0)
     with pytest.raises(ValueError, match="grid"):
-        render.presentation_from_result(result, zen, az[:-1], 20.0, 50.0)
+        render.presentation_from_result(result, zen,
+                                        np.linspace(0.0, 180.0, 6), 20.0, 50.0)
     with pytest.raises(ValueError, match="zenith"):
         # solved at sun zenith 70 (elevation 20); binding 21 misrepresents it
         render.presentation_from_result(result, zen, az, 21.0, 50.0)
@@ -1136,3 +1138,47 @@ def test_summary_zero_stderr_without_run_metadata():
                     effective={"mc": {"n_photons_run": 100}},
                     stderr=np.zeros((1, 3)))
     assert "although the Monte Carlo term ran" in render.format_result_summary(ran)
+
+
+# ---------------------------------------------------------------------------
+# 8. review round 4: full-span half dome (R4 fix)
+# ---------------------------------------------------------------------------
+def test_binding_requires_full_span_half_dome(atmo7):
+    """A cropped layout lying inside the domain but not covering 0..180 /
+    0..90 is refused: cameras would clamp the missing sky onto the edge and
+    the ground integral would halve.  The isotropic anchor (L=1, albedo=1,
+    no direct light -> ground spectrum exactly 1) pins the accepted shape."""
+    import dataclasses
+
+    from skycolor import render
+    from skycolor.rt.solver import solve
+
+    zen = np.linspace(0.0, 90.0, 3)
+    az = np.linspace(0.0, 180.0, 5)
+    Z, A = np.meshgrid(zen, az, indexing="ij")
+    result = solve(atmo7, 70.0, Z.ravel(), A.ravel())
+    ones = np.ones_like(result.radiance)
+    with pytest.raises(ValueError, match="full half dome"):
+        render.presentation_from_result(result, zen, az[:3], 20.0, 0.0)
+    with pytest.raises(ValueError, match="full half dome"):
+        render.presentation_from_result(result, zen, az[1:], 20.0, 0.0)
+    with pytest.raises(ValueError, match="full half dome"):
+        render.presentation_from_result(result, zen[1:], az, 20.0, 0.0)
+    # external entry: same invariant
+    field = lambda z, a: np.ones((np.asarray(z).size, WL7.size))  # noqa: E731
+    with pytest.raises(ValueError, match="full half dome"):
+        render.presentation_from_field(field, atmo7, 20.0, 0.0,
+                                       n_zenith=3, n_azimuth=5,
+                                       min_zenith_deg=30.0)
+    # accepted shape: the ground spectrum entering the colour mapping is
+    # exactly albedo/pi * (pi*L + 0) = 1 -- the full dome, integrated once
+    full = render.presentation_from_result(
+        dataclasses.replace(result, radiance=ones), zen, az, 20.0, 0.0,
+        ground_albedo=1.0, ground_direct_irradiance=np.zeros(WL7.size),
+        ground_supported=True)
+    e_diff = render.hemispherical_irradiance(full.radiance, full.zenith,
+                                             full.azimuth_rel)
+    np.testing.assert_allclose(e_diff, np.pi, rtol=1e-3)
+    lg = np.asarray(full.ground_albedo, float) / np.pi * (
+        np.zeros(WL7.size) + e_diff)
+    np.testing.assert_allclose(lg, 1.0, rtol=1e-3)
