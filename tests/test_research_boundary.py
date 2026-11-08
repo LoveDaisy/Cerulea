@@ -33,6 +33,15 @@ ACTIVE_THEMES = {
     "clouds": "clouds",
 }
 
+# The minimal acceptance tree (task-research-boundary Step 6) deliberately
+# excludes the research areas: production, the default suite and validation
+# must run without them.  The absence itself is the stronger structural
+# proof there, so the file-presence assertions below skip in that tree;
+# the AST-import scans stay unconditional (they scan whatever source exists).
+FULL_TREE = (REPO / "experiments").is_dir()
+NEEDS_FULL_TREE = pytest.mark.skipif(
+    not FULL_TREE, reason="minimal acceptance tree: research areas intentionally absent")
+
 
 def _imports_of(path: Path) -> set[str]:
     tree = ast.parse(path.read_text(), filename=str(path))
@@ -64,6 +73,7 @@ def test_default_test_modules_stay_out_of_research_areas(path):
     assert not overlap, f"{path.relative_to(REPO)} imports {sorted(overlap)}"
 
 
+@NEEDS_FULL_TREE
 def test_research_theme_tests_live_outside_default_collection():
     # the CSSP suite is theme-local; nothing under tests/ may shadow it
     assert not (TESTS_DIR / "test_cssp_observation_inputs.py").exists()
@@ -72,6 +82,7 @@ def test_research_theme_tests_live_outside_default_collection():
     assert 'testpaths = ["tests"]' in config
 
 
+@NEEDS_FULL_TREE
 def test_experiments_common_has_no_import_side_effects():
     src = (REPO / "experiments/common.py").read_text()
     header = src.split("def save", 1)[0]
@@ -83,6 +94,7 @@ def test_experiments_common_has_no_import_side_effects():
 
 
 @pytest.mark.parametrize("theme,module", sorted(ACTIVE_THEMES.items()))
+@NEEDS_FULL_TREE
 def test_theme_scripts_own_their_outputs(theme, module):
     src = (REPO / "experiments" / theme / f"{module}.py").read_text()
     assert "THEME = Path(__file__).resolve().parent" in src
@@ -96,6 +108,7 @@ def test_check6_writes_into_validation_figures():
     assert 'C.ROOT / "figures"' not in src
 
 
+@NEEDS_FULL_TREE
 def test_research_tools_are_retired_from_active_trees():
     for retired in ["tools/point_solar_table.py", "tools/unified_solar_transport.py",
                     "experiments/twilight_figure.py",
