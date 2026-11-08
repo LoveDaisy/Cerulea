@@ -55,6 +55,28 @@ owner granted (see the adjudication note at the bottom of this file) is no
 longer needed for the current pair; the adjudication's regression clause
 (any suite stably exceeding 6 min is escalated) remains the standing guard.
 
+## Later tree: architecture consolidation (2026-11-08)
+
+This does **not** replace or retroactively extend the 436-test formal pair above.
+On source tree `6c8d9ed` (same production/default-test tree as `7d7ce15`),
+`task-approximation-story` ran the default entries sequentially in the designated
+macOS worktree with its own uv environment:
+
+| Entry | Actual result / outer wall | Interpretation |
+|---|---|---|
+| `uv run pytest --collect-only -q` | 526 collected; no experiments/tools | Default production boundary retained |
+| `uv run pytest -q` | **526 passed**, exit 0, **364.54 s** (pytest internal 364.32 s) | Functional regression green; **not performance acceptance**: exceeds 300 s target and 360 s guard |
+| `uv run python -m validation.run_all` | exit 1, **242.10 s**, 2P/4F/0 skip (2/3/5/6) | Existing physical failures; all validation output files including results.json byte-identical to before |
+
+The preceding research-boundary closeout measured 526 tests / 357.39 s on
+`7d7ce15`; the current single run crosses 360 s and is explicitly escalated to
+the owner under the standing guard. No production/default-test/settings or
+budget change was made by the representation task, so it does not claim a new
+physical or functional regression, does not re-bin tests, and does not reduce
+moments/photons/tolerances to mask the cost. Whether to fund a suite-performance
+follow-up belongs to the owner, not this example/documentation task. These are
+one-run current-tree observations, **not** a new two-run ≤300 s certification.
+
 ## What was slow, and why
 
 1. **pytest default collection was broken.**  Without `testpaths`, pytest

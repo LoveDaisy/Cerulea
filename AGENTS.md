@@ -17,11 +17,10 @@ uv sync        # 从 uv.lock 重建 .venv；不要 pip install 进环境
 ### 测试
 
 ```bash
-uv run pytest -q                      # 全量测试（436 项）：12-worker xdist，
-                                      # 实测 LPT 分箱（正式对子 257.4/256.2 s
-                                      # 外层墙钟，严格 ≤300 s）；详见
-                                      # validation/FAST_SUITE.md
-uv run pytest -n 0 -q ...             # 串行等价诊断（约 26 min），不作为验收口径
+uv run pytest -q                      # 当前默认全量，12-worker xdist / LPT；
+                                      # 当前树实测与历史436项正式对子分开记录于
+                                      # validation/FAST_SUITE.md，不沿用旧时长认证
+uv run pytest -n 0 -q ...             # 串行等价诊断，不作为性能验收口径
 uv run python -m validation.run_all   # 六项物理校验，单池 8 worker，实测约 4 min；
                                       # 既有物理 FAIL 预期 exit=1
 ```
@@ -35,7 +34,8 @@ uv run python -m skycolor.cli render --sun-elevation 3 --camera perspective \
     --yaw 180 --out sunset.png
 
 # 生成实验图（写各主题目录 figures/，仓库根目录运行）
-uv run python -m experiments.day.day_cycle --quick
+uv run python -m experiments.approximations.compare
+# 近似/实测解释：docs/physics/APPROXIMATIONS.md；正式图/完整参数：figures/README.md
 ```
 
 ### 代码格式化
