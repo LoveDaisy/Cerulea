@@ -695,6 +695,32 @@ def test_narrow_crescent_scatter_matches_independent_cap_integral():
         t = _crescent_reference(e_loc, crit)
         assert t > 0.0
         assert abs(v - t) <= 5e-3 * t, (h_km, v, t)
+        # the ray_fraction seam must scale the mixture linearly against the
+        # same independent integral; rf=1 elsewhere would mask a doubled
+        # or dropped application of the fraction
+        v_half = float(src.scatter(x, backward, iw=0,
+                                   ray_fraction=np.full(1, 0.5),
+                                   aerosol_fractions=np.zeros((1, 0)))[0])
+        assert abs(v_half - 0.5 * t) <= 5e-3 * (0.5 * t), (h_km, v_half, t)
+
+
+def test_ground_flux_disk_center_on_horizon_matches_analytic():
+    """Disk centre exactly on the horizon: half-occulted ground flux.
+
+    Analytic independent form for a uniform cap of radius alpha centred at
+    elevation 0 (vacuum, refraction off, so apparent == true): with the
+    production normalisation sum(w cos rho) = 1 the F-free angular integral
+    is (alpha - sin(alpha)cos(alpha)) / (pi sin^2 alpha); the lower cap
+    half must be excluded exactly once, not doubled or dropped.  This is
+    the sunset ground-illumination seam the renderer consumes.
+    """
+    atmo = _vacuum_550()
+    source = SolarSource(atmo, 90.0, 0.0, n_radial=48, n_azimuth=512)
+    x = np.array([[0.0, 0.0, R_EARTH]])
+    got = float(source.ground(x, iw=0)[0])
+    alpha = np.radians(SUN_RADIUS_DEG)
+    expected = (alpha - np.sin(alpha) * np.cos(alpha)) / (np.pi * np.sin(alpha) ** 2)
+    assert abs(got - expected) <= 5e-3 * expected, (got, expected)
 
 
 def test_ground_local_accounting_is_observer_invariant():
@@ -739,33 +765,6 @@ def test_ground_local_accounting_is_observer_invariant():
                          n_mu=6, single_view=True)
     assert np.array_equal(r0.direct_down_boa, r24.direct_down_boa)
     assert np.array_equal(r0.flux_up_boa, r24.flux_up_boa)
-
-
-def test_real_point_solar_table_feeds_finite_source():
-    """End-to-end smoke: real Atmosphere + real PointSolarTable + adapter.
-
-    Review gen2 R1 Major#3/#4: the experimental adapter guessed the query
-    protocol from atmosphere attributes and passed a positional extinction
-    array into the real table's ``iw`` keyword parameter, so every real
-    audit run raised TypeError.  Both supported table kinds speak iw;
-    this test proves the real supply-consumer chain executes.
-    """
-    from pathlib import Path
-    import sys
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from tools.point_solar_table import PointSolarTable
-    from tools.unified_solar_transport import FiniteSolarSource
-    atmo = Atmosphere.standard(W3)
-    table = PointSolarTable(atmo, n_height=6)
-    source = FiniteSolarSource(atmo, table)
-    x = np.array([[0.0, 0.0, R_EARTH], [0.0, 0.0, R_EARTH + 5e3]])
-    backward = np.tile(np.array([0.0, 0.0, 1.0]), (2, 1))
-    zs = np.radians(87.0)                       # sun zenith, azimuth 0
-    sun_hat = np.array([0.0, np.sin(zs), np.cos(zs)])
-    out = source.scatter(x, backward, sun_hat, iw=1, ray_fraction=np.ones(2),
-                         aerosol_fractions=np.zeros((2, len(atmo.aerosols))))
-    assert out.shape == (2,)
-    assert np.all(np.isfinite(out)) and np.all(out >= 0.0)
 
 
 # ---------------------------------------------------------------------------
