@@ -54,9 +54,13 @@ rt.solver.solve      the one authoritative composition: four finite
     |                sky_radiance_with_cloud are thin forwarders
     |
 color / render       spectral field -> XYZ -> adapted -> tone-mapped sRGB;
-                     sky_dome/render_scene accept a ``radiance_field`` closure
-                     so ANY spectral field (cloudy, experimental) uses the
-                     same display path
+                     solve_dome prepares one result for display (grid, ground
+                     lighting, apparent sun); render_result/chart_table are
+                     pure consumers; sky_dome/render_scene keep a
+                     ``radiance_field`` closure so ANY spectral field (cloudy,
+                     experimental) uses the same display path;
+                     scene.resolve_sun is the one solar input contract
+                     (time or numbers -> pre-refraction direction)
 ```
 
 ### What is shared vs deliberately independent
@@ -243,15 +247,34 @@ pre = solve(atmo, sun_z, vza, va, sun_az, cloud_layer=deck,
 ### `skycolor.render`
 
 ```python
-sky_dome(atmo, sun_zenith_deg, ..., radiance_field=None)
-render_scene(..., radiance_field=None, ground_direct_transmittance=None)
-ground_radiance(..., direct_transmittance=None)
+resolve_sun(sun_elevation=None, sun_azimuth=None, time=..., ...)  # scene.py
+pres = solve_dome(atmo, sun_elev, sun_az, approximation=..., cloud_layer=...)
+render_result(pres, camera=..., ground=..., sun_disk=None)   # pure display
+chart_table(pres)                          # nearest-node rows + actual angles
+format_result_summary(pres)                # provenance/limits, result fields only
+presentation_from_result(res, zen, az_rel, sun_elev, sun_az)  # bind a ready result
+presentation_from_field(field, atmo, ...)  # the external-field seam
+sky_dome(atmo, sun_zenith_deg, ..., radiance_field=None)     # thin: dict form
+render_scene(..., radiance_field=None, ground_direct_transmittance=None,
+             approximation=..., cloud_layer=...)             # thin: ndarray form
+ground_radiance(..., direct_transmittance=None)              # legacy ground seam
 ```
+
+The production flow is one-directional: `resolve_sun -> one solve
+(`solve_dome`) -> `SkyPresentation` -> outputs`.  Preparation binds the grid
+layout, the ground albedo/irradiance snapshots and the adopted source's
+apparent sun geometry; after that, switching cameras, tone maps or output
+formats re-enters nothing (spied in `tests/test_presentation.py`).
+`SkyResult` stays the only authority on solver facts — the carrier copies no
+diagnostics and holds no solver callback.
 
 `radiance_field(zen_flat, az_rel_flat) -> (n_view, n_wl)`: the display layer
 consumes any spectral field without knowing the medium; bind medium and
 solar geometry in the caller's closure.  With a field given, `atmo` is used
-only for `wl` metadata (and the ground).
+only for `wl` metadata (and the ground albedo default).  An external field
+records provenance `"external"`: a ground display then requires a matching
+`ground_direct_irradiance` (or the retired `ground_direct_transmittance`)
+instead of silently pairing the custom sky with the clear beam.
 
 ## Entry-point migration map
 
@@ -266,8 +289,36 @@ only for `wl` metadata (and the ground).
 | `refraction._Profile` / `_trace` in data pipeline | `refractive_profile` / `trace_ray(..., profile=...)` |
 | mutating a shared aerosol | `aerosol.replace(**kw)` (shared instances are frozen) |
 | `at_altitude` (double-scaled rescaling) | truncation at the site (Step 3c) |
-| `experiments/clouds.py` display helpers | `render.sky_dome` / `render_scene` with `radiance_field` |
+| `experiments/clouds.py` display helpers | `render.sky_dome` / `render_scene` with `radiance_field`; the deck ground-beam helper lives in `rt.cloud.ground_direct_irradiance` (experiments forward to it) |
 | CLI `--elevation` | unchanged semantics (site altitude); values follow the truncation fix |
+| CLI `--time` (chart ignored it; `refraction=True` ephemeris angle) | both subcommands consume `--time` through `scene.resolve_sun`: naive means UTC, explicit offsets convert before the ephemeris reads clock fields, and the resolved direction is pre-refraction (the source applies refraction once) |
+
+### Semantics tightened by the presentation consolidation
+
+Display-level corrections (task-presentation-flow); solve numbers inside the
+supported domains are unchanged:
+
+1. Time/numeric solar inputs now describe the same pre-refraction direction
+   on every consumer; the old CLI path double-refracted (geometric
+   correction at the ephemeris, then the source's traced bending).
+   Explicit angles together with `--time` are an error; numeric defaults
+   fill only when no time is given.
+2. A cloudy display bound through `radiance_field` without a matching
+   `ground_direct_irradiance`: silently paired with the clear beam →
+   `ValueError` (`ground=False` skips the ground display).
+3. Ground display for an observer off the model bottom: evaluated at the
+   wrong height → `ValueError` (the sky keeps working with
+   `ground=False`).
+4. The decorative sun disk consumes the adopted source's apparent position
+   and occultation-aware visibility (was: true elevation with a −0.9°
+   cutoff) and defaults to off on cloud scenes (was: drawn on any request);
+   `--no-sun` still disables it entirely.  The marker stays an annotation:
+   it never enters charts or ground energy.
+5. Convenience ndarray entries (`sky_dome`, `sky_radiance_grid`,
+   `render_scene`) warn visibly on SOS non-convergence, MC undetected
+   wavelengths and the statistical nature of MC stderr; CLI products print
+   `format_result_summary` instead (result fields only, unknowns stay
+   unknown).
 
 ### Semantics tightened by the entry consolidation
 

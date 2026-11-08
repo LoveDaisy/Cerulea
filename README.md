@@ -53,8 +53,14 @@ uv run python -m skycolor.cli render --sun-elevation 3 --camera perspective \
     --size 1200x520 --pitch 14 --hfov 100 --preset clear --aod 0.05 \
     --yaw 180 --out sunset.png
 
-# colour coordinates of the zenith / horizon
-uv run python -m skycolor.cli chart --sun-elevation 20 --preset hazy --aod 0.3
+# colour coordinates of the zenith / horizon (time input: naive = UTC,
+# explicit offsets honoured; the resolved direction is pre-refraction)
+uv run python -m skycolor.cli chart --time 2026-06-01T08:00:00Z \
+    --latitude 39.9 --longitude 116.4
+
+# pick an approximation and a uniform cloud deck
+uv run python -m skycolor.cli render --sun-elevation 10 --cloud stratus \
+    --approximation hybrid-sos --out overcast.png
 ```
 
 ```python
@@ -63,8 +69,10 @@ from skycolor import render
 from skycolor.constants import WL_COARSE
 
 atmo = clear(WL_COARSE, aod=0.05)          # clean mid-latitude air
-img = render.render_scene(atmo, sun_elevation_deg=5.0,
-                          camera="perspective", size=(900, 500))
+pres = render.solve_dome(atmo, sun_elevation_deg=5.0)   # one solve, prepared
+img = render.render_result(pres, camera="perspective", size=(900, 500))
+# after preparation, tables and every camera are pure consumers of `pres`;
+# render.format_result_summary(pres) states what ran and its limits
 ```
 
 ## What is in the box
@@ -97,11 +105,11 @@ docs/                 project overview, architecture and development guide
 
 ## Where it stands
 
-[STATUS.md](docs/STATUS.md) records current behavior and validation limits;
+[STATUS.md](docs/STATUS.md) records current behavior, the physical-check
+snapshot and validation limits;
 [the documentation guide](docs/README.md) maps methods and historical evidence.
-The latest committed six-check snapshot is **3 PASS / 3 FAIL**. Rayleigh optical
-depth and direct illuminance agree closely with their references; diffuse
-illuminance and horizon luminance retain substantial deviations.
+The six-check suite currently exits non-zero for known physical deviations
+(their scope is in STATUS.md, which is the single place the counts live).
 
 Recent work fixed raised-ground solar occlusion and AOD550 wavelength slicing.
 Twilight source/transport experiments now have independent closure checks, but

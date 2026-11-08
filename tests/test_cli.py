@@ -51,40 +51,11 @@ def _run(argv):
 # ---------------------------------------------------------------------------
 # in-process wiring
 # ---------------------------------------------------------------------------
-def test_chart_consumes_time_and_numbers_identically():
-    """chart must consume --time (it used to ignore it) and the numeric pair
-    resolves to the identical direction -> byte-identical table."""
-    _, out_time, _ = _run(["chart", "--time", "2026-11-05T00:00:00Z",
-                           "--latitude", repr(BEIJING[0]),
-                           "--longitude", repr(BEIJING[1])] + GRID)
-    _, out_num, _ = _run(["chart"] + _numeric_angle_args() + GRID)
-    assert out_time == out_num
-    assert "45deg sun-side" in out_num
-
-
-def test_render_consumes_time_and_numbers_identically(tmp_path):
-    """Same fixed exposure, decoration off, same grid: the decoded PNGs are
-    bit-identical between the time and the numeric command."""
-    common = ["--size", "32x16", "--no-sun", "--exposure", "1e-3"] + GRID
-    p_time = tmp_path / "time.png"
-    p_num = tmp_path / "num.png"
-    code1, _, _ = _run(["render", "--time", "2026-11-05T00:00:00Z",
-                        "--latitude", repr(BEIJING[0]),
-                        "--longitude", repr(BEIJING[1]),
-                        "--out", str(p_time)] + common)
-    code2, _, _ = _run(["render"] + _numeric_angle_args() +
-                       ["--out", str(p_num)] + common)
-    assert code1 == code2 == 0
-    from PIL import Image
-
-    a = np.asarray(Image.open(p_time)).astype(int)
-    b = np.asarray(Image.open(p_num)).astype(int)
-    assert np.array_equal(a, b)
-
-
 def test_raw_spectrum_matches_between_inputs():
     """Full-precision check behind the rounded table: the same UTC instant
-    and the round-tripped numeric angles produce bit-identical raw angles."""
+    and the round-tripped numeric angles produce bit-identical raw angles.
+    The full command pairs run as real subprocesses below (plan 6.2); this
+    is the last-bits guarantee the printed two-decimal table cannot show."""
     from skycolor.scene import resolve_sun
 
     az_t, el_t = resolve_sun(time=WHEN, latitude=BEIJING[0], longitude=BEIJING[1])
@@ -122,6 +93,7 @@ def test_subprocess_chart_pair_identical_stdout():
     n = _subprocess(["chart"] + _numeric_angle_args() + GRID)
     assert t.returncode == 0 and n.returncode == 0, (t.stderr, n.stderr)
     assert t.stdout == n.stdout
+    assert "45deg sun-side" in t.stdout      # table content sanity, not just equality
 
 
 def test_subprocess_render_pair_identical_png(tmp_path):

@@ -18,6 +18,7 @@ completed work and proposed next scopes are in [ROADMAP.md](ROADMAP.md).
 | Clouds | One homogeneous plane-parallel deck, delta-Eddington; per-beam top/base/mixed illumination from the unified source |
 | Horizontal heterogeneity | Radial aerosol field, first order only |
 | Request entry | `rt.solver.solve`: four finite approximations (spherical-single / plane-sos / hybrid-sos / spherical-mc), capability/support checks before kernels, per-component arrays plus effective settings; the three legacy entry points are thin forwarders |
+| Presentation | `render.solve_dome` prepares one result for display (regular dome grid, ground albedo/irradiance, apparent sun geometry); `render_result`/`chart_table` are pure consumers; the CLI render/chart share one preparation and print a provenance summary (`format_result_summary`); solar time/numeric inputs resolve through `scene.resolve_sun` to the pre-refraction direction |
 | Colour and cameras | CIE 1931 → Bradford → tone mapping; panorama, fisheye, perspective |
 
 Frozen `Medium` and `Scene` define the atmosphere and observing scenario;

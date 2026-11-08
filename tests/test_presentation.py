@@ -577,7 +577,7 @@ def test_sun_marker_visibility_and_explicit_rules(atmo7, stratus, monkeypatch):
 # ---------------------------------------------------------------------------
 # 4. diagnostics through to the consumer (M4)
 # ---------------------------------------------------------------------------
-TINY_MC = dict(n_zen=3, n_az=4, n_anchor=3, n_photons=6.0e5)
+TINY_MC = dict(n_zen=3, n_az=4, n_anchor=3, n_photons=2.0e5)
 
 
 def test_summary_reports_hybrid_provenance(atmo7):

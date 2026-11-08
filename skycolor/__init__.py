@@ -7,8 +7,13 @@ Quick start::
     from skycolor.constants import WL_COARSE
 
     atmo = clear(WL_COARSE)                      # clean mid-latitude air
-    img = render.render_scene(atmo, sun_elevation_deg=5.0,
-                              camera="perspective", size=(900, 500))
+    pres = render.solve_dome(atmo, sun_elevation_deg=5.0)
+    img = render.render_result(pres, camera="perspective", size=(900, 500))
+
+One request, one solve: ``solve_dome`` prepares the result for display
+(grid, ground lighting, apparent sun geometry); ``render_result``,
+``chart_table`` and ``format_result_summary`` are pure consumers of the
+prepared presentation.
 """
 from .atmosphere import AerosolLayer, Atmosphere, ExponentialProfile, GaussianProfile
 from .constants import R_EARTH, WL_COARSE, WL_DEFAULT

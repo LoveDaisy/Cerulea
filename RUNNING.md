@@ -30,8 +30,8 @@ The validation suite is the guard rail: a dependency bump that changes
 
 [.python-version](.python-version) pins the interpreter and [uv.lock](uv.lock)
 pins dependencies. Read these files for exact versions rather than maintaining
-a second list here. The latest committed physical-check snapshot is 3 PASS /
-3 FAIL; `validation.run_all` therefore currently exits non-zero for known
-physical deviations. See [STATUS.md](docs/STATUS.md) for their scope.
+a second list here. `validation.run_all` currently exits non-zero for known
+physical deviations; the current PASS/FAIL snapshot lives in
+[STATUS.md](docs/STATUS.md) and is not duplicated here.
 
 Branch, review, test-selection and merge procedures: [DEVELOPMENT.md](docs/DEVELOPMENT.md).
