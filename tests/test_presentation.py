@@ -123,3 +123,233 @@ def test_numeric_defaults_and_azimuth_wrap():
     assert az == 180.0 and el == -12.0
     az, _ = resolve_sun(sun_azimuth=450.0)
     assert az == 90.0
+
+
+# ---------------------------------------------------------------------------
+# 2. one solve, then pure display (M2)
+# ---------------------------------------------------------------------------
+WL7 = np.array([400.0, 450.0, 500.0, 550.0, 600.0, 650.0, 700.0])
+N_ZEN, N_AZ = 5, 7
+
+
+@pytest.fixture(scope="module")
+def atmo7():
+    from skycolor import presets
+
+    return presets.clear(WL7)
+
+
+def _forbid_solve_and_source(monkeypatch):
+    """Replace every solve path and the solar source with raisers: after
+    preparation, displays must not re-enter any of them."""
+    import skycolor.rt.solver as solver
+    import skycolor.rt.multiple as multiple
+    import skycolor.rt.twilight as twilight
+    import skycolor.solar_source as solar_source
+
+    def boom(name):
+        def _boom(*a, **k):
+            raise AssertionError(f"{name} must not run after preparation")
+        return _boom
+
+    monkeypatch.setattr(solver, "solve", boom("solve"))
+    monkeypatch.setattr(solver, "_single", boom("rt.single"))
+    monkeypatch.setattr(multiple, "solve", boom("rt.multiple"))
+    monkeypatch.setattr(twilight, "multiple_scattered", boom("rt.twilight"))
+    monkeypatch.setattr(solar_source, "SolarSource", boom("SolarSource"))
+
+
+def test_prepare_once_then_display_without_solve_or_source(atmo7, monkeypatch):
+    """A4: after ``solve_dome`` preparation, chart tables and all three
+    cameras render repeatedly from the bound arrays alone."""
+    from skycolor import render
+
+    pres = render.solve_dome(atmo7, 20.0, 30.0, n_zenith=N_ZEN, n_azimuth=N_AZ)
+    _forbid_solve_and_source(monkeypatch)
+    for _ in range(2):
+        rows = render.chart_table(pres)
+        assert len(rows) == len(render.DEFAULT_CHART_ROWS)
+        assert render.render_result(pres, camera="panorama", size=(24, 12),
+                                    ground=False).shape == (12, 24, 3)
+        assert render.render_result(pres, camera="fisheye", size=(20,),
+                                    ground=False).shape == (20, 20, 3)
+        assert render.render_result(pres, camera="perspective", size=(24, 16),
+                                    ground=True).shape == (16, 24, 3)
+
+
+def test_solve_dome_sends_absolute_azimuths_to_one_solve(atmo7, monkeypatch):
+    """The relative grid plus the same solar azimuth goes to exactly one
+    solve call."""
+    import skycolor.rt.solver as solver
+    from skycolor import render
+
+    seen = {}
+    real = solver.solve
+
+    def spy(atmo, sun_zen, vzen, vaz, **k):
+        seen["sun_zen"] = sun_zen
+        seen["vzen"] = np.array(vzen)
+        seen["vaz"] = np.array(vaz)
+        seen["sun_az"] = k.get("sun_azimuth_deg")
+        return real(atmo, sun_zen, vzen, vaz, **k)
+
+    monkeypatch.setattr(solver, "solve", spy)
+    pres = render.solve_dome(atmo7, 20.0, 137.0, n_zenith=N_ZEN, n_azimuth=N_AZ)
+    zen = np.linspace(0.0, 90.0, N_ZEN)
+    az = np.linspace(0.0, 180.0, N_AZ)
+    Z, A = np.meshgrid(zen, az, indexing="ij")
+    assert seen["sun_zen"] == 70.0
+    assert seen["sun_az"] == 137.0
+    np.testing.assert_array_equal(seen["vzen"], Z.ravel())
+    np.testing.assert_allclose(seen["vaz"], A.ravel() + 137.0, rtol=0, atol=0)
+    assert pres.radiance.shape == (N_ZEN, N_AZ, WL7.size)
+
+
+def test_joint_rotation_leaves_the_sky_invariant(atmo7):
+    """Rotating the sun and the grid together rotates the physics, not the
+    numbers.  Tolerance source: the joint rotation changes only the order of
+    trigonometric evaluations in the kernels (last-bit rounding), so a pure
+    relative tolerance at 1e-10 covers rounding, not physics (atol=0)."""
+    from skycolor import render
+
+    p0 = render.solve_dome(atmo7, 20.0, 0.0, n_zenith=N_ZEN, n_azimuth=N_AZ)
+    p1 = render.solve_dome(atmo7, 20.0, 137.0, n_zenith=N_ZEN, n_azimuth=N_AZ)
+    np.testing.assert_allclose(p1.radiance, p0.radiance, rtol=1e-10, atol=0)
+
+
+def test_panorama_brightness_follows_absolute_sun_azimuth(atmo7):
+    """Camera rotation with a non-zero sun azimuth: the brightest horizon
+    column sits at the sun's absolute azimuth, not at the grid origin."""
+    from skycolor import render
+
+    pres = render.solve_dome(atmo7, 20.0, 137.0, n_zenith=N_ZEN, n_azimuth=N_AZ)
+    img = render.render_result(pres, camera="panorama", size=(72, 8),
+                               ground=False, sun_disk=False)
+    row = img[-1].astype(float)
+    col = int(np.argmax(row.mean(axis=1)))
+    expected = 137.0 / 360.0 * 72.0                    # 27.4 -> pixel 27/28
+    assert abs(col - expected) <= 1.5
+
+
+def test_presentation_from_result_is_pure_binding(atmo7, monkeypatch):
+    """An explicit result + grid binds without any solve or source query."""
+    from skycolor import render
+    from skycolor.rt.solver import solve
+
+    zen = np.linspace(0.0, 90.0, N_ZEN)
+    az = np.linspace(0.0, 180.0, N_AZ)
+    Z, A = np.meshgrid(zen, az, indexing="ij")
+    result = solve(atmo7, 70.0, Z.ravel(), A.ravel(), sun_azimuth_deg=50.0)
+    _forbid_solve_and_source(monkeypatch)
+    pres = render.presentation_from_result(result, zen, az, 20.0, 50.0,
+                                           ground_albedo=0.1,
+                                           ground_direct_irradiance=np.zeros(WL7.size))
+    assert render.render_result(pres, camera="panorama", size=(16, 8),
+                                ground=True).shape == (8, 16, 3)
+
+
+def test_presentation_from_result_rejects_mismatch(atmo7):
+    """Grid rows, wavelength count and the recorded solar direction must
+    match the result; nothing is silently reshaped or re-solved."""
+    from skycolor import render
+    from skycolor.rt.solver import solve
+
+    zen = np.linspace(0.0, 90.0, N_ZEN)
+    az = np.linspace(0.0, 180.0, N_AZ)
+    Z, A = np.meshgrid(zen, az, indexing="ij")
+    result = solve(atmo7, 70.0, Z.ravel(), A.ravel(), sun_azimuth_deg=50.0)
+    with pytest.raises(ValueError, match="view rows"):
+        render.presentation_from_result(result, zen[:-1], az, 20.0, 50.0)
+    with pytest.raises(ValueError, match="grid"):
+        render.presentation_from_result(result, zen, az[:-1], 20.0, 50.0)
+    with pytest.raises(ValueError, match="zenith"):
+        # solved at sun zenith 70 (elevation 20); binding 21 misrepresents it
+        render.presentation_from_result(result, zen, az, 21.0, 50.0)
+    with pytest.raises(ValueError, match="azimuth"):
+        render.presentation_from_result(result, zen, az, 20.0, 51.0)
+
+
+def test_external_field_presentation_and_ground_rules(atmo7):
+    """The seam keeps its convention (relative azimuths, one sampling); the
+    ground display requires matching lighting and refuses both overrides."""
+    from skycolor import render
+
+    def field(zen, az_rel):
+        return np.zeros((np.asarray(zen).size, WL7.size))
+
+    zen = np.linspace(0.0, 90.0, N_ZEN)
+    az = np.linspace(0.0, 180.0, N_AZ)
+    Z, A = np.meshgrid(zen, az, indexing="ij")
+    pres = render.presentation_from_field(field, atmo7, 20.0, 0.0,
+                                          n_zenith=N_ZEN, n_azimuth=N_AZ)
+    assert pres.provenance == "external"
+    assert pres.radiance.shape == (N_ZEN, N_AZ, WL7.size)
+    assert np.array_equal(pres.radiance.reshape(-1, WL7.size), field(Z.ravel(), A.ravel()))
+    # ground without lighting: refused, not silently defaulted
+    with pytest.raises(ValueError, match="ground_direct_irradiance"):
+        render.render_result(pres, camera="panorama", size=(8, 4), ground=True)
+    # both overrides at once: refused
+    pres_lit = render.presentation_from_field(
+        field, atmo7, 20.0, 0.0, n_zenith=N_ZEN, n_azimuth=N_AZ,
+        ground_direct_irradiance=np.zeros(WL7.size))
+    with pytest.raises(ValueError, match="not both"):
+        render.render_result(pres_lit, size=(8, 4), ground=True,
+                             ground_direct_transmittance=np.zeros(WL7.size))
+    # lit or sky-only both render
+    assert render.render_result(pres_lit, size=(8, 4), ground=True).shape == (4, 8, 3)
+    assert render.render_result(pres, size=(8, 4), ground=False).shape == (4, 8, 3)
+
+
+def test_sky_dome_thin_forward_is_bit_identical(atmo7):
+    """The dict path rides the same solve: bit-identical to the historical
+    ndarray wrapper's composition."""
+    from skycolor import render
+    from skycolor.rt.solver import sky_radiance_total
+
+    zen = np.linspace(0.0, 90.0, N_ZEN)
+    az = np.linspace(0.0, 180.0, N_AZ)
+    Z, A = np.meshgrid(zen, az, indexing="ij")
+    direct = sky_radiance_total(atmo7, 70.0, Z.ravel(), A.ravel()).reshape(
+        N_ZEN, N_AZ, WL7.size)
+    dome = render.sky_dome(atmo7, 70.0, n_zenith=N_ZEN, n_azimuth=N_AZ)
+    assert set(dome) == {"zenith", "azimuth_rel", "radiance", "wl",
+                         "sun_zenith_deg"}
+    assert np.array_equal(dome["radiance"], direct)
+    np.testing.assert_array_equal(dome["zenith"], zen)
+    np.testing.assert_array_equal(dome["azimuth_rel"], az)
+    assert dome["sun_zenith_deg"] == 70.0
+
+
+def test_sky_radiance_grid_passes_new_options_through(atmo7):
+    """The keyword-only solver options reach the entry; the default request
+    stays the historical one."""
+    from skycolor import render
+    from skycolor.rt.single import sky_radiance as single_kernel
+    from skycolor.rt.solver import sky_radiance_total
+
+    zen = np.array([0.0, 45.0, 90.0])
+    az = np.array([0.0, 90.0, 180.0])
+    Z, A = np.meshgrid(zen, az, indexing="ij")
+    grid = render.sky_radiance_grid(atmo7, 60.0, Z, A)
+    direct = sky_radiance_total(atmo7, 60.0, Z.ravel(), A.ravel()).reshape(
+        3, 3, WL7.size)
+    assert np.array_equal(grid, direct)
+    single_only = render.sky_radiance_grid(atmo7, 60.0, Z, A,
+                                           approximation="spherical-single")
+    ref = single_kernel(atmo7, 60.0, Z.ravel(), A.ravel()).reshape(3, 3, WL7.size)
+    assert np.array_equal(single_only, ref)
+
+
+def test_render_scene_is_prepare_then_render_result(atmo7):
+    """render_scene keeps its ndarray contract and adds no second display
+    implementation: identical pixels to solve_dome + render_result."""
+    from skycolor import render
+
+    img = render.render_scene(atmo7, 20.0, 30.0, camera="perspective",
+                              size=(24, 16), sun_disk=False, ground=True,
+                              n_zenith=N_ZEN, n_azimuth=N_AZ)
+    pres = render.solve_dome(atmo7, 20.0, 30.0, n_zenith=N_ZEN, n_azimuth=N_AZ)
+    ref = render.render_result(pres, camera="perspective", size=(24, 16),
+                               sun_disk=False, ground=True)
+    assert img.shape == (16, 24, 3)
+    assert np.array_equal(img, ref)

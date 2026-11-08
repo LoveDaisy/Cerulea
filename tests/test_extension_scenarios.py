@@ -181,10 +181,14 @@ def test_one_display_path_for_clear_and_cloud():
 
     clear_rgb = render.render_scene(atmo, sun_elevation_deg=90.0 - sza,
                                     camera="panorama", size=(60, 24),
-                                    sun_disk=False)
+                                    sun_disk=False, ground=False)
     cloudy_rgb = render.render_scene(atmo, sun_elevation_deg=90.0 - sza,
                                      camera="panorama", size=(60, 24),
-                                     sun_disk=False, radiance_field=cloudy_field)
+                                     sun_disk=False, ground=False,
+                                     radiance_field=cloudy_field)
+    # (ground=False: the display-path comparison is about the sky field; a
+    # cloudy ground display would need the deck-matched beam irradiance --
+    # see test_presentation.py's external-field ground rules)
     # same pipeline call, same output contract, physically different skies
     assert clear_rgb.shape == cloudy_rgb.shape
     assert not np.allclose(clear_rgb, cloudy_rgb)
