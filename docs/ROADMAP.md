@@ -529,3 +529,44 @@ Open: closing the −12° anchors needs tail-defeating estimators (the
 candidate mitigates, the rest dominates); curved diffuse transport and
 continuous-wavelength quadrature remain explicit unknowns of the
 reference contract.
+
+### M20 — one production story, finite approximation branches (2026-11-08)
+
+The architecture consolidation keeps four implemented routes behind
+`rt.solver.solve`, not an arbitrary physics-switch framework. Solar numeric/time
+input resolves once to the pre-refraction direction; `render.solve_dome` prepares
+one `SkyResult`/`SkyPresentation`, then images and tables are pure consumers.
+The unified finite-disk source is already production code; continuous diffuse
+refraction remains a historical research route. The task-7 estimator/diagnostic
+source described in M19 was **not** adopted into the production MC: only its
+frozen data/docs were integrated; see the [retired index](../experiments/retired/README.md).
+
+[APPROXIMATIONS](physics/APPROXIMATIONS.md) now separates medium, source,
+propagation, refraction, orders, algorithm and numerical/statistical limits.
+The [thin example](../experiments/approximations/README.md) actually ran 30°/3°
+skies and three fixed low-budget daytime MC seeds in 121.73 s total, preserving
+spectra/components, XYZ/xy/Lv, cost and diagnostics. It verifies shared-component
+closure, not improved observational accuracy. The [catalogue](../figures/README.md)
+contains four newly generated, inspected, common-exposure images with complete
+commands and source version; all 26 earlier candidates were byte-preserved in
+phenomenon/history topics rather than overwritten or re-certified.
+
+Regression: full tree 526 passed; research-free tree **526 passed with no skip**
+in its own uv environment. The latter removes every experiment/research package
+and all tools except the one original maintenance file dynamically consumed by
+the default test harness (`tools/make_scheduling_weights.py`); deleting it too
+was tested and caused collection errors, so that invalid minimal-tree assumption
+was corrected without copying code or deleting tests. Real CLI spectra/table/
+PNG/summary closure and 32 source-check records agree across the two trees.
+Source checks retain only the already-adjudicated RK direction failures;
+run_all retains 2P/4F with all outputs byte-identical. Current runtime and the
+**364.54 s full-suite performance guard breach** are recorded separately from
+functional success in [FAST_SUITE](../validation/FAST_SUITE.md); this milestone
+is not a new ≤300 s certification. No production/default-test/physical-baseline
+or dependency change was made by the representation task.
+
+The useful simplification is operational: render the README scene, read the
+branch map and recompute the saved spectra, or locate historical work by its
+fixed version. Deep-twilight tail coverage, absolute observation matching,
+full curved propagation and current-suite performance remain explicit limits;
+none was solved by re-labelling a picture.

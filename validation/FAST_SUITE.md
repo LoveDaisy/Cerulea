@@ -77,6 +77,17 @@ moments/photons/tolerances to mask the cost. Whether to fund a suite-performance
 follow-up belongs to the owner, not this example/documentation task. These are
 one-run current-tree observations, **not** a new two-run ≤300 s certification.
 
+The isolated research-free export of `6c8d9ed` subsequently ran the same default
+suite: **526 passed, zero skip, exit 0, 355.72 s outer / 355.54 s internal**.
+It has its own locked environment and removes all experiments/research data;
+only `tools/make_scheduling_weights.py` remains as a byte-identical maintenance
+input to `test_validation_harness` (all other tools absent). An initial export
+that removed this maintenance consumer too produced 502 passes + worker
+collection errors, not a valid green run. Correcting the export restored all
+526 tests; no test or source implementation was copied/changed/skipped. This
+supports research independence but does not erase the full-tree guard breach
+or certify the ≤300 s target.
+
 ## What was slow, and why
 
 1. **pytest default collection was broken.**  Without `testpaths`, pytest
