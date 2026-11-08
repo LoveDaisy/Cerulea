@@ -178,5 +178,5 @@ y_ip = P_publish_p{ ∫dt w_i(t) ∫dλ R_p(λ) ∫_Ω+ dΩ A(λ,Ω) H(Ω) cosθ
 - 未取得：KBFD 7/3 全天文件（NOAA 端点超时，失败探针照实保留；冻结窗口行已覆盖
   晨窗证据）、白盘角响应、原位大气、其余夜次的独立天气筛查。
 - 完整 3192 列元数据重放与 35 谱冻结证据仍由
-  [matched-observation 包](../validation/data/matched_twilight_observations/README.md)
+  [matched-observation 包](../../validation/data/matched_twilight_observations/README.md)
   的 `--full-source-folder` 模式承载；两个包互为引用、互不覆盖。

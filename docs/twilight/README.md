@@ -14,8 +14,11 @@ unified source and continuous transport have not replaced production defaults.
 ## Audit sequence (M13–M18)
 
 Each report preserves a different intervention and its conditions. Their numerical
-results are not interchangeable. Scripts and frozen evidence remain in the
-repository's `tools/` and `validation/data/` trees, linked from each report.
+results are not interchangeable. Their scripts were retired from the active
+`tools/` tree in the research-boundary reorganisation: code, rerun commands and
+known limitations are indexed per topic in `experiments/retired/README.md`
+(fixed commit `afaae17`; task-7 tooling at `dda8673`), and the frozen evidence
+packages stay under `validation/data/`.
 
 | Document | Question and outcome |
 |---|---|

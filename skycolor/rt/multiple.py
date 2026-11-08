@@ -114,6 +114,24 @@ class SOSResult:
         Number of scattering orders that were summed.
     converged : bool
         Whether the ``tol`` criterion was met before ``max_orders``.
+    n_mu_eff, n_modes_eff, n_moments_eff : int
+        The angular discretisation *after* the kernel's clamps (even node
+        count, moments capped at ``2 * n_mu``, modes capped by moments) --
+        what actually ran, not what was requested.
+    n_moments_optics : int or None
+        Moment count used to build the delta-M layer optics.  With
+        ``delta_m=True`` the optics are built from the *requested*
+        ``n_moments`` before the transport truncation is applied, so this
+        can differ from ``n_moments_eff`` (the moments the order recursion
+        actually used); both numbers affect the result and are recorded
+        separately.  ``None`` when ``delta_m=False`` (the raw layer optics
+        carry no moment truncation).
+    tol : float
+        Convergence threshold passed to the order recursion.
+    max_orders : int
+        Order limit passed to the order recursion.
+    delta_m : bool
+        Whether the delta-M moment scaling was applied.
     """
 
     radiance: np.ndarray
@@ -125,6 +143,13 @@ class SOSResult:
     incident_flux: np.ndarray
     orders: int
     converged: bool
+    n_mu_eff: int = 0
+    n_modes_eff: int = 0
+    n_moments_eff: int = 0
+    n_moments_optics: int | None = None
+    tol: float = 0.0
+    max_orders: int = 0
+    delta_m: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -202,6 +227,24 @@ def _direct_source_coefficients(atmo, source, n_modes: int, l_max: int):
     return c_direct
 
 
+def _effective_discretisation(n_mu: int, n_modes: int, n_moments: int):
+    """Angular discretisation after the kernel's clamps.
+
+    ``n_mu`` is forced even (no Gauss node at ``mu = 0``), the moment count
+    is capped at ``2 * n_mu`` so the Gauss rule integrates the energy
+    identity exactly, and the mode count is capped by the moment count.
+    Computed once, *before* the early-return path, so ``SOSResult`` reports
+    the discretisation that actually ran (or would have run) from a single
+    authority -- callers must not re-derive the clamps.
+    """
+    n_mu = max(2, int(n_mu))
+    if n_mu % 2:
+        n_mu += 1
+    n_moments = int(min(max(int(n_moments), 1), 2 * n_mu))
+    n_modes = int(min(max(int(n_modes), 1), n_moments))
+    return n_mu, n_modes, n_moments
+
+
 def solve(
     atmo,
     sun_zenith_deg,
@@ -247,6 +290,7 @@ def solve(
     # the optical depth and the moments is the standard cure (Wiscombe 1977);
     # without it the multiple-scattering field of a dusty sky is wrong.
     props = atmo.delta_m_properties(n_moments) if delta_m else atmo.layer_properties()
+    n_moments_optics = int(n_moments) if delta_m else None
     beta_ext = np.maximum(props["beta_ext"], 0.0)
     beta_sca = np.maximum(props["beta_sca"], 0.0)
     dz = np.diff(z_bounds) * 1000.0
@@ -292,6 +336,8 @@ def solve(
 
     zeros_flux = np.zeros(n_wl)
     empty_rad = np.zeros((n_view, n_wl))
+    n_mu_eff, n_modes_eff, n_moments_eff = _effective_discretisation(
+        n_mu, n_modes, n_moments)
 
     if not np.any(beta_sca > 0.0):
         # no scattering at all: multiple scattering is identically zero
@@ -305,13 +351,17 @@ def solve(
             incident_flux=incident,
             orders=0,
             converged=True,
+            n_mu_eff=n_mu_eff, n_modes_eff=n_modes_eff,
+            n_moments_eff=n_moments_eff,
+            n_moments_optics=n_moments_optics, tol=float(tol),
+            max_orders=int(max_orders), delta_m=bool(delta_m),
         )
 
     # -- angular discretisation ---------------------------------------------
-    x, w = _gauss_nodes(n_mu)
+    x, w = _gauss_nodes(n_mu_eff)
     # ensure moments are integrable exactly by the Gauss rule
-    n_moments = int(min(max(int(n_moments), 1), 2 * x.size))
-    n_modes = int(min(max(int(n_modes), 1), n_moments))
+    n_moments = n_moments_eff
+    n_modes = n_modes_eff
     l_max = n_moments - 1
     m_max = n_modes - 1
     # per-layer direct-source Fourier coefficients (needs l_max; the layer
@@ -521,6 +571,10 @@ def solve(
         incident_flux=incident,
         orders=orders,
         converged=converged,
+        n_mu_eff=n_mu_eff, n_modes_eff=n_modes_eff,
+        n_moments_eff=n_moments_eff,
+        n_moments_optics=n_moments_optics, tol=float(tol),
+        max_orders=int(max_orders), delta_m=bool(delta_m),
     )
 
 

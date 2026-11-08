@@ -122,10 +122,18 @@ def test_balloon_and_plateau_are_distinct_constructions():
     assert plateau.r_bounds[0] == pytest.approx(6371e3 + 5000.0)
 
     # the plateau sky loses the 0-5 km column's scattering; the balloon sky
-    # still sees that air horizontally -> measurably different
-    r_balloon = sky_radiance_total(balloon, 60.0, 30.0, 120.0)
-    r_plateau = sky_radiance_total(plateau, 60.0, 30.0, 120.0)
+    # still sees that air horizontally -> measurably different (spherical
+    # single scattering, which has no plane-observer restriction)
+    r_balloon = sky_radiance_total(balloon, 60.0, 30.0, 120.0, multiple=False)
+    r_plateau = sky_radiance_total(plateau, 60.0, 30.0, 120.0, multiple=False)
     assert not np.allclose(r_balloon, r_plateau)
+    # a *full* (SOS-including) balloon computation is rejected since the
+    # entry consolidation: the plane-parallel diffuse field lives at the
+    # model bottom and cannot represent the below-observer air, so silently
+    # evaluating it there is no longer allowed (single-spotted semantic
+    # correction, task-simulation-entry plan section 3.4)
+    with pytest.raises(ValueError, match="model bottom"):
+        sky_radiance_total(balloon, 60.0, 30.0, 120.0)
     # the truncated domain's direct beam is not darker (same column above)
     T_balloon = direct_sun_transmittance(balloon, 60.0)
     T_plateau = direct_sun_transmittance(plateau, 60.0)
@@ -173,10 +181,14 @@ def test_one_display_path_for_clear_and_cloud():
 
     clear_rgb = render.render_scene(atmo, sun_elevation_deg=90.0 - sza,
                                     camera="panorama", size=(60, 24),
-                                    sun_disk=False)
+                                    sun_disk=False, ground=False)
     cloudy_rgb = render.render_scene(atmo, sun_elevation_deg=90.0 - sza,
                                      camera="panorama", size=(60, 24),
-                                     sun_disk=False, radiance_field=cloudy_field)
+                                     sun_disk=False, ground=False,
+                                     radiance_field=cloudy_field)
+    # (ground=False: the display-path comparison is about the sky field; a
+    # cloudy ground display would need the deck-matched beam irradiance --
+    # see test_presentation.py's external-field ground rules)
     # same pipeline call, same output contract, physically different skies
     assert clear_rgb.shape == cloudy_rgb.shape
     assert not np.allclose(clear_rgb, cloudy_rgb)

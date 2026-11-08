@@ -21,6 +21,7 @@ Setup and run commands live in [the project README](../README.md) and
 
 | Location | Scope |
 |---|---|
+| [Approximation story](physics/APPROXIMATIONS.md) | Shared target, branch map and actual controlled comparison; [production figures](../figures/README.md) own versions/commands |
 | [physics/](physics/README.md) | Aerosol/Mie, clouds, refraction, successive orders and independent MC methods |
 | [twilight/](twilight/README.md) | Production twilight engine, historical profile sweeps and M13–M18 audit sequence |
 | [validation/results.json](../validation/results.json) | Latest committed six-check regression snapshot, including existing failures |

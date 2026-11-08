@@ -78,6 +78,8 @@ __all__ = [
     "sun_transmittance_to_height",
     "illuminate_cloud",
     "cloud_radiance",
+    "ground_direct_irradiance",
+    "apply_cloud_overlay",
     "sky_radiance_with_cloud",
     "overcast_shape",
 ]
@@ -634,6 +636,59 @@ def illuminate_cloud(atmo, cloud: CloudLayer, sun_zenith_deg: float,
                              optics=optics, shadow_km=z_shadow)
 
 
+def ground_direct_irradiance(atmo, cloud_layer, sun_zenith_deg: float) -> np.ndarray:
+    """Deck-attenuated direct irradiance on the opaque model bottom.
+
+    The display-side ground lighting of a cloudy scene, moved here from the
+    cloud experiments (task-presentation-flow M3) so production and the
+    figures share exactly one implementation.  Plain-disk beam sum: each
+    beam contributes the unified source's own ground incidence (occultation,
+    apparent direction, full-column extinction via the ground vertex)
+    attenuated by the deck at that beam's entry inclination.  Zero cloud
+    optical depth reproduces the plain beam-sum ground irradiance exactly;
+    with no deck this *is* that plain beam sum.  The production clear-sky
+    default uses the source's per-point seam
+    (``SolarSource.direct_irradiance``) instead and is untouched by this
+    helper -- do not use this function to replace it.
+
+    A deck below a raised model bottom (``base_km < z_bounds[0]``) leaves
+    the ground with no direct light: the deck is underground relative to the
+    opaque surface.  ``cloud_layer=None`` returns the plain beam sum from
+    the same disk beam set (the tau=0 limit evaluates the same beams
+    through the deck branch; the two differ only in floating-point
+    summation order, not in beams or weights).
+    """
+    source = SolarSource(atmo, float(sun_zenith_deg), 0.0)
+    z_ground = float(atmo.z_bounds[0])   # the model's opaque ground height
+    if z_ground > 0.0 and cloud_layer is not None and cloud_layer.base_km < z_ground:
+        # deck below the raised ground plane: no ground-level direct light
+        return np.zeros(len(atmo.wl))
+    f_inf = spectra.solar_irradiance(atmo.wl)
+    if cloud_layer is None:
+        # the no-deck plain beam sum: the same contact-band adaptive disk
+        # the deck branch consumes (a fixed disk kept a +21% contact-band
+        # error here -- review round 5)
+        return source.ground(np.array([[0.0, 0.0, R_EARTH + z_ground * 1e3]]),
+                             iw=None)[0] * f_inf
+    directions, weights = source.disk_for_column(z_ground)
+    n_beam = directions.shape[0]
+    up = np.array([0.0, 0.0, 1.0])
+    true_e = np.degrees(np.arcsin(np.clip(directions @ up, -1.0, 1.0)))
+    app_g, t_g, gain_g, lit_g = source.vertex(np.full(n_beam, z_ground), true_e)
+    optics = cloud_layer.optics(atmo.wl) if cloud_layer is not None else None
+    if optics is not None:
+        app_t, _, _, _ = source.vertex(np.full(n_beam, float(cloud_layer.top_km)),
+                                       true_e)
+        mu_entry = np.maximum(np.abs(np.sin(np.radians(app_t))), 1e-3)
+        deck_trans = np.exp(-optics.tau[None, :] / mu_entry[:, None])
+    else:
+        deck_trans = np.ones((n_beam, 1))
+    sin_app = np.maximum(np.sin(np.radians(app_g)), 0.0)
+    per_beam = (lit_g[:, None] * t_g * gain_g[:, None] * sin_app[:, None]
+                * deck_trans)                                    # (nb, n_wl)
+    return (weights[:, None] * per_beam).sum(axis=0) * f_inf
+
+
 def overcast_shape(mu_view):
     """CIE overcast sky: ``L = L_zenith (1 + 2 mu)/3``, horizon/zenith = 1/3.
 
@@ -676,8 +731,65 @@ def cloud_radiance(illum: CloudIllumination, view_zenith_deg,
 
 
 # ---------------------------------------------------------------------------
-# the drop-in replacement for rt.solver.sky_radiance_total
+# the local deck-overlay operator and the legacy full wrapper
 # ---------------------------------------------------------------------------
+def apply_cloud_overlay(
+    atmo,
+    cloud_layer: CloudLayer,
+    sun_zenith_deg: float,
+    view_zenith_deg,
+    clear_radiance,
+    ground_albedo=None,
+    include_clear: bool = True,
+    include_cloud: bool = True,
+):
+    """Local overlay operator: compose a *precomputed* clear field with a deck.
+
+    This is the cloud composition with the clear-sky computation removed.
+    The caller supplies ``clear_radiance`` -- production goes through
+    ``rt.solver.solve`` (the one authoritative clear orchestration); tests
+    and tools may hand in any precomputed field whose provenance they know.
+    This function never reaches back into the solver, which is what keeps
+    the dependency one-way and the clear combination single-source.
+
+    Returns
+    -------
+    (total, components)
+        ``total = clear_radiance * transmittance + cloud_term`` (``total =
+        cloud_term`` when ``include_clear`` is false -- the excluded term is
+        still recorded in the components but not summed into the total).
+        ``components`` carries the trans-attenuated clear field (``clear``),
+        the cloud term, the view ``transmittance``, the beam ``illumination``
+        and the deck ``optics``.
+    """
+    view = np.atleast_1d(np.asarray(view_zenith_deg, dtype=float)).ravel()
+    n_view = view.size
+    wl = np.asarray(atmo.wl, dtype=float)
+
+    if clear_radiance is None:
+        # cloud-only request without a clear field: the overlay sees zero
+        clear_radiance = np.zeros((n_view, len(wl)))
+    clear_radiance = np.asarray(clear_radiance, dtype=float)
+
+    optics = cloud_layer.optics(wl)
+    mu_view = np.clip(np.cos(np.radians(view)), 1e-6, 1.0)
+    tau_view = optics.tau[None, :] / mu_view[:, None]
+    trans = np.exp(-tau_view)
+
+    illum = illuminate_cloud(atmo, cloud_layer, sun_zenith_deg,
+                             ground_albedo=ground_albedo)
+    cloud_term = cloud_radiance(illum, view) if include_cloud else np.zeros_like(clear_radiance)
+
+    total = clear_radiance * trans + cloud_term
+    if not include_clear:
+        total = cloud_term
+
+    components = dict(clear=clear_radiance * trans, cloud=cloud_term,
+                      illumination=illum, optics=optics,
+                      transmittance=trans)
+    return total, components
+
+
 def sky_radiance_with_cloud(
     atmo,
     cloud_layer: CloudLayer,
@@ -696,9 +808,18 @@ def sky_radiance_with_cloud(
 ):
     """Total sky radiance with a cloud deck, ``(n_view, n_wl)``.
 
-    Drop-in replacement for :func:`skycolor.rt.solver.sky_radiance_total`::
+    Thin forwarder kept for the historical signature::
 
         L = L_clear * exp(-tau_cloud / mu_view) + L_cloud
+
+    Every request goes through the authoritative entry as one cloud
+    request (:func:`rt.solver.solve` with ``cloud_layer=``): the solver
+    runs its own clear composition when needed, the deck composition
+    itself is the local operator :func:`apply_cloud_overlay`, and the
+    support-domain checks (observer below the cloud base, angle domain,
+    horizontal-field applicability) hold identically on this wrapper and
+    on :func:`rt.solver.solve`.  There is no second clear-sky or deck
+    implementation behind this wrapper.
 
     Parameters
     ----------
@@ -709,49 +830,44 @@ def sky_radiance_with_cloud(
     view_zenith_deg, view_azimuth_deg : array_like
     sun_azimuth_deg : float
     multiple : bool
-        Passed to the clear-sky solver.
+        Order selection of the clear base (``multiple=False`` computes a
+        single-scattering-only clear field under the deck).
     clear_radiance : ndarray, optional
-        Pre-computed ``(n_view, n_wl)`` clear-sky field, to avoid re-running
-        the multiple-scattering solver for every call.
+        Pre-computed ``(n_view, n_wl)`` clear-sky field; when given, no
+        clear-sky kernel runs (the solver records the provenance as
+        ``"external"``) and ``n_gauss``/``chunk`` have no consumer -- they
+        keep their historical no-op behaviour here.
     ground_albedo : float or ndarray, optional
         Overrides ``atmo.ground_albedo`` for the cloud-ground coupling.
+    include_clear, include_cloud : bool
+        Exclude either term from the total (``include_clear=False`` is a
+        cloud-only request: no clear-sky kernel runs, matching the
+        historical wrapper that skipped the clear solve).
     return_components : bool
-        Also return a dict with the clear and cloud terms and the diagnostics.
+        Also return the component dict (the solver's cloud decomposition:
+        ``clear``/``cloud``/``illumination``/``optics``/``transmittance``,
+        plus the un-occluded clear ``single``/``multiple`` sub-fields when
+        the solver computed them).
 
     Returns
     -------
     ndarray ``(n_view, n_wl)``, or ``(radiance, components)``.
     """
-    from .solver import sky_radiance_total
+    from .solver import solve
 
-    view = np.atleast_1d(np.asarray(view_zenith_deg, dtype=float)).ravel()
-    n_view = view.size
-    wl = np.asarray(atmo.wl, dtype=float)
-
-    if clear_radiance is None and include_clear:
-        clear_radiance = sky_radiance_total(
-            atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
-            sun_azimuth_deg=sun_azimuth_deg, multiple=multiple,
-            n_gauss=n_gauss, chunk=chunk)
-    if clear_radiance is None:
-        clear_radiance = np.zeros((n_view, len(wl)))
-    clear_radiance = np.asarray(clear_radiance, dtype=float)
-
-    optics = cloud_layer.optics(wl)
-    mu_view = np.clip(np.cos(np.radians(view)), 1e-6, 1.0)
-    tau_view = optics.tau[None, :] / mu_view[:, None]
-    trans = np.exp(-tau_view)
-
-    illum = illuminate_cloud(atmo, cloud_layer, sun_zenith_deg,
-                             ground_albedo=ground_albedo)
-    cloud_term = cloud_radiance(illum, view) if include_cloud else np.zeros_like(clear_radiance)
-
-    total = clear_radiance * trans + cloud_term
-    if not include_clear:
-        total = cloud_term
-
+    clear_runs_here = clear_radiance is None and include_clear
+    res = solve(
+        atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
+        sun_azimuth_deg=sun_azimuth_deg,
+        cloud_layer=cloud_layer,
+        clear_radiance=clear_radiance,
+        ground_albedo=ground_albedo,
+        include_clear=include_clear,
+        include_cloud=include_cloud,
+        multiple=multiple,
+        # n_gauss/chunk configure the spherical single kernel only; with no
+        # clear single term to run they keep their historical silent no-op
+        **({"n_gauss": n_gauss, "chunk": chunk} if clear_runs_here else {}))
     if return_components:
-        return total, dict(clear=clear_radiance * trans, cloud=cloud_term,
-                           illumination=illum, optics=optics,
-                           transmittance=trans)
-    return total
+        return res.radiance, res.components
+    return res.radiance

@@ -86,7 +86,14 @@ def test_clear_diagnostics_orders_and_convergence(atmo81):
     assert isinstance(res.diagnostics["orders"], int)
     assert res.diagnostics["orders"] > 0
     assert isinstance(res.diagnostics["converged"], bool)
-    assert res.stderr is None and res.components is None
+    assert res.stderr is None
+    # the clear combination formally provides its components; the total is
+    # their exact sum and no kernel ran twice
+    comps = res.components
+    assert set(comps) == {"single", "multiple"}
+    assert np.array_equal(res.radiance,
+                          comps["single"] + comps["multiple"])
+    assert res.approximation == "hybrid-sos"
     assert res.options["sun_zenith_deg"] == 65.0
 
 
@@ -174,16 +181,20 @@ def test_ground_radiance_direct_transmittance_override(atmo7):
 
 def test_solve_rejects_empty_request_and_records_cloud_options(atmo7, stratus):
     """single=False + multiple=False computes nothing -> ValueError; the
-    cloud branch does not record ``single`` in options (the deck composition
-    always includes the clear single scattering)."""
+    cloud composition always includes the clear single term, so
+    ``single=False`` on an overlay request is rejected instead of being
+    silently ignored (plan section 3.4); use ``include_clear=False`` for a
+    cloud-only total."""
     with pytest.raises(ValueError, match="computes nothing"):
         solve(atmo7, 60.0, 30.0, 90.0, single=False, multiple=False)
     with pytest.raises(ValueError, match="computes nothing"):
         solve(atmo7, 96.0, 30.0, 90.0, method="twilight", quality="low",
               grid=TINY, seed=0, single=False, multiple=False)
-    res = solve(atmo7, 75.0, 45.0, 135.0, method="cloud", cloud_layer=stratus,
-                single=False)   # not supported on the cloud path...
-    assert "single" not in res.options          # ...and honestly not recorded
+    with pytest.raises(ValueError, match="single=False"):
+        solve(atmo7, 75.0, 45.0, 135.0, method="cloud", cloud_layer=stratus,
+              single=False)
+    res = solve(atmo7, 75.0, 45.0, 135.0, method="cloud", cloud_layer=stratus)
+    assert res.options["single"] is True   # the deck always includes it
     # while the clear branch does record it
     res_ss = solve(atmo7, 60.0, 30.0, 90.0, single=True, multiple=False)
     assert res_ss.options["single"] is True

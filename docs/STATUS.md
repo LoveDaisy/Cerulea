@@ -1,6 +1,6 @@
 # Status
 
-Current production behavior and limits after M18 (2026-11-01).
+Current production behavior and limits (2026-11-08, unified production/presentation entry).
 Methods and frozen evidence are linked in [the documentation guide](README.md);
 completed work and proposed next scopes are in [ROADMAP.md](ROADMAP.md).
 
@@ -17,16 +17,24 @@ completed work and proposed next scopes are in [ROADMAP.md](ROADMAP.md).
 | Refraction | On by default; two-branch solar columns and occlusion at the model's opaque bottom |
 | Clouds | One homogeneous plane-parallel deck, delta-Eddington; per-beam top/base/mixed illumination from the unified source |
 | Horizontal heterogeneity | Radial aerosol field, first order only |
+| Request entry | `rt.solver.solve`: four finite approximations (spherical-single / plane-sos / hybrid-sos / spherical-mc), capability/support checks before kernels, per-component arrays plus effective settings; the three legacy entry points are thin forwarders |
+| Presentation | `render.solve_dome` prepares one result for display (regular dome grid, ground albedo/irradiance, apparent sun geometry); `render_result`/`chart_table` are pure consumers; the CLI render/chart share one preparation and print a provenance summary (`format_result_summary`); solar time/numeric inputs resolve through `scene.resolve_sun` to the pre-refraction direction |
 | Colour and cameras | CIE 1931 → Bradford → tone mapping; panorama, fisheye, perspective |
 
 Frozen `Medium` and `Scene` define the atmosphere and observing scenario;
 `Atmosphere` is their facade. Shared species/column algebra lives in `optics`.
-Explicit `rt.solver.solve` dispatch returns `SkyResult`; all spectral fields can
+`rt.solver.solve` is the single authoritative composition and returns a
+`SkyResult`; all spectral fields can
 use the same renderer. `at_altitude` truncates the domain without renormalising
 columns, and solar occlusion uses the same `r_bounds[0]` bottom. Contracts and
 shared-physics validation blind spots: [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Validation snapshot
+
+The [approximation story](physics/APPROXIMATIONS.md) separates orders,
+propagation and numerics using two real current-production scenes; the
+[curated figure catalogue](../figures/README.md) owns versions and display
+parameters. These examples explain behavior, not absolute accuracy.
 
 The latest committed [six-check results](../validation/results.json) are
 **2 PASS / 4 FAIL** (unified solar source; see [physics/SOLAR_SOURCE.md](physics/SOLAR_SOURCE.md)). Passing regression tests do not close these physical gaps.
@@ -77,9 +85,12 @@ These backends have not replaced production defaults.
 
 ## Remaining limits
 
-- Production solar prescriptions differ between backends; inverse-angle tables
-  are sparse and refracted disk angular gain is absent. The experimental source
-  addresses these contracts; production integration remains proposed work.
+- Production backends share the unified finite-disk solar source
+  (`physics/SOLAR_SOURCE.md` §Known deviations records the adjudicated
+  residuals). Remaining inverse-angle table sparsity and refracted disk
+  angular gain are tracked there; the entry consolidation
+  (task-simulation-entry) made `rt.solver.solve` the single composition
+  of single+SOS/MC/cloud.
 - Absolute twilight validation needs matched solar-axis metadata, site atmospheres
   and instrument responses. Patat's total V-band sky includes night background.
   The limited filter-only conversion changes present −6° spectra by 0.5–0.7%;

@@ -34,10 +34,20 @@ radiance, stderr = twilight_radiance(
 Both arrays are `(n_view, n_wl)` in W m⁻² sr⁻¹ nm⁻¹ and the view angles
 broadcast against each other, exactly like `rt.solver.sky_radiance_total`.
 
+The wrapper is a thin format adapter over
+`rt.solver.solve(approximation="spherical-mc")`; the composition itself
+lives in the solver.  `stderr` is a composite MC error estimate: per-anchor
+statistics are smoothed across anchors/wavelength and carry a 3 % floor
+(`MS_BIAS`) — it is not a pure sample SE and not a total physical error.
+`coarse_errors` in the diagnostics are the pre-smoothing per-anchor
+statistics.
+
 The figure is produced by `experiments/twilight_nocturnal.py`
-(`figures/11_twilight_deep.png`): the zenith brightness from 0 to −18° for the
-deterministic model, the engine and the Patat fit, plus fisheye renders at −9°
-and −12°.
+(`figures/11_twilight_deep.png`; both retired — code frozen at commit `afaae17`,
+see `experiments/retired/README.md`; the figure now lives at
+`experiments/retired/figures/11_twilight_deep.png`): the zenith brightness from
+0 to −18° for the deterministic model, the engine and the Patat fit, plus
+fisheye renders at −9° and −12°.
 
 > **Provenance of the committed PNG.**  The deterministic and single-scattering
 > curves come from `twilight_nocturnal.py --quick`; `twilight_figure.py` then
@@ -153,10 +163,11 @@ The first-order term is deterministic and carries no statistical error.
 
 ## 2. Historical validation benchmarks (pre-AOD550 correction)
 
-The cases below were measured with `tools/twilight_benchmark.py` before the
-AOD550 correction. Running `uv run python tools/twilight_benchmark.py` today
-reruns those cases with current optics; it does not reproduce these historical
-engine values verbatim. Recorded runtime was about 10 min (`--quick` about
+The cases below were measured with `tools/twilight_benchmark.py` (retired;
+frozen at commit `afaae17`, see `experiments/retired/README.md`) before the
+AOD550 correction. Running that tool from the frozen tree reruns those cases
+with that tree's optics; it does not reproduce these historical engine values
+verbatim. Recorded runtime was about 10 min (`--quick` about
 2 min for noisier versions). Atmosphere: `presets.clear` (AOD₅₅₀ = 0.05,
 300 DU ozone, ground albedo 0.1), observer at sea level.
 

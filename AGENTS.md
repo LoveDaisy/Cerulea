@@ -17,11 +17,10 @@ uv sync        # 从 uv.lock 重建 .venv；不要 pip install 进环境
 ### 测试
 
 ```bash
-uv run pytest -q                      # 全量测试（436 项）：12-worker xdist，
-                                      # 实测 LPT 分箱（正式对子 257.4/256.2 s
-                                      # 外层墙钟，严格 ≤300 s）；详见
-                                      # validation/FAST_SUITE.md
-uv run pytest -n 0 -q ...             # 串行等价诊断（约 26 min），不作为验收口径
+uv run pytest -q                      # 当前默认全量，12-worker xdist / LPT；
+                                      # 当前树实测与历史436项正式对子分开记录于
+                                      # validation/FAST_SUITE.md，不沿用旧时长认证
+uv run pytest -n 0 -q ...             # 串行等价诊断，不作为性能验收口径
 uv run python -m validation.run_all   # 六项物理校验，单池 8 worker，实测约 4 min；
                                       # 既有物理 FAIL 预期 exit=1
 ```
@@ -34,8 +33,9 @@ uv run python -m skycolor.cli render --sun-elevation 3 --camera perspective \
     --size 1200x520 --pitch 14 --hfov 100 --preset clear --aod 0.05 \
     --yaw 180 --out sunset.png
 
-# 生成实验图（figures/，脚本从仓库根目录运行）
-uv run python experiments/01_day_cycle.py
+# 生成实验图（写各主题目录 figures/，仓库根目录运行）
+uv run python -m experiments.approximations.compare
+# 近似/实测解释：docs/physics/APPROXIMATIONS.md；正式图/完整参数：figures/README.md
 ```
 
 ### 代码格式化
@@ -72,12 +72,12 @@ uv run python experiments/01_day_cycle.py
 │   ├── presets.py       # 命名场景
 │   └── data/            # 提交在仓库里的数据表（离线可运行）
 ├── validation/          # check1..6 + common.py + 各轮 addendum
-├── experiments/         # 生成 figures/ 的脚本（01..12）
+├── experiments/         # 现象研究主题（薄调用生产入口）+ cssp/retired 主题
 ├── tests/               # 测试套件
 ├── docs/                # 项目入口：STATUS / ROADMAP / ARCHITECTURE / DEVELOPMENT / SUMMARY.zh
 │   ├── physics/         # 通用散射、气溶胶、折射与云方法
 │   └── twilight/        # 暮光引擎、审计链与历史廓线实验
-├── tools/               # build_data.py、twilight_benchmark.py
+├── tools/               # build_data.py、perf_bench.py、benchmark/make_scheduling_weights 窄维护
 ├── figures/             # 提交在仓库里的结果图
 └── scratchpad/          # 本地任务管理（gitignore，不进 git）
 ```

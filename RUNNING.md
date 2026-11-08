@@ -14,6 +14,27 @@ uv run python -m validation.run_all
 and platform. Do not `pip install` into the environment — if a package is
 missing, add it to `pyproject.toml` and run `uv lock`.
 
+## Run and understand a current sky
+
+Use the [README's complete CLI scene](README.md#quick-start) to reproduce the
+current low-sun image. Add `--approximation spherical-single`, `plane-sos`,
+`hybrid-sos` (default) or `spherical-mc` only within their
+[declared domains](docs/ARCHITECTURE.md). There is no all-physics switch.
+
+To compare branches and reuse the same result for images/tables:
+
+```bash
+uv run python -m experiments.approximations.compare
+uv run python -m experiments.approximations.compare \
+  --from-npz experiments/approximations/data/representative.npz --publish-figures
+```
+
+The first command does real fixed-scene solves and writes only theme-local
+outputs. The second redraws the committed spectra, with no solve. See the
+[approximation story](docs/physics/APPROXIMATIONS.md) for what the comparisons
+can establish and the [catalogue](figures/README.md) for exact parameters.
+MC is a budgeted algorithm choice, not automatic accuracy certification.
+
 ## Updating
 
 ```bash
@@ -30,8 +51,8 @@ The validation suite is the guard rail: a dependency bump that changes
 
 [.python-version](.python-version) pins the interpreter and [uv.lock](uv.lock)
 pins dependencies. Read these files for exact versions rather than maintaining
-a second list here. The latest committed physical-check snapshot is 3 PASS /
-3 FAIL; `validation.run_all` therefore currently exits non-zero for known
-physical deviations. See [STATUS.md](docs/STATUS.md) for their scope.
+a second list here. `validation.run_all` currently exits non-zero for known
+physical deviations; the current PASS/FAIL snapshot lives in
+[STATUS.md](docs/STATUS.md) and is not duplicated here.
 
 Branch, review, test-selection and merge procedures: [DEVELOPMENT.md](docs/DEVELOPMENT.md).

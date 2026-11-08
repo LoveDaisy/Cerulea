@@ -15,3 +15,24 @@ scratchpad/
 
 # local editor settings
 .claude/settings.local.json
+
+# theme-owned run outputs (curated figures live in the root figures/ or
+# validation/figures/ only by explicit choice; experiments/retired/figures/
+# holds moved historical figures and stays tracked)
+experiments/day/figures/
+experiments/day/out/
+experiments/twilight/figures/
+experiments/twilight/out/
+experiments/aerosol/figures/
+experiments/aerosol/out/
+experiments/heterogeneity/figures/
+experiments/heterogeneity/out/
+experiments/altitude/figures/
+experiments/altitude/out/
+experiments/bluesun/figures/
+experiments/bluesun/out/
+experiments/clouds/figures/
+experiments/clouds/out/
+experiments/cssp/out/
+experiments/approximations/figures/
+experiments/approximations/out/

@@ -17,7 +17,7 @@ import numpy as np
 import pytest
 from scipy.optimize import brentq
 
-from skycolor.atmosphere import Atmosphere, ExponentialProfile
+from skycolor.atmosphere import AerosolLayer, Atmosphere, ExponentialProfile
 from skycolor.aerosol import HinterlandAerosol, shared
 from skycolor.constants import N_STD_AIR, R_EARTH
 from skycolor.refraction import REFRACTIVITY_STD
@@ -695,6 +695,32 @@ def test_narrow_crescent_scatter_matches_independent_cap_integral():
         t = _crescent_reference(e_loc, crit)
         assert t > 0.0
         assert abs(v - t) <= 5e-3 * t, (h_km, v, t)
+        # the ray_fraction seam must scale the mixture linearly against the
+        # same independent integral; rf=1 elsewhere would mask a doubled
+        # or dropped application of the fraction
+        v_half = float(src.scatter(x, backward, iw=0,
+                                   ray_fraction=np.full(1, 0.5),
+                                   aerosol_fractions=np.zeros((1, 0)))[0])
+        assert abs(v_half - 0.5 * t) <= 5e-3 * (0.5 * t), (h_km, v_half, t)
+
+
+def test_ground_flux_disk_center_on_horizon_matches_analytic():
+    """Disk centre exactly on the horizon: half-occulted ground flux.
+
+    Analytic independent form for a uniform cap of radius alpha centred at
+    elevation 0 (vacuum, refraction off, so apparent == true): with the
+    production normalisation sum(w cos rho) = 1 the F-free angular integral
+    is (alpha - sin(alpha)cos(alpha)) / (pi sin^2 alpha); the lower cap
+    half must be excluded exactly once, not doubled or dropped.  This is
+    the sunset ground-illumination seam the renderer consumes.
+    """
+    atmo = _vacuum_550()
+    source = SolarSource(atmo, 90.0, 0.0, n_radial=48, n_azimuth=512)
+    x = np.array([[0.0, 0.0, R_EARTH]])
+    got = float(source.ground(x, iw=0)[0])
+    alpha = np.radians(SUN_RADIUS_DEG)
+    expected = (alpha - np.sin(alpha) * np.cos(alpha)) / (np.pi * np.sin(alpha) ** 2)
+    assert abs(got - expected) <= 5e-3 * expected, (got, expected)
 
 
 def test_ground_local_accounting_is_observer_invariant():
@@ -741,31 +767,121 @@ def test_ground_local_accounting_is_observer_invariant():
     assert np.array_equal(r0.flux_up_boa, r24.flux_up_boa)
 
 
-def test_real_point_solar_table_feeds_finite_source():
-    """End-to-end smoke: real Atmosphere + real PointSolarTable + adapter.
+class _IsotropicToyAerosol:
+    """Grey aerosol with a constant phase per wavelength column.
 
-    Review gen2 R1 Major#3/#4: the experimental adapter guessed the query
-    protocol from atmosphere attributes and passed a positional extinction
-    array into the real table's ``iw`` keyword parameter, so every real
-    audit run raised TypeError.  Both supported table kinds speak iw;
-    this test proves the real supply-consumer chain executes.
+    Grey extinction (constant relative curve) keeps the per-beam weights
+    identical across wavelengths and across instances, so scatter outputs
+    with different phase values compare by pure ratio -- the expected
+    values come from the toy definition, not from the kernel under test.
     """
-    from pathlib import Path
-    import sys
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from tools.point_solar_table import PointSolarTable
-    from tools.unified_solar_transport import FiniteSolarSource
-    atmo = Atmosphere.standard(W3)
-    table = PointSolarTable(atmo, n_height=6)
-    source = FiniteSolarSource(atmo, table)
-    x = np.array([[0.0, 0.0, R_EARTH], [0.0, 0.0, R_EARTH + 5e3]])
-    backward = np.tile(np.array([0.0, 0.0, 1.0]), (2, 1))
-    zs = np.radians(87.0)                       # sun zenith, azimuth 0
-    sun_hat = np.array([0.0, np.sin(zs), np.cos(zs)])
-    out = source.scatter(x, backward, sun_hat, iw=1, ray_fraction=np.ones(2),
-                         aerosol_fractions=np.zeros((2, len(atmo.aerosols))))
-    assert out.shape == (2,)
-    assert np.all(np.isfinite(out)) and np.all(out >= 0.0)
+
+    def __init__(self, wl_nm, phase_values):
+        self.wl = np.asarray(wl_nm, float)
+        self.values = np.asarray(phase_values, float)
+
+    def relative_coefficients(self, wl):
+        wl = np.atleast_1d(np.asarray(wl, float))
+        ones = np.ones(len(wl))
+        return ones, ones
+
+    def phase(self, mu, wl_nm):
+        mu_arr = np.atleast_1d(np.asarray(mu, float))
+        wl = np.atleast_1d(np.asarray(wl_nm, float))
+        col = np.array([self.values[int(np.argmin(np.abs(self.wl - w)))]
+                        for w in wl])
+        return (col[None, :] * np.ones((len(mu_arr), 1)))
+
+
+def test_scatter_aerosol_mixture_matches_analytic_cap_weights():
+    """Absolute mixture anchor: transparent medium, analytic cap weights.
+
+    With a zero-optical-depth toy aerosol in vacuum air the per-beam
+    transmission and gain are exactly 1, so the documented kernel contract
+    ``sum_beams T*G*p_mix`` reduces to ``sum(w) * p``; ``sum(w) =
+    2/(1+cos rho_max)`` is the disk weight convention anchored by
+    ``test_solar_disk_normalisation`` and ``p`` is the toy phase value.
+    This pins the ABSOLUTE aerosol coefficient (uniformly rescaling the
+    aerosol term cannot pass), exercises the full-spectrum branch
+    (``iw=None``) with per-wavelength fractions, and the scalar-iw branch.
+    """
+    values = np.array([1.0, 2.0, 4.0])
+    atmo = Atmosphere(W3, refraction=False, ozone_du=0.0, no2_column=0.0,
+                      air_profile=lambda z: np.zeros_like(np.asarray(z, float)),
+                      aerosols=[AerosolLayer(_IsotropicToyAerosol(W3, values),
+                                             0.0, ExponentialProfile(1.5))])
+    src = SolarSource(atmo, 30.0, 0.0)
+    x = np.array([[0.0, 0.0, R_EARTH]])
+    backward = np.array([[0.0, 0.0, 1.0]])
+    weight_sum = 2.0 / (1.0 + np.cos(np.radians(SUN_RADIUS_DEG)))
+
+    # scalar-iw branch: one fraction per layer
+    for iw in range(3):
+        got = float(src.scatter(x, backward, iw=iw, ray_fraction=np.zeros(1),
+                                aerosol_fractions=np.array([[0.5]]))[0])
+        expected = 0.5 * values[iw] * weight_sum
+        assert abs(got - expected) <= 1e-9 * expected, (iw, got, expected)
+
+    # full-spectrum branch: fractions vary per wavelength
+    af_wl = np.array([[[0.3, 0.7, 0.2]]])
+    full = src.scatter(x, backward, ray_fraction=np.full((1, 3), 0.0),
+                       aerosol_fractions=af_wl)
+    assert full.shape == (1, 3)
+    expected_full = af_wl[0, 0] * values * weight_sum
+    np.testing.assert_allclose(full[0], expected_full, rtol=1e-9, atol=0.0)
+
+
+def test_scatter_applies_aerosol_phase_per_channel_and_fractions_linearly():
+    """The aerosol term of the scatter mixture is present, per-channel, linear.
+
+    Research-era independent coverage (the frozen ToyTable mixture moment)
+    had no production analogue: every production test pinned the Rayleigh
+    term only (aerosol_fractions all zero), so a kernel that dropped the
+    aerosol term or reused one wavelength's fraction column for all bands
+    would pass.  With grey extinction the per-beam weights are identical
+    across iw, so the outputs must follow the toy phase columns exactly
+    (1 : 2 : 4), scale linearly in the fraction, and split additively
+    against the Rayleigh-only scatter.
+    """
+    values = np.array([1.0, 2.0, 4.0])
+
+    # channel ratios: vacuum air (no wavelength-dependent air extinction) +
+    # grey toy aerosol, so the per-beam weights are identical across iw and
+    # the outputs must follow the toy phase columns exactly
+    atmo_grey = Atmosphere(W3, ozone_du=0.0, no2_column=0.0,
+                           air_profile=lambda z: np.zeros_like(
+                               np.asarray(z, float)),
+                           aerosols=[AerosolLayer(
+                               _IsotropicToyAerosol(W3, values), 0.2,
+                               ExponentialProfile(1.5))])
+    src = SolarSource(atmo_grey, 30.0, 0.0)
+    x = np.array([[0.0, 0.0, R_EARTH]])
+    backward = np.array([[0.0, 0.0, 1.0]])
+    af1 = np.array([[1.0]])
+    per_iw = [float(src.scatter(x, backward, iw=i, ray_fraction=np.zeros(1),
+                                aerosol_fractions=af1)[0]) for i in range(3)]
+    assert all(v > 0.0 for v in per_iw)
+    np.testing.assert_allclose(per_iw, values * (per_iw[0] / values[0]),
+                               rtol=2e-15, atol=0.0)
+    # fraction linearity
+    b_half = float(src.scatter(x, backward, iw=1, ray_fraction=np.zeros(1),
+                               aerosol_fractions=np.array([[0.5]]))[0])
+    assert abs(b_half - 0.5 * per_iw[1]) <= 2e-15 * per_iw[1]
+
+    # additive split against the Rayleigh-only term: within one iw the
+    # per-beam weights are the same across fraction settings, so the
+    # mixture must equal the sum exactly even with real (wavelength
+    # dependent) air extinction
+    atmo_air = Atmosphere(W3, aerosols=[AerosolLayer(
+        _IsotropicToyAerosol(W3, values), 0.2, ExponentialProfile(1.5))])
+    src_air = SolarSource(atmo_air, 30.0, 0.0)
+    b = float(src_air.scatter(x, backward, iw=1, ray_fraction=np.zeros(1),
+                              aerosol_fractions=af1)[0])
+    a_ray = float(src_air.scatter(x, backward, iw=1, ray_fraction=np.ones(1),
+                                  aerosol_fractions=np.zeros((1, 1)))[0])
+    c_mix = float(src_air.scatter(x, backward, iw=1, ray_fraction=np.ones(1),
+                                  aerosol_fractions=af1)[0])
+    assert abs(c_mix - (a_ray + b)) <= 1e-12 * c_mix
 
 
 # ---------------------------------------------------------------------------

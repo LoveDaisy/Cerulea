@@ -1,20 +1,16 @@
-"""Cost probes for the production solar-source task (baseline vs unified source).
+"""Cost probes for the production solar-source entry points.
 
 Runs on one machine in one script so the numbers are comparable.  It reports
-three blocks with separate, additive cost accounting (Mie construction is
-measured on its own, so the *source* cost is never contaminated by it):
+blocks with separate, additive cost accounting (Mie construction is measured
+on its own, so the *source* cost is never contaminated by it):
 
 ``baseline``
-    Current production entry points (no unified source): cold import/build,
-    warm ``rt.single``/SOS/MC/dome/CLI-sized calls.  This is the "old" side
-    of every ratio in the availability gate.
-``source_experimental``
-    The verified experimental algorithms that the production source will
-    migrate (``tools.radial_solar_mapping`` / ``continuous_solar_columns`` /
-    ``point_solar_table``): profile build, mapping build, column tool build,
-    table build at pilot and default density, warm queries at the sizes the
-    backends actually need (single point, 1000 vertices, 46x91 dome, 81-wl
-    single direction).
+    Current production entry points: cold import/build, warm
+    ``rt.single``/SOS/MC/dome/CLI-sized calls.
+``gate``
+    Availability budgets (plan 6.5) evaluated against the measured baseline.
+``cold``
+    Fresh-interpreter import + first-call costs (``--skip-cold`` to skip).
 ``process``
     Peak RSS of this process and versions/hashes for reproducibility.
 
@@ -178,76 +174,6 @@ print(json.dumps(dict(import_s=t_import, mie81_cold_s=t_mie,
     return json.loads(out.stdout.strip().splitlines()[-1])
 
 
-def source_experimental_block() -> dict:
-    """Build/query costs of the experimental algorithms to be migrated."""
-    from skycolor import presets
-    from tools.continuous_solar_columns import ContinuousSolarColumns
-    from tools.point_solar_table import PointSolarTable
-    from tools.radial_solar_mapping import RadialSolarMapping
-
-    rows = {}
-    atmo3 = presets.clear(W3)
-    atmo81 = presets.clear(W81)
-
-    t0 = time.perf_counter()
-    prof3 = RadialSolarMapping(atmo3)
-    rows["mapping_build_3wl_s"] = time.perf_counter() - t0
-    # mapping construction itself is wavelength independent; the 81-wl number
-    # isolates RefractiveProfile tabulation + spline setup
-    t0 = time.perf_counter()
-    RadialSolarMapping(atmo81)
-    rows["mapping_build_81wl_s"] = time.perf_counter() - t0
-
-    t0 = time.perf_counter()
-    cols3 = ContinuousSolarColumns(atmo3, mapping=prof3)
-    rows["columns_build_3wl_s"] = time.perf_counter() - t0
-
-    h = np.full(1000, 40.0)
-    app = np.linspace(-5.2, -5.8, 1000)
-    t, _, _ = _time(lambda: cols3.columns(h[:2], app[:2]), repeat=3)
-    rows["columns_2pts_warm_s"] = t
-    t, _, v = _time(lambda: cols3.columns(h, app), repeat=3)
-    rows["columns_1000pts_warm_s"] = t
-    rows["columns_1000pts_finite"] = bool(np.isfinite(v).all())
-
-    # pilot table (the density the availability gate assumes achievable)
-    t0 = time.perf_counter()
-    table3 = PointSolarTable(atmo3, n_height=17, label="cost-probe")
-    rows["table_build_pilot17_3wl_s"] = time.perf_counter() - t0
-    rows["table_pilot17_rows"] = int(len(table3.heights))
-    rows["table_pilot17_knots"] = int(sum(len(r["t"]) for r in table3.rows))
-
-    t, _, _ = _time(lambda: table3.query(np.array([40.0]), np.array([-6.0]), iw=0))
-    rows["query_1pt_1wl_warm_s"] = t
-    t, _, _ = _time(lambda: table3.query(np.array([40.0]), np.array([-6.0])))
-    rows["query_1pt_allwl_warm_s"] = t
-    rng = np.random.default_rng(7)
-    zq = np.full(1000, 40.0)
-    eq = rng.uniform(-15.0, 89.0, 1000)
-    t, _, _ = _time(lambda: table3.query(zq, eq, iw=0))
-    rows["query_1000pts_1wl_warm_s"] = t
-    t, _, _ = _time(lambda: table3.query(zq, eq))
-    rows["query_1000pts_allwl_warm_s"] = t
-    zen = np.linspace(0.0, 90.0, 46)
-    az = np.linspace(0.0, 180.0, 91)
-    Z, A = np.meshgrid(zen, az, indexing="ij")
-    t, _, _ = _time(lambda: table3.query_fields(np.full(Z.size, 40.0),
-                                                np.full(Z.size, 20.0)))
-    rows["query_dome46x91_1wl_warm_s"] = t
-
-    # full-density table at 3 wl: the default the backends would build
-    t0 = time.perf_counter()
-    table3f = PointSolarTable(atmo3, label="cost-probe-full")
-    rows["table_build_default_3wl_s"] = time.perf_counter() - t0
-    rows["table_default_rows"] = int(len(table3f.heights))
-    rows["table_default_knots"] = int(sum(len(r["t"]) for r in table3f.rows))
-
-    t0 = time.perf_counter()
-    PointSolarTable(atmo81, label="cost-probe-81")
-    rows["table_build_default_81wl_s"] = time.perf_counter() - t0
-    return rows
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, required=True)
@@ -263,7 +189,6 @@ def main() -> None:
                      numpy=np.__version__),
         baseline=base,
         gate=gate_block(base),
-        source_experimental=source_experimental_block(),
         peak_rss_gib=_rss_gib(),
     )
     if not args.skip_cold:

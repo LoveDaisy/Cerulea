@@ -38,17 +38,29 @@ optics.py            shared species listing + column algebra: the species
 rt.single            exact first-order scattering, spherical geometry
 rt.multiple          orders >= 2, plane-parallel discrete ordinates (SOS)
 rt.twilight + rt.mc  deep-twilight spherical engine (split estimator: exact
-    |                first order + Monte Carlo higher orders)
-rt.cloud             delta-Eddington cloud deck composed on the clear solver
+    |                first order + Monte Carlo higher orders);
+    |                twilight_radiance is a thin format adapter
+rt.cloud             delta-Eddington cloud deck; apply_cloud_overlay is the
+    |                local composition operator (takes clear components,
+    |                never solves for them)
     |
-rt.solver.solve      explicit backend dispatch -> SkyResult (method, options,
-    |                stderr, components, diagnostics); sky_radiance_total is
-    |                the legacy ndarray wrapper of the "clear" branch
+rt.solver.solve      the one authoritative composition: four finite
+    |                approximations (spherical-single / plane-sos /
+    |                hybrid-sos / spherical-mc) resolved from one request
+    |                with capability/support checks, then each needed local
+    |                kernel once -> SkyResult (approximation, options,
+    |                stderr, components, diagnostics, effective);
+    |                sky_radiance_total / twilight_radiance /
+    |                sky_radiance_with_cloud are thin forwarders
     |
 color / render       spectral field -> XYZ -> adapted -> tone-mapped sRGB;
-                     sky_dome/render_scene accept a ``radiance_field`` closure
-                     so ANY spectral field (cloudy, experimental) uses the
-                     same display path
+                     solve_dome prepares one result for display (grid, ground
+                     lighting, apparent sun); render_result/chart_table are
+                     pure consumers; sky_dome/render_scene keep a
+                     ``radiance_field`` closure so ANY spectral field (cloudy,
+                     experimental) uses the same display path;
+                     scene.resolve_sun is the one solar input contract
+                     (time or numbers -> pre-refraction direction)
 ```
 
 ### What is shared vs deliberately independent
@@ -70,6 +82,9 @@ anchor each other for small size parameters
 (`tests/test_extension_scenarios.py`).
 
 ### Backing approximations (CAPABILITIES)
+
+The conceptual branch map and real controlled comparison live in
+[APPROXIMATIONS.md](physics/APPROXIMATIONS.md); this document owns API and support contracts.
 
 Each backend declares its standing approximations as a module-level
 `CAPABILITIES` dict; `rt.solver.solve` warns on the one degenerate request
@@ -191,47 +206,185 @@ Atmosphere(wl_nm, ozone_du=300, no2_column=0, aerosols=[...],
 
 ```python
 solve(atmo, sun_zenith_deg, view_zenith_deg, view_azimuth_deg,
-      sun_azimuth_deg=0.0, *, method="clear"|"twilight"|"cloud",
-      cloud_layer=None, single=True, multiple=True,
-      quality="medium", seed=0, grid=None) -> SkyResult
+      sun_azimuth_deg=0.0, *,
+      method=None,                    # legacy alias: "clear"|"twilight"|"cloud"
+      approximation=None,             # "spherical-single"|"plane-sos"|
+                                      # "hybrid-sos" (default)|"spherical-mc"
+      cloud_layer=None, clear_radiance=None, ground_albedo=None,
+      include_clear=True, include_cloud=True,
+      single=None, multiple=None,     # order selection, default both on
+      n_gauss=None, chunk=None, quality=None, seed=None, grid=None,
+      single_config=None, sos_config=None, mc_config=None) -> SkyResult
 
-sky_radiance_total(...)  # legacy ndarray entry, wraps the "clear" branch
+sky_radiance_total(...)      # thin forwarder of the hybrid-sos branch
+twilight_radiance(...)       # thin format adapter of spherical-mc
+sky_radiance_with_cloud(...) # thin forwarder: solve + apply_cloud_overlay
 ```
 
 `SkyResult` = `radiance (n_view, n_wl)`, `wl`, `method`, `options`,
-`stderr` (twilight MC 1σ only), `components` (cloud decomposition),
-`diagnostics` (SOS `orders`/`converged`, twilight `undetected_wl` + grid,
-...).  Statistical, convergence and physical-approximation information stay
-separate; there is no single "confidence" number.
+`stderr` (MC/smoother composite estimate including the 3 % floor — not a
+pure sample SE, not total physical error), `components` (the selected
+`single`/`multiple` arrays, strictly closing the total; cloud keeps
+`clear`/`cloud`/`transmittance`/`illumination`/`optics`), `diagnostics`
+(SOS `orders`/`converged`, MC `undetected_wl` + grid, ...) plus
+`approximation` + `approximations` (per-component kernel capabilities
+actually run) + `effective` (clamped discretisation/settings as returned
+by the kernels).  Statistical, convergence and physical-approximation
+information stay separate; there is no single "confidence" number.
+
+```python
+from skycolor.rt.solver import solve, MCConfig, SOSConfig
+
+res = solve(atmo, sun_z, vza, va, sun_az)              # hybrid-sos default
+res.components["single"] + res.components["multiple"]  # closes res.radiance
+res.effective["sos"]      # discretisation the kernel actually ran with
+sph = solve(atmo, sun_z, vza, va, sun_az, approximation="spherical-single")
+pln = solve(atmo, sun_z, vza, va, sun_az, approximation="plane-sos")
+mc  = solve(atmo, sun_z, vza, va, sun_az, approximation="spherical-mc",
+            mc_config=MCConfig(seed=7))
+cloudy = solve(atmo, sun_z, vza, va, sun_az, cloud_layer=deck)  # overlay
+pre = solve(atmo, sun_z, vza, va, sun_az, cloud_layer=deck,
+            clear_radiance=cached_clear)   # external clear: not recomputed
+```
 
 ### `skycolor.render`
 
 ```python
-sky_dome(atmo, sun_zenith_deg, ..., radiance_field=None)
-render_scene(..., radiance_field=None, ground_direct_transmittance=None)
-ground_radiance(..., direct_transmittance=None)
+resolve_sun(sun_elevation=None, sun_azimuth=None, time=..., ...)  # scene.py
+pres = solve_dome(atmo, sun_elev, sun_az, approximation=..., cloud_layer=...)
+render_result(pres, camera=..., ground=..., sun_disk=None)   # pure display
+chart_table(pres)                          # nearest-node rows + actual angles
+format_result_summary(pres)                # provenance/limits, result fields only
+presentation_from_result(res, zen, az_rel, sun_elev, sun_az)  # bind a ready result
+presentation_from_field(field, atmo, ...)  # the external-field seam
+sky_dome(atmo, sun_zenith_deg, ..., radiance_field=None)     # thin: dict form
+render_scene(..., radiance_field=None, ground_direct_transmittance=None,
+             approximation=..., cloud_layer=...)             # thin: ndarray form
+ground_radiance(..., direct_transmittance=None)              # legacy ground seam
 ```
+
+The production flow is one-directional: `resolve_sun -> one solve
+(`solve_dome`) -> `SkyPresentation` -> outputs`.  Preparation binds the grid
+layout, the ground albedo/irradiance snapshots and the adopted source's
+apparent sun geometry; after that, switching cameras, tone maps or output
+formats re-enters nothing (spied in `tests/test_presentation.py`).
+`SkyResult` stays the only authority on solver facts — the carrier copies no
+diagnostics and holds no solver callback.
 
 `radiance_field(zen_flat, az_rel_flat) -> (n_view, n_wl)`: the display layer
 consumes any spectral field without knowing the medium; bind medium and
 solar geometry in the caller's closure.  With a field given, `atmo` is used
-only for `wl` metadata (and the ground).
+only for `wl` metadata (and the ground albedo default).  An external field
+records provenance `"external"`: a ground display then requires a matching
+`ground_direct_irradiance` (or the retired `ground_direct_transmittance`)
+instead of silently pairing the custom sky with the clear beam.
 
 ## Entry-point migration map
 
 | Old | Now |
 |---|---|
-| `rt.solver.sky_radiance_total` | kept (compat); structured access via `rt.solver.solve` |
-| `rt.twilight.twilight_radiance` (2-tuple) | kept; `return_info=True` adds the MC info dict |
-| `rt.cloud.sky_radiance_with_cloud` | kept; structured via `solve(method="cloud")` |
-| `experiments/profile_variants.py` subclasses | thin constructors over `ozone_profile=` / `air_profile=` |
+| `rt.solver.sky_radiance_total` | kept: thin forwarder; the one composition lives in `solve` (hybrid-sos) |
+| `rt.twilight.twilight_radiance` (2-tuple) | kept: thin format adapter over `solve(approximation="spherical-mc")`; `return_info=True` adds the MC info dict |
+| `rt.cloud.sky_radiance_with_cloud` | kept: thin forwarder (clear via `solve`, overlay via `cloud.apply_cloud_overlay`); structured via `solve(cloud_layer=...)` |
+| `experiments/profile_variants.py` subclasses | retired at `afaae17`; production extension is `ozone_profile=` / `air_profile=` (see [retired index](../experiments/retired/README.md)) |
 | `install_twilight_profile_support` | removed — `_restrict` is the engine's native path |
 | `cloud._Distribution` | `cloud.SizeDistribution` (alias kept) |
 | `refraction._Profile` / `_trace` in data pipeline | `refractive_profile` / `trace_ray(..., profile=...)` |
 | mutating a shared aerosol | `aerosol.replace(**kw)` (shared instances are frozen) |
 | `at_altitude` (double-scaled rescaling) | truncation at the site (Step 3c) |
-| `experiments/clouds.py` display helpers | `render.sky_dome` / `render_scene` with `radiance_field` |
+| `experiments/clouds/clouds.py` display helpers | `render.sky_dome` / `render_scene` with `radiance_field`; the deck ground-beam helper lives in `rt.cloud.ground_direct_irradiance` (experiments forward to it) |
 | CLI `--elevation` | unchanged semantics (site altitude); values follow the truncation fix |
+| CLI `--time` (chart ignored it; `refraction=True` ephemeris angle) | both subcommands consume `--time` through `scene.resolve_sun`: naive means UTC, explicit offsets convert before the ephemeris reads clock fields, and the resolved direction is pre-refraction (the source applies refraction once) |
+
+### Semantics tightened by the presentation consolidation
+
+Display-level corrections (task-presentation-flow); solve numbers inside the
+supported domains are unchanged:
+
+1. Time/numeric solar inputs now describe the same pre-refraction direction
+   on every consumer; the old CLI path double-refracted (geometric
+   correction at the ephemeris, then the source's traced bending).
+   Explicit angles together with `--time` are an error; numeric defaults
+   fill only when no time is given.
+2. A cloudy display bound through `radiance_field` without a matching
+   `ground_direct_irradiance`: silently paired with the clear beam →
+   `ValueError` (`ground=False` skips the ground display).
+3. Ground display for an observer off the model bottom: evaluated at the
+   wrong height → `ValueError` (the sky keeps working with
+   `ground=False`).
+4. The decorative sun disk consumes the adopted source's apparent position
+   and occultation-aware visibility (was: true elevation with a −0.9°
+   cutoff) and defaults to off on cloud scenes (was: drawn on any request);
+   `--no-sun` still disables it entirely.  The marker stays an annotation:
+   it never enters charts or ground energy.
+5. Convenience ndarray entries (`sky_dome`, `sky_radiance_grid`,
+   `render_scene`) warn visibly on SOS non-convergence, MC undetected
+   wavelengths and the statistical nature of MC stderr; CLI products print
+   `format_result_summary` instead (result fields only, unknowns stay
+   unknown).  An MC result that ran but came back all-undetected is
+   reported as "ran, statistics not determinable from zeros" -- never as
+   "no MC term ran".
+6. An external `radiance_field` and a solver choice (`approximation`,
+   `cloud_layer`, grouped configs, explicit order selection) are mutually
+   exclusive: silently ignored → `ValueError` at every public entry
+   (`solve_dome` / `render_scene` / `sky_radiance_grid`); the legacy
+   `sky_dome` field forwarding injects no solver settings and is not
+   misflagged.  `render_scene`'s retired `ground_direct_transmittance`
+   converts once at the wrapper boundary when given alone (same deprecated
+   formula, one warning) and errors when given together with
+   `ground_direct_irradiance`.
+
+### Semantics tightened by the entry consolidation
+
+Previously silently ignored or silently miscomputed; numbers inside the
+supported domains are unchanged (bitwise frozen-baseline evidence in the
+task log).  Applicability of every setting and support check now follows
+the request's *execution plan* -- which kernels actually run:
+
+1. Elevated observer + a plane-parallel term (``plane-sos``; ``hybrid-sos``
+   with the SOS higher orders enabled): the plane field was solved at the
+   domain bottom regardless of the observer → `ValueError`.  Use
+   `spherical-single`, `spherical-mc` (both evaluate the observer at its
+   actual elevation), ``hybrid-sos`` with ``multiple=False``, or
+   `at_altitude(z0)` for a raised station.
+2. Cloud request with `single=False`: silently ignored → `ValueError`
+   (cloud-only totals use `include_clear=False`).
+3. Observer inside/above the cloud deck: unchecked on the external-clear
+   path → `ValueError` on every cloud entry point.
+4. `plane-sos` with a heterogeneous horizontal field: silently unused
+   input → `ValueError`; likewise any request whose execution plan runs
+   no spherical single term (higher orders only, external clear,
+   cloud-only) — the field would apply to no output component.
+5. Unknown `quality`/`grid` keys, explicit settings for a kernel the
+   request will not run (e.g. `n_gauss`/`SingleConfig` on `plane-sos`,
+   whose first order comes from the SOS run; single/SOS settings with an
+   external clear field or a cloud-only request), disagreeing
+   `method`/`approximation`, the same setting given through both the
+   legacy and grouped channels: silently ignored or undefined →
+   `ValueError` before any kernel runs.
+6. View zenith outside `[0, 90]` degrees (or non-finite): the single
+   kernel returned broken geometry, SOS clipped such rays onto the
+   horizon → `ValueError` (the horizon at exactly 90° keeps the existing
+   clipping approximation).
+7. Cloud-only requests (`include_clear=False`, no external field): the
+   formal entry used to run the whole clear solve and discard it → no
+   clear kernel runs (the historical wrapper semantics), the excluded
+   term is recorded as zeros.
+8. Result records: `options` keeps the *request* values (`sos` kwargs,
+   single `n_gauss`/`chunk` including on the MC route, `refraction`,
+   `quality`/`seed`/`grid`); `effective` keeps what the kernels *ran*
+   with (clamped SOS discretisation split into transport `n_moments` vs
+   optics `n_moments_optics`, MC `n_anchor_run`/`n_photons_run` after
+   anchor dedup and photon rounding); per-component provenance records
+   the actual `source_refraction` switch instead of assuming it.
+9. The legacy `sky_radiance_total` wrapper keeps its lenient behaviour
+   (`single=False` silently drops `n_gauss`/`chunk`); the formal `solve`
+   is strict.  The cloud wrapper now forwards the cloud request itself,
+   so checks 2/3/4/6 hold identically on both entry points.
+10. spherical-mc routing runs the single term with the wrapper default
+   `chunk=512` (the old twilight path used the kernel default 128);
+   arrays are bitwise unchanged, only the memory blocking differs.
+11. `spherical-single` with explicit `multiple=True` → `ValueError`.
 
 ## Validation targets
 

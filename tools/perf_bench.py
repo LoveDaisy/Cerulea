@@ -8,7 +8,7 @@ changes can be evaluated in isolation.  It prints numbers only; the
 acceptance thresholds live in the task notes (scratchpad/task-mie-cache,
 handoff 2026-10-30 §3.6), not here.
 
-Scenarios (81-wavelength working grid, ``validation.common.WL_COARSE``):
+Scenarios (81-wavelength working grid, ``skycolor.constants.WL_COARSE``):
 
 1. warm ``single`` sky_radiance, clear preset, one viewing direction; the
    first, cold call is printed for context but is *not* an acceptance
@@ -40,7 +40,7 @@ sys.path.insert(0, str(ROOT))
 
 from skycolor import presets  # noqa: E402
 from skycolor.rt.single import sky_radiance as single  # noqa: E402
-from validation.common import WL_COARSE  # noqa: E402
+from skycolor.constants import WL_COARSE  # noqa: E402
 
 
 def _timed(label: str, fn):
