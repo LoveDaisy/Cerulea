@@ -72,6 +72,8 @@ def sky_dome(atmo, sun_zenith_deg: float, n_zenith: int = 46, n_azimuth: int = 9
                       min_zenith_deg=min_zenith_deg, multiple=multiple,
                       single_config=_single_config(n_gauss, chunk),
                       radiance_field=radiance_field)
+    if pres.result is not None:
+        _warn_result_limits(pres.result)
     return dict(zenith=pres.zenith, azimuth_rel=pres.azimuth_rel,
                 radiance=pres.radiance, wl=pres.wl,
                 sun_zenith_deg=sun_zenith_deg)
@@ -119,6 +121,7 @@ def sky_radiance_grid(atmo, sun_zenith_deg, Z, A, n_gauss=3, chunk=512,
     res = solve(atmo, sun_zenith_deg, np.ravel(Z),
                 np.ravel(A) + sun_azimuth_deg,
                 sun_azimuth_deg=sun_azimuth_deg, **kwargs)
+    _warn_result_limits(res)
     return res.radiance.reshape(shape + (res.radiance.shape[-1],))
 
 
@@ -548,6 +551,125 @@ def _sun_marker_geometry(pres: SkyPresentation, sun_disk):
     return (pres.sun_azimuth_deg, pres.sun_apparent_elevation_deg)
 
 
+# ---------------------------------------------------------------------------
+# diagnostics through to the consumer
+# ---------------------------------------------------------------------------
+def format_result_summary(source) -> str:
+    """A human-readable provenance/limitations summary of one result.
+
+    Reads **only** fields the result itself carries: what actually ran, its
+    effective numerics, its convergence/statistics state and the kernels'
+    standing approximations.  Missing information is reported as unknown,
+    never inferred or filled in from the request.  Accepts a
+    :class:`SkyPresentation` or a bare :class:`~skycolor.rt.result.SkyResult`.
+    """
+    result = getattr(source, "result", None)
+    if result is None:
+        result = source
+    lines = []
+    approx = getattr(result, "approximation", "") or "unknown"
+    method = getattr(result, "method", "") or "unknown"
+    lines.append(f"approximation: {approx} (method {method!r})")
+    opt = getattr(result, "options", None) or {}
+    if "sun_zenith_deg" in opt:
+        lines.append(f"sun: zenith {float(opt['sun_zenith_deg']):.3f} deg, "
+                     f"azimuth {float(opt.get('sun_azimuth_deg', 0.0)):.3f} deg "
+                     "(input direction pre-refraction)")
+    lines.append("source-side refraction: "
+                 + ("on" if opt.get("refraction") else "off"))
+    approximations = getattr(result, "approximations", None) or {}
+    if approximations:
+        lines.append("components:")
+        for name, comp in approximations.items():
+            lines.append(f"  {name}: {comp.get('kernel', 'unknown')} "
+                         f"(source_refraction={comp.get('source_refraction')})")
+            for key, text in (comp.get("approximations", None) or {}).items():
+                lines.append(f"    {key}: {text}")
+    else:
+        lines.append("components: unknown (no provenance recorded)")
+    effective = getattr(result, "effective", None) or {}
+    if effective:
+        parts = "; ".join(f"{k} {v}" for k, v in effective.items())
+        lines.append(f"effective: {parts}")
+    else:
+        lines.append("effective: unknown")
+    d = getattr(result, "diagnostics", None) or {}
+    if "orders" in d:
+        conv = d.get("converged")
+        conv_txt = "yes" if conv is True else ("NO" if conv is False else "unknown")
+        note = ("  -- multiple scattering truncated; treat with caution"
+                if conv is False else "")
+        lines.append(f"sos: orders={d['orders']} converged={conv_txt}{note}")
+    if "n_photons" in d or "undetected_wl" in d:
+        mc_eff = effective.get("mc", None) or {}
+        lines.append(
+            "mc: photons_run={} anchors_run={} coarse grid {}x{} seed {}".format(
+                mc_eff.get("n_photons_run", "unknown"),
+                mc_eff.get("n_anchor_run", "unknown"),
+                mc_eff.get("n_zen_run", "unknown"),
+                mc_eff.get("n_az_run", "unknown"),
+                mc_eff.get("seed", "unknown")))
+        und = d.get("undetected_wl")
+        und = [] if und is None else np.asarray(und, dtype=float).ravel()
+        if und.size:
+            shown = ", ".join(f"{float(w):.0f}" for w in und[:8])
+            more = " ..." if und.size > 8 else ""
+            lines.append(
+                f"mc undetected wavelengths: {und.size} [{shown}{more}] nm -- "
+                "no Monte Carlo contribution detected; report as unresolved, "
+                "not zero")
+    stderr = getattr(result, "stderr", None)
+    if stderr is not None:
+        arr = np.asarray(stderr, dtype=float)
+        finite = arr[np.isfinite(arr)]
+        if (opt.get("mc_run", True) is False) or not finite.size or not np.any(finite):
+            lines.append("mc stderr: identically zero (no Monte Carlo term ran)")
+        else:
+            lines.append(
+                "mc stderr (W m-2 sr-1 nm-1): median {:.3e}, max {:.3e} -- "
+                "composite estimate: the MC standard error propagated through "
+                "the angular smoother and wavelength interpolation plus a ~3% "
+                "smoother resolution-bias floor (in quadrature); not the total "
+                "physical error of the model, and the photon budget is not "
+                "tail coverage".format(float(np.median(finite)),
+                                       float(finite.max())))
+    return "\n".join(lines)
+
+
+def _warn_result_limits(result) -> None:
+    """Visible limitations for the convenience ndarray entries.
+
+    Non-convergence, undetected Monte Carlo wavelengths and the statistical
+    nature of MC stderr must not hide behind a dict the user never opens.
+    The presentation carrier path stays silent here: its consumers read
+    :func:`format_result_summary` instead.
+    """
+    import warnings
+
+    d = getattr(result, "diagnostics", None) or {}
+    if d.get("converged") is False:
+        warnings.warn(
+            f"SOS did not converge ({d.get('orders', '?')} orders): the "
+            "plane-parallel multiple-scattering term is truncated",
+            RuntimeWarning, stacklevel=3)
+    und = d.get("undetected_wl")
+    if und is not None and np.size(und):
+        warnings.warn(
+            f"Monte Carlo detected no contribution at {np.size(und)} "
+            "wavelength(s): treat them as unresolved, not zero",
+            RuntimeWarning, stacklevel=3)
+    stderr = getattr(result, "stderr", None)
+    if stderr is not None:
+        opt = getattr(result, "options", None) or {}
+        arr = np.asarray(stderr, dtype=float)
+        if (opt.get("mc_run", True) is not False) and np.any(arr > 0):
+            warnings.warn(
+                "higher orders are a Monte Carlo statistical estimate: stderr "
+                "is a composite (smoother + interpolation + bias floor), not "
+                "the total physical error",
+                RuntimeWarning, stacklevel=3)
+
+
 def render_result(pres: SkyPresentation, *, camera: str = "panorama",
                   size=(1000, 500), exposure=None, tonemap: str = "aces",
                   adaptation=None, reference_percentile: float = 92.0,
@@ -726,6 +848,8 @@ def render_scene(atmo, sun_elevation_deg: float, sun_azimuth_deg: float = 0.0,
                       single_config=single_config, sos_config=sos_config,
                       mc_config=mc_config, radiance_field=radiance_field,
                       ground_direct_irradiance=ground_direct_irradiance)
+    if pres.result is not None:
+        _warn_result_limits(pres.result)
     return render_result(pres, camera=camera, size=size, exposure=exposure,
                          tonemap=tonemap, adaptation=adaptation,
                          reference_percentile=reference_percentile,

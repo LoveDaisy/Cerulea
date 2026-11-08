@@ -572,3 +572,131 @@ def test_sun_marker_visibility_and_explicit_rules(atmo7, stratus, monkeypatch):
         render._sun_marker_geometry(pres_ext, True)
     # explicit False disables everywhere
     assert render._sun_marker_geometry(pres_ext, False) is None
+
+
+# ---------------------------------------------------------------------------
+# 4. diagnostics through to the consumer (M4)
+# ---------------------------------------------------------------------------
+TINY_MC = dict(n_zen=3, n_az=4, n_anchor=3, n_photons=6.0e5)
+
+
+def test_summary_reports_hybrid_provenance(atmo7):
+    """A converged deterministic run states what ran and its numerics."""
+    from skycolor import render
+    from skycolor.rt.solver import solve
+
+    res = solve(atmo7, 70.0, np.array([0.0, 45.0, 90.0]), 0.0)
+    text = render.format_result_summary(res)
+    assert "approximation: hybrid-sos (method 'clear')" in text
+    assert "converged=yes" in text
+    assert "n_gauss" in text and "n_mu" in text     # request + effective numerics
+    assert "source-side refraction: on" in text
+    assert "input direction pre-refraction" in text
+
+
+def test_summary_reports_mc_budget_and_composite_stderr(atmo7):
+    """A real low-budget MC run: actual photon/grid counts, the composite
+    stderr statement and the budget-is-not-tail-coverage caveat."""
+    from skycolor import render
+    from skycolor.rt.solver import solve
+
+    res = solve(atmo7, 96.0, np.array([0.0, 45.0]), np.array([0.0, 180.0]),
+                approximation="spherical-mc", quality="low", seed=0,
+                grid=TINY_MC)
+    text = render.format_result_summary(res)
+    assert "approximation: spherical-mc (method 'twilight')" in text
+    assert "photons_run=" in text and "anchors_run=" in text
+    assert "coarse grid 3x4" in text
+    assert "composite estimate" in text
+    assert "not tail coverage" in text
+    assert "converged" not in text          # no SOS ran: no convergence claim
+
+
+def test_summary_reports_single_term_without_convergence_claim(atmo7):
+    from skycolor import render
+    from skycolor.rt.solver import solve
+
+    res = solve(atmo7, 70.0, np.array([45.0]), 0.0,
+                approximation="spherical-single")
+    text = render.format_result_summary(res)
+    assert "approximation: spherical-single" in text
+    assert "converged" not in text
+    assert "effective: single" in text
+
+
+def test_summary_unknowns_stay_unknown():
+    """Missing diagnostics are reported as unknown, never filled in."""
+    from skycolor import render
+    from skycolor.rt.result import SkyResult
+
+    bare = SkyResult(radiance=np.zeros((1, 3)), wl=np.array([400.0, 500.0, 600.0]),
+                     method="clear", approximation="hybrid-sos")
+    text = render.format_result_summary(bare)
+    assert "components: unknown" in text
+    assert "effective: unknown" in text
+
+
+def test_summary_flags_non_convergence_and_undetected():
+    """Synthetic failure states (hard to reproduce physically) surface in
+    the summary as limitations, not as normal output."""
+    from skycolor import render
+    from skycolor.rt.result import SkyResult
+
+    bad = SkyResult(radiance=np.zeros((1, 3)), wl=np.array([400.0, 500.0, 600.0]),
+                    method="clear", approximation="hybrid-sos",
+                    diagnostics={"orders": 40, "converged": False})
+    text = render.format_result_summary(bad)
+    assert "converged=NO" in text and "truncated" in text
+
+    und = SkyResult(radiance=np.zeros((1, 3)), wl=np.array([400.0, 500.0, 600.0]),
+                    method="twilight", approximation="spherical-mc",
+                    diagnostics={"n_photons": 1.0e5,
+                                 "undetected_wl": np.array([500.0, 600.0])},
+                    stderr=np.array([0.0, 1e-12, 2e-12]))
+    text = render.format_result_summary(und)
+    assert "undetected wavelengths: 2" in text and "unresolved" in text
+
+
+def test_convenience_entries_warn_on_result_limits(atmo7, monkeypatch):
+    """The ndarray conveniences surface non-convergence / MC statistics as
+    visible warnings instead of hiding them in the result dict."""
+    import warnings as _warnings
+
+    from skycolor import render
+    from skycolor.rt.result import SkyResult
+    import skycolor.rt.solver as solver
+
+    zen = np.linspace(0.0, 90.0, 3)
+    az = np.linspace(0.0, 180.0, 3)
+    Z, A = np.meshgrid(zen, az, indexing="ij")
+
+    def fake_solve(atmo, sun_zen, vzen, vaz, sun_azimuth_deg=0.0, **k):
+        return SkyResult(radiance=np.zeros((vzen.size, atmo.wl.size)),
+                         wl=atmo.wl,
+                         method="clear", options={"sun_zenith_deg": float(sun_zen),
+                                                  "sun_azimuth_deg": float(sun_azimuth_deg),
+                                                  "refraction": True},
+                         approximation="hybrid-sos",
+                         diagnostics={"orders": 40, "converged": False})
+
+    monkeypatch.setattr(solver, "solve", fake_solve)
+    with pytest.warns(RuntimeWarning, match="did not converge"):
+        render.sky_dome(atmo7, 70.0, n_zenith=3, n_azimuth=3)
+    with pytest.warns(RuntimeWarning, match="did not converge"):
+        render.sky_radiance_grid(atmo7, 70.0, Z, A)
+    with pytest.warns(RuntimeWarning, match="did not converge"):
+        render.render_scene(atmo7, 20.0, 0.0, size=(8, 4),
+                            n_zenith=3, n_azimuth=3)
+
+
+def test_carrier_path_stays_silent_and_offers_summary(atmo7):
+    """The carrier path reports through the summary function, not through
+    blanket warnings: a converged deterministic preparation is silent."""
+    import warnings as _warnings
+
+    from skycolor import render
+
+    with _warnings.catch_warnings():
+        _warnings.simplefilter("error")
+        pres = render.solve_dome(atmo7, 20.0, 0.0, n_zenith=3, n_azimuth=3)
+    assert "converged=yes" in render.format_result_summary(pres)

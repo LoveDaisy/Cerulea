@@ -140,3 +140,71 @@ def test_subprocess_render_pair_identical_png(tmp_path):
     a = np.asarray(Image.open(p_time)).astype(int)
     b = np.asarray(Image.open(p_num)).astype(int)
     assert np.array_equal(a, b)
+
+
+# ---------------------------------------------------------------------------
+# the four approximations and the cloud option route through the one entry
+# (M4)
+# ---------------------------------------------------------------------------
+MC_BUDGET = ["--quality", "low", "--seed", "0", "--mc-photons", "2e5",
+             "--mc-n-zen", "2", "--mc-n-az", "3", "--mc-n-anchor", "3"]
+
+
+@pytest.mark.parametrize("approx", ["spherical-single", "plane-sos",
+                                    "hybrid-sos", "spherical-mc"])
+def test_cli_routes_all_four_approximations(approx):
+    argv = ["chart", "--sun-elevation", "10", "--sun-azimuth", "137"] + GRID + \
+        ["--approximation", approx]
+    if approx == "spherical-mc":
+        argv += MC_BUDGET
+    code, out, err = _run(argv)
+    assert code == 0, err
+    assert f"approximation: {approx}" in err       # the summary shows what ran
+
+
+def test_cli_rejects_mc_settings_on_non_mc_request():
+    """--quality with plane-sos: the solver refuses MC settings for a request
+    that runs no MC term; the CLI reports it and exits non-zero."""
+    code, _, err = _run(["chart", "--sun-elevation", "10"] + GRID +
+                        ["--approximation", "plane-sos", "--quality", "low"])
+    assert code == 2
+    assert "Monte Carlo" in err
+
+
+def test_cli_rejects_cloud_with_mc():
+    code, _, err = _run(["chart", "--sun-elevation", "10"] + GRID +
+                        ["--cloud", "stratus", "--approximation",
+                         "spherical-mc"] + MC_BUDGET)
+    assert code == 2
+    assert "composes with" in err
+
+
+def test_cli_cloud_option_runs_and_declares_itself():
+    code, out, err = _run(["chart", "--sun-elevation", "10"] + GRID +
+                          ["--cloud", "stratus"])
+    assert code == 0, err
+    assert "approximation: hybrid-sos (method 'cloud')" in err
+
+
+def test_cli_render_cloud_writes_png_with_summary(tmp_path):
+    p = tmp_path / "cloud.png"
+    code, out, err = _run(["render", "--sun-elevation", "10"] + GRID +
+                          ["--cloud", "stratus", "--size", "16x8", "--out",
+                           str(p)])
+    assert code == 0, err
+    assert p.exists()
+    from PIL import Image
+
+    assert np.asarray(Image.open(p)).shape == (8, 16, 3)
+    assert "approximation:" in err
+    assert f"wrote {p}" in out
+
+
+def test_cli_help_lists_the_shared_options(capsys):
+    with pytest.raises(SystemExit) as exc:
+        main(["chart", "--help"])
+    assert exc.value.code == 0
+    out = capsys.readouterr().out
+    for flag in ("--approximation", "--cloud", "--quality", "--seed",
+                 "--mc-photons", "--mc-n-zen", "--mc-n-az", "--mc-n-anchor"):
+        assert flag in out
