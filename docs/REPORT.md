@@ -4,7 +4,9 @@ This report explains the physics and the recorded figures. Use
 [STATUS.md](STATUS.md) for the current validation snapshot and
 [the documentation guide](README.md) for method/audit ownership. Figure values
 retain their original experimental conditions; the engine benchmarks in §3.1
-predate the AOD550 anchor-optics correction.
+predate the AOD550 anchor-optics correction. This is a historical physics narrative,
+not a current capability/accuracy promise. Use the [approximation story](physics/APPROXIMATIONS.md)
+for current branches and [figure catalogue](../figures/README.md) for present-version images.
 
 ## 1. The question
 
@@ -129,9 +131,8 @@ and [ARCHITECTURE.md](ARCHITECTURE.md) for the production contract.
 
 ## 3. Does it work?
 
-The latest committed six-check snapshot is **3 PASS / 3 FAIL**, with failures
-in diffuse illuminance, CIE luminance distribution and single-scattering deep
-twilight. [STATUS.md](STATUS.md) summarises those checks and their limits;
+The current six-check snapshot, existing failures and interpretation limits
+are maintained only in [STATUS.md](STATUS.md);
 [validation/results.json](../validation/results.json) holds the metric values.
 The original single-scattering baseline is in
 [REPORT.md](../validation/REPORT.md); subsequent historical changes

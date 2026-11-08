@@ -14,6 +14,27 @@ uv run python -m validation.run_all
 and platform. Do not `pip install` into the environment — if a package is
 missing, add it to `pyproject.toml` and run `uv lock`.
 
+## Run and understand a current sky
+
+Use the [README's complete CLI scene](README.md#quick-start) to reproduce the
+current low-sun image. Add `--approximation spherical-single`, `plane-sos`,
+`hybrid-sos` (default) or `spherical-mc` only within their
+[declared domains](docs/ARCHITECTURE.md). There is no all-physics switch.
+
+To compare branches and reuse the same result for images/tables:
+
+```bash
+uv run python -m experiments.approximations.compare
+uv run python -m experiments.approximations.compare \
+  --from-npz experiments/approximations/data/representative.npz --publish-figures
+```
+
+The first command does real fixed-scene solves and writes only theme-local
+outputs. The second redraws the committed spectra, with no solve. See the
+[approximation story](docs/physics/APPROXIMATIONS.md) for what the comparisons
+can establish and the [catalogue](figures/README.md) for exact parameters.
+MC is a budgeted algorithm choice, not automatic accuracy certification.
+
 ## Updating
 
 ```bash

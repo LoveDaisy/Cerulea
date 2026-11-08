@@ -83,6 +83,9 @@ anchor each other for small size parameters
 
 ### Backing approximations (CAPABILITIES)
 
+The conceptual branch map and real controlled comparison live in
+[APPROXIMATIONS.md](physics/APPROXIMATIONS.md); this document owns API and support contracts.
+
 Each backend declares its standing approximations as a module-level
 `CAPABILITIES` dict; `rt.solver.solve` warns on the one degenerate request
 combination (twilight + non-uniform `HorizontalField`, which reaches the
@@ -283,7 +286,7 @@ instead of silently pairing the custom sky with the clear beam.
 | `rt.solver.sky_radiance_total` | kept: thin forwarder; the one composition lives in `solve` (hybrid-sos) |
 | `rt.twilight.twilight_radiance` (2-tuple) | kept: thin format adapter over `solve(approximation="spherical-mc")`; `return_info=True` adds the MC info dict |
 | `rt.cloud.sky_radiance_with_cloud` | kept: thin forwarder (clear via `solve`, overlay via `cloud.apply_cloud_overlay`); structured via `solve(cloud_layer=...)` |
-| `experiments/profile_variants.py` subclasses | thin constructors over `ozone_profile=` / `air_profile=` |
+| `experiments/profile_variants.py` subclasses | retired at `afaae17`; production extension is `ozone_profile=` / `air_profile=` (see [retired index](../experiments/retired/README.md)) |
 | `install_twilight_profile_support` | removed — `_restrict` is the engine's native path |
 | `cloud._Distribution` | `cloud.SizeDistribution` (alias kept) |
 | `refraction._Profile` / `_trace` in data pipeline | `refractive_profile` / `trace_ray(..., profile=...)` |

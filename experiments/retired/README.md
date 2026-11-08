@@ -70,8 +70,9 @@
 
 - 代码（@ `afaae17`）：`experiments/06_gallery.py`、`experiments/07_timelapse.py`
 - 退休理由：重复展示编排；不为一张候选图维护完整画廊/动画工作流。
-- 旧图去向：`06_gallery_*.png`、`06_hero_*.png`、`07_sunset.gif` 留在根 `figures/`
-  （生产候选池，任务4甄别）；`07_sunset_ends.png`（GIF 首尾帧中间图）在本目录 `figures/`。
+- 旧图去向：`06_gallery_*.png`、`06_hero_*.png`、`07_sunset.gif` 已保持原字节移入
+  本目录 `figures/`；不再作为现行生产代表。`07_sunset_ends.png`同属本目录。
+  当前代表与生成版本见[根图录](../../figures/README.md)。
 
 ## 历史廓线与深暮光图（profiles / twilight figures）
 
@@ -86,8 +87,13 @@
 
 | 图 | 内容与限制 |
 |---|---|
+| `01_day_cycle_*.png` | 旧−18°…70°混合SOS扫描，深点不是可靠暮光；图片逐幅适应，不作亮度对照 |
+| `02_twilight_*.png` | pre-M10暮光图，旧一次项/亮度条件保留，不认证当前深暮光 |
+| `05_altitude*.png` / `05_twilight_duration.png` | 旧高度/纬度图，域截断/遮挡语义已变，不当当前海拔结论 |
+| `06_gallery_*.png` / `06_hero_*.png` / `07_sunset.gif` | 冻结组合/自动适应/装饰日面；原生成版本未可靠识别，源码定位afaae17 |
+| `08_afterglow*.png` / `08_volcanic_twilight.png` | pre-M10散射层/火山暮光图；数值与显示条件非当前模型 |
 | `07_sunset_ends.png` | timelapse GIF 首尾帧中间图 |
-| `10_cloud_albedo_and_sunset.png` | 验证与生产混合图；整体按历史验证/研究用途保存，任务4需要时拆选重画 |
+| `10_cloud_albedo_and_sunset.png` | 验证与生产混合图；整体按历史验证/研究用途保存，不作当前代表 |
 | `11_twilight_deep.png` | 深暮光引擎比较（旧 M10 硬编码数值 + 统计限制），ROADMAP M19 |
 | `12_profile_sensitivity.png` | 历史廓线敏感性（`docs/twilight/PROFILES.md` 冻结期有效） |
 | `14_twilight_altitude_audit.png` | 海拔审计图（域截断语义曾变更，不作当前海拔结论） |

@@ -1,6 +1,6 @@
 # Status
 
-Current production behavior and limits after M18 (2026-11-01).
+Current production behavior and limits (2026-11-08, unified production/presentation entry).
 Methods and frozen evidence are linked in [the documentation guide](README.md);
 completed work and proposed next scopes are in [ROADMAP.md](ROADMAP.md).
 
@@ -30,6 +30,11 @@ columns, and solar occlusion uses the same `r_bounds[0]` bottom. Contracts and
 shared-physics validation blind spots: [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Validation snapshot
+
+The [approximation story](physics/APPROXIMATIONS.md) separates orders,
+propagation and numerics using two real current-production scenes; the
+[curated figure catalogue](../figures/README.md) owns versions and display
+parameters. These examples explain behavior, not absolute accuracy.
 
 The latest committed [six-check results](../validation/results.json) are
 **2 PASS / 4 FAIL** (unified solar source; see [physics/SOLAR_SOURCE.md](physics/SOLAR_SOURCE.md)). Passing regression tests do not close these physical gaps.

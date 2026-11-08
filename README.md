@@ -7,15 +7,18 @@ the composition of the air, and the direction you are looking?  And what
 happens to that colour when the air changes — more water vapour, more haze, a
 dust storm, clean air near you and haze on the horizon?*
 
-Everything is computed from first principles: a solar spectrum, molecular
-(Rayleigh) and aerosol (Mie) scattering, ozone absorption, and a spherical
-radiative-transfer solver.  The output is spectral radiance
-(W m⁻² sr⁻¹ nm⁻¹), converted to colour through an explicit chain
-(CIE colorimetry → chromatic adaptation → tone mapping).
+The model combines a solar spectrum, molecular (Rayleigh) and aerosol (Mie)
+scattering, gas absorption and explicitly bounded radiative-transfer
+approximations. The output is spectral radiance (W m⁻² sr⁻¹ nm⁻¹), converted
+through CIE colorimetry → optional chromatic adaptation → tone mapping.
+[Four approximation branches](docs/physics/APPROXIMATIONS.md) share one source
+and production entry; the default is spherical first order + plane SOS.
 
-![A sunset](figures/06_hero_sunset.png)
+![Current production sky, sun 3 degrees above the geometric horizon](figures/sky_03.png)
 
-## What the model reproduces
+Fixed-exposure diffuse sky, no sun marker or ground. [Parameters and version](figures/README.md).
+
+## Phenomena represented (not accuracy certifications)
 
 | Effect | Mechanism |
 |---|---|
@@ -29,7 +32,7 @@ radiative-transfer solver.  The output is spectral radiance
 | Near-vs-far weather | Horizontally varying aerosol optical depth along the line of sight |
 | **Red afterglow filling the sky** | A scattering layer *above the shadow* — volcanic stratospheric sulphate or cirrus |
 | **Blue sun** | Anomalous (non-monotonic) Mie extinction from a narrow size distribution |
-| **Refraction, flattened sunset sun** | Traced rays through the refractive atmosphere (on by default) |
+| **Solar-side refraction** | Refracted illumination/occultation (default on); the display sun marker is not a resolved solar image |
 | **Overcast / underlit cloud decks** | Delta-Eddington two-stream on a plane-parallel layer |
 
 ## Quick start
@@ -49,9 +52,11 @@ validation suite (`uv run python -m validation.run_all`) before committing it.
 ```bash
 
 # a 3-degree sun, looking at it, 100-degree field of view
-uv run python -m skycolor.cli render --sun-elevation 3 --camera perspective \
-    --size 1200x520 --pitch 14 --hfov 100 --preset clear --aod 0.05 \
-    --yaw 180 --out sunset.png
+uv run python -m skycolor.cli render --sun-elevation 3 --sun-azimuth 0 \
+    --camera perspective --size 640x320 --pitch 14 --hfov 100 --yaw 0 \
+    --preset clear --aod 0.05 --n-zenith 25 --n-azimuth 37 \
+    --approximation hybrid-sos --exposure 0.03 --tonemap aces \
+    --no-sun --no-ground --out sunset.png
 
 # colour coordinates of the zenith / horizon (time input: naive = UTC,
 # explicit offsets honoured; the resolved direction is pre-refraction)
@@ -84,7 +89,8 @@ skycolor/
   mie.py          Mie coefficients, analytic Legendre moments, adaptive phase grids
   aerosol.py      eight-member aerosol library (rural … volcanic … cloud), delta-M
   geometry.py     solar position, spherical-shell ray tracing
-  rt/single.py    exact single scattering in spherical geometry
+  rt/solver.py    one production entry, four finite approximation combinations
+  rt/single.py    spherical-shell first order, straight viewing rays
   rt/multiple.py  successive-orders multiple scattering (Fourier + Gauss-Legendre)
   rt/mc.py        independent Monte Carlo reference solver
   rt/twilight.py  spherical multiple scattering for deep twilight
@@ -115,7 +121,11 @@ Recent work fixed raised-ground solar occlusion and AOD550 wavelength slicing.
 Twilight source/transport experiments now have independent closure checks, but
 have not replaced production defaults. Absolute twilight brightness, rare-path
 MC uncertainty and comparisons between observing sites remain unresolved.
-See [ROADMAP.md](docs/ROADMAP.md) for M11–M18 and proposed follow-up work.
+For a reproducible comparison of added orders and changed propagation, run
+`uv run python -m experiments.approximations.compare`; read the
+[approximation story](docs/physics/APPROXIMATIONS.md) and [figure catalogue](figures/README.md).
+Historical tools have [fixed-version entry points](experiments/retired/README.md),
+not a maintenance dependency on the current solver. See [ROADMAP.md](docs/ROADMAP.md).
 
 ## Data provenance
 
