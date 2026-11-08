@@ -402,7 +402,8 @@ def presentation_from_field(field, atmo, sun_elevation_deg: float,
 
 
 def _bind_display_material(atmo, result, zenith, azimuth_rel,
-                           sun_elevation_deg, sun_azimuth_deg):
+                           sun_elevation_deg, sun_azimuth_deg,
+                           cloud_layer=None):
     """One preparation-time binding of the adopted source's display geometry
     and the matching ground material (clear scenes; the cloud deck's
     beam-attenuated ground irradiance is bound by the same step once its
@@ -421,7 +422,14 @@ def _bind_display_material(atmo, result, zenith, azimuth_rel,
     e_dir = None
     if ground_supported:
         albedo = np.asarray(atmo.ground_albedo, dtype=float).ravel().copy()
-        if result.method != "cloud":
+        if result.method == "cloud":
+            # the deck's beam-attenuated ground lighting: the one library
+            # implementation of the adopted prescription (single-source with
+            # the experiments since M3)
+            from .rt.cloud import ground_direct_irradiance as _deck_ground
+
+            e_dir = _deck_ground(atmo, cloud_layer, sun_zenith_deg)
+        else:
             # the plain unified-source ground seam at the opaque model bottom
             x_ground = np.array([[0.0, 0.0, float(atmo.r_bounds[0])]])
             e_dir = np.asarray(
@@ -477,7 +485,8 @@ def solve_dome(atmo, sun_elevation_deg: float, sun_azimuth_deg: float = 0.0,
                    mc_config=mc_config)
     pres = _bind_display_material(atmo, result, zen, az,
                                   float(sun_elevation_deg),
-                                  float(sun_azimuth_deg))
+                                  float(sun_azimuth_deg),
+                                  cloud_layer=cloud_layer)
     if ground_direct_irradiance is not None:
         pres = _dc_replace(pres, ground_direct_irradiance=np.array(
             ground_direct_irradiance, dtype=float).ravel().copy())

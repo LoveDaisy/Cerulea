@@ -23,7 +23,6 @@ from common import FIG, OUT, WL, chromaticity_of, save
 from skycolor import cloud, color, presets, render
 from skycolor.rt.cloud import (delta_eddington, illuminate_cloud,
                                sky_radiance_with_cloud)
-from skycolor.rt.single import direct_sun_transmittance
 
 #: Monte-Carlo reference albedos (conservative layer, mu0 = 1, black ground).
 #: 2e5-4e5 photons, 1 sigma <= 0.001; see docs/physics/CLOUD.md.
@@ -46,48 +45,16 @@ def _cloud_field(atmo, cloud_layer, sun_zenith_deg):
 
 
 def _cloud_direct_irradiance(atmo, cloud_layer, sun_zenith_deg):
-    """Deck-attenuated direct irradiance on the ground (unified source).
+    """Deck-attenuated ground irradiance -- thin forwarder.
 
-    Plain-disk beam sum: each beam contributes the source's own ground
-    incidence (occultation, apparent direction, full-column extinction via
-    the ground vertex) attenuated by the deck at that beam's entry
-    inclination.  Zero cloud optical depth reproduces the clear ground
-    irradiance exactly; with no deck this is the plain unified ground
-    irradiance from the same beam set.
+    The implementation moved to the library
+    (:func:`skycolor.rt.cloud.ground_direct_irradiance`, task M3) so the
+    production display and these figures share exactly one beam-sum; this
+    wrapper keeps the experiment call sites unchanged.
     """
-    from skycolor.constants import R_EARTH
-    from skycolor.solar_source import SolarSource
-    from skycolor import spectra
+    from skycolor.rt.cloud import ground_direct_irradiance as _library_helper
 
-    source = SolarSource(atmo, float(sun_zenith_deg), 0.0)
-    z_ground = float(atmo.z_bounds[0])   # the model's opaque ground height
-    if z_ground > 0.0 and cloud_layer is not None and cloud_layer.base_km < z_ground:
-        # deck below the raised ground plane: no ground-level direct light
-        return np.zeros(len(atmo.wl))
-    f_inf = spectra.solar_irradiance(atmo.wl)
-    if cloud_layer is None:
-        # tau = 0 reduces EXACTLY to the unified per-point ground seam (the
-        # same contact-band adaptive evaluation as the renderer; the fixed
-        # disk kept a +21% contact-band error here -- review round 5)
-        return source.ground(np.array([[0.0, 0.0, R_EARTH + z_ground * 1e3]]),
-                             iw=None)[0] * f_inf
-    directions, weights = source.disk_for_column(z_ground)
-    n_beam = directions.shape[0]
-    up = np.array([0.0, 0.0, 1.0])
-    true_e = np.degrees(np.arcsin(np.clip(directions @ up, -1.0, 1.0)))
-    app_g, t_g, gain_g, lit_g = source.vertex(np.full(n_beam, z_ground), true_e)
-    optics = cloud_layer.optics(atmo.wl) if cloud_layer is not None else None
-    if optics is not None:
-        app_t, _, _, _ = source.vertex(np.full(n_beam, float(cloud_layer.top_km)),
-                                       true_e)
-        mu_entry = np.maximum(np.abs(np.sin(np.radians(app_t))), 1e-3)
-        deck_trans = np.exp(-optics.tau[None, :] / mu_entry[:, None])
-    else:
-        deck_trans = np.ones((n_beam, 1))
-    sin_app = np.maximum(np.sin(np.radians(app_g)), 0.0)
-    per_beam = (lit_g[:, None] * t_g * gain_g[:, None] * sin_app[:, None]
-                * deck_trans)                                    # (nb, n_wl)
-    return (weights[:, None] * per_beam).sum(axis=0) * f_inf
+    return _library_helper(atmo, cloud_layer, sun_zenith_deg)
 
 
 def _cloud_panorama(atmo, cloud_layer, sun_elevation_deg, size=(420, 170),

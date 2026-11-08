@@ -78,6 +78,7 @@ __all__ = [
     "sun_transmittance_to_height",
     "illuminate_cloud",
     "cloud_radiance",
+    "ground_direct_irradiance",
     "apply_cloud_overlay",
     "sky_radiance_with_cloud",
     "overcast_shape",
@@ -633,6 +634,59 @@ def illuminate_cloud(atmo, cloud: CloudLayer, sun_zenith_deg: float,
     return CloudIllumination(geometry=geometry_name, beams=tuple(beams),
                              sun_zenith_deg=float(sun_zenith_deg),
                              optics=optics, shadow_km=z_shadow)
+
+
+def ground_direct_irradiance(atmo, cloud_layer, sun_zenith_deg: float) -> np.ndarray:
+    """Deck-attenuated direct irradiance on the opaque model bottom.
+
+    The display-side ground lighting of a cloudy scene, moved here from the
+    cloud experiments (task-presentation-flow M3) so production and the
+    figures share exactly one implementation.  Plain-disk beam sum: each
+    beam contributes the unified source's own ground incidence (occultation,
+    apparent direction, full-column extinction via the ground vertex)
+    attenuated by the deck at that beam's entry inclination.  Zero cloud
+    optical depth reproduces the plain beam-sum ground irradiance exactly;
+    with no deck this *is* that plain beam sum.  The production clear-sky
+    default uses the source's per-point seam
+    (``SolarSource.direct_irradiance``) instead and is untouched by this
+    helper -- do not use this function to replace it.
+
+    A deck below a raised model bottom (``base_km < z_bounds[0]``) leaves
+    the ground with no direct light: the deck is underground relative to the
+    opaque surface.  ``cloud_layer=None`` returns the plain beam sum from
+    the same disk beam set (the tau=0 limit evaluates the same beams
+    through the deck branch; the two differ only in floating-point
+    summation order, not in beams or weights).
+    """
+    source = SolarSource(atmo, float(sun_zenith_deg), 0.0)
+    z_ground = float(atmo.z_bounds[0])   # the model's opaque ground height
+    if z_ground > 0.0 and cloud_layer is not None and cloud_layer.base_km < z_ground:
+        # deck below the raised ground plane: no ground-level direct light
+        return np.zeros(len(atmo.wl))
+    f_inf = spectra.solar_irradiance(atmo.wl)
+    if cloud_layer is None:
+        # the no-deck plain beam sum: the same contact-band adaptive disk
+        # the deck branch consumes (a fixed disk kept a +21% contact-band
+        # error here -- review round 5)
+        return source.ground(np.array([[0.0, 0.0, R_EARTH + z_ground * 1e3]]),
+                             iw=None)[0] * f_inf
+    directions, weights = source.disk_for_column(z_ground)
+    n_beam = directions.shape[0]
+    up = np.array([0.0, 0.0, 1.0])
+    true_e = np.degrees(np.arcsin(np.clip(directions @ up, -1.0, 1.0)))
+    app_g, t_g, gain_g, lit_g = source.vertex(np.full(n_beam, z_ground), true_e)
+    optics = cloud_layer.optics(atmo.wl) if cloud_layer is not None else None
+    if optics is not None:
+        app_t, _, _, _ = source.vertex(np.full(n_beam, float(cloud_layer.top_km)),
+                                       true_e)
+        mu_entry = np.maximum(np.abs(np.sin(np.radians(app_t))), 1e-3)
+        deck_trans = np.exp(-optics.tau[None, :] / mu_entry[:, None])
+    else:
+        deck_trans = np.ones((n_beam, 1))
+    sin_app = np.maximum(np.sin(np.radians(app_g)), 0.0)
+    per_beam = (lit_g[:, None] * t_g * gain_g[:, None] * sin_app[:, None]
+                * deck_trans)                                    # (nb, n_wl)
+    return (weights[:, None] * per_beam).sum(axis=0) * f_inf
 
 
 def overcast_shape(mu_view):
