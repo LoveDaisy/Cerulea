@@ -793,6 +793,44 @@ class _IsotropicToyAerosol:
         return (col[None, :] * np.ones((len(mu_arr), 1)))
 
 
+def test_scatter_aerosol_mixture_matches_analytic_cap_weights():
+    """Absolute mixture anchor: transparent medium, analytic cap weights.
+
+    With a zero-optical-depth toy aerosol in vacuum air the per-beam
+    transmission and gain are exactly 1, so the documented kernel contract
+    ``sum_beams T*G*p_mix`` reduces to ``sum(w) * p``; ``sum(w) =
+    2/(1+cos rho_max)`` is the disk weight convention anchored by
+    ``test_solar_disk_normalisation`` and ``p`` is the toy phase value.
+    This pins the ABSOLUTE aerosol coefficient (uniformly rescaling the
+    aerosol term cannot pass), exercises the full-spectrum branch
+    (``iw=None``) with per-wavelength fractions, and the scalar-iw branch.
+    """
+    values = np.array([1.0, 2.0, 4.0])
+    atmo = Atmosphere(W3, refraction=False, ozone_du=0.0, no2_column=0.0,
+                      air_profile=lambda z: np.zeros_like(np.asarray(z, float)),
+                      aerosols=[AerosolLayer(_IsotropicToyAerosol(W3, values),
+                                             0.0, ExponentialProfile(1.5))])
+    src = SolarSource(atmo, 30.0, 0.0)
+    x = np.array([[0.0, 0.0, R_EARTH]])
+    backward = np.array([[0.0, 0.0, 1.0]])
+    weight_sum = 2.0 / (1.0 + np.cos(np.radians(SUN_RADIUS_DEG)))
+
+    # scalar-iw branch: one fraction per layer
+    for iw in range(3):
+        got = float(src.scatter(x, backward, iw=iw, ray_fraction=np.zeros(1),
+                                aerosol_fractions=np.array([[0.5]]))[0])
+        expected = 0.5 * values[iw] * weight_sum
+        assert abs(got - expected) <= 1e-9 * expected, (iw, got, expected)
+
+    # full-spectrum branch: fractions vary per wavelength
+    af_wl = np.array([[[0.3, 0.7, 0.2]]])
+    full = src.scatter(x, backward, ray_fraction=np.full((1, 3), 0.0),
+                       aerosol_fractions=af_wl)
+    assert full.shape == (1, 3)
+    expected_full = af_wl[0, 0] * values * weight_sum
+    np.testing.assert_allclose(full[0], expected_full, rtol=1e-9, atol=0.0)
+
+
 def test_scatter_applies_aerosol_phase_per_channel_and_fractions_linearly():
     """The aerosol term of the scatter mixture is present, per-channel, linear.
 

@@ -24,13 +24,25 @@
 - 代码（@ `afaae17`）：`tools/check_curved_hamiltonian.py`、`check_curved_single.py`、
   `check_majorant_equivalence.py`、`continuous_curved_mc.py`、`curved_mc_transport.py`、
   `summarize_curved_transport.py`
-- 数据：`validation/data/curved_transport_audit/`（在位冻结，含源码快照
-  `snapshots/*.py`、`source-binding-guard.patch`、hash manifest）
-- 复跑：**checkpoint `2756b2f`** 的固定树 + 将 `source-binding-guard.patch` 反向应用
-  （还原运行时源，包内 `runtime-source-provenance.json` hash 验证），再按该树
-  `validation/data/curved_transport_audit/README.md` 的命令执行；已有可信长预算记录
-  （`logs/`、`raw/*.jsonl`），不重启 ensemble。
-- 已知限制：只在其记录的 checkpoint+patch 组合成立；不随当前 `rt/mc.py` 运行。
+- **完整闭包树 = `5ac0c74`**（归档包、归约工具与匹配库同树；2026-11-08 在其固定树实测）。
+  源 checkpoint `2756b2f` 只是运行库源码的版本指称——该提交不含归档包与工具，勿在其上找包。
+- 离线归约（已实测）：`5ac0c74` 树内按包 README 逐字命令重算 `summary.json`，
+  318/318 键与提交版逐位一致（输出到一次性路径，不改包内文件）：
+
+  ```bash
+  uv run python -m tools.summarize_curved_transport \
+    --directory validation/data/curved_transport_audit/raw \
+    --straight-file global-straight-high-stat.jsonl \
+    --out <一次性输出路径>.json
+  ```
+
+- 运行时源还原（hash 已核对）：包内 `majorant-control/snapshots/` 的
+  `unified_solar_transport_{before,after}_guard.py` 等快照与
+  `runtime-source-provenance.json` 记录的 before/after-guard SHA256 逐位相符；
+  `source-binding-guard.patch` 可在 after-guard 快照上干净反向应用。MC 复跑即以
+  before-guard 快照为运行源在 `5ac0c74` 环境执行包 README 命令——属长预算，
+  本任务不重启（证据级别：raw JSONL + logs 在包，归约已复算）。
+- 已知限制：只在此闭包组合（`5ac0c74` 树 + 包内快照/patch）成立；不随当前 `rt/mc.py` 运行。
 
 ## 太阳源审计链（solar source audits）
 
