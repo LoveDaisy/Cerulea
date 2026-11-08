@@ -127,6 +127,15 @@ def sky_radiance_grid(atmo, sun_zenith_deg, Z, A, n_gauss=3, chunk=512,
     if new_options:
         if multiple is not None:
             kwargs["multiple"] = multiple
+        # Explicit legacy settings must reach the entry in this mode too --
+        # dropping them would silently change the request.  Only values
+        # equal to the wrapper's historical defaults stay unforwarded (the
+        # sentinel limitation of positional defaults: 3/512 explicit is
+        # indistinguishable from 3/512 default, and the kernel defaults are
+        # the same numbers anyway).  The solver then merges or rejects them
+        # (applicability, flat-vs-grouped conflicts) instead of this wrapper.
+        if n_gauss != 3 or chunk != 512:
+            kwargs.update(n_gauss=n_gauss, chunk=chunk)
         kwargs.update(approximation=approximation, cloud_layer=cloud_layer,
                       single_config=single_config, sos_config=sos_config,
                       mc_config=mc_config)
@@ -272,9 +281,21 @@ class SkyPresentation:
 
 
 def _check_grid(zenith, azimuth_rel, radiance, n_wl) -> np.ndarray:
-    """Validate grid/field shape compatibility, return the 3-D reshape."""
+    """Validate grid/field shape compatibility, return the 3-D reshape.
+
+    Each axis needs at least two finite, strictly increasing nodes: the
+    camera interpolation (``sample_dome``) clips and bisects on them, so a
+    descending, duplicated or single-node axis would bind fine and then
+    silently produce a wrong sky.
+    """
     zen = np.asarray(zenith, dtype=float).ravel()
     az = np.asarray(azimuth_rel, dtype=float).ravel()
+    for name, axis in (("zenith", zen), ("azimuth_rel", az)):
+        if (axis.size < 2 or not np.all(np.isfinite(axis))
+                or not np.all(np.diff(axis) > 0)):
+            raise ValueError(
+                f"{name} grid must have at least two finite, strictly "
+                f"increasing nodes for interpolation; got {axis}")
     rad = np.asarray(radiance, dtype=float)
     n_view = zen.size * az.size
     if rad.ndim == 2:
@@ -330,13 +351,16 @@ def presentation_from_result(result, zenith, azimuth_rel,
 
     Pure reshape/bind: no solver runs, no backend choice is taken here, no
     missing display material is silently recomputed.  The result's grid
-    shape and its recorded solar direction must match the arguments; the
-    ground display additionally needs ``ground_albedo`` and a matching
-    ``ground_direct_irradiance`` bound by the caller (compute them once in
-    the caller's preparation step -- not here).  Missing material keeps the
-    sky display working (:func:`render_result` with ``ground=False``) and
-    makes the ground display fail loudly instead of pairing this sky with
-    someone else's beam.
+    shape and its recorded solar direction must match the arguments, and
+    each grid axis must be strictly increasing (the camera interpolation
+    clips and bisects on it).  ``ground_supported`` is the caller's
+    declaration of the scene fact the plan pins down -- the observer sits
+    on the opaque model bottom; a bound ``ground_albedo`` +
+    ``ground_direct_irradiance`` do not by themselves make a ground display
+    legal, and :func:`render_result` refuses ``ground=True`` without the
+    declaration.  Missing material keeps the sky display working
+    (``ground=False``) and makes the ground display fail loudly instead of
+    pairing this sky with someone else's beam.
     """
     from .rt.result import SkyResult
 
@@ -401,6 +425,12 @@ def presentation_from_field(field, atmo, sun_elevation_deg: float,
         # the historical default: the facade's ground albedo lights the
         # display ground unless the caller overrides it
         ground_albedo = np.asarray(atmo.ground_albedo, dtype=float).ravel()
+    # the ground-display capability is a fact of the caller's scene (the
+    # model-bottom observer rule, the same tolerance as the solver's), not
+    # something an external field may claim unconditionally
+    z0 = float(np.asarray(atmo.z_bounds).ravel()[0])
+    ground_supported = (abs(float(atmo.elevation_km) - z0)
+                        <= 1e-9 * max(1.0, abs(z0)))
     return SkyPresentation(
         zenith=zen.copy(), azimuth_rel=az.copy(), wl=wl.copy(),
         radiance=rad3,
@@ -416,7 +446,7 @@ def presentation_from_field(field, atmo, sun_elevation_deg: float,
         ground_direct_irradiance=(None if ground_direct_irradiance is None
                                   else np.array(ground_direct_irradiance,
                                                 dtype=float).ravel().copy()),
-        ground_supported=True,
+        ground_supported=ground_supported,
     )
 
 
@@ -589,10 +619,27 @@ def format_result_summary(source) -> str:
     Reads **only** fields the result itself carries: what actually ran, its
     effective numerics, its convergence/statistics state and the kernels'
     standing approximations.  Missing information is reported as unknown,
-    never inferred or filled in from the request.  Accepts a
-    :class:`SkyPresentation` or a bare :class:`~skycolor.rt.result.SkyResult`.
+    never inferred or filled in from the request -- and an external-field
+    presentation is summarised as external, not as a result with holes.
+    Accepts a :class:`SkyPresentation` or a bare
+    :class:`~skycolor.rt.result.SkyResult`.
     """
     result = getattr(source, "result", None)
+    if result is None and getattr(source, "provenance", None) == "external":
+        pres = source
+        return "\n".join([
+            "provenance: external field (no solver result bound; "
+            "capabilities and statistics unknown)",
+            f"sun (caller-declared, pre-refraction): elevation "
+            f"{pres.sun_elevation_deg:.3f} deg, azimuth "
+            f"{pres.sun_azimuth_deg:.3f} deg",
+            "approximation: not applicable (external)",
+            "ground material: albedo "
+            + ("bound" if pres.ground_albedo is not None else "not bound")
+            + "; direct irradiance "
+            + ("bound" if pres.ground_direct_irradiance is not None
+               else "not bound"),
+        ])
     if result is None:
         result = source
     lines = []
@@ -601,11 +648,16 @@ def format_result_summary(source) -> str:
     lines.append(f"approximation: {approx} (method {method!r})")
     opt = getattr(result, "options", None) or {}
     if "sun_zenith_deg" in opt:
+        azimuth = (f"{float(opt['sun_azimuth_deg']):.3f}"
+                   if "sun_azimuth_deg" in opt else "unknown")
         lines.append(f"sun: zenith {float(opt['sun_zenith_deg']):.3f} deg, "
-                     f"azimuth {float(opt.get('sun_azimuth_deg', 0.0)):.3f} deg "
+                     f"azimuth {azimuth} deg "
                      "(input direction pre-refraction)")
-    lines.append("source-side refraction: "
-                 + ("on" if opt.get("refraction") else "off"))
+    if "refraction" in opt:
+        lines.append("source-side refraction: "
+                     + ("on" if opt.get("refraction") else "off"))
+    else:
+        lines.append("source-side refraction: unknown")
     approximations = getattr(result, "approximations", None) or {}
     if approximations:
         lines.append("components:")
@@ -755,6 +807,14 @@ def render_result(pres: SkyPresentation, *, camera: str = "panorama",
 
     e_dir = pres.ground_direct_irradiance
     if ground:
+        # scene capability first: the diffuse ground light is the observer
+        # dome's hemispherical integral, which is a *ground* field only for
+        # an observer on the opaque model bottom -- bound lighting material
+        # does not make an off-bottom scene support a ground display
+        if not pres.ground_supported:
+            raise ValueError(
+                "the presentation's observer is off the model bottom, so "
+                "there is no ground display; use ground=False")
         if ground_direct_transmittance is not None:
             if e_dir is not None:
                 raise ValueError(
@@ -771,10 +831,6 @@ def render_result(pres: SkyPresentation, *, camera: str = "panorama",
             cosz = max(np.cos(np.radians(pres.sun_zenith_deg)), 0.0)
             e_dir = solar_irradiance(pres.wl) * T * cosz
         if e_dir is None:
-            if pres.provenance == "solve" and not pres.ground_supported:
-                raise ValueError(
-                    "the presentation's observer is off the model bottom, so "
-                    "there is no ground display; use ground=False")
             raise ValueError(
                 "the presentation carries no ground_direct_irradiance; bind "
                 "matching ground lighting at preparation time (or display "

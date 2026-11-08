@@ -243,7 +243,8 @@ def test_presentation_from_result_is_pure_binding(atmo7, monkeypatch):
     _forbid_solve_and_source(monkeypatch)
     pres = render.presentation_from_result(result, zen, az, 20.0, 50.0,
                                            ground_albedo=0.1,
-                                           ground_direct_irradiance=np.zeros(WL7.size))
+                                           ground_direct_irradiance=np.zeros(WL7.size),
+                                           ground_supported=True)
     assert render.render_result(pres, camera="panorama", size=(16, 8),
                                 ground=True).shape == (8, 16, 3)
 
@@ -501,19 +502,22 @@ def test_albedo_bound_on_carrier_drives_display(atmo7):
     dark = render.render_result(
         render.presentation_from_result(result, zen, az, 20.0, 0.0,
                                         ground_albedo=0.1,
-                                        ground_direct_irradiance=e_dir),
+                                        ground_direct_irradiance=e_dir,
+                                        ground_supported=True),
         size=(8, 4), ground=True, sun_disk=False)
     bright = render.render_result(
         render.presentation_from_result(result, zen, az, 20.0, 0.0,
                                         ground_albedo=0.9,
-                                        ground_direct_irradiance=e_dir),
+                                        ground_direct_irradiance=e_dir,
+                                        ground_supported=True),
         size=(8, 4), ground=True, sun_disk=False)
     assert np.any(bright > dark)
     atmo.ground_albedo = 0.5                    # facade value must be irrelevant
     again = render.render_result(
         render.presentation_from_result(result, zen, az, 20.0, 0.0,
                                         ground_albedo=0.1,
-                                        ground_direct_irradiance=e_dir),
+                                        ground_direct_irradiance=e_dir,
+                                        ground_supported=True),
         size=(8, 4), ground=True, sun_disk=False)
     assert np.array_equal(again, dark)
 
@@ -873,3 +877,143 @@ def test_external_field_rejects_solver_options(atmo7, monkeypatch):
                            radiance_field=field)
     assert dome["radiance"].shape == (3, 3, WL7.size)
     assert calls["n"] == 1
+
+
+# ---------------------------------------------------------------------------
+# 6. review round 2: forwarding fidelity, ground capability, unknown facts,
+#    grid sanity (R2 fixes)
+# ---------------------------------------------------------------------------
+def test_sky_radiance_grid_forwards_explicit_legacy_settings(atmo7, monkeypatch):
+    """Explicit n_gauss/chunk reach the authoritative entry even in
+    new-options mode; unset defaults are not injected (no phantom
+    rejection); inapplicable or conflicting settings are rejected by the
+    solver, not silently dropped by the wrapper."""
+    import skycolor.rt.solver as solver
+    from skycolor import render
+    from skycolor.rt.solver import SingleConfig
+
+    seen = {}
+    real = solver.solve
+
+    def spy(atmo, sun_zen, vzen, vaz, sun_azimuth_deg=0.0, **k):
+        seen.update(k)
+        return real(atmo, sun_zen, vzen, vaz, sun_azimuth_deg=sun_azimuth_deg,
+                    **k)
+
+    monkeypatch.setattr(solver, "solve", spy)
+    zen = np.array([0.0, 60.0, 90.0])
+    az = np.array([0.0, 120.0])
+    Z, A = np.meshgrid(zen, az, indexing="ij")
+    render.sky_radiance_grid(atmo7, 60.0, Z, A, n_gauss=9, chunk=17,
+                             approximation="spherical-single")
+    assert seen.get("n_gauss") == 9 and seen.get("chunk") == 17
+    seen.clear()
+    render.sky_radiance_grid(atmo7, 60.0, Z, A,
+                             approximation="spherical-single")
+    assert "n_gauss" not in seen and "chunk" not in seen
+    assert seen.get("single_config") is None
+    seen.clear()
+    with pytest.raises(ValueError, match="single-scattering kernel"):
+        render.sky_radiance_grid(atmo7, 60.0, Z, A, n_gauss=9,
+                                 approximation="plane-sos")
+    with pytest.raises(ValueError, match="twice"):
+        render.sky_radiance_grid(atmo7, 60.0, Z, A, n_gauss=9,
+                                 approximation="spherical-single",
+                                 single_config=SingleConfig(n_gauss=5))
+
+
+def test_ground_capability_is_checked_before_material(atmo7):
+    """The model-bottom rule is a scene fact, not implied by bound lighting:
+    a fully-lit but off-bottom presentation (solve-bound or external field)
+    refuses ground=True and keeps ground=False."""
+    from skycolor import presets, render
+    from skycolor.rt.solver import solve
+
+    zen = np.array([0.0, 45.0, 90.0])
+    az = np.array([0.0, 90.0, 180.0])
+    Z, A = np.meshgrid(zen, az, indexing="ij")
+    result = solve(atmo7, 70.0, Z.ravel(), A.ravel())
+    pres = render.presentation_from_result(
+        result, zen, az, 20.0, 0.0, ground_albedo=0.1,
+        ground_direct_irradiance=np.zeros(WL7.size), ground_supported=False)
+    with pytest.raises(ValueError, match="model bottom"):
+        render.render_result(pres, size=(8, 4), ground=True, sun_disk=False)
+    assert render.render_result(pres, size=(8, 4), ground=False,
+                                sun_disk=False).shape == (4, 8, 3)
+    # external field on a raised facade: no unconditional ground claim
+    balloon = presets.clear(WL7)
+    balloon.elevation_km = 2.0
+    field = lambda z, a: np.zeros((np.asarray(z).size, WL7.size))  # noqa: E731
+    pres_ext = render.presentation_from_field(
+        field, balloon, 20.0, 0.0, n_zenith=3, n_azimuth=3,
+        ground_direct_irradiance=np.zeros(WL7.size))
+    assert pres_ext.ground_supported is False
+    with pytest.raises(ValueError, match="model bottom"):
+        render.render_result(pres_ext, size=(8, 4), ground=True,
+                             sun_disk=False)
+    # sea-level facade keeps the ground display
+    pres_sea = render.presentation_from_field(
+        field, presets.clear(WL7), 20.0, 0.0, n_zenith=3, n_azimuth=3,
+        ground_direct_irradiance=np.zeros(WL7.size))
+    assert pres_sea.ground_supported is True
+
+
+def test_summary_keeps_missing_metadata_unknown():
+    """Missing refraction/azimuth stay unknown: no fabricated off/0 values."""
+    from skycolor import render
+    from skycolor.rt.result import SkyResult
+
+    wl = np.array([400.0, 500.0, 600.0])
+    bare = SkyResult(radiance=np.zeros((1, 3)), wl=wl, method="clear",
+                     approximation="hybrid-sos")
+    text = render.format_result_summary(bare)
+    assert "source-side refraction: unknown" in text
+    assert "refraction: off" not in text
+    partial = SkyResult(radiance=np.zeros((1, 3)), wl=wl, method="clear",
+                        approximation="hybrid-sos",
+                        options={"sun_zenith_deg": 70.0})
+    text = render.format_result_summary(partial)
+    assert "azimuth unknown" in text
+    assert "refraction False" not in text
+    off = SkyResult(radiance=np.zeros((1, 3)), wl=wl, method="clear",
+                    approximation="hybrid-sos",
+                    options={"sun_zenith_deg": 70.0, "sun_azimuth_deg": 5.0,
+                             "refraction": False})
+    assert "source-side refraction: off" in render.format_result_summary(off)
+
+
+def test_summary_external_presentation_is_summarised_as_external():
+    from skycolor import presets, render
+
+    atmo = presets.clear(WL7)
+    field = lambda z, a: np.zeros((np.asarray(z).size, WL7.size))  # noqa: E731
+    pres = render.presentation_from_field(field, atmo, 20.0, 137.0,
+                                          n_zenith=3, n_azimuth=3)
+    text = render.format_result_summary(pres)
+    assert "external field" in text
+    assert "not applicable" in text
+    assert "refraction: off" not in text          # no fabricated solver facts
+    assert "137.000" in text                       # caller-declared direction shown as such
+
+
+def test_presentation_rejects_non_monotonic_grid(atmo7):
+    """sample_dome clips and bisects on the grid axes: descending,
+    duplicated or single-node axes are rejected at the binding boundary
+    instead of silently producing a wrong sky."""
+    from skycolor import render
+    from skycolor.rt.solver import solve
+
+    zen = np.array([0.0, 45.0, 90.0])
+    az = np.array([0.0, 90.0, 180.0])
+    Z, A = np.meshgrid(zen, az, indexing="ij")
+    result = solve(atmo7, 70.0, Z.ravel(), A.ravel())
+    with pytest.raises(ValueError, match="strictly increasing"):
+        render.presentation_from_result(result, zen[::-1], az, 20.0, 0.0)
+    with pytest.raises(ValueError, match="strictly increasing"):
+        render.presentation_from_result(result, zen, az * 0.0, 20.0, 0.0)
+    with pytest.raises(ValueError, match="at least two"):
+        render.presentation_from_result(
+            result, np.array([45.0]), az, 20.0, 0.0)
+    with pytest.raises(ValueError, match="finite"):
+        render.presentation_from_result(
+            result, np.array([0.0, np.nan, 90.0]), az, 20.0, 0.0)
