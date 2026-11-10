@@ -409,13 +409,16 @@ def draw(data, destination):
 
     destination.mkdir(parents=True, exist_ok=True)
 
-    # per-layer images, one per rendered solve (theme-local, not tracked)
+    # per-layer images, one per rendered solve -- theme-local run outputs,
+    # never published to root figures/ (only the two curated figures below)
+    theme_figures = THEME / "figures"
+    theme_figures.mkdir(parents=True, exist_ok=True)
     for key in data["runs"]:
         if f"{key}/display" not in data:
             continue
         rgb = render.render_result(bind(data, str(key)), **ast.literal_eval(
             str(data[f"{key}/display"])))
-        render.save_png(rgb, destination / f"{key}.png")
+        render.save_png(rgb, theme_figures / f"{key}.png")
 
     # the overview: the whole ladder in one image -- the committed reader's
     # main carrier (published to root figures/ via --publish-figures)

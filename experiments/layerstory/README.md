@@ -102,7 +102,7 @@ with np.load('experiments/layerstory/data/layer_story.npz', allow_pickle=False) 
 | L3 | rt.solver.solve 天顶行 | 可表达 | Chappuis 带：560–610 nm 比值 0.674（相对无 O₃ 桥接态）；NO₂ 天顶最大相对变化 2.6%（可见、次要，如实声明） |
 | L4 | solve_dome + plane-sos 双阶 | 可表达 | 反太阳侧多次散射占比 24–37%（550 nm） |
 | L5 | solve_dome + spherical-single / spherical-mc | 可表达 | −4° 实跑通过；single 天顶 Lv 4.41、MC 6.08 cd m⁻²（+38% 填充） |
-| L5 对照 | solve_dome + plane-sos @−4° | 可表达（采纳） | plane 族**不拒绝**负太阳角且物理可判读：连续柱透射让高层在地平下仍被「照亮」（天顶 550 nm 5.9×10⁻⁵ vs 球面 1.0×10⁻⁴）——没有地影、没有暮光弧，是「平面世界没有暮光几何」的配图证据 |
+| L5 对照 | solve_dome + plane-sos @−4° | 可表达（采纳） | plane 族**不拒绝**负太阳角且物理可判读：连续柱透射让高层在地平下仍被「照亮」。天顶量级与球面几乎相同（550 nm 5.887×10⁻⁵ vs 5.870×10⁻⁵，×1.003——单点量级可「碰对」），但角向结构全错：严格地平（90° 天顶节点）平面世界精确为零，而球面 single 同方向保留 2.70×10⁻⁵（向日侧）——没有地影、没有暮光弧 |
 | L6 | solve_dome + hybrid-sos ± cloud_layer | 可表达 | 契约匹配对跑通；云下天顶 ×4.7、谱平坦度 0.068（近白）；观察者低于云底成立 |
 | L7 | — | 无新计算 | 引用既有 validation 证据（阶梯文档） |
 
