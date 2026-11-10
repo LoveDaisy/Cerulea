@@ -278,6 +278,14 @@ def recheck_check2(workers: int) -> None:
         ifac_model = b["dhi"] / b["lz"]
         ifac_cie = _cie_integral_factor(90.0 - h, 37, 72)
         ifac_cie_hi = _cie_integral_factor(90.0 - h, 73, 144)
+        grid_rel = abs(b['dhi'] / 1000.0 / metric['model'] - 1.0)
+        if grid_rel > 0.01:
+            # closure gate: the 37x72 audit grid must reproduce the 73x144
+            # criterion-grid DHI within the quantified discretisation error;
+            # a larger drift silently invalidates every factor decomposition
+            raise RuntimeError(f"2c: audit-grid DHI deviates from the "
+                               f"results.json metric by {100*grid_rel:.2f}% "
+                               f"(> 1%) -- grid transfer broken")
         print(f"2c  h={h:.0f}: DHI_model(37x72)={b['dhi']/1000:.4f} klx vs "
               f"metric(73x144)={metric['model']:.4f} klx "
               f"({100*(b['dhi']/1000/metric['model']-1):+.2f}% grid)")
@@ -313,18 +321,22 @@ def recheck_check2(workers: int) -> None:
               f"DHI={s['dhi']/1000:7.3f} klx  ratio={s['dhi']/dhi_cie:.3f}"
               "  [measured combination point]")
         # AOD* where the model DHI equals the CIE T=2.2 reference: log-linear
-        # extrapolation below the lowest scanned point; the spread between
-        # the four-point fit and the two-point bracket is the extrapolation
-        # uncertainty band quoted in the report.
+        # extrapolation below the lowest scanned point.  Two estimators are
+        # printed because their spread IS the method uncertainty: the true
+        # least-squares zero of the 4-point log-linear fit, and the same
+        # slope anchored at the 0.05 criterion point; the two-point
+        # [0.02, 0.035] extrapolation brackets the other side.
         aods = np.array([p[1] for p in scan_pts])
         lnr = np.log(np.array(ratios))
-        slope4 = float(np.polyfit(aods, lnr, 1)[0])
-        aod_star_4pt = float(aods[2] - lnr[2] / slope4)
+        slope4, intercept4 = np.polyfit(aods, lnr, 1)
+        aod_star_fit = float(-intercept4 / slope4)
+        aod_star_anchor = float(aods[2] - lnr[2] / slope4)
         slope2 = float((lnr[1] - lnr[0]) / (aods[1] - aods[0]))
         aod_star_2pt = float(aods[0] - lnr[0] / slope2)
-        print(f"2c  AOD* (DHI ratio = 1, log-linear extrapolation): "
-              f"4-point fit -> {aod_star_4pt:.4f}; two-point [0.02,0.035] "
-              f"-> {aod_star_2pt:.4f}  [report quotes this range]")
+        print(f"2c  AOD* (DHI ratio = 1, log-linear): 4-point LS zero -> "
+              f"{aod_star_fit:.4f}; same slope anchored at AOD=0.05 -> "
+              f"{aod_star_anchor:.4f}; two-point [0.02,0.035] -> "
+              f"{aod_star_2pt:.4f}  [report quotes the range]")
 
     # model effective Linke turbidity: independent transcription of the
     # Kasten-96 pyrheliometric formula -- constants checked verbatim against
@@ -431,8 +443,16 @@ def recheck_check3(workers: int) -> None:
     res = json.loads((C.VAL / "results.json").read_text())
     m3 = {m["name"]: m for m in
           next(c for c in res["checks"] if c["key"] == "check3")["metrics"]}
+    dev_metric = m3["horizon sun-side / zenith, h=45deg"]["dev"] / 100.0
+    base_rel = abs(b["horizon_sun"] / b["cie_horizon_sun"] - 1.0 - dev_metric)
+    if base_rel > 1e-6:
+        # closure gate: the audit grid must be the same mechanism as the
+        # criterion run -- the baseline ratio deviation must reproduce
+        # results.json bit-for-bit, or every scan number above is suspect
+        raise RuntimeError(f"3c: audit baseline deviates from results.json "
+                           f"by {base_rel:.2e} -- mechanism mismatch")
     print(f"3c  results.json hsun/zen={m3['horizon sun-side / zenith, h=45deg']['model']:.3f} "
-          f"-> baseline match: {abs(b['horizon_sun']/b['cie_horizon_sun']-1-m3['horizon sun-side / zenith, h=45deg']['dev']/100):.2e}")
+          f"-> baseline match: {base_rel:.2e}")
     print("3c  AOD scan (h=45, 37x72): hsun/zen and rms_all response")
     for nm, aod in (("c3_h45_a000", 0.0), ("c3_h45_a025", 0.025),
                     ("c3_h45_base", 0.05), ("c3_h45_a100", 0.10),
