@@ -288,54 +288,64 @@ def mie_coefficients_batch(x, m) -> MieCoefficientsBatch:
     rho = m_arr * x_arr
     big, ratio1, denom1, ratio2, denom2 = _smith_division_constants(
         np.real(rho), np.imag(rho))
+    # work TRANSPOSED (recurrence-step rows x pair columns): the per-step
+    # operands become contiguous rows instead of cache-hostile matrix columns.
+    # Branch 1 (|re| >= |im|) is built for all pairs without a where() over
+    # the full (nmx, P) matrix -- every atmospheric index in the library is
+    # branch 1; a branch-2 pair, if one ever appears, is patched column-wise.
     n_val = np.arange(nmx_pad + 1, dtype=float)
     with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
-        n_over_rho = np.where(
-            big[:, None],
-            (n_val[None, :] / denom1[:, None])
-            + 1j * (-(n_val[None, :] * ratio1[:, None]) / denom1[:, None]),
-            (n_val[None, :] * ratio2[:, None] / denom2[:, None])
-            + 1j * (-(n_val[None, :] / denom2[:, None])),
-        )
+        n_over_rho = (n_val[:, None] / denom1[None, :]) + 1j * (
+            -(n_val[:, None] * ratio1[None, :]) / denom1[None, :])
+    if not big.all():
+        idx2 = np.nonzero(~big)[0]
+        with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+            n_over_rho[:, idx2] = (
+                (n_val[:, None] * ratio2[None, idx2] / denom2[None, idx2])
+                + 1j * (-(n_val[:, None] / denom2[None, idx2])))
 
     # --- D down-recurrence, one masked step per n --------------------------
-    D = np.zeros((P, nmx_pad + 1), dtype=complex)
+    # rows beyond a pair's nmx keep their zero seed: the masked updates leave
+    # each pair's trajectory starting from its own nmx, like the scalar loop
+    D = np.zeros((nmx_pad + 1, P), dtype=complex)
     for n in range(nmx_pad, 0, -1):
         mask = nmx_arr >= n
-        tm = n_over_rho[mask, n]
+        tm = n_over_rho[n, mask]
         # 1.0/(D[n] + n/rho): the scalar path's operand is a numpy complex128
         # scalar, i.e. numpy scalar division -- bitwise-equal to array division
-        D[mask, n - 1] = tm - 1.0 / (D[mask, n] + tm)
+        D[n - 1, mask] = tm - 1.0 / (D[n, mask] + tm)
 
     # --- psi / chi up-recurrence (real arithmetic) --------------------------
-    psi = np.zeros((P, n_max_pad + 2))
-    chi = np.zeros((P, n_max_pad + 2))
+    psi = np.zeros((n_max_pad + 2, P))
+    chi = np.zeros((n_max_pad + 2, P))
     sx = np.sin(x_arr)
     cx = np.cos(x_arr)
-    psi[:, 0] = sx
-    chi[:, 0] = cx
-    psi[:, 1] = sx / x_arr - cx
-    chi[:, 1] = cx / x_arr + sx
+    psi[0] = sx
+    chi[0] = cx
+    psi[1] = sx / x_arr - cx
+    chi[1] = cx / x_arr + sx
     for n in range(1, n_max_pad + 1):
         mask = n_max_arr >= n
-        f = (2 * n + 1) / x_arr
-        psi[mask, n + 1] = f[mask] * psi[mask, n] - psi[mask, n - 1]
-        chi[mask, n + 1] = f[mask] * chi[mask, n] - chi[mask, n - 1]
+        f = ((2 * n + 1) / x_arr)[mask]
+        psi[n + 1, mask] = f * psi[n, mask] - psi[n - 1, mask]
+        chi[n + 1, mask] = f * chi[n, mask] - chi[n - 1, mask]
 
     xi = psi - 1j * chi
 
-    # --- a / b combination ---------------------------------------------------
-    a = np.zeros((P, n_max_pad + 1), dtype=complex)
-    b = np.zeros((P, n_max_pad + 1), dtype=complex)
+    # --- a / b combination (transposed; transposed back for the public layout)
+    aT = np.zeros((n_max_pad + 1, P), dtype=complex)
+    bT = np.zeros((n_max_pad + 1, P), dtype=complex)
     for n in range(1, n_max_pad + 1):
         mask = n_max_arr >= n
-        dn = D[mask, n]
+        dn = D[n, mask]
         pa = dn / m_arr[mask] + n / x_arr[mask]
         pb = m_arr[mask] * dn + n / x_arr[mask]
-        a[mask, n] = (pa * psi[mask, n] - psi[mask, n - 1]) \
-            / (pa * xi[mask, n] - xi[mask, n - 1])
-        b[mask, n] = (pb * psi[mask, n] - psi[mask, n - 1]) \
-            / (pb * xi[mask, n] - xi[mask, n - 1])
+        aT[n, mask] = (pa * psi[n, mask] - psi[n - 1, mask]) \
+            / (pa * xi[n, mask] - xi[n - 1, mask])
+        bT[n, mask] = (pb * psi[n, mask] - psi[n - 1, mask]) \
+            / (pb * xi[n, mask] - xi[n - 1, mask])
+    a = np.ascontiguousarray(aT.T)
+    b = np.ascontiguousarray(bT.T)
 
     # --- cheap reductions stay per-pair (K2): same np.sum calls as scalar ---
     qext = np.empty(P)
@@ -581,7 +591,7 @@ def mie_moment_numerators_batch(
     n_max: np.ndarray,
     n_moments: int = 32,
 ) -> np.ndarray:
-    """Batched :func:`mie_moment_numerators` over one wavelength's nodes.
+    """Batched :func:`mie_moment_numerators` over a set of size nodes.
 
     Parameters
     ----------
@@ -595,17 +605,21 @@ def mie_moment_numerators_batch(
     Returns
     -------
     ndarray (n_pair, n_moments)
-        ``U_l = Q_sca * beta_l`` per pair.
+        ``U_l = Q_sca * beta_l`` per pair.  Only the real part of the scalar
+        path's band sum is computed (the scalar discards the imaginary part
+        via ``(C * tot).real``), so the reduction runs in real arithmetic.
 
-    Equivalence note (task-cold-optics): the elementwise machinery (masked
-    stride-2 tail sums, P/Q assembly) is bitwise-equal to the scalar path,
-    but the per-``l`` band reduction cannot be -- the scalar path's
-    ``np.dot`` on ~100-element rows dispatches to BLAS with an accumulation
-    order no batched form reproduces (probe B2).  The drift is ulp-level
-    (<= 9e-13 relative over the full clear+dusty pair population) and is
-    covered by the task's D2 declared tolerances downstream; the single
-    global band set also replaces the per-pair ``max(256, nmax)`` Gaunt
-    rebuilds of the scalar path (a measured secondary win).
+    Equivalence note (task-cold-optics): the elementwise machinery (stride-2
+    tail sums, P/Q assembly) is bitwise-equal to the scalar path, but the
+    per-``l`` band reduction cannot be -- the scalar path's ``np.dot`` on
+    ~100-element rows dispatches to BLAS with an accumulation order no
+    batched form reproduces (probe B2).  The drift is ulp-level and covered
+    by the task's D2 declared tolerances downstream.  Pairs are processed in
+    geometric ``n_max`` buckets so each bucket's band pass runs at its own
+    truncation: the scalar loops every pair at its own ``n_max``, and a
+    single pass padded to the batch maximum wastes several-fold work on
+    log-uniform size distributions (measured 2.5x -> projected ~10x on the
+    moment stage, see the 2026-11-10 re-adjudication entry).
     """
     x_arr = np.asarray(x, dtype=float)
     qsca_arr = np.asarray(qsca, dtype=float)
@@ -622,47 +636,81 @@ def mie_moment_numerators_batch(
         return out
 
     bands = _gaunt_bands(n_moments - 1, max(256, nmax_pad))
-    n = np.arange(1, nmax_pad + 1, dtype=float)
-    c = np.zeros(nmax_pad + 1)
-    c[1:] = (2.0 * n + 1.0) / (n * (n + 1.0))
-
-    # tail sums S^a_k = sum_{n>=k, step 2} c_n a_n -- masked stride-2
-    # down-accumulation, bitwise-equal to the scalar loop (rows are exact
-    # zeros beyond each pair's n_max, matching the scalar zeros)
-    Sa = np.zeros((P, nmax_pad + 5), dtype=complex)
-    Sb = np.zeros((P, nmax_pad + 5), dtype=complex)
-    for kk in range(nmax_pad, 0, -1):
-        mask = n_max_arr >= kk
-        Sa[mask, kk] = c[kk] * a_mat[mask, kk] + Sa[mask, kk + 2]
-        Sb[mask, kk] = c[kk] * b_mat[mask, kk] + Sb[mask, kk + 2]
-
-    k = np.arange(nmax_pad + 2)
-    ca = np.zeros(nmax_pad + 2)
-    ca[1: nmax_pad + 1] = c[1:]
-    aa = np.zeros((P, nmax_pad + 2), dtype=complex)
-    bb = np.zeros((P, nmax_pad + 2), dtype=complex)
-    aa[:, 1: nmax_pad + 1] = a_mat[:, 1: nmax_pad + 1]
-    bb[:, 1: nmax_pad + 1] = b_mat[:, 1: nmax_pad + 1]
-
-    # P_a, Q_a (the Legendre coefficients of S1 and S2)
-    Pv = (2.0 * k + 1.0) * (Sa[:, k + 1] - Sb[:, k + 2]) \
-        + (k * k * ca)[None, :] * bb
-    Qv = (2.0 * k + 1.0) * (Sb[:, k + 1] - Sa[:, k + 2]) \
-        + (k * k * ca)[None, :] * aa
-
+    # transposed (step rows x pair columns) for contiguous per-step vectors
+    aT = np.ascontiguousarray(a_mat.T)
+    bT = np.ascontiguousarray(b_mat.T)
     C = 2.0 / (x_arr**2)
-    for l in range(n_moments):
-        tot = np.zeros(P, dtype=complex)
-        for d, a0, G in bands[l]:
-            a_hi = min(nmax_pad, nmax_pad - d, a0 + G.size - 1)
+
+    # geometric n_max buckets: (lo, hi] with hi doubling from 2
+    edges = [2]
+    while edges[-1] < nmax_pad:
+        edges.append(edges[-1] * 2)
+    for lo, hi in zip([0] + edges[:-1], edges):
+        hi = min(hi, nmax_pad)
+        mask = (n_max_arr <= hi) & (n_max_arr > lo)
+        rows = int(np.count_nonzero(mask))
+        if rows == 0:
+            continue
+        idx = np.nonzero(mask)[0]
+        aB = aT[: hi + 1, idx]
+        bB = bT[: hi + 1, idx]
+
+        n = np.arange(1, hi + 1, dtype=float)
+        c = np.zeros(hi + 1)
+        c[1:] = (2.0 * n + 1.0) / (n * (n + 1.0))
+        # stride-2 tail sums; rows with n_max < kk hold exact zeros in aB/bB,
+        # so the sums propagate zeros exactly like the scalar's untouched
+        # entries -- no per-step mask needed inside the bucket
+        Sa = np.zeros((hi + 5, rows), dtype=complex)
+        Sb = np.zeros((hi + 5, rows), dtype=complex)
+        for kk in range(hi, 0, -1):
+            Sa[kk] = c[kk] * aB[kk] + Sa[kk + 2]
+            Sb[kk] = c[kk] * bB[kk] + Sb[kk + 2]
+
+        k = np.arange(hi + 2)
+        ca = np.zeros(hi + 2)
+        ca[1: hi + 1] = c[1:]
+        aa = np.zeros((hi + 2, rows), dtype=complex)
+        bb = np.zeros((hi + 2, rows), dtype=complex)
+        aa[1: hi + 1] = aB[1: hi + 1]
+        bb[1: hi + 1] = bB[1: hi + 1]
+        kca = k * k * ca
+        Pv = (2.0 * k + 1.0)[:, None] * (Sa[k + 1] - Sb[k + 2]) \
+            + kca[:, None] * bb
+        Qv = (2.0 * k + 1.0)[:, None] * (Sb[k + 1] - Sa[k + 2]) \
+            + kca[:, None] * aa
+
+        # realified band reduction, restructured per shift d: the product
+        # P[a]*conj(P[a+d]) + Q[a]*conj(Q[a+d]) depends only on d, not on l,
+        # so it is built once per d and contracted against a (a, l) matrix of
+        # squared Wigner coefficients with one BLAS gemm per d -- the scalar
+        # path's 528 (l, band) dot products collapse to 63 product blocks +
+        # 63 gemms (measured: the elementwise band loop is numpy-throughput
+        # bound; this form runs at BLAS throughput)
+        Pr = np.ascontiguousarray(Pv.real)
+        Pi = np.ascontiguousarray(Pv.imag)
+        Qr = np.ascontiguousarray(Qv.real)
+        Qi = np.ascontiguousarray(Qv.imag)
+        Cb = C[idx]
+        Lm1 = n_moments - 1
+        acc = np.zeros((n_moments, rows))
+        for d in range(-Lm1, Lm1 + 1):
+            a0 = max(0, -d)
+            a_hi = min(hi, hi - d)
             if a_hi < a0:
                 continue
-            n_here = a_hi - a0 + 1
-            sl = slice(a0, a_hi + 1)
-            sl2 = slice(a0 + d, a_hi + 1 + d)
-            prod = Pv[:, sl] * np.conj(Pv[:, sl2]) + Qv[:, sl] * np.conj(Qv[:, sl2])
-            tot += (G[:n_here][None, :] * prod).sum(axis=1)
-        out[:, l] = (C * tot).real
+            s1 = slice(a0, a_hi + 1)
+            s2 = slice(a0 + d, a_hi + 1 + d)
+            prod = Pr[s1] * Pr[s2]
+            prod += Pi[s1] * Pi[s2]
+            prod += Qr[s1] * Qr[s2]
+            prod += Qi[s1] * Qi[s2]
+            a_arr = np.arange(a0, a_hi + 1, dtype=float)
+            Gd = np.empty((a_arr.size, n_moments))
+            for l in range(n_moments):
+                Gd[:, l] = _gaunt_sq(a_arr, a_arr + d, l)
+            acc += Gd.T @ prod
+        out[idx, :] = (Cb[None, :] * acc).T
     return out
 
 
