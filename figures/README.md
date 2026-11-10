@@ -92,9 +92,11 @@ Lv ≈ 4.4 cd m⁻² — the day group's zenith spans 824–1357 cd m⁻², so 1
 darker depending on the panel). All: perspective 640×320,
 pitch14°/hfov100°, ACES, adaptation=None, preserve_chromaticity=True,
 no sun marker; yaw 0° except the L4 anti-solar panel (yaw 180°). Day/twilight
-`ground=False`; the cloud panel `ground=True` (the deck-lit floor is part of
-the L6 story). Below-horizon pixels follow the
-renderer's no-ground display convention. L3 is a zenith-spectrum panel (no
+`ground=False` — for those panels, below-horizon pixels follow the renderer's
+no-ground display convention and are not a physically rendered surface; the
+cloud panel `ground=True` renders the solve-bound deck-lit floor (saved with
+the NPZ so redraws can rebind it), which is part of the L6 story. L3 is a
+zenith-spectrum panel (no
 render); L5 MC is qualitative, single seed, budget-limited. Media, grids and
 per-call records are single-sourced in the theme README and `data/layers.md`.
 

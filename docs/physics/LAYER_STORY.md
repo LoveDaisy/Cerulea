@@ -173,7 +173,7 @@ overlay（生产契约：overlay 只与 `hybrid-sos` 组合，观察者必须在
 （内建廓线按柱量归一）、`aerosols=()` 为默认、`single/multiple` 阶选择在
 `solve` 一等可达、`spherical-single`/`spherical-mc` 接受负太阳角实跑通过、
 `plane-sos`/`hybrid-sos` @−4° 不被拒绝（产出物理可判读的"平面世界"）、
-`cloud_layer` overlay 契约（hybrid-sos + 云底之上观察者）原样可用。
+`cloud_layer` overlay 契约（hybrid-sos + 观察者低于云底）原样可用。
 唯一的表述级发现已写进 L5：**契约不拒绝平面族在地平下运行**——它不构成
 缺陷（输出物理可判读且恰好是教学素材），但消费方应知道"跑通"不等于
 "物理适用"。

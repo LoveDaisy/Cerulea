@@ -117,9 +117,9 @@ MEDIA_DESC = {
 
 
 def _assert_single_ingredient_step(media):
-    """Mechanism evidence for the ladder narrative (review code-r1 Minor).
-
-    The whole story rests on "L3 = L2 plus exactly {O3, NO2}"; presets build
+    """Mechanism evidence for the ladder narrative: L3 is exactly L2 plus
+    {O3, NO2} -- same albedo, observer, pressure, refraction and the same
+    aerosol member/aod/profile; only the gas columns differ.  presets build
     L2 while L3 is hand-constructed, so this is asserted from the objects
     instead of trusted from the constructor calls.
     """
@@ -400,14 +400,12 @@ def write_tables(data, directory):
             else:
                 dirs = DIRECTIONS
             for name, z, a in dirs:
-                i = int(np.argmin(np.abs(zen - z)))
-                j = int(np.argmin(np.abs(az - a)))
-                row = i * len(az) + j
+                row = row_index(data, key, z, a)
                 for part in ("total", "single", "multiple", "clear", "cloud"):
                     if f"{key}/{part}" not in data:
                         continue
                     writer.writerow((key, data[f"{key}/layer"], part, name,
-                                     zen[i], az[j],
+                                     zen[row // len(az)], az[row % len(az)],
                                      data[f"{key}/{part}_Lv"][row],
                                      *data[f"{key}/{part}_xy"][row]))
     lines = ["# The layer story, actual production calls", "",
