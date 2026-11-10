@@ -2,9 +2,10 @@
 
 Seven rungs, each adding exactly one ingredient on top of the previous
 medium, all through the public production entry -- this is a thin caller,
-not a new solver.  The ladder, its comparison baselines and the solve
-inventory are pinned in ``scratchpad/task-layer-story/plan.md`` and
-narrated in ``docs/physics/LAYER_STORY.md``.
+not a new solver.  The committed authorities for the ladder and its
+comparison baselines are ``docs/physics/LAYER_STORY.md`` (narration) and
+the theme README plus ``data/layers.md`` (scene parameters, call record);
+authored per the task plan (scratchpad, not tracked).
 
 Run from the repository with ``python -m experiments.layerstory.layer_story``.
 The NPZ contains ordinary arrays and literal text, never pickled objects.
@@ -124,8 +125,10 @@ def _assert_single_ingredient_step(media):
     """
     l2, l3 = media["l2"], media["l3"]
     np.testing.assert_array_equal(l2.ground_albedo, l3.ground_albedo)
-    for attr in ("elevation_km", "refraction", "surface_pressure"):
-        assert getattr(l2, attr) == getattr(l3, attr), attr
+    np.testing.assert_allclose(l2.ground_albedo, 0.1)
+    assert l2.elevation_km == l3.elevation_km == 0.0
+    assert l2.refraction is True and l3.refraction is True
+    assert l2.surface_pressure == l3.surface_pressure
     assert l2.ozone_du == 0.0 and l3.ozone_du == 300.0
     assert l2.no2_column == 0.0 and l3.no2_column == NO2_COLUMN
     assert len(l2.aerosols) == len(l3.aerosols) == 1
@@ -229,6 +232,9 @@ def compute(quick=False):
     step_evidence = _assert_single_ingredient_step(media)
     print(f"medium step check: {step_evidence}", flush=True)
     deck = cloud.stratus()  # tau550=20, base 0.5 km, top 1.5 km; observer below
+    deck_desc = (f"cloud.stratus(): tau550={deck.tau550}, base {deck.base_km}, "
+                 f"top {deck.top_km} km, r_eff={deck.r_eff_um} um, "
+                 f"{deck.phase}")
     version = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     data = dict(
         wl=np.asarray(WL), runs=[], quick=np.asarray(bool(quick)),
@@ -236,9 +242,7 @@ def compute(quick=False):
         medium_step_check=np.asarray(step_evidence),
         config=repr(dict(day_grid=DAY_GRID, twilight_grid=TWILIGHT_GRID,
                          cloud_grid=CLOUD_GRID, mc_grid=MC_GRID,
-                         no2_column=NO2_COLUMN,
-                         deck="cloud.stratus(): tau550=20, base 0.5, top 1.5 km, "
-                              "r_eff=8 um, water")),
+                         no2_column=NO2_COLUMN, deck=deck_desc)),
         media=repr(MEDIA_DESC),
         display_groups=repr(DISPLAY_GROUPS),
     )
@@ -365,7 +369,13 @@ def bind(data, key, part="total"):
 
 
 def row_index(data, key, zenith_deg, azimuth_deg=0.0):
-    """Flat row of the nearest saved direction for one solve."""
+    """Flat row of the nearest saved direction for one solve.
+
+    Coarse grids may snap a requested direction to a distant node (the
+    11-node twilight/cloud grids have no 86.25 deg node, so a "horizon"
+    request lands on the exact-horizon 90 deg node); consumers must compare
+    the recorded zenith_deg/azimuth_rel_deg, not the direction label.
+    """
     zen, az = data[f"{key}/zenith"], data[f"{key}/azimuth_rel"]
     i = int(np.argmin(np.abs(zen - zenith_deg)))
     j = int(np.argmin(np.abs(az - azimuth_deg)))

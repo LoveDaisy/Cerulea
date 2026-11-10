@@ -88,7 +88,8 @@ uv run python -m experiments.layerstory.layer_story \
 Display: three locked groups, no per-panel auto exposure — day (L1/L2/L4) and
 cloud (L6) at **exposure=.03** (the approximations value), twilight (L5) at
 **exposure=10.0**, locked once from the first real −4° result (twilight zenith
-Lv ≈ 4.4 cd m⁻² is ~190× darker than day). All: perspective 640×320,
+Lv ≈ 4.4 cd m⁻² — the day group's zenith spans 824–1357 cd m⁻², so 187–308×
+darker depending on the panel). All: perspective 640×320,
 pitch14°/hfov100°, ACES, adaptation=None, preserve_chromaticity=True,
 no sun marker; yaw 0° except the L4 anti-solar panel (yaw 180°). Day/twilight
 `ground=False`; the cloud panel `ground=True` (the deck-lit floor is part of
