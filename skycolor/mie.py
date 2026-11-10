@@ -253,7 +253,10 @@ def mie_coefficients_batch(x, m) -> MieCoefficientsBatch:
         Size parameters; must be positive (pairs with ``x < 1e-4`` are the
         caller's business, mirroring the scalar early-out).
     m : array_like (n_pair,) complex
-        Refractive index per pair.
+        Refractive index per pair.  ``m == 0`` is outside the physical domain
+        and the two paths fail differently: the scalar kernel raises
+        ``ZeroDivisionError`` while the batch kernel propagates NaN -- callers
+        relying on the exception must screen ``m`` themselves.
 
     Returns
     -------
@@ -307,15 +310,20 @@ def mie_coefficients_batch(x, m) -> MieCoefficientsBatch:
     if not big.all():
         # branch-2 pairs: write through the real/imag VIEWS (a fancy-indexed
         # copy would silently discard the assignment and leave the branch-1
-        # placeholder constants in place)
+        # placeholder constants in place).  The scratch is sized to the
+        # branch-2 subset: mixed branch-1/branch-2 batches are valid input
+        # (the scalar path handles any m per pair), and reusing the full-width
+        # ``scr`` here crashes on every mixed population -- only the uniform
+        # branch-2 case happens to share its shape.
         idx2 = np.nonzero(~big)[0]
+        scr2 = np.empty((nmx_pad + 1, idx2.size))
         with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
-            np.multiply(n_val[:, None], ratio2[None, idx2], out=scr)
-            np.divide(scr, denom2[None, idx2], out=scr)
-            n_over_rho.real[:, idx2] = scr
-            np.divide(n_val[:, None], denom2[None, idx2], out=scr)
-            np.negative(scr, out=scr)
-            n_over_rho.imag[:, idx2] = scr
+            np.multiply(n_val[:, None], ratio2[None, idx2], out=scr2)
+            np.divide(scr2, denom2[None, idx2], out=scr2)
+            n_over_rho.real[:, idx2] = scr2
+            np.divide(n_val[:, None], denom2[None, idx2], out=scr2)
+            np.negative(scr2, out=scr2)
+            n_over_rho.imag[:, idx2] = scr2
 
     # --- D down-recurrence, one masked step per n --------------------------
     # rows beyond a pair's nmx keep their zero seed: the masked updates leave
@@ -529,7 +537,11 @@ def _gaunt_bands(l_max: int, a_max: int):
 
 #: cached squared-Wigner weight rows for the per-shift moment reduction:
 #: ``G_l(a, a+d)`` depends only on ``(a, d, l)``, so rows are built once for
-#: the longest requested ``a`` range and sliced (bitwise-identical prefixes)
+#: the longest requested ``a`` range and sliced (bitwise-identical prefixes).
+#: Key space is bounded by ``n_moments`` (~32) x the ``d`` range (~2*n_moments)
+#: and each array by ``a_hi`` (~nmax_pad), so the cache stays well under a MB;
+#: arrays are stored read-only and the returned slices are views -- callers
+#: must not write through them (current sole consumer copies into ``Gd``).
 _GAUNT_WEIGHT_CACHE: dict[tuple[int, int], np.ndarray] = {}
 
 
@@ -542,6 +554,7 @@ def _gaunt_weights(d: int, l: int, a_hi: int) -> np.ndarray:
     if arr is None or arr.size < need:
         a_arr = np.arange(a0, a_hi + 1, dtype=float)
         arr = _gaunt_sq(a_arr, a_arr + d, l)
+        arr.flags.writeable = False
         _GAUNT_WEIGHT_CACHE[key] = arr
     return arr[:need]
 
@@ -667,7 +680,6 @@ def mie_moment_numerators_batch(
     if nmax_pad <= 0:
         return out
 
-    bands = _gaunt_bands(n_moments - 1, max(256, nmax_pad))
     # transposed (step rows x pair columns) for contiguous per-step vectors
     aT = np.ascontiguousarray(a_mat.T)
     bT = np.ascontiguousarray(b_mat.T)

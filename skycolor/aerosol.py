@@ -798,9 +798,14 @@ class _State:
     g: float
     x_max: float
     beta: np.ndarray | None = None
-    # per-pair kernel headers (the coefficient arrays live in coeffs, exact
-    # length per pair); matrices for the batched moment/table kernels are
-    # assembled from coeffs on the fly as transients
+    # per-pair kernel headers (xs/qs/nmaxs/wts are derived copies of the same
+    # node facts stored per pair in coeffs -- qext/qsca/nmax/w*area).  They
+    # exist so the batched moment/table kernels get contiguous headers without
+    # unzipping coeffs; the padded matrices themselves are assembled from
+    # coeffs on the fly as transients.  Contract: the headers must only ever
+    # be written by _build_states from the same node facts as coeffs -- never
+    # assigned independently (this is the single-source guarantee behind the
+    # shared-instance read-only contract).
     xs: np.ndarray | None = None       # (n_nodes,) size parameters
     qs: np.ndarray | None = None       # (n_nodes,) scattering efficiencies
     nmaxs: np.ndarray | None = None    # (n_nodes,) per-pair truncation

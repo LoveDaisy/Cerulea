@@ -6,12 +6,24 @@ the scalar path are reproduced exactly), while the batched moment and
 phase-table kernels carry the task's D2 declared tolerances (the per-band
 ``np.dot`` reduction of the scalar path dispatches to BLAS on long rows and
 its accumulation order cannot be replicated by any batched form; measured
-drift is <= 9e-13 relative on the real pair population -- see
-scratchpad/task-cold-optics/probe_equivalence.log).
+drift is <= 9e-13 relative on the real pair population).
 
-The pinned arrays in ``tests/data/mie_anchor.npz`` were captured from the
-scalar tree; regenerate only with an explicit recorded reason (see
-``tools/make_mie_anchor_arrays.py``).
+The pinned arrays in ``tests/data/mie_anchor.npz`` have two provenance
+classes: the kernel-level ``coef_*`` grids are scalar-path truth (the scalar
+kernel is unchanged by the task); the preset-level production surfaces were
+regenerated from the batched tree on 2026-11-10 during the 9-wavelength
+table-anchor slimming, with scalar equivalence at that point evidenced by the
+dev-period ref_checkpoint (24/24 -- see the task progress log and the
+``mie_anchor.meta.json`` sidecar).  Regenerate only with an explicit recorded
+reason -- never to make a failing comparison pass (same rule as the golden
+fixtures).
+
+Platform binding: the bitwise class is anchored to this machine's toolchain
+(CPython 3.12 Smith+FMA division contraction, this numpy/BLAS build -- see
+``_fma`` / ``_smith_division_constants`` in ``skycolor/mie.py``).  On a
+different toolchain a wholesale bitwise-anchor failure is the expected
+scream, not a physics regression: attribute the platform difference first,
+then re-baseline through the recorded-reason route.
 """
 from __future__ import annotations
 
@@ -120,6 +132,27 @@ def test_batch_coefficients_absorbing_index_branch2_bitwise():
             assert np.array_equal(bat.b[j, : nx + 1], ref.b)
             assert bat.qext[j] == ref.qext
             assert bat.qsca[j] == ref.qsca
+
+
+def test_batch_coefficients_mixed_branch_population_bitwise():
+    """Mixed branch-1/branch-2 batches reproduce the scalar path.
+
+    The branch-2 column patch must handle arbitrary branch composition:
+    uniform branch-2 is covered by the absorbing-index test above, but a
+    mixed population previously crashed on the full-width scratch
+    (ValueError at the write-through assignment).  Two of the four pairs
+    here are branch 2, so both the k=1 and 1<k<P shapes are exercised.
+    """
+    xs = np.array([0.5, 2.0, 8.0, 40.0])
+    ms = np.array([1.5 + 0.1j, 0.2 + 5.0j, 1.75 + 0.45j, 0.2 + 5.0j])
+    bat = mie_coefficients_batch(xs, ms)
+    for j in range(xs.size):
+        ref = mie_coefficients(float(xs[j]), complex(ms[j]))
+        nx = ref.nmax
+        assert np.array_equal(bat.a[j, : nx + 1], ref.a)
+        assert np.array_equal(bat.b[j, : nx + 1], ref.b)
+        assert bat.qext[j] == ref.qext
+        assert bat.qsca[j] == ref.qsca
 
 
 def test_empty_state_phase_falls_back_to_isotropic():
