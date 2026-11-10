@@ -20,6 +20,7 @@ ACTIVE_THEMES = {
     "altitude": "altitude_latitude",
     "bluesun": "blue_sun",
     "clouds": "clouds",
+    "layerstory": "layer_story",
 }
 
 

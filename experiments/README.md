@@ -20,6 +20,7 @@ uv run python -m experiments.heterogeneity.heterogeneity
 uv run python -m experiments.altitude.altitude_latitude
 uv run python -m experiments.bluesun.blue_sun
 uv run python -m experiments.clouds.clouds
+uv run python -m experiments.layerstory.layer_story [--quick]
 ```
 
 `--quick`（day/twilight）：几何缩格的有界冒烟（光谱网格不变——色度辅助函数在其上积分）。
@@ -31,6 +32,7 @@ import 无目录创建副作用。
 | 目录 | 内容 | 对应现象 |
 |---|---|---|
 | [approximations/](approximations/README.md) | 固定30°/3°，三确定性路线与有限MC | 加阶次与换传播/算法分开；正式生产代表图 |
+| [layerstory/](layerstory/README.md) | 主线阶梯：Rayleigh→气溶胶→O₃→多次散射→球面暮光→云，逐层一要素 | 递进叙事与 `docs/physics/LAYER_STORY.md` 单源互链 |
 | `day/` | 日变化色彩轨迹与全景条带 | 太阳 -18°…+70°扫描；深点仍用默认SOS，不认证深暮光 |
 | `twilight/` | 暮光亮度/色度扫描（Patat 2006 对照）与鱼眼序列、晚霞/火山暮光 | 暮光渐进与 afterglow |
 | `aerosol/` | 气溶胶负荷/类型/霾渐变 | AOD 与成分对天空色彩的影响 |
