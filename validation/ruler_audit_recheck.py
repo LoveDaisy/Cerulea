@@ -199,6 +199,9 @@ def recheck_check2(workers: int) -> None:
     t_g173 = dni_m / et_m
     rho = t_g173 / t_model
     cont = (rho > 0.98) & (rho < 1.06)
+    if not cont.any():
+        raise RuntimeError("2a continuum mask is empty -- rho range shifted, "
+                           "the 0.98/1.06 window no longer brackets the continuum")
     print(f"2a  t_G173/t_model continuum (380-780, excl. dips): "
           f"median={np.median(rho[cont]):.4f}  p10={np.percentile(rho[cont],10):.4f} "
           f"p90={np.percentile(rho[cont],90):.4f}")
@@ -218,6 +221,10 @@ def recheck_check2(workers: int) -> None:
     # done by source comparison at report time; here quantify the two
     # documented deviations: dni_extra 1361 vs 1364, Kasten66 vs KY89 airmass
     from validation.check2_illuminance import bird_clear_sky
+    # aod380/aod500 mirror check2_illuminance's own Bird inputs (its lines
+    # "aod380 = 0.05 * (380/550)**-1.3"), NOT the Hinterland spectral shape
+    # (alpha ~ 1.01) -- the Bird reference is compared on the same loading
+    # convention the check used.
     aod380 = 0.05 * (380.0 / 550.0) ** -1.3
     aod500 = 0.05 * (500.0 / 550.0) ** -1.3
     for h in (30.0, 60.0):
@@ -254,6 +261,7 @@ def recheck_check2(workers: int) -> None:
         dict(name="c2_h30_a020", sun_elev=30.0, aod=0.02),
         dict(name="c2_h30_a035", sun_elev=30.0, aod=0.035),
         dict(name="c2_h30_a080", sun_elev=30.0, aod=0.08),
+        dict(name="c2_h30_a020b0", sun_elev=30.0, aod=0.02, albedo=0.0),
         dict(name="c2_h30_b000", sun_elev=30.0, albedo=0.0),
         dict(name="c2_h30_b020", sun_elev=30.0, albedo=0.2),
         dict(name="c2_h60_b000", sun_elev=60.0, albedo=0.0),
@@ -288,19 +296,29 @@ def recheck_check2(workers: int) -> None:
 
     # AOD scan: what turbidity would the CIE DHI correspond to?
     for h, base in ((30.0, "c2_h30_base"),):
-        print("2c  DHI vs AOD scan (h=30, 37x72):")
-        for nm in ("c2_h30_a020", "c2_h30_a035", base, "c2_h30_a080"):
+        print("2c  DHI vs AOD scan (h=30, 37x72, albedo 0.1):")
+        for nm, aod in (("c2_h30_a020", 0.02), ("c2_h30_a035", 0.035),
+                        (base, 0.05), ("c2_h30_a080", 0.08)):
             s = sky[nm]
-            aod = {"c2_h30_a020": 0.02, "c2_h30_a035": 0.035,
-                   "c2_h30_base": 0.05, "c2_h30_a080": 0.08}[nm]
             dhi_cie = C.cie110_zenith_luminance(
                 h, 2.2) * _cie_integral_factor(90.0 - h, 37, 72)
             print(f"    AOD550={aod:.3f}: DHI={s['dhi']/1000:7.3f} klx  "
                   f"vs CIE(T=2.2)={dhi_cie/1000:.3f} klx  "
                   f"ratio={s['dhi']/dhi_cie:.3f}")
+        s = sky["c2_h30_a020b0"]
+        dhi_cie = C.cie110_zenith_luminance(
+            h, 2.2) * _cie_integral_factor(90.0 - h, 37, 72)
+        print(f"    AOD550=0.020 + albedo 0.0 (both premises 'pure'): "
+              f"DHI={s['dhi']/1000:7.3f} klx  ratio={s['dhi']/dhi_cie:.3f}"
+              "  [measured combination point]")
 
-    # model effective Linke turbidity (Kasten96 pyrheliometric formula via
-    # pvlib 0.11, Ineichen 2008): TL = (9.4+0.9 am)(d_clean+d_water+d_aod)
+    # model effective Linke turbidity: independent transcription of the
+    # Kasten-96 pyrheliometric formula -- constants checked verbatim against
+    # the pvlib 0.11 source (its kasten96_lt; refs Ineichen 2008 /
+    # Molineaux 1998).  pvlib itself is NOT installed here, so this inline
+    # form is the reproducible chain and the report labels it as such.
+    # TL = (9.4 + 0.9 am)(d_clean + d_water + d_aod), d_clean/d_water from
+    # the Molineaux/Ineichen fits quoted in that source.
     am = 2.0
     d_clean = -0.101 + 0.235 * am ** -0.16
     aod_model550 = _hinterland_aod(np.array([380.0, 500.0, 700.0]), 0.05)
@@ -311,8 +329,9 @@ def recheck_check2(workers: int) -> None:
     print(f"2c  model scene (clear, AOD550=0.05): AOD380={aod_model550[0]:.4f} "
           f"AOD500={aod_model550[1]:.4f} AOD700={aod_model550[2]:.4f} "
           f"AOD_bb={aod_bb_model:.4f}")
-    print(f"2c  effective TL (Kasten96/pvlib, am=2): pw=0 -> {tl_no_water:.2f}, "
-          f"pw=1.42cm -> {tl_water142:.2f}   [CIE side uses T=2.2]")
+    print(f"2c  effective TL (Kasten-96 inline, source-verified vs pvlib 0.11, am=2): "
+          f"pw=0 -> {tl_no_water:.2f}, pw=1.42cm -> {tl_water142:.2f}   "
+          f"[CIE side uses T=2.2]")
     # invert: AOD_bb that gives TL=2.2 at pw=1.42
     aod_bb_22 = 2.2 / (9.4 + 0.9 * am) - d_clean - 0.112 * am ** -0.55 * 1.42 ** 0.34
     print(f"2c  AOD_bb implied by T=2.2 (pw=1.42, am=2): {aod_bb_22:.4f}")
@@ -372,6 +391,7 @@ def recheck_check3(workers: int) -> None:
     jobs3 = [
         dict(name="c3_h45_base", sun_elev=45.0),
         dict(name="c3_h45_a000", sun_elev=45.0, kind="pristine"),
+        dict(name="c3_h45_clr000", sun_elev=45.0, aod=0.0),
         dict(name="c3_h45_a025", sun_elev=45.0, aod=0.025),
         dict(name="c3_h45_a100", sun_elev=45.0, aod=0.10),
         dict(name="c3_h45_a200", sun_elev=45.0, aod=0.20),
@@ -382,6 +402,13 @@ def recheck_check3(workers: int) -> None:
     sky = run_sky_jobs(jobs3, workers=workers)
 
     b = sky["c3_h45_base"]
+    clr0 = sky["c3_h45_clr000"]
+    p0 = sky["c3_h45_a000"]
+    print(f"3c  pristine vs clear(aod=0) equivalence (same O3/pressure/grid): "
+          f"lz {p0['lz']:.2f} vs {clr0['lz']:.2f} "
+          f"({100*(clr0['lz']/p0['lz']-1):+.3f}%), "
+          f"hsun/zen {p0['horizon_sun']:.4f} vs {clr0['horizon_sun']:.4f} "
+          f"({100*(clr0['horizon_sun']/p0['horizon_sun']-1):+.3f}%)")
     print(f"3c  baseline (AOD .05, 37x72): hsun/zen={b['horizon_sun']:.3f} "
           f"(CIE {b['cie_horizon_sun']:.3f}), anti={b['horizon_anti']:.3f} "
           f"(CIE {b['cie_horizon_anti']:.3f}), rms_all={b['rms_all']:.1f}%, "
@@ -440,14 +467,23 @@ def recheck_check6(workers: int) -> None:
     # -- 4a: transcription table -------------------------------------------
     with (C.DATA / "twilight_koomen1952.csv").open() as fh:
         rows = {float(r["sun_elevation_deg"]): r for r in csv.DictReader(fh)}
+    # coverage gate: every scanned depth must exist in the CSV -- a missing
+    # row must fail loudly, never silently shrink the "full-depth" claim
+    # (learnings: grid-domain checks must assert endpoint coverage).
+    missing = sorted(set(KOOMEN_SCAN_MARYLAND_ZENITH) - set(rows))
+    if missing:
+        raise RuntimeError(f"4a: twilight_koomen1952.csv missing depth(s) "
+                           f"{missing} -- transcription coverage broken")
     print("4a  CSV vs original scan (Maryland zenith, cd/ft^2):")
     ok = True
+    n_checked = 0
     for h, scan in sorted(KOOMEN_SCAN_MARYLAND_ZENITH.items(), reverse=True):
         if h not in rows:
             continue
         csvv = float(rows[h]["I_cd_ft2"])
         match = abs(csvv - scan) <= 1e-12 + 1e-9 * abs(scan)
         ok &= match
+        n_checked += 1
         print(f"    h={h:+5.1f}: scan={scan:<10g} csv={csvv:<10g} "
               f"{'OK' if match else 'MISMATCH'}")
     cd_ft2 = 1.0 / 0.09290304
@@ -459,7 +495,8 @@ def recheck_check6(workers: int) -> None:
         print(f"4a  Nawar mag conversion h={h:+.0f}: m={mag:.4f} "
               f"(CSV V_mag_arcsec2_source={rows[h]['V_mag_arcsec2_source']})")
     print(f"4a  full-depth transcription vs original scan: "
-          f"{'ALL MATCH' if ok else 'DIFFERENCES FOUND'}")
+          f"{'ALL MATCH' if ok else 'DIFFERENCES FOUND'} "
+          f"(checked {n_checked}/{len(KOOMEN_SCAN_MARYLAND_ZENITH)} depths)")
 
     # -- 4c: site vertical transmission ------------------------------------
     wl = C.WL
