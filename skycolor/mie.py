@@ -305,14 +305,17 @@ def mie_coefficients_batch(x, m) -> MieCoefficientsBatch:
         np.negative(scr, out=scr)
         n_over_rho.imag = scr
     if not big.all():
+        # branch-2 pairs: write through the real/imag VIEWS (a fancy-indexed
+        # copy would silently discard the assignment and leave the branch-1
+        # placeholder constants in place)
         idx2 = np.nonzero(~big)[0]
         with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
             np.multiply(n_val[:, None], ratio2[None, idx2], out=scr)
             np.divide(scr, denom2[None, idx2], out=scr)
-            n_over_rho[:, idx2].real = scr
+            n_over_rho.real[:, idx2] = scr
             np.divide(n_val[:, None], denom2[None, idx2], out=scr)
             np.negative(scr, out=scr)
-            n_over_rho[:, idx2].imag = scr
+            n_over_rho.imag[:, idx2] = scr
 
     # --- D down-recurrence, one masked step per n --------------------------
     # rows beyond a pair's nmx keep their zero seed: the masked updates leave

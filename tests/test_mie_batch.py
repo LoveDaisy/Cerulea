@@ -81,6 +81,62 @@ def test_batch_coefficients_anchor_bitwise(anchor):
     assert np.array_equal(bat.qsca, anchor["coef_qsca"])
 
 
+def test_state_surface_arrays_vs_anchor(anchor):
+    """Plan 3b/3d test points: rc/asym bitwise, production single within TOL.
+
+    The anchor arrays pin the pre-change scalar tree; the coefficient kernel
+    is bitwise (so rc/asym must match exactly) and the production radiance
+    carries the declared table-kernel tolerance.
+    """
+    from skycolor.rt.single import sky_radiance as single
+
+    for name, factory in (("clear", presets.clear), ("dusty", presets.dusty)):
+        aer = factory(WL_COARSE).aerosols[0].aerosol
+        ext, sca = aer.relative_coefficients(WL_COARSE)
+        assert np.array_equal(ext, anchor[f"{name}_rc_ext"])
+        assert np.array_equal(sca, anchor[f"{name}_rc_sca"])
+        assert np.array_equal(aer.asymmetry(WL_COARSE), anchor[f"{name}_asym"])
+        atm = factory(WL_COARSE)
+        out = single(atm, 80.0,
+                     np.array([0.0, 20.0, 45.0, 70.0]),
+                     np.array([0.0, 90.0, 180.0, 270.0]))
+        assert np.allclose(out, anchor[f"{name}_single"], **TOL_SINGLE)
+
+
+def test_batch_coefficients_absorbing_index_branch2_bitwise():
+    """Branch-2 Smith pairs (|Im m| > |Re m|) reproduce the scalar path.
+
+    The library indices are all branch 1; the public kernel accepts any m,
+    and the branch-2 column patch must genuinely write through.
+    """
+    xs = np.array([0.5, 2.0, 8.0, 40.0])
+    for m in (1.0 + 10.0j, 0.5 + 3.0j, 0.2 + 5.0j):
+        ms = np.full(xs.size, m)
+        bat = mie_coefficients_batch(xs, ms)
+        for j in range(xs.size):
+            ref = mie_coefficients(float(xs[j]), complex(m))
+            nx = ref.nmax
+            assert np.array_equal(bat.a[j, : nx + 1], ref.a)
+            assert np.array_equal(bat.b[j, : nx + 1], ref.b)
+            assert bat.qext[j] == ref.qext
+            assert bat.qsca[j] == ref.qsca
+
+
+def test_empty_state_phase_falls_back_to_isotropic():
+    """A state whose every node falls below the Rayleigh cutoff keeps the
+    scalar path's isotropic fallback on the phase surface (no crash)."""
+    from skycolor.aerosol import LogNormalMode, MieAerosol
+
+    aer = MieAerosol(modes=[LogNormalMode(1e-8, 1.01)])
+    assert len(aer._nodes) == 0
+    t = aer.phase_table(550.0)
+    assert t.p_peak == 1.0
+    assert np.allclose(t.p, 1.0)
+    mom = aer.legendre_moments(np.array([550.0]), 4)
+    assert mom[0, 0] == 1.0
+    assert np.allclose(mom[1:], 0.0)
+
+
 def test_batch_moments_match_scalar_within_declaration(anchor):
     """Kernel-level: batched U_l vs per-pair scalar U_l on the anchor grid."""
     from types import SimpleNamespace

@@ -772,6 +772,12 @@ def _coeff_matrices(state: "_State") -> tuple[np.ndarray, np.ndarray]:
     kernels want one padded 2-D block, so build it here as a transient.
     """
     m = len(state.coeffs)
+    if m == 0:
+        # empty state (every node below the Rayleigh cutoff): the batched
+        # kernels handle zero rows and _build_table falls through to the
+        # isotropic fallback, matching the scalar path
+        return (np.zeros((0, 1), dtype=complex),
+                np.zeros((0, 1), dtype=complex))
     pad = int(state.nmaxs.max()) + 1
     a_mat = np.zeros((m, pad), dtype=complex)
     b_mat = np.zeros((m, pad), dtype=complex)
