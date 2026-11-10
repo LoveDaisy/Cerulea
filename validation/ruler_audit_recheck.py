@@ -50,6 +50,14 @@ from validation import common as C  # noqa: E402
 
 SECTIONS = ("check2", "check3", "check6")
 
+#: Re-adjudication legality gate tolerances for the task-ruler-fix
+#: results.json changes (all fail-closed).  One turbidity for both elevations,
+#: and two independent Kasten-96 transcriptions must agree end to end; a gap
+#: above these means a convention or transcription divergence, never a
+#: licence to widen the gate.
+T_CONSISTENCY_TOL = 0.01
+MAPPING_CONSISTENCY_TOL = 0.02
+
 # Solar-elevation refraction offset (Saemundsson's formula, as reproduced in
 # Meeus, "Astronomical Algorithms"; R = 1.02/tan(h + 10.3/(h+5.11)) arcmin).
 # This is the true-vs-apparent elevation difference the model input convention
@@ -245,8 +253,8 @@ def recheck_check2(workers: int) -> None:
     res = json.loads((C.VAL / "results.json").read_text())
     m2 = {m["name"]: m for m in
           next(c for c in res["checks"] if c["key"] == "check2")["metrics"]}
-    dhi30 = m2["DHI illuminance, h=30deg (CIE 110, T=2.2)"]
-    dhi60 = m2["DHI illuminance, h=60deg (CIE 110, T=2.2)"]
+    dhi30 = m2["DHI illuminance, h=30deg (CIE 110, scene-mapped TL)"]
+    dhi60 = m2["DHI illuminance, h=60deg (CIE 110, scene-mapped TL)"]
     print(f"2c  results.json: model DHI h=30 = {dhi30['model']:.4f} klx, "
           f"CIE = {dhi30['reference']:.4f} klx (dev {dhi30['dev']:+.1f}%)")
     print(f"2c  results.json: model DHI h=60 = {dhi60['model']:.4f} klx, "
@@ -273,7 +281,8 @@ def recheck_check2(workers: int) -> None:
         b = sky[base]
         yz_cie = C.cie110_zenith_luminance(h, 2.2)
         print(f"2c  h={h:.0f}: Lz_model(37x72)={b['lz']:.1f} vs Yz(CIE,T=2.2)={yz_cie:.1f} "
-              f"({100*(b['lz']/yz_cie-1):+.1f}%)  [docstring claims 3%]")
+              f"({100*(b['lz']/yz_cie-1):+.1f}%)  "
+              f"[historical anchor; the 3% docstring claim is retired, see RULER_AUDIT.md 2c(ii)]")
         # two-factor decomposition on the audit grid
         ifac_model = b["dhi"] / b["lz"]
         ifac_cie = _cie_integral_factor(90.0 - h, 37, 72)
@@ -292,6 +301,14 @@ def recheck_check2(workers: int) -> None:
         print(f"2c  h={h:.0f}: factors  Lz_model/Lz_CIE="
               f"{b['lz']/yz_cie:.3f}  I_model/I_CIE={ifac_model/ifac_cie:.3f} "
               f"(CIE grid 73x144 vs 37x72: {100*(ifac_cie_hi/ifac_cie-1):+.2f}%)")
+        # report anchor for RULER_AUDIT 2c(ii): the h=60 same-grid operands of
+        # the quoted "11.5713/7.934 = 1.458" ratio, at four decimals
+        if h == 60.0:
+            dhi_cie_22 = C.cie110_zenith_luminance(
+                h, 2.2) * _cie_integral_factor(90.0 - h, 37, 72)
+            print(f"2c  h=60 report anchor: DHI_model(37x72)={b['dhi']/1000:.4f} / "
+                  f"dhi_cie(37x72, T=2.2)={dhi_cie_22/1000:.4f} klx = "
+                  f"{b['dhi']/dhi_cie_22:.4f}")
         # effective Linke turbidity of the model scene in the CIE Yz metric:
         # invert Yz = (1.376 T - 1.81) tanh + 0.38 kcd/m2 for the model's own
         # zenith luminance
@@ -365,10 +382,59 @@ def recheck_check2(workers: int) -> None:
           f"AOD_bb={aod_bb_model:.4f}")
     print(f"2c  effective TL (Kasten-96 inline, source-verified vs pvlib 0.11, am=2): "
           f"pw=0 -> {tl_no_water:.2f}, pw=1.42cm -> {tl_water142:.2f}   "
-          f"[CIE side uses T=2.2]")
+          f"[pre-ruler-fix contract; check2 now maps CIE T from scene inputs, "
+          f"gates below]")
     # invert: AOD_bb that gives TL=2.2 at pw=1.42
     aod_bb_22 = 2.2 / (9.4 + 0.9 * am) - d_clean - 0.112 * am ** -0.55 * 1.42 ** 0.34
     print(f"2c  AOD_bb implied by T=2.2 (pw=1.42, am=2): {aod_bb_22:.4f}")
+
+    # -- re-adjudication legality gates (task-ruler-fix; all fail-closed) ---
+    # The scene-mapped TL in results.json (check2 DHI re-adjudication) must
+    # be backed by this evidence chain:
+    #   (1) T consistency -- the two DHI reference values invert to the same
+    #       Linke turbidity on the check's own 181x144 CIE reference grid
+    #       (check2 uses one T for both elevations);
+    #   (2) mapping consistency -- that inverted T agrees with this
+    #       recheck's independent Kasten-96 transcription above: two
+    #       implementations, no shared code, one gate;
+    #   (3) adjudication semantics -- tolerance still 25 %, passed, dev
+    #       within tolerance: the mapping corrects the reference's
+    #       atmospheric premise and must not loosen the criterion.
+    t_inv = {}
+    for h, metric in ((30.0, dhi30), (60.0, dhi60)):
+        # ref [klx] = Yz(T) [kcd/m2] * I(181x144); Yz is linear in T
+        ifac_ref = _cie_integral_factor(90.0 - h, 181, 144)
+        t_inv[h] = ((metric["reference"] / ifac_ref - 0.38)
+                    / math.tan(math.radians(h)) + 1.81) / 1.376
+    t_gap = abs(t_inv[30.0] - t_inv[60.0])
+    map_gap = abs(t_inv[30.0] - tl_water142)
+    print(f"2c  inverted reference T (results.json, 181x144 CIE grid): "
+          f"h=30 -> {t_inv[30.0]:.4f}, h=60 -> {t_inv[60.0]:.4f} "
+          f"(gap {t_gap:.4f}); recheck Kasten-96 TL = {tl_water142:.4f} "
+          f"(gap {map_gap:.4f})")
+    if t_gap > T_CONSISTENCY_TOL:
+        raise RuntimeError(
+            f"2c: the two DHI references invert to different turbidities "
+            f"(gap {t_gap:.4f} > {T_CONSISTENCY_TOL}) -- check2 must use one "
+            f"T for both elevations")
+    if map_gap > MAPPING_CONSISTENCY_TOL:
+        raise RuntimeError(
+            f"2c: inverted reference T {t_inv[30.0]:.4f} disagrees with the "
+            f"recheck Kasten-96 transcription {tl_water142:.4f} "
+            f"(gap {map_gap:.4f} > {MAPPING_CONSISTENCY_TOL}) -- the two "
+            f"AOD->TL mapping conventions diverge")
+    for h, metric in ((30.0, dhi30), (60.0, dhi60)):
+        if metric["tolerance"] != 25.0 or not metric["passed"] \
+                or metric["dev"] > 25.0:
+            raise RuntimeError(
+                f"2c: DHI h={h:.0f} adjudication semantics gate failed "
+                f"(tolerance={metric['tolerance']}, passed={metric['passed']}, "
+                f"dev={metric['dev']}) -- re-adjudication must not loosen the "
+                f"criterion")
+    print(f"2c  re-adjudication summary: DHI h=30 dev {dhi30['dev']:+.1f}% / "
+          f"h=60 dev {dhi60['dev']:+.1f}% vs tolerance 25.0% -> "
+          f"{'PASS' if dhi30['passed'] and dhi60['passed'] else 'FAIL'} "
+          f"(scene-mapped TL {tl_water142:.3f}); legality gates green")
 
     # -- 2d: ground albedo premises ----------------------------------------
     # Bird's reference side carries its own albedo term: DHI is enhanced by

@@ -15,12 +15,30 @@ covers both quantities at both requested solar elevations:
    60 deg.  The standard gives the relative luminance distribution and the
    absolute zenith luminance Yz(T, h) = (1.376 T - 1.81) tan h + 0.38
    kcd m^-2.  Integrating Yz * L_rel cos(theta) dOmega over the hemisphere
-   gives the diffuse horizontal illuminance.  We use T = 2.2, a typical
-   Linke turbidity for a clean continental boundary layer with
-   AOD_550 ~ 0.05.  (The CIE T is not exactly the model's Linke turbidity;
-   T = 2.2 is chosen from the standard's clear-sky range and is stated
-   explicitly.  At T = 2.2 the CIE zenith luminance agrees with the model to
-   within 3 %, which is a useful consistency check in itself.)
+   gives the diffuse horizontal illuminance.
+
+   The reference turbidity is mapped from the model scene *inputs* only
+   (never from model outputs, so the ruler cannot be calibrated by the very
+   quantity it measures): the scene loading AOD_550 = 0.05 with the preset's
+   Hinterland spectral shape gives AOD_bb = 0.0398 (Bird's broadband form
+   0.27583*AOD380 + 0.35*AOD500), which the Kasten-96 pyrheliometric formula
+   (see ``kasten96_lt`` below) converts to T ~= 2.64 at air mass 2 with the
+   G173 standard-atmosphere water column pw = 1.42 cm.  The water-vapour
+   convention is part of the mapping and is stated explicitly, because Linke
+   turbidity is convention dependent: under pw = 0 the same scene maps to
+   T ~= 1.67.
+
+   The previously hardcoded T = 2.2 is retired: under the pw = 1.42 cm
+   convention it inverts to AOD_550 ~= 0.001 (nearly aerosol-free), which
+   does not correspond to the scene under test, and the old docstring claim
+   that the CIE zenith luminance agreed with the model to 3 % at T = 2.2 was
+   disproved by the ruler audit (measured +25.3 % / +31.4 % at h = 30/60 deg;
+   ``validation/RULER_AUDIT.md`` section 2c).  Residuals under the
+   scene-mapped turbidity, kept here for honesty: the zenith luminance ratio
+   is about -5 % / -8 % (h = 30/60 deg); the relative-distribution integral
+   factor keeps its +11-12 % excess; and the ground-albedo share (~8 / ~12
+   percentage points of the old DHI gap) is a scene premise accounted
+   separately, never attributed to turbidity.
 
 3. **Bird & Hulstrom (1981) clear-sky broadband model**, evaluated with
    AOD_500 = 0.057, precipitable water 1.5 cm, ozone 0.3 atm-cm, and
@@ -34,6 +52,10 @@ Tolerances
 * diffuse horizontal illuminance: 25 % against CIE 110 (the model has no
   multiple scattering, so a one-sided low bias is expected in principle),
 * spectral shape: 10 % RMS over 400-700 nm.
+
+The 25 % DHI tolerance is not loosened by the turbidity mapping: the mapping
+corrects the reference's atmospheric premise (which aerosol load the CIE
+reference stands for), it does not widen the criterion.
 
 Run:  python validation/check2_illuminance.py
 """
@@ -106,6 +128,46 @@ def bird_clear_sky(solar_zenith_deg, aod380, aod500, precipitable_water=1.5,
     )
     ghi = (idnh + ias) / (1.0 - albedo * rs)
     return float(idn), float(ghi - idnh)
+
+
+def kasten96_lt(aod_bb, pw_cm, am=2.0):
+    """Linke turbidity from broadband aerosol optical depth (Kasten 1996).
+
+    Inline transcription of the pyrheliometric form implemented by pvlib 0.11
+    ``kasten96_lt`` (constants checked verbatim against that source; refs
+    Ineichen 2008 and Molineaux 1998)::
+
+        TL = (9.4 + 0.9 am) * (d_clean + d_water + aod_bb)
+        d_clean = -0.101 + 0.235 am^-0.16
+        d_water = 0.112 am^-0.55 pw^0.34
+
+    Deliberately a *second* implementation, independent of the audit
+    recheck's own inline transcription (``validation/ruler_audit_recheck.py``):
+    the two share no code, and their agreement is asserted by the recheck's
+    mapping-consistency gate, so a transcription error in either one fails
+    closed instead of silently becoming the ruler.
+    """
+    d_clean = -0.101 + 0.235 * am ** -0.16
+    d_water = 0.112 * am ** -0.55 * pw_cm ** 0.34
+    return (9.4 + 0.9 * am) * (d_clean + d_water + aod_bb)
+
+
+def scene_aod_bb(aod550):
+    """Broadband AOD of the scene aerosol at the given 550 nm loading.
+
+    Same semantics as the audit recheck's ``_hinterland_aod``: the ``clear``
+    preset scales the shared Hinterland layer so its *column* extinction at
+    550 nm equals ``aod550``; the spectral shape is the aerosol's own
+    extinction cross section (Angstrom alpha ~ 1.01).  Consumed only by the
+    AOD -> TL mapping above, never by the model itself.
+    """
+    from skycolor.aerosol import HinterlandAerosol, shared
+
+    a = shared(HinterlandAerosol)
+    e550 = float(a.extinction(np.array([550.0]))[0])
+    aod380 = float(a.extinction(np.array([380.0]))[0]) / e550 * aod550
+    aod500 = float(a.extinction(np.array([500.0]))[0]) / e550 * aod550
+    return 0.27583 * aod380 + 0.35 * aod500
 
 
 def cie110_diffuse_illuminance(solar_elevation_deg, turbidity, n_zen=181, n_az=144):
@@ -205,16 +267,24 @@ def run():
     ))
 
     # -- 2. CIE 110 diffuse at 30 and 60 deg --------------------------------
-    T_CIE = 2.2
+    # Scene-matched reference turbidity: map the scene *input* AOD_550 to
+    # Linke turbidity (Kasten-96, G173 water column pw = 1.42 cm -- see
+    # docstring reference 2).  Input-side by construction: no model output
+    # enters this mapping, so the ruler value is independent of how well the
+    # model happens to reproduce anything.
+    aod_scene = 0.05
+    aod_bb_scene = scene_aod_bb(aod_scene)
+    T_scene = kasten96_lt(aod_bb_scene, pw_cm=1.42)
     cie_dhi = {}
     for h in (30.0, 60.0):
-        cie_dhi[h] = cie110_diffuse_illuminance(h, T_CIE) / 1000.0
-    model = {h: model_case(h, wl=wl) for h in (30.0, 60.0)}
+        cie_dhi[h] = cie110_diffuse_illuminance(h, T_scene) / 1000.0
+    model = {h: model_case(h, aod550=aod_scene, wl=wl) for h in (30.0, 60.0)}
     for h in (30.0, 60.0):
         m = model[h]["dhi"] / 1000.0
         metrics.append(C.Metric(
-            f"DHI illuminance, h={h:.0f}deg (CIE 110, T=2.2)", m, cie_dhi[h],
-            unit="klx", tolerance=25.0, dev=float(C.rel_dev(m, cie_dhi[h])),
+            f"DHI illuminance, h={h:.0f}deg (CIE 110, scene-mapped TL)", m,
+            cie_dhi[h], unit="klx", tolerance=25.0,
+            dev=float(C.rel_dev(m, cie_dhi[h])),
         ))
 
     # -- 3. Bird & Hulstrom direct at 30 and 60 deg -------------------------
@@ -237,7 +307,9 @@ def run():
         model_am15_visible=model_vis,
         spectral_rms=float(np.sqrt(np.mean(spec_dev**2))),
         cie_dhi_klx=cie_dhi,
-        turbidity=T_CIE,
+        turbidity=T_scene,
+        turbidity_aod_bb=aod_bb_scene,
+        turbidity_pw_cm=1.42,
         model={str(k): dict(dni=v["dni"] / 1000.0, dhi=v["dhi"] / 1000.0,
                             ghi=v["ghi"] / 1000.0) for k, v in model.items()},
         bird={str(k): dict(dni=v[0], dhi=v[1]) for k, v in bird_klx.items()},
@@ -329,9 +401,20 @@ def main():
         print_line = f"  {name:16s} {m:9.2f} klx {r:9.2f} klx"
         lines.append(print_line)
     lines.append("")
-    lines.append(f"  CIE 110 diffuse reference uses turbidity T = {result.details['turbidity']}.")
+    lines.append(
+        "  CIE 110 diffuse reference uses the scene-mapped Linke turbidity "
+        f"T = {result.details['turbidity']:.3f} (Kasten-96 from scene "
+        f"AOD_bb = {result.details['turbidity_aod_bb']:.4f} at pw = "
+        f"{result.details['turbidity_pw_cm']} cm; docstring ref 2).")
     lines.append("  Bird & Hulstrom direct reference uses AOD500 = 0.057, pw = 1.5 cm,")
     lines.append("  and the G173 luminous efficacy 107.9 lm/W.")
+    for h, tag in (("30.0", "30"), ("60.0", "60")):
+        m_dhi = result.details["model"][h]["dhi"]
+        b_dhi = result.details["bird_dhi_klx"][h]
+        lines.append(
+            f"  Diagnostic (not scored): DHI h={tag} model {m_dhi:.2f} vs "
+            f"Bird & Hulstrom {b_dhi:.2f} klx "
+            f"({100.0 * (m_dhi / b_dhi - 1):+.1f}%).")
     return C.run_standalone(result, lines)
 
 
