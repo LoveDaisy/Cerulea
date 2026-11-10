@@ -22,7 +22,8 @@ uv run pytest -q                      # 当前默认全量 526 项，12-worker x
                                       # （证据包已上抛），与历史对子分开记录于
                                       # validation/FAST_SUITE.md，不沿用旧时长认证
 uv run pytest -n 0 -q ...             # 串行等价诊断，不作为性能验收口径
-uv run python -m validation.run_all   # 六项物理校验，单池 8 worker，实测约 4 min；
+uv run python -m validation.run_all   # 六项物理校验，单池 8 worker，recert 实测
+                                      # 285.14/353.50 s（validation/FAST_SUITE.md）；
                                       # 既有物理 FAIL 预期 exit=1
 ```
 

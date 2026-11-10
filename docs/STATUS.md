@@ -39,14 +39,14 @@ propagation and numerics using two real current-production scenes; the
 parameters. These examples explain behavior, not absolute accuracy.
 
 The latest committed [six-check results](../validation/results.json) are
-**2 PASS / 4 FAIL** (unified solar source; see [physics/SOLAR_SOURCE.md](physics/SOLAR_SOURCE.md)). Passing regression tests do not close these physical gaps.
+**3 PASS / 3 FAIL** (unified solar source; see [physics/SOLAR_SOURCE.md](physics/SOLAR_SOURCE.md)). Passing regression tests do not close these physical gaps.
 Use `uv run pytest -q` for the current test count; the M18 full run is preserved
 in [CURVED_TRANSPORT_AUDIT.md](twilight/CURVED_TRANSPORT_AUDIT.md).
 
 | Check | Recorded result |
 |---|---|
 | 1 — Rayleigh optical depth | PASS; RMS 0.48% vs Bodhaine (1999) |
-| 2 — Direct/diffuse illuminance | FAIL; DNI +4–6%, DHI +41–46% vs CIE 110 |
+| 2 — Direct/diffuse illuminance | PASS; DNI +4–6%, DHI +6.8%/+3.0% vs CIE 110 at scene-mapped turbidity (ruler-fix; contract analysis in [RULER_AUDIT](../validation/RULER_AUDIT.md)) |
 | 3 — CIE relative luminance | FAIL; upper sky RMS 10.6%, sun-side horizon +142% at sun 45° |
 | 4 — Horizon chromaticity | PASS, marginal; Δxy = 0.0184 |
 | 5 — Twilight, first order only | FAIL in deep twilight; does not test the full engine |
@@ -56,6 +56,10 @@ Read-only audit of the reference contracts behind checks 2/3/6 (premises,
 definitions, solar-axis conventions, transcription): 2026-11-10, see
 [validation/RULER_AUDIT.md](../validation/RULER_AUDIT.md) — **conclusions live
 there** (this pointer is not a second source; no physical numbers changed).
+The ruler-fix correction landed 2026-11-11: check2's DHI reference contract
+was re-mapped to the scene turbidity per the audit's adjudication and the two
+DHI metrics re-adjudicated PASS, backed by the `ruler_audit_recheck.py`
+legality gates.
 
 Check6's deep points are one low-budget seed, not converged predictions. The
 [deep-twilight reference](twilight/DEEP_TWILIGHT_REFERENCE.md) quantifies
