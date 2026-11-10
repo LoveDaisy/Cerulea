@@ -786,6 +786,11 @@ def _coeff_matrices(state: "_State") -> tuple[np.ndarray, np.ndarray]:
     a_mat = np.zeros((m, pad), dtype=complex)
     b_mat = np.zeros((m, pad), dtype=complex)
     for j, (c, _r, _w, _area) in enumerate(state.coeffs):
+        # header/coeffs single-source contract, mechanically enforced (a50):
+        # xs/qs/nmaxs/wts may only be written by _build_states from the same
+        # node facts as coeffs -- a mismatch here means someone assigned a
+        # header independently.
+        assert c.nmax == int(state.nmaxs[j])
         a_mat[j, : c.nmax + 1] = c.a
         b_mat[j, : c.nmax + 1] = c.b
     return a_mat, b_mat

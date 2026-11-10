@@ -23,8 +23,10 @@ Run from the repository root:
     uv run python tools/make_mie_anchor_arrays.py
 
 Writes ``tests/data/mie_anchor.npz`` plus ``tests/data/mie_anchor.meta.json``
-(generating tree, numpy version, UTC+8 timestamp) so the provenance of the
-Git-tracked arrays stays retrievable in-repo.
+(generating tree, numpy version, UTC+8 timestamp, provenance class split and
+regeneration rule) so the provenance of the Git-tracked arrays stays
+retrievable in-repo and every regeneration produces the schema-complete
+sidecar.
 """
 from __future__ import annotations
 
@@ -145,6 +147,18 @@ def main() -> None:
                                      ).isoformat(timespec="seconds"),
         "git_head_at_generation": tree,
         "numpy": np.__version__,
+        "provenance": (
+            "kernel-level coef_* arrays are scalar-path truth (the scalar "
+            "kernel is unchanged); preset-level arrays are the production "
+            "path's output at git_head_at_generation -- their scalar "
+            "equivalence at re-pin time must be evidenced by the recorded "
+            "reason for this regeneration in the task progress log"
+        ),
+        "regeneration_rule": (
+            "regenerate only with an explicit recorded reason in the task "
+            "progress log -- never to make a failing comparison pass "
+            "(same rule as the golden fixtures)"
+        ),
     }
     (ROOT / "tests" / "data" / "mie_anchor.meta.json").write_text(
         json.dumps(meta, indent=2) + "\n", encoding="utf-8")

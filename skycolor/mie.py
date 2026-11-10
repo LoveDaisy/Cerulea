@@ -538,10 +538,12 @@ def _gaunt_bands(l_max: int, a_max: int):
 #: cached squared-Wigner weight rows for the per-shift moment reduction:
 #: ``G_l(a, a+d)`` depends only on ``(a, d, l)``, so rows are built once for
 #: the longest requested ``a`` range and sliced (bitwise-identical prefixes).
-#: Key space is bounded by ``n_moments`` (~32) x the ``d`` range (~2*n_moments)
-#: and each array by ``a_hi`` (~nmax_pad), so the cache stays well under a MB;
-#: arrays are stored read-only and the returned slices are views -- callers
-#: must not write through them (current sole consumer copies into ``Gd``).
+#: Key space is bounded by ``n_moments * (2*n_moments - 1)`` (d,l) pairs --
+#: 2556 at n_moments=36 -- each holding up to ``a_hi`` (~nmax_pad ~ 372)
+#: doubles: about 8 MiB resident for a dusty build (measured 7.12 MiB), a
+#: process-lifetime global that counts into tracemalloc-traced live.  Arrays
+#: are stored read-only and the returned slices are views -- callers must
+#: not write through them (current sole consumer copies into ``Gd``).
 _GAUNT_WEIGHT_CACHE: dict[tuple[int, int], np.ndarray] = {}
 
 
