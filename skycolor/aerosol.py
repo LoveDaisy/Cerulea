@@ -601,6 +601,10 @@ class MieAerosol(Aerosol):
         wl = np.atleast_1d(np.asarray(wl_nm, dtype=float))
         n_moments = int(n_moments)
         states = self._states_for(wl)
+        # refill trigger compares against ``need`` (cache-sized), not the
+        # caller's n_moments: fills always produce ``need``-length beta, so
+        # the two comparisons coincide for every reachable state -- the
+        # tighter form just keeps the trigger and the fill width consistent.
         need = max(n_moments, int(self.moments_cache_size))
         missing = [i for i, s in enumerate(states)
                    if s.beta is None or s.beta.size < need]
