@@ -1,0 +1,24 @@
+# recert2 pytest formal run1 | window start: 2026-11-10T15:40:11.126337 | load: (5.046875, 29.24072265625, 34.470703125)
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [ 13%]
+........................................................................ [ 27%]
+........................................................................ [ 41%]
+........................................................................ [ 54%]
+........................................................................ [ 68%]
+........................................................................ [ 82%]
+........................................................................ [ 95%]
+......................                                                   [100%]
+=============================== warnings summary ===============================
+tests/test_result.py::test_ground_radiance_direct_transmittance_override@bin4
+  /Users/zhangjiajie/Codes/sky-wt-13/tests/test_result.py:174: DeprecationWarning: direct_transmittance is deprecated by the unified solar source; pass direct_irradiance instead (it carries the disk geometry)
+    dark0, E_zero = render.ground_radiance(atmo7, dome, 60.0,
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+526 passed, 1 warning in 376.36s (0:06:16)
+real 376.54
+user 2821.79
+sys 570.74
+RUN1_EXIT=0
+# window end: 2026-11-10T15:46:27.671532 | load: (41.169921875, 44.30810546875, 39.9404296875)
