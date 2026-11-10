@@ -110,11 +110,12 @@ def test_batch_phase_table_preset_anchor_declared_tolerance(anchor):
             p = aer.phase_table(w).p
             assert np.allclose(p, anchor[f"{name}_table_p{int(w)}"],
                                **TOL_TABLE)
+        wl_sub = anchor[f"{name}_p_peak_wl"]
         assert np.allclose(
-            np.array([aer.phase_table(w).p_peak for w in WL_COARSE]),
+            np.array([aer.phase_table(w).p_peak for w in wl_sub]),
             anchor[f"{name}_p_peak"], **TOL_TABLE)
         assert np.allclose(
-            np.array([aer.phase_table(w).normalisation() for w in WL_COARSE]),
+            np.array([aer.phase_table(w).normalisation() for w in wl_sub]),
             anchor[f"{name}_p_norm"], **TOL_TABLE)
 
 

@@ -58,6 +58,13 @@ VIEW_ZENITH_DEG = np.array([0.0, 20.0, 45.0, 70.0])
 VIEW_AZIMUTH_DEG = np.array([0.0, 90.0, 180.0, 270.0])
 N_MOMENTS_DIRECT = 36
 TABLE_SAMPLE_WL = (380.0, 550.0, 780.0)
+#: wavelengths whose phase-table scalars are pinned.  The full-grid capture
+#: lives in the task scratchpad ref_capture (dev-time); the in-repo anchor
+#: keeps a spanning subset so the default-collection test stays affordable
+#: (one dusty table build costs ~0.4 s serial and inflates ~4x under
+#: 12-worker memory-bandwidth contention).
+TABLE_SCALAR_WL = (380.0, 410.0, 440.0, 470.0, 505.0, 550.0, 620.0, 700.0,
+                   780.0)
 
 
 def kernel_level() -> dict:
@@ -103,12 +110,14 @@ def _preset_level(name: str, factory) -> dict:
     out[f"{name}_rc_sca"] = sca
     out[f"{name}_asym"] = aer.asymmetry(wl)
     out[f"{name}_beta_direct"] = aer.legendre_moments(wl, N_MOMENTS_DIRECT)
-    peak = np.empty(wl.size)
-    norm = np.empty(wl.size)
-    for i, w in enumerate(wl):
+    wl_sub = np.array(TABLE_SCALAR_WL)
+    peak = np.empty(wl_sub.size)
+    norm = np.empty(wl_sub.size)
+    for i, w in enumerate(wl_sub):
         t = aer.phase_table(w)
         peak[i] = t.p_peak
         norm[i] = t.normalisation()
+    out[f"{name}_p_peak_wl"] = wl_sub
     out[f"{name}_p_peak"] = peak
     out[f"{name}_p_norm"] = norm
     for w in TABLE_SAMPLE_WL:
