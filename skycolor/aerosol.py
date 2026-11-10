@@ -49,8 +49,11 @@ from typing import Callable, Sequence
 import numpy as np
 
 from .mie import (
+    MieCoefficients,
+    MieCoefficientsBatch,
     log_normal_nodes,
     mie_coefficients,
+    mie_coefficients_batch,
     mie_moment_numerators,
     mie_phase,
     phase_table_angles,
@@ -460,19 +463,42 @@ class MieAerosol(Aerosol):
             self._states.move_to_end(key)
             return state
 
-        coeffs = []
-        ce = cs = gnum = 0.0
-        x_max = 0.0
+        # one batched coefficient build per wavelength.  The batch kernel is
+        # bitwise-equal to the per-pair scalar path (task-cold-optics probe
+        # A3c); the node-order scalar accumulations below (ce/cs/g, the LRU
+        # bookkeeping) are kept so the cache machinery is untouched.
+        xs = []
+        ms = []
+        kept = []
         for r, w, mi in self._nodes:
             x = 2.0 * np.pi * r / (float(wl_nm) * 1e-3)
             if x < 1e-4:
                 # far below the Rayleigh regime the cross section is
                 # negligible; skipping avoids ill-conditioned Bessel recurrences
                 continue
-            m = self._index(mi, wl_nm)
-            c = mie_coefficients(x, m)
+            xs.append(x)
+            ms.append(self._index(mi, wl_nm))
+            kept.append((r, w))
+        batch = mie_coefficients_batch(np.array(xs), np.array(ms, dtype=complex))
+
+        coeffs = []
+        ce = cs = gnum = 0.0
+        x_max = 0.0
+        wts = np.empty(batch.n_pair)
+        for j, (r, w) in enumerate(kept):
+            nx = int(batch.n_max[j])
+            c = MieCoefficients(
+                x=float(batch.x[j]),
+                m=complex(batch.m[j]),
+                a=batch.a[j, : nx + 1],
+                b=batch.b[j, : nx + 1],
+                qext=float(batch.qext[j]),
+                qsca=float(batch.qsca[j]),
+                nmax=nx,
+            )
             area = np.pi * (r * 1e-6) ** 2
             wt = w * area
+            wts[j] = wt
             ce += wt * c.qext
             cs += wt * c.qsca
             gnum += wt * c.qsca * c.g
@@ -480,7 +506,8 @@ class MieAerosol(Aerosol):
             x_max = max(x_max, c.x)
         g = float(gnum / cs) if cs > 0.0 else 0.0
         state = _State(
-            wl=key, coeffs=coeffs, ce=float(ce), cs=float(cs), g=g, x_max=x_max
+            wl=key, coeffs=coeffs, ce=float(ce), cs=float(cs), g=g,
+            x_max=x_max, batch=batch, wts=wts,
         )
         self._states[key] = state
         while len(self._states) > max(int(self.max_cached_wavelengths), 1):
@@ -634,6 +661,11 @@ class _State:
     g: float
     x_max: float
     beta: np.ndarray | None = None
+    # batched coefficient build behind ``coeffs`` (the per-pair a/b arrays in
+    # coeffs are views into batch.a/b); None for states built before the
+    # batched kernel existed (never the case in production)
+    batch: "MieCoefficientsBatch | None" = None
+    wts: np.ndarray | None = None  # (n_nodes,) number weight * geometric area
 
 
 # ===========================================================================
