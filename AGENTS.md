@@ -17,8 +17,9 @@ uv sync        # 从 uv.lock 重建 .venv；不要 pip install 进环境
 ### 测试
 
 ```bash
-uv run pytest -q                      # 当前默认全量，12-worker xdist / LPT；
-                                      # 当前树实测与历史436项正式对子分开记录于
+uv run pytest -q                      # 当前默认全量 526 项，12-worker xdist / LPT；
+                                      # 当前树 recert 实测 376.5–446.9s 超 360s 回归线
+                                      # （证据包已上抛），与历史对子分开记录于
                                       # validation/FAST_SUITE.md，不沿用旧时长认证
 uv run pytest -n 0 -q ...             # 串行等价诊断，不作为性能验收口径
 uv run python -m validation.run_all   # 六项物理校验，单池 8 worker，实测约 4 min；

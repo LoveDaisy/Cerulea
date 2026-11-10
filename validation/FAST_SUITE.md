@@ -236,3 +236,52 @@ suite stably exceeding 6 min counts as a regression and is escalated.
 The post-fix pair (257.41 / 256.22 s outer wall) passes strictly, so the
 windowed
 interpretation is not exercised by the current acceptance evidence.
+
+## 526-test recert (2026-11-10, task `suite-recert`)
+
+This does **not** replace or retroactively extend any earlier pair. On source
+tree `0dd68a6` (branch `task/suite-recert`, same production/default-test tree
+as `286486e`), `task-suite-recert` regenerated the LPT weights table from a
+fresh 12-worker `--durations=0` listing of the current 526-test population
+(`recert-durations-526.{txt,json}`: 319 listed nodeids — pytest hides <5 ms
+phases — totalling 4490.5 s; the table now holds 7 module groups + 213
+individually scheduled nodes, regenerated via
+`tools/make_scheduling_weights.py`, no `@bin` keys). Offline preview
+(`recert-scheduling-assignment.json`): 12 bins at 380.46–380.47 s predicted
+load, max/min ratio 1.00003; `tests/test_validation_harness.py` structural
+tests 24 passed; `--collect-only` still 526, exit 0.
+
+**Formal pairs — four sequential runs, all 526 passed / exit 0, all over the
+360 s guard: certification not achieved, escalated under the standing
+clause.**
+
+| pair | runs (outer wall s) | window load (1-min start → end) | logs |
+|---|---|---|---|
+| recert | **425.20 ✗ / 446.86 ✗** | 5.91 → 47.23 (15-min avg 21 → 41) | `recert-pytest-run{1,2}.log` |
+| recert2 (pre-registered single retake) | **376.54 ✗ / 397.04 ✗** | 5.05 → 78.81 (sampler peak 129.3) | `recert2-pytest-run{1,2}.log`, `memory-sample-during-pytest-recert2.log` |
+
+Measurement-window attribution: the machine hosts concurrent agent sessions
+and every measurement window overlapped a sustained load wave (sampled
+1-minute averages peaked at 129, ≈10.8× the 12-core capacity). pytest's own
+CPU accounting (recert2 run1: user+sys 3392.5 s ⇒ ~283 s across 12 cores,
+plus ~40 s startup/collection/report overhead ≈ 320–330 s) suggests an
+idle-machine run might land near or below the line, but no uncontended
+certification window could be obtained on this machine. Per the
+pre-registered protocol the retake was taken once; both pairs are retained
+without selection and no windowed interpretation is applied. The disposition
+(accept / split the default suite / adjust the target) belongs to the owner;
+the durations distribution and binning preview above are delivered as the
+evidence package for that decision.
+
+`uv run python -m validation.run_all` formal pair on the same tree,
+sequential: **285.14 / 353.50 s**, exit=1 both, **2 PASS / 4 FAIL / 0 SKIP**,
+failure set exactly {check2, check3, check5, check6}
+(`recert-runall-run{1,2}.log`); tracked validation outputs byte-identical to
+the committed baseline (`git status --porcelain validation/` lists only the
+new evidence logs).
+
+Freeze tags created (local only; pushing is an owner action):
+`freeze/research-boundary-afaae17` → afaae17,
+`freeze/cssp-inputs-5ac0c74` → 5ac0c74,
+`freeze/deep-twilight-dda8673` → dda8673,
+`freeze/task7-exec-2756b2f` → 2756b2f.

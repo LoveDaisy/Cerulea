@@ -61,6 +61,13 @@ uv run pytest -q --durations=0 # per-test wall times under the real schedule
 uv run python tools/make_scheduling_weights.py <durations-log>
 ```
 
+**Maintenance rule:** any task that adds or removes tests from the default
+collection must, before closing, regenerate `tests/data/scheduling_weights.json`
+from a fresh parallel `--durations=0` listing (commands above), re-take the
+sequential formal wall-clock pair for the default suite, and record the table
+and pair evidence in [validation/FAST_SUITE.md](../validation/FAST_SUITE.md) —
+the 360 s guard line and its escalation clause live there.
+
 ## Commit and merge locally
 
 Commit the task's relevant files on its topic branch after verification. Before
