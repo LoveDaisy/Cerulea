@@ -94,9 +94,9 @@
           "unit": "klx"
         },
         {
-          "dev": 45.86698909200495,
+          "dev": 45.86698909200491,
           "dev_kind": "rel_pct",
-          "model": 11.579720486270455,
+          "model": 11.579720486270451,
           "name": "DHI illuminance, h=60deg (CIE 110, T=2.2)",
           "passed": false,
           "reference": 7.9385476853619,
@@ -183,9 +183,9 @@
           "unit": "%"
         },
         {
-          "dev": 35.23430481909276,
+          "dev": 35.234304819092756,
           "dev_kind": "abs",
-          "model": 35.23430481909276,
+          "model": 35.234304819092756,
           "name": "RMS dev, whole sky, h=45deg",
           "passed": false,
           "reference": 0.0,
@@ -222,7 +222,7 @@
       "key": "check4",
       "metrics": [
         {
-          "dev": 0.008282467386894305,
+          "dev": 0.00828246738689431,
           "dev_kind": "abs",
           "model": 0.29954518807785635,
           "name": "mean delta x, horizon",
@@ -232,7 +232,7 @@
           "unit": "xy"
         },
         {
-          "dev": 0.011164929384992625,
+          "dev": 0.011164929384992627,
           "dev_kind": "abs",
           "model": 0.32391846498543136,
           "name": "mean delta y, horizon",
@@ -242,9 +242,9 @@
           "unit": "xy"
         },
         {
-          "dev": 0.018414202754464964,
+          "dev": 0.018414202754464967,
           "dev_kind": "abs",
-          "model": 0.018414202754464964,
+          "model": 0.018414202754464967,
           "name": "RMS delta xy, horizon",
           "passed": true,
           "reference": 0.0,
@@ -252,9 +252,9 @@
           "unit": "xy"
         },
         {
-          "dev": 0.010513820145311702,
+          "dev": 0.010513820145311707,
           "dev_kind": "abs",
-          "model": 0.010513820145311702,
+          "model": 0.010513820145311707,
           "name": "RMS delta u'v', horizon",
           "passed": true,
           "reference": 0.0,
@@ -346,7 +346,7 @@
           "name": "zenith luminance, h=-9deg",
           "passed": true,
           "reference": 0.0161459,
-          "tolerance": 0.3292245072791287,
+          "tolerance": 0.32922450727912855,
           "unit": "cd/m2"
         },
         {
