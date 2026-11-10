@@ -84,22 +84,22 @@
           "unit": "%"
         },
         {
-          "dev": 40.92293803328026,
+          "dev": 6.819618447911427,
           "dev_kind": "rel_pct",
           "model": 9.756497912124939,
-          "name": "DHI illuminance, h=30deg (CIE 110, T=2.2)",
-          "passed": false,
-          "reference": 6.92328590950953,
+          "name": "DHI illuminance, h=30deg (CIE 110, scene-mapped TL)",
+          "passed": true,
+          "reference": 9.133619885454385,
           "tolerance": 25.0,
           "unit": "klx"
         },
         {
-          "dev": 45.86698909200491,
+          "dev": 2.957108052908203,
           "dev_kind": "rel_pct",
           "model": 11.579720486270451,
-          "name": "DHI illuminance, h=60deg (CIE 110, T=2.2)",
-          "passed": false,
-          "reference": 7.9385476853619,
+          "name": "DHI illuminance, h=60deg (CIE 110, scene-mapped TL)",
+          "passed": true,
+          "reference": 11.247130679233722,
           "tolerance": 25.0,
           "unit": "klx"
         },
@@ -124,9 +124,9 @@
           "unit": "klx"
         }
       ],
-      "summary": "DNI: 94.7/101.8/109.4 klx at h=30/48.19/60 vs 91.2/97.1/103.6; DHI: 9.8/11.6 klx vs CIE 6.9/7.9.",
+      "summary": "DNI: 94.7/101.8/109.4 klx at h=30/48.19/60 vs 91.2/97.1/103.6; DHI: 9.8/11.6 klx vs CIE 9.1/11.2.",
       "title": "Clear-sky direct and diffuse illuminance",
-      "verdict": "FAIL"
+      "verdict": "PASS"
     },
     {
       "error": null,
