@@ -50,6 +50,7 @@ __all__ = [
     "mie_asymmetry",
     "mie_phase",
     "mie_moment_numerators",
+    "mie_moment_numerators_batch",
     "mie_legendre_moments",
     "gaunt_squared",
     "phase_table_angles",
@@ -569,6 +570,99 @@ def mie_legendre_moments(
     if coeff.qsca > 0.0:
         U = U / coeff.qsca
     return U
+
+
+def mie_moment_numerators_batch(
+    x: np.ndarray,
+    qsca: np.ndarray,
+    a: np.ndarray,
+    b: np.ndarray,
+    n_max: np.ndarray,
+    n_moments: int = 32,
+) -> np.ndarray:
+    """Batched :func:`mie_moment_numerators` over one wavelength's nodes.
+
+    Parameters
+    ----------
+    x, qsca : ndarray (n_pair,)
+    a, b : ndarray (n_pair, n_max_pad + 1) complex
+        Batch coefficient rows (as produced by :func:`mie_coefficients_batch`);
+        entries beyond each pair's ``n_max`` are zero.
+    n_max : ndarray (n_pair,) int
+    n_moments : int
+
+    Returns
+    -------
+    ndarray (n_pair, n_moments)
+        ``U_l = Q_sca * beta_l`` per pair.
+
+    Equivalence note (task-cold-optics): the elementwise machinery (masked
+    stride-2 tail sums, P/Q assembly) is bitwise-equal to the scalar path,
+    but the per-``l`` band reduction cannot be -- the scalar path's
+    ``np.dot`` on ~100-element rows dispatches to BLAS with an accumulation
+    order no batched form reproduces (probe B2).  The drift is ulp-level
+    (<= 9e-13 relative over the full clear+dusty pair population) and is
+    covered by the task's D2 declared tolerances downstream; the single
+    global band set also replaces the per-pair ``max(256, nmax)`` Gaunt
+    rebuilds of the scalar path (a measured secondary win).
+    """
+    x_arr = np.asarray(x, dtype=float)
+    qsca_arr = np.asarray(qsca, dtype=float)
+    a_mat = np.asarray(a, dtype=complex)
+    b_mat = np.asarray(b, dtype=complex)
+    n_max_arr = np.asarray(n_max, dtype=int)
+    n_moments = int(n_moments)
+    P = x_arr.size
+    out = np.zeros((P, n_moments))
+    if P == 0 or n_moments <= 0:
+        return out
+    nmax_pad = int(n_max_arr.max())
+    if nmax_pad <= 0:
+        return out
+
+    bands = _gaunt_bands(n_moments - 1, max(256, nmax_pad))
+    n = np.arange(1, nmax_pad + 1, dtype=float)
+    c = np.zeros(nmax_pad + 1)
+    c[1:] = (2.0 * n + 1.0) / (n * (n + 1.0))
+
+    # tail sums S^a_k = sum_{n>=k, step 2} c_n a_n -- masked stride-2
+    # down-accumulation, bitwise-equal to the scalar loop (rows are exact
+    # zeros beyond each pair's n_max, matching the scalar zeros)
+    Sa = np.zeros((P, nmax_pad + 5), dtype=complex)
+    Sb = np.zeros((P, nmax_pad + 5), dtype=complex)
+    for kk in range(nmax_pad, 0, -1):
+        mask = n_max_arr >= kk
+        Sa[mask, kk] = c[kk] * a_mat[mask, kk] + Sa[mask, kk + 2]
+        Sb[mask, kk] = c[kk] * b_mat[mask, kk] + Sb[mask, kk + 2]
+
+    k = np.arange(nmax_pad + 2)
+    ca = np.zeros(nmax_pad + 2)
+    ca[1: nmax_pad + 1] = c[1:]
+    aa = np.zeros((P, nmax_pad + 2), dtype=complex)
+    bb = np.zeros((P, nmax_pad + 2), dtype=complex)
+    aa[:, 1: nmax_pad + 1] = a_mat[:, 1: nmax_pad + 1]
+    bb[:, 1: nmax_pad + 1] = b_mat[:, 1: nmax_pad + 1]
+
+    # P_a, Q_a (the Legendre coefficients of S1 and S2)
+    Pv = (2.0 * k + 1.0) * (Sa[:, k + 1] - Sb[:, k + 2]) \
+        + (k * k * ca)[None, :] * bb
+    Qv = (2.0 * k + 1.0) * (Sb[:, k + 1] - Sa[:, k + 2]) \
+        + (k * k * ca)[None, :] * aa
+
+    C = 2.0 / (x_arr**2)
+    for l in range(n_moments):
+        tot = np.zeros(P, dtype=complex)
+        for d, a0, G in bands[l]:
+            a_hi = min(nmax_pad, nmax_pad - d, a0 + G.size - 1)
+            if a_hi < a0:
+                continue
+            n_here = a_hi - a0 + 1
+            sl = slice(a0, a_hi + 1)
+            sl2 = slice(a0 + d, a_hi + 1 + d)
+            prod = Pv[:, sl] * np.conj(Pv[:, sl2]) + Qv[:, sl] * np.conj(Qv[:, sl2])
+            tot += (G[:n_here][None, :] * prod).sum(axis=1)
+        out[:, l] = (C * tot).real
+    return out
 
 
 # ===========================================================================

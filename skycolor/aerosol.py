@@ -54,7 +54,7 @@ from .mie import (
     log_normal_nodes,
     mie_coefficients,
     mie_coefficients_batch,
-    mie_moment_numerators,
+    mie_moment_numerators_batch,
     mie_phase,
     phase_table_angles,
 )
@@ -549,12 +549,19 @@ class MieAerosol(Aerosol):
             out = np.zeros(n_moments)
             out[0] = 1.0
             return out
+        if state.batch is None or state.wts is None:
+            raise RuntimeError(
+                "state was built without the batched coefficient kernel; "
+                "rebuild the aerosol state")
+        U = mie_moment_numerators_batch(
+            state.batch.x, state.batch.qsca, state.batch.a, state.batch.b,
+            state.batch.n_max, n_moments)
         num = np.zeros(n_moments)
         den = 0.0
-        for c, r, w, area in state.coeffs:
-            U = mie_moment_numerators(c, n_moments)  # = qsca * beta_l
-            num += (w * area) * U
-            den += (w * area) * c.qsca
+        for j, (c, _r, _w, _area) in enumerate(state.coeffs):
+            # node-order scalar accumulation, same sequence as the scalar path
+            num += state.wts[j] * U[j]
+            den += state.wts[j] * c.qsca
         if den <= 0.0:
             out = np.zeros(n_moments)
             out[0] = 1.0

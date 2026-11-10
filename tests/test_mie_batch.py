@@ -81,6 +81,41 @@ def test_batch_coefficients_anchor_bitwise(anchor):
     assert np.array_equal(bat.qsca, anchor["coef_qsca"])
 
 
+def test_batch_moments_match_scalar_within_declaration(anchor):
+    """Kernel-level: batched U_l vs per-pair scalar U_l on the anchor grid."""
+    from types import SimpleNamespace
+
+    from skycolor.mie import mie_moment_numerators, mie_moment_numerators_batch
+
+    for j in range(anchor["coef_x"].size):
+        xv = float(anchor["coef_x"][j])
+        nx = int(anchor["coef_nmax"][j])
+        coeff = SimpleNamespace(
+            x=xv, qsca=float(anchor["coef_qsca"][j]), nmax=nx,
+            a=anchor["coef_a"][j, : nx + 1], b=anchor["coef_b"][j, : nx + 1])
+        U_ref = mie_moment_numerators(coeff, 32)
+        U_bat = mie_moment_numerators_batch(
+            np.array([xv]), np.array([coeff.qsca]),
+            anchor["coef_a"][j: j + 1, : nx + 1],
+            anchor["coef_b"][j: j + 1, : nx + 1],
+            np.array([nx]), 32)
+        assert np.allclose(U_bat[0], U_ref, **TOL_MOMENTS)
+
+
+def test_batch_moments_preset_anchor_declared_tolerance(anchor):
+    """Production surface: moments through the aerosol path vs pinned arrays."""
+    for name, factory in (("clear", presets.clear), ("dusty", presets.dusty)):
+        aer = factory(WL_COARSE).aerosols[0].aerosol
+        beta = aer.legendre_moments(WL_COARSE, 36)
+        assert beta.shape == anchor[f"{name}_beta_direct"].shape
+        assert np.allclose(beta, anchor[f"{name}_beta_direct"], **TOL_MOMENTS)
+        res = aer.delta_m(WL_COARSE, 32)
+        assert np.allclose(res.beta, anchor[f"{name}_delta_m_beta"],
+                           **TOL_MOMENTS)
+        assert np.allclose(res.f, anchor[f"{name}_delta_m_f"],
+                           rtol=1e-11, atol=0.0)
+
+
 def test_batch_coefficients_full_preset_population_bitwise():
     """Every (node, wavelength) pair of both presets, the production set."""
     for factory in (HinterlandAerosol, DustAerosol):
