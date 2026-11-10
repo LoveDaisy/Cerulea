@@ -112,7 +112,9 @@ directly, which is unambiguous).
   Hulburt (1952)**, *Measurements of the Brightness of the Twilight Sky*,
   Journal of the Optical Society of America **42**, 353–359.  DOI:
   [10.1364/JOSA.42.000353](https://doi.org/10.1364/JOSA.42.000353).
-  * A recording photometer of **photopic** sensitivity (no filter), at two
+  * A recording photometer with a **green filter** over a Type 1P22
+    photomultiplier, the authors' target being the light adapted eye response
+    (Koomen 1952 p353; the response curve itself was not published), at two
     stations: **Maryland, altitude 30 m**, and **Sacramento Peak, New Mexico,
     altitude 2800 m**; solar altitude +5° to −15°, clear air, no clouds.
   * The Maryland **zenith** surface brightness in cd ft⁻², and the conversion

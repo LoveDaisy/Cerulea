@@ -14,11 +14,20 @@ Geophys. 9, 63), which also gives the conversion used here:
 
     m [mag arcsec^-2] = -2.5 log10 I[cd ft^-2] + 9.9846.
 
-There is no filter in the optical train: the photometer response *is* the
-photopic curve, so the measured quantity is the same photopic luminance that
-``validation.common.luminance`` computes from the model spectrum.  This makes
-Koomen et al. the closest like-for-like check available: a photopic, absolute,
-sea-level twilight measurement, independent of Patat et al. (2006).
+The instrument was a nine-stage photomultiplier (Type 1P22) "covered with
+ground glass and a green filter" (Koomen 1952, p353, verbatim); the authors
+state that the green filter caused the spectral response to be that of the
+light adapted eye, citing Plymale (1947).  The like-for-like claim therefore
+holds in the "photopic-target" sense: the response was *designed* to match
+the light adapted eye, but the actual response curve was never published
+(Plymale 1947 gives the filter design), so no deviation budget against
+CIE V(lambda) exists, and because the twilight spectrum shifts with solar
+depth, that deviation's spectral dependence does not vanish at the deep end.
+The measured quantity is a photopic-target luminance -- comparable to, not
+identical with, the ``validation.common.luminance`` photopic integral of the
+model spectrum.  This still makes Koomen et al. the closest like-for-like
+check available: a photopic-targeted, absolute, sea-level twilight
+measurement, independent of Patat et al. (2006).
 
 Second reference (secondary, used only as a cross-check)
 --------------------------------------------------------
