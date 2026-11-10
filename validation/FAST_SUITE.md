@@ -296,21 +296,22 @@ Freeze tags created (local only; pushing is an owner action):
 ## Later tree: cold-optics batch kernels (2026-11-10)
 
 Task-cold-optics added `tests/test_mie_batch.py` (anchor/binary-equivalence
-for the batched Mie kernels; 10 tests after the review-fix rounds) and
+for the batched Mie kernels; 11 tests after the review-fix rounds) and
 regenerated the scheduling weights from a parallel `--durations=0` run on the
-final tree (`scratchpad/task-cold-optics/durations_parallel4.log`, 4358.6 s
-total over 8 module groups + 199 individual nodes).  Test-count chain,
+final tree (`scratchpad/task-cold-optics/durations_parallel5.log`, 4300.0 s
+total over 8 module groups + 200 individual nodes).  Test-count chain,
 mechanically exported (`uv run pytest --collect-only -q`): the 526-test tree
 above is the 2026-10-30 measurement; this task's base tree (286486e)
-collects 527; final tree collects **537** (= 527 + the 10 batch-anchor
+collects 527; final tree collects **538** (= 527 + the 11 batch-anchor
 tests).  Formal pairs on the green tree:
 
 | entry | result | verdict |
 |---|---|---|
-| `uv run pytest --collect-only -q` (final tree) | 537 collected | count chain above; the earlier "533 collected / +6 vs 526" row was arithmetically wrong and is superseded here |
-| `uv run pytest -q` (pre-fix-tree pair, 2026-11-10 21:25/21:31) | 533 passed, 368.76 / 370.86 s (`formal_run{1,2}.log`) | **superseded evidence**: these logs measured the tree before the review-fix commits (d4e9c03/e1d9c59 never saw a full run until the pair below) |
-| `uv run pytest -q` (final-tree formal pair) | **537 passed, 399.84 / 391.90 s** (`formal_run{3,4}.log`) | green, **over the 360 s guard**: pre-task tree already 364.54 s (escalated); the added batch-anchor tests carry their own cost under 12-worker memory-bandwidth contention. Standing escalation clause applies, owned together with the suite-recert task |
-| `uv run python -m validation.run_all` (final tree) | 2 PASS / 4 FAIL / 0 SKIP, exit 1 (`run_all_final.log`) | same FAIL set as the committed baseline; `validation/results.json` bit-identical after the run (zero numeric drift, D2 declared-tolerance criterion satisfied) |
+| `uv run pytest --collect-only -q` (final tree) | 538 collected | count chain above; the earlier "533 collected / +6 vs 526" row was arithmetically wrong and is superseded here |
+| `uv run pytest -q` (pre-fix-tree pair, 2026-11-10 21:25/21:31) | 533 passed, 368.76 / 370.86 s (`formal_run{1,2}.log`) | **superseded evidence**: measured before the review-fix commits (d4e9c03/e1d9c59 never saw a full run until the 206ba7b pair) |
+| `uv run pytest -q` (206ba7b pair) | 537 passed, 399.84 / 391.90 s (`formal_run{3,4}.log`) | **superseded by the review-rework tree**: the round-2 Minor rework added one k=1 branch test (538) |
+| `uv run pytest -q` (final-tree formal pair) | **538 passed, 395.81 / 382.86 s** (`formal_run{5,6}.log`) | green, **over the 360 s guard**: pre-task tree already 364.54 s (escalated); the added batch-anchor tests carry their own cost under 12-worker memory-bandwidth contention (largest single item: the production-single consumption test, 266 s parallel-measured). Standing escalation clause applies, owned together with the suite-recert task |
+| `uv run python -m validation.run_all` (final tree) | 2 PASS / 4 FAIL / 0 SKIP, exit 1 (`run_all_final{,2}.log`) | same FAIL set as the committed baseline; `validation/results.json` bit-identical after both runs (zero numeric drift, D2 declared-tolerance criterion satisfied) |
 
 Performance context for the same task: cold dusty `delta_m(32)` 39.4 -> 3.1 s
 (`scratchpad/task-cold-optics/bench_{baseline,after}.log`).
