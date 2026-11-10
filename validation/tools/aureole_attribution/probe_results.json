@@ -22,13 +22,14 @@
       0.3333333333333333,
       0.25
     ],
+    "moment_tail_from": 33,
     "worker_isolation": "MC configs run in fresh subprocesses (heap-corruption containment, see docstring)"
   },
   "configs": {
     "b0": {
-      "wall_s_clean": 34.80484816594981,
-      "wall_s_instrumented": 26.52638362511061,
-      "mem_peak_mb": 1058.26332,
+      "wall_s_clean": 32.61639641714282,
+      "wall_s_instrumented": 25.51247270894237,
+      "mem_peak_mb": 1058.266217,
       "ratio": 8.81523527413475,
       "dev_vs_cie": 141.40606682437675,
       "lz": 1989.508343897231,
@@ -39,9 +40,9 @@
       "anchor_ok": true
     },
     "b0c": {
-      "wall_s_clean": 1.2050589171703905,
-      "wall_s_instrumented": 1.5741180421318859,
-      "mem_peak_mb": 223.611372,
+      "wall_s_clean": 1.1770865409635007,
+      "wall_s_instrumented": 1.537541959201917,
+      "mem_peak_mb": 223.611473,
       "ratio": 8.81523527413475,
       "dev_vs_cie": 141.40606682437675,
       "n_mu_eff": 32,
@@ -54,9 +55,9 @@
       "cross_check_ok": true
     },
     "p1": {
-      "wall_s_clean": 3.177552750101313,
-      "wall_s_instrumented": 3.4459362500347197,
-      "mem_peak_mb": 387.094537,
+      "wall_s_clean": 3.1533153750933707,
+      "wall_s_instrumented": 3.1401809160597622,
+      "mem_peak_mb": 387.096321,
       "ratio": 8.811875420257813,
       "dev_vs_cie": 141.3140569024277,
       "n_mu_eff": 64,
@@ -67,9 +68,9 @@
       "converged": true
     },
     "p2": {
-      "wall_s_clean": 1.3013712079264224,
-      "wall_s_instrumented": 1.5987569999415427,
-      "mem_peak_mb": 223.61135,
+      "wall_s_clean": 1.2494378748815507,
+      "wall_s_instrumented": 1.625714125111699,
+      "mem_peak_mb": 223.61118,
       "ratio": 8.815235274134752,
       "dev_vs_cie": 141.4060668243768,
       "n_mu_eff": 32,
@@ -80,9 +81,9 @@
       "converged": true
     },
     "p3": {
-      "wall_s_clean": 261.44852091604844,
-      "wall_s_instrumented": 438.9353308749851,
-      "mem_peak_mb": 1073.415334,
+      "wall_s_clean": 251.67753845802508,
+      "wall_s_instrumented": 427.46246462501585,
+      "mem_peak_mb": 1073.415134,
       "ratio": 8.775991161879439,
       "sigma_ratio": 0.04178553857146513,
       "wl_subset": [
@@ -121,7 +122,9 @@
           0.05
         ]
       ],
-      "column_550": 5.0004629543898014e-05
+      "layer_aod_sum": 0.05,
+      "column_550": 0.05000462954389801,
+      "column_matches_layers": true
     },
     "aod_after": {
       "layers": [
@@ -130,12 +133,28 @@
           0.05
         ]
       ],
-      "column_550": 5.0004629543898014e-05
+      "layer_aod_sum": 0.05,
+      "column_550": 0.05000462954389801,
+      "column_matches_layers": true
     },
     "aod_invariant_ok": true,
     "energy_identity_b0": 1.5987211554602254e-14,
     "energy_identity_p1": 1.5543122344752192e-15,
-    "energy_identity_p2": 1.5987211554602254e-14
+    "energy_identity_p2": 1.5987211554602254e-14,
+    "moment_tail_b0": {
+      "n_moments": 32,
+      "nonzero": 31,
+      "terminus_l": 30,
+      "max_abs_beta_l32_plus": 0.0,
+      "beta_last_nonzero": 2.1056222136065813e-24
+    },
+    "moment_tail_p1": {
+      "n_moments": 128,
+      "nonzero": 31,
+      "terminus_l": 30,
+      "max_abs_beta_l32_plus": 0.0,
+      "beta_last_nonzero": 2.1056222136065813e-24
+    }
   },
   "g1": {
     "B0_minus_CIE": 5.163614007902098,

@@ -9,13 +9,29 @@ settings through the production ``solve()`` request layer.
 Process isolation (empirical containment, not a physics choice): repeated
 ``solve(approximation='spherical-mc')`` calls on a ``_restrict``-subset
 atmosphere in ONE process corrupt the heap and SIGSEGV after ~4-8 calls
-(evidence: ``probe_mc_stress.py`` -- 4 clean reps then SEGV at a different
-site each time; full-spectrum atmosphere 8 reps clean; crash sites are
-manifestations inside the MC transport flush, not the source).  Each MC
-config therefore runs in a fresh worker subprocess performing at most two
-transports (wall-clock pass + instrumented pass).  The root cause is a
-production finding, out of this task's scope; it is reported verbatim in
-progress.md for an owner-level spin-off.
+(evidence: ``mc_repeat_segfault_stress.py`` in this directory -- 4 clean
+reps then SEGV at a different site each time; full-spectrum atmosphere 8
+reps clean; crash sites are manifestations inside the MC transport flush,
+not the source.  The corruption is INTERMITTENT: an identical 30-rep run
+later the same day completed clean, so one clean run is not evidence of
+absence).  Each MC config therefore runs in a fresh worker
+subprocess performing at most two transports (wall-clock pass +
+instrumented pass).  The root cause is a production finding, out of this
+task's scope; it is reported in the task records for an owner-level
+spin-off.
+
+Moment-series terminus (measured, see ``moment_tail`` diagnostics): the
+Mie scattering amplitude is a finite polynomial (degree <= 2*nmax), so the
+Legendre moment series of this mixture terminates EXACTLY at l=30
+(nmax <= 15 for the rural mode set); beta_l = 0 for l >= 31.  The delta-M
+renormalisation is therefore the identity here (f = beta_32 = 0), the P1
+"128-moment" configuration lifts no content (its +0.07% share is the
+n_mu 32->64 quadrature effect), and T2 is degenerate in N (identical at
+N=32 and N=128 by construction).  For large-x members (dust, clouds)
+nmax is large enough that the 32-moment truncation does lose forward
+energy and delta-M is load-bearing -- the moment-series terminus moves
+with particle size.  This is recorded as part of the stop-loss
+attribution handed to the owner.
 
 Configs
 -------
@@ -23,13 +39,16 @@ B0   default 32-moment delta-M SOS on the full check3 grid.  Mechanical
      anchor: the h=45deg "horizon sun-side / zenith" dev must reproduce the
      value recorded in ``validation/results.json`` within 0.1 pp (plan Step 1;
      same-link same-scene deterministic SOS).  B0 failing aborts the probe
-     before P1/P2/P3 run.
+     before P1/P2/P3 run (and writes ``probe_results_anchorfail.json``,
+     never overwriting the committed evidence).
 B0c  the same B0 request issued through ``solve()`` on the probe's meridian
      cut views, cross-checked against the full-grid map rows (tight numeric
      tolerance, not bitwise: BLAS shape-dependent reduction order per
      learnings) -- mechanically proves the P1/P2 manipulation differs from
-     B0 only by the SOS settings.
-P1   ``SOSConfig(n_mu=64, n_moments=128)``  (resolution up, nested f down)
+     B0 only by the SOS settings.  Its spectral cut (``b0c_rad`` in the
+     npz) is the B0 spectral angular profile (same-link verified).
+P1   ``SOSConfig(n_mu=64, n_moments=128)``  (resolution up, nested f down;
+     with the moment terminus at l=30 this reduces to the n_mu effect)
 P2   ``SOSConfig(delta_m=False)``           (raw moments, no renormalisation)
 P3   ``approximation='spherical-mc'``       (exact phase sampling + spherical
      transport; fixed seed, 14-wl stride-30 subset of ``WL_COARSE``; MC
@@ -37,7 +56,8 @@ P3   ``approximation='spherical-mc'``       (exact phase sampling + spherical
      isolated)
 T2   aureole-band residual of the truncated Legendre series vs the exact
      mixture phase function (reference data; consumed by G1 only where the
-     plan mandates it)
+     plan mandates it, and only with a non-zero moment tail -- with the
+     terminus at l=30 it is degenerate in N)
 T1   ``SOSConfig(n_mu=128, n_moments=256)`` single-point trend (only on the
      plan's ambiguous-cell trigger)
 CTL  full-spectrum low-photon MC control run (only on the plan's 0.05-band
@@ -49,6 +69,9 @@ grid columns at az=0 (sun azimuth) and az=180 (anti-solar) plus an
 aureole-resolved supplement at gamma = 1, 1.5, 2, 3, 4, 6, 8 deg on both
 sides of the sun along az=0.  The sun-side horizon (z=90, az=0) and the
 zenith (z=0, az=0) -- the two cells of the check3 ratio -- are cut members.
+Both records the plan requires are kept per config: the photopic profile
+(``*_lum``) and the spectral angular profile (``*_rad``, n_view x n_wl;
+``p3`` on its 14-wl subset).
 
 Cost protocol (plan Step 1, r2-Suggestion2 / r3-Minor2): two passes per
 config -- pass 1 measures wall clock without instrumentation (the cost
@@ -72,19 +95,21 @@ The L1 residual matches the denominator's "integral energy" semantics; the
 raw series (not delta-M) is measured because delta-M is itself a candidate
 remedy, not the convergence limit being tested.
 
-P3 systematic rule (plan G1; review r2-Minor1 one-line recipe): when the
-3-sigma-counted P3 share participates in a gate comparison (1/3 or 1/4) and
-its distance to that gate is <= 0.05, a full-spectrum low-photon MC control
-run is issued (at most once) and
+P3 systematic rule (plan G1; review r2-Minor1 one-line recipe): whenever the
+3-sigma-counted P3 share is the deciding quantity of a gate comparison
+(1/3 or 1/4) and its distance to that gate is <= 0.05, a full-spectrum
+low-photon MC control run is issued (at most once) and
 
     upper_bound_share = (|ratio_ctl - ratio_P3| + 3*sigma_combined) / (B0-CIE)
     corrected_share   = share_P3 - upper_bound_share
 
-with ``sigma_combined = sqrt(sigma_ctl^2 + sigma_P3^2)``; the corrected share
-participates in that comparison.  If the measured |ratio difference| alone
-exceeds 0.05 in share units, the run flags the 0.05 band as miscalibrated
-(review new-r2-Sug1 adaptive clause) for a progress-recorded amendment
-request.
+with ``sigma_combined = sqrt(sigma_ctl^2 + sigma_P3^2)``; the corrected
+share participates in that comparison.  The band check is applied
+symmetrically at every gate P3 adjudicates (the branch-2 entry test at 1/3
+and the 1/4 boundary classification whenever P3 supplies the argmax).  If
+the measured |ratio difference| alone exceeds 0.05 in share units, the run
+flags the 0.05 band as miscalibrated (review new-r2-Sug1 adaptive clause)
+for a progress-recorded amendment request.
 
 G1 gate (plan Step 1, complete partition):
   branch 1  share_P1 >= 1/3 or share_P2 >= 1/3      -> axis A significant,
@@ -98,27 +123,31 @@ with R = max of the counted shares (P3 counted only when share > 3 sigma;
 an uncounted P3 participates in no comparison).
 
 Run (driver):
-  PYTHONPATH=. uv run python \
-      validation/tools/aureole_attribution/probe_aureole.py [--configs b0,b0c,...]
+  PYTHONPATH=. uv run python validation/tools/aureole_attribution/probe_aureole.py
+Outputs (``probe_results.json`` / ``probe_costs.csv`` / ``probe_profiles.npz``)
+land in ``--out-dir`` (default: this directory).  A rerun OVERWRITES the
+committed 2026-11-11 evidence in the default location -- pass
+``--out-dir <dir>`` for side-by-side runs, or restore with ``git checkout``.
 """
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import tracemalloc
 from pathlib import Path
 
 import numpy as np
 
-# NOTE: ``scratchpad/`` is a symlink to the parent checkout in this worktree,
-# so ``Path(__file__).resolve()`` would silently resolve through it and put
-# the PARENT repo first on sys.path (the whole probe then imports the
-# parent's skycolor).  ``absolute()`` anchors on the cwd without following
-# the symlink.
+# NOTE: ``scratchpad/`` is a symlink to the parent checkout in worktrees, so
+# ``Path(__file__).resolve()`` would silently resolve through it and put the
+# PARENT repo first on sys.path.  ``absolute()`` anchors on the cwd without
+# following the symlink.
 REPO = Path(__file__).absolute().parents[3]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
@@ -147,6 +176,7 @@ T2_BAND = (1.0, 10.0)             # aureole band, deg
 T2_THRESH = 0.20                  # plan pre-registered (review-revisable)
 GATES = (1.0 / 3.0, 0.25)         # plan pre-registered
 BAND = 0.05                       # plan pre-registered P3 systematic band
+MOMENT_TAIL_FROM = 33             # diagnostic: max|beta_l| for l >= 33
 
 
 def log(msg: str) -> None:
@@ -254,12 +284,44 @@ def energy_identity(atmo, n_mu: int, n_moments: int, delta_m: bool) -> float:
     return float(np.max(np.abs(integral - 2.0)))
 
 
+def moment_tail(atmo, n_moments: int, layer: int = 0) -> dict:
+    """Moment-series terminus diagnostic (review r1 Major 2).
+
+    The Mie amplitude is a polynomial of degree <= 2*nmax, so the raw
+    Legendre moments vanish EXACTLY beyond l = 2*nmax; for this mixture the
+    terminus is l=30.  Records how many moments carry content and the tail
+    magnitude above ``MOMENT_TAIL_FROM`` -- the mechanical proof of whether a
+    higher-moment configuration lifts anything at all.
+    """
+    beta = atmo.phase_moments(n_moments)[layer, :, WL550_IDX]
+    nonzero = int(np.count_nonzero(beta))
+    tail_slice = beta[MOMENT_TAIL_FROM - 1:]
+    tail = float(np.max(np.abs(tail_slice))) if tail_slice.size else 0.0
+    terminus = int(nonzero - 1)
+    return {"n_moments": n_moments, "nonzero": nonzero,
+            "terminus_l": terminus,
+            f"max_abs_beta_l{MOMENT_TAIL_FROM - 1}_plus": tail,
+            "beta_last_nonzero": float(beta[terminus])}
+
+
 def aod_invariants(atmo) -> dict:
-    """Layer AOD550 values + the coefficient-integrated column at 550 nm."""
+    """Layer AOD550 values + the coefficient-integrated column at 550 nm.
+
+    The coefficients are per metre and the heights in km, so the column
+    integral is ``trapz(ext, z_km * 1e3)``; the assertion ties it to the
+    layer AOD (review r1 Minor: the old km-integral read 1000x small and
+    silently failed its obvious purpose).
+    """
     lays = [(lay.aerosol.name, float(lay.aod550)) for lay in atmo.aerosols]
     z_fine = np.linspace(0.0, float(atmo.z_bounds[-1]), 4001)
     ext550 = atmo.aerosol_coefficients(z_fine)[0][:, WL550_IDX]
-    return {"layers": lays, "column_550": float(np.trapezoid(ext550, z_fine))}
+    column = float(np.trapezoid(ext550, z_fine * 1e3))   # metres: column AOD
+    layer_aod = float(sum(a for _n, a in lays))
+    ok = abs(column - layer_aod) <= 1e-3 * max(layer_aod, 1e-300)
+    assert ok, (f"AOD550 column invariant failed: column={column} vs "
+                f"layer sum {layer_aod}")
+    return {"layers": lays, "layer_aod_sum": layer_aod,
+            "column_550": column, "column_matches_layers": bool(ok)}
 
 
 # ---------------------------------------------------------------------------
@@ -309,7 +371,8 @@ def run_worker(name: str, args) -> int:
 
     Each worker performs at most two MC transports (pass 1 + instrumented
     pass 2) -- far below the ~4-8-call corruption threshold observed in
-    ``probe_mc_stress.py``.
+    ``mc_repeat_segfault_stress.py``.  The fragment lands in the driver's
+    out-dir (``--fragment-dir``) and is unlinked by the driver after read.
     """
     atmo = C.atmosphere("clear", C.WL_COARSE)
     cut_z, cut_a, zv, idx = build_cut()
@@ -331,7 +394,8 @@ def run_worker(name: str, args) -> int:
     res, wall = timed(fn)
     log(f"--- {name}: worker pass 2 (tracemalloc) ---")
     _res2, wall_i, peak = instrumented(fn)
-    l = lum_of(res.radiance, wl_run)
+    rad = np.asarray(res.radiance, dtype=float)
+    l = lum_of(rad, wl_run)
     ratio = ratio_of(l, idx)
     sig = sigma_ratio_of(np.asarray(res.stderr, dtype=float), wl_run, l, idx)
     info = res.diagnostics
@@ -353,14 +417,14 @@ def run_worker(name: str, args) -> int:
     log(f"{name}: ratio={ratio:.4f} +/- {sig:.4f} (rel stderr max "
         f"{entry['rel_stderr_max']:.3f} / median {entry['rel_stderr_median']:.3f})")
     frag = {"config": name, "entry": entry, "lum": l.tolist(),
-            "wl": wl_run.tolist()}
-    (OUT / f"probe_fragment_{name}.json").write_text(
+            "rad": rad.tolist(), "wl": wl_run.tolist()}
+    (Path(args.fragment_dir) / f"probe_fragment_{name}.json").write_text(
         json.dumps(frag, indent=2, default=str))
     return 0
 
 
 def spawn_worker(name: str, args, attempts: int = 2, mc_quality=None):
-    """Run one MC config in a fresh subprocess; return (entry, lum).
+    """Run one MC config in a fresh subprocess; return (entry, lum, rad).
 
     A worker crash (the residual heap-corruption risk) consumes one attempt;
     a fresh process restarts the corruption budget from zero.  The CTL
@@ -371,14 +435,18 @@ def spawn_worker(name: str, args, attempts: int = 2, mc_quality=None):
     for attempt in range(1, attempts + 1):
         proc = subprocess.run(
             [sys.executable, str(Path(__file__).absolute()), "--worker", name,
-             "--mc-quality", quality, "--seed", str(args.seed)],
+             "--mc-quality", quality, "--seed", str(args.seed),
+             "--fragment-dir", args.fragment_dir],
             env={**os.environ, "PYTHONPATH": str(REPO)},
             capture_output=True, text=True)
-        if proc.returncode == 0:
-            frag = json.loads((OUT / f"probe_fragment_{name}.json").read_text())
+        frag_path = Path(args.fragment_dir) / f"probe_fragment_{name}.json"
+        if proc.returncode == 0 and frag_path.exists():
+            frag = json.loads(frag_path.read_text())
+            frag_path.unlink()          # no stray debris in the evidence dir
             log(f"worker {name}: {frag['entry']['ratio']:.4f} +/- "
                 f"{frag['entry']['sigma_ratio']:.4f}")
-            return frag["entry"], np.asarray(frag["lum"], dtype=float)
+            return (frag["entry"], np.asarray(frag["lum"], dtype=float),
+                    np.asarray(frag["rad"], dtype=float))
         log(f"worker {name} attempt {attempt}/{attempts} FAILED "
             f"(exit {proc.returncode}); stderr tail:\n{proc.stderr[-600:]}")
     raise RuntimeError(f"worker {name} failed after {attempts} attempts")
@@ -396,9 +464,19 @@ def main() -> int:
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--worker", default=None,
                     help="internal: run one MC config in this fresh process")
+    ap.add_argument("--out-dir", default=None,
+                    help="output directory (default: this script's directory; "
+                         "a rerun there overwrites the committed evidence)")
+    ap.add_argument("--fragment-dir", default=None,
+                    help="worker fragment directory (default: out-dir; "
+                         "fragments are unlinked after read)")
     args = ap.parse_args()
+    args.out_dir = Path(args.out_dir).absolute() if args.out_dir else OUT
+    args.fragment_dir = (Path(args.fragment_dir).absolute()
+                         if args.fragment_dir else str(args.out_dir))
     if args.worker:
         return run_worker(args.worker, args)
+    out_dir = args.out_dir
     wanted = [s.strip().lower() for s in args.configs.split(",") if s.strip()]
     # B0 anchor is the precondition of everything downstream (plan Step 1)
     if any(k in wanted for k in ("p1", "p2", "p3", "t1", "ctl")) \
@@ -413,6 +491,7 @@ def main() -> int:
                 wl_subset_stride=SUBSET_STRIDE, near_gamma=list(NEAR_GAMMA),
                 t2_band=list(T2_BAND), t2_threshold=T2_THRESH,
                 band=BAND, gates=list(GATES),
+                moment_tail_from=MOMENT_TAIL_FROM,
                 worker_isolation="MC configs run in fresh subprocesses "
                                  "(heap-corruption containment, see docstring)")
     results = {"meta": meta, "configs": {}, "invariants": {}, "g1": None,
@@ -448,6 +527,7 @@ def main() -> int:
     log(f"CIE sun-side horizon/zenith (h=45): {ratio_cie:.6f}")
 
     lum = {}          # config -> cut luminance vector (npz material)
+    rad_cut = {}      # config -> cut spectral radiance (npz material)
     b0_map = {}       # full-grid B0 map (npz material)
     control = {"corrected": None}   # 0.05-band control-run cache (run once)
 
@@ -481,9 +561,11 @@ def main() -> int:
         log(f"B0 anchor: dev={dev_b0:.6f}% vs results.json {anchor_dev:.6f}% "
             f"(delta {dev_b0 - anchor_dev:+.2e} pp) -> {'OK' if ok else 'FAIL'}")
         if not ok:
-            (OUT / "probe_results.json").write_text(
+            # never overwrite the committed evidence with failed-run data
+            (out_dir / "probe_results_anchorfail.json").write_text(
                 json.dumps(results, indent=2, default=str))
-            log("B0 anchor failed -- probe stops before P1/P2/P3 (plan Step 1)")
+            log("B0 anchor failed -- probe stops before P1/P2/P3 (plan Step 1); "
+                "results written to probe_results_anchorfail.json")
             return 2
 
     # -- deterministic SOS on the cut ---------------------------------------
@@ -491,8 +573,10 @@ def main() -> int:
         res, entry = run_config(name, lambda: solve(
             atmo, SUN_ZEN, cut_z, cut_a, sun_azimuth_deg=0.0,
             approximation=HYBRID_SOS, sos_config=sos_cfg))
-        l = lum_of(res.radiance, C.WL_COARSE)
+        rad = np.asarray(res.radiance, dtype=float)
+        l = lum_of(rad, C.WL_COARSE)
         lum[name] = l
+        rad_cut[name] = rad
         ratio = ratio_of(l, idx)
         eff = res.effective["sos"]
         entry.update(ratio=ratio,
@@ -532,9 +616,10 @@ def main() -> int:
 
     # -- P3: spherical MC in an isolated worker ------------------------------
     if "p3" in wanted:
-        entry, l = spawn_worker("p3", args)
+        entry, l, rad = spawn_worker("p3", args)
         results["configs"]["p3"] = entry
         lum["p3"] = l
+        rad_cut["p3"] = rad
         entry["sigma_share"] = (entry["sigma_ratio"]
                                 / (results["ratio_b0"] - ratio_cie))
         results["ratio_p3"] = entry["ratio"]
@@ -555,6 +640,13 @@ def main() -> int:
             results["invariants"][key] = energy_identity(atmo, n_mu, n_mom, dm)
             log(f"energy identity [{name}]: max|int p dmu - 2| = "
                 f"{results['invariants'][key]:.3e}")
+    # moment-series terminus diagnostics (review r1 Major 2): the proof of
+    # whether each higher-moment configuration lifts any content at all
+    for name, n in (("b0", 32), ("p1", 128), ("t1", 256)):
+        if name in wanted:
+            key = f"moment_tail_{name}"
+            results["invariants"][key] = moment_tail(atmo, n)
+            log(f"moment tail [{name}] (n={n}): {results['invariants'][key]}")
 
     # -- T2 reference data ----------------------------------------------------
     results["t2"] = t2_aureole_residual(atmo)
@@ -563,11 +655,13 @@ def main() -> int:
 
     # -- G1 ------------------------------------------------------------------
     if all(k in results["configs"] for k in ("b0", "p1", "p2", "p3")):
-        g = evaluate_g1(results, args, control, lum, spawn_worker)
-        if g.get("t1_trigger") and "t1" not in results["configs"]:
-            sos_cut("t1", SOSConfig(n_mu=128, n_moments=256))
-            results["invariants"]["energy_identity_t1"] = energy_identity(
-                atmo, 128, 256, True)
+        g = evaluate_g1(results, args, control, lum, rad_cut, spawn_worker)
+        if g.get("t1_trigger"):
+            if "t1" not in results["configs"]:
+                sos_cut("t1", SOSConfig(n_mu=128, n_moments=256))
+                results["invariants"]["energy_identity_t1"] = energy_identity(
+                    atmo, 128, 256, True)
+                results["invariants"]["moment_tail_t1"] = moment_tail(atmo, 256)
             d1 = abs(results["configs"]["t1"]["ratio"]
                      - results["configs"]["p1"]["ratio"])
             thresh = 0.20 * (results["ratio_b0"]
@@ -588,10 +682,12 @@ def main() -> int:
         log(f"G1 branch {g.get('branch')}: {g.get('verdict')}")
 
     # -- outputs --------------------------------------------------------------
-    (OUT / "probe_results.json").write_text(
+    (out_dir / "probe_results.json").write_text(
         json.dumps(results, indent=2, default=str))
 
     npz = {f"{name}_lum": l for name, l in lum.items()}
+    for name, r in rad_cut.items():
+        npz[f"{name}_rad"] = r
     npz["cut_z"] = cut_z
     npz["cut_az"] = cut_a
     npz["cut_gamma"] = gamma_cut
@@ -599,9 +695,9 @@ def main() -> int:
     if "lum" in b0_map:
         npz["b0_map_lum"] = b0_map["lum"]
         npz["b0_map_rel"] = b0_map["rel"]
-    np.savez_compressed(OUT / "probe_profiles.npz", **npz)
+    np.savez_compressed(out_dir / "probe_profiles.npz", **npz)
 
-    with (OUT / "probe_costs.csv").open("w") as fh:
+    with (out_dir / "probe_costs.csv").open("w") as fh:
         fh.write("config,wall_clean_s,wall_instrumented_s,mem_peak_mb\n")
         for name, e in results["configs"].items():
             fh.write(f"{name},{e['wall_s_clean']:.3f},"
@@ -612,11 +708,18 @@ def main() -> int:
     return 0
 
 
-def evaluate_g1(results, args, control, lum, mc_runner):
+def evaluate_g1(results, args, control, lum, rad_cut, mc_runner):
     """Pre-registered G1 partition (plan Step 1; see module docstring).
 
-    ``mc_runner(name, args) -> (entry, lum)`` runs one MC config (the CTL
-    control run) in an isolated worker.
+    The 0.05-band control run applies symmetrically at every gate P3
+    actually adjudicates: the branch-2 entry test at 1/3, and the 1/4
+    boundary classification whenever P3 supplies the argmax (a P3-decided
+    1/4 comparison decides between gray zone and stop-loss, so the
+    uncorrected reading must not classify it -- review r1 Major 1).  The
+    control runs at most once per probe (cached in ``control``).
+
+    ``mc_runner(name, args, mc_quality=None) -> (entry, lum, rad)`` runs one
+    MC config (the CTL control run) in an isolated worker.
     """
     ratio_b0 = results["ratio_b0"]
     ratio_cie = results["ratio_cie"]
@@ -635,13 +738,7 @@ def evaluate_g1(results, args, control, lum, mc_runner):
         f"counted={share['p3_counted']})")
 
     def p3_effective(gate):
-        """P3 share for one gate comparison, with the 0.05-band control run.
-
-        The control runs at most once per probe (cached in ``control``);
-        the trigger is the comparison P3 actually adjudicates.  The control
-        budget is pinned to ``low`` (the plan's full-spectrum low-photon
-        semantics) independently of P3's preset.
-        """
+        """P3 share for one gate comparison, with the 0.05-band control run."""
         if control["corrected"] is not None:
             return control["corrected"], True
         s = share["p3"]
@@ -649,9 +746,10 @@ def evaluate_g1(results, args, control, lum, mc_runner):
             return s, False
         log(f"P3 share {s:.4f} within {BAND} of gate {gate:.4f} -> "
             "control run (full spectrum, low photons, isolated worker)")
-        entry, l = mc_runner("ctl", args, mc_quality="low")
+        entry, l, rad = mc_runner("ctl", args, mc_quality="low")
         results["configs"]["ctl"] = entry
         lum["ctl"] = l
+        rad_cut["ctl"] = rad
         sig_p3 = results["configs"]["p3"]["sigma_ratio"]
         sig_comb = float(np.sqrt(entry["sigma_ratio"] ** 2 + sig_p3 ** 2))
         dev_share = abs(entry["ratio"]
@@ -703,53 +801,59 @@ def evaluate_g1(results, args, control, lum, mc_runner):
     s3_eff, _ = p3_effective(GATES[0])
     if s3_eff >= GATES[0]:
         g["branch"] = 2
-        t2 = results["t2"][128]["t2"]
-        g["t2_gate_value"] = t2
-        if t2 > T2_THRESH:
-            g["verdict"] = ("ambiguous cell -> axis A unresolved at 128 "
-                            "moments -> Step 2, C3-leaning (T2 > 0.20)")
+        g["t2_gate_value"] = t2_gate_value(results, g)
+        if g["t2_gate_value"]["t2"] > T2_THRESH:
+            g["verdict"] = ("ambiguous cell -> axis A unresolved -> "
+                            "Step 2, C3-leaning (T2 > 0.20)")
         else:
             g["t1_trigger"] = True
             g["verdict"] = ("ambiguous cell, T2 <= 0.20 -> T1 confirmation "
                             "point required before the exit verdict")
         return g
 
-    # R = max of counted shares; P3 adjudicates the 1/3 and 1/4 boundaries
+    # R = max of counted shares.  The 1/4 boundary comparison (gray vs
+    # stop-loss): whenever P3 supplies the argmax, P3 adjudicates that
+    # comparison and the 0.05-band rule applies to the 1/4 gate too.
     counted = {"p1": share["p1"], "p2": share["p2"], "p3": s3_eff}
+    if counted["p3"] == max(counted.values()):
+        s3_eff, _ = p3_effective(GATES[1])
+        counted["p3"] = s3_eff
+        if s3_eff >= GATES[0]:
+            # correction only subtracts, so this is unreachable; asserted
+            # rather than silently misrouted
+            raise AssertionError("corrected P3 share crossed 1/3 upward")
     r = max(counted.values())
     g["R"] = r
-    if r >= GATES[0]:            # unreachable unless the correction lifted P3
-        g["branch"] = 3
-        g["verdict"] = "R >= 1/3 after correction -> Step 2 (strong evidence)"
-        return g
-    if abs(r - GATES[0]) <= BAND and counted["p3"] == r:
-        s3_eff, _ = p3_effective(GATES[0])
-        counted["p3"] = s3_eff
-        r = max(counted.values())
-        g["R"] = r
-        if r >= GATES[0]:
-            g["branch"] = 3
-            g["verdict"] = "R >= 1/3 after correction -> Step 2"
-            return g
     if r >= GATES[1]:
         g["branch"] = 3
         g["verdict"] = ("gray zone [1/4, 1/3) -> Step 2 with weak evidence; "
                         "C2/C4 preferred, C3 only if T2 > 0.20")
         return g
-    if abs(r - GATES[1]) <= BAND and counted["p3"] == r:
-        s3_eff, _ = p3_effective(GATES[1])
-        counted["p3"] = s3_eff
-        r = max(counted.values())
-        g["R"] = r
-        if r >= GATES[1]:
-            g["branch"] = 3
-            g["verdict"] = ("gray zone after correction -> Step 2 with weak "
-                            "evidence")
-            return g
     g["branch"] = 4
     g["verdict"] = ("R < 1/4 -> stop-loss: axis B dominant (or the gap is not "
                     "representation-repairable); evidence attached")
     return g
+
+
+def t2_gate_value(results, g):
+    """T2 gate consumption with the non-zero-tail precondition (r1 Major 2).
+
+    With the moment terminus at l=30 the T2 series is degenerate in N; the
+    gate reading is only meaningful when the moment tail above l=32 carries
+    content.  A degenerate tail is recorded and the gate value is flagged.
+    """
+    tail = (results["invariants"].get("moment_tail_p1")
+            or results["invariants"].get("moment_tail_b0"))
+    degenerate = tail is not None and tail["nonzero"] <= MOMENT_TAIL_FROM - 1
+    t2 = results["t2"][128]["t2"]
+    value = {"t2": t2, "tail_degenerate": bool(degenerate)}
+    if degenerate:
+        value["note"] = ("moment series terminates below l=33: T2 is "
+                         "degenerate in N and cannot tie-break axis A "
+                         "unresolvedness; escalation must rely on T1")
+        g["notes"].append(value["note"])
+        log("T2 gate: DEGENERATE (moment tail zero) -- recorded")
+    return value
 
 
 if __name__ == "__main__":

@@ -1,15 +1,16 @@
 """Supplementary stop-loss decomposition: single vs multiple in the ratio.
 
-The pre-registered probe (probe_aureole.py) ruled out the moment
-representation (P1/P2) and the diffuse-transport geometry (P3) as sources of
-the check3 h=45deg horizon/zenith excess.  This script decomposes the B0
-ratio into its deterministic components -- exact spherical single scattering
-alone vs the SOS multiple-scattering field alone -- so the residual
-attribution records WHERE the 8.8 vs CIE 3.65 ratio comes from.  Two
-deterministic SOS calls on the probe's meridian cut; no MC (no isolation
-needed); the sum reproduces the B0c cut total per-view.
+The pre-registered probe (probe_aureole.py in this directory) ruled out the
+moment representation (P1/P2) and the diffuse-transport geometry (P3) as
+sources of the check3 h=45deg horizon/zenith excess.  This script decomposes
+the B0 ratio into its deterministic components -- exact spherical single
+scattering alone vs the SOS multiple-scattering field alone -- so the
+residual attribution records WHERE the 8.8 vs CIE 3.65 ratio comes from.
+Three deterministic SOS calls on the probe's meridian cut (single-only,
+multiple-only, and the total used for the per-view closure check
+``single + multiple == total``); no MC (no worker isolation needed).
 
-Run: PYTHONPATH=<repo root> uv run python scratchpad/task-aureole-delta-fit/probe_decompose.py
+Run: PYTHONPATH=. uv run python validation/tools/aureole_attribution/probe_decompose.py
 """
 from __future__ import annotations
 
