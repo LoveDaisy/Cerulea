@@ -452,11 +452,14 @@ def recheck_check3(workers: int) -> None:
 #: from the archived original scan (sha256-verified against
 #: validation/data/twilight_reference_audit/source_provenance.json).  The
 #: scan's deep rows use the repeated-zero subscript notation
-#: (0.0_2 15 = 0.0015).
+#: (0.0_2 15 = 0.0015).  +5/+3 deg are context rows from the scan (the CSV
+#: starts at 0); the check's reference depths are the non-positive ones.
 KOOMEN_SCAN_MARYLAND_ZENITH = {
     5.0: 43.0, 3.0: 35.0, 0.0: 15.0, -3.0: 2.0, -6.0: 0.06,
     -9.0: 0.0015, -12.0: 0.00012, -15.0: 0.00004,
 }
+#: Depths the check's reference CSV must cover (its scored/fitted range).
+KOOMEN_CSV_REQUIRED_DEPTHS = (0.0, -3.0, -6.0, -9.0, -12.0, -15.0)
 
 
 def recheck_check6(workers: int) -> None:
@@ -470,7 +473,7 @@ def recheck_check6(workers: int) -> None:
     # coverage gate: every scanned depth must exist in the CSV -- a missing
     # row must fail loudly, never silently shrink the "full-depth" claim
     # (learnings: grid-domain checks must assert endpoint coverage).
-    missing = sorted(set(KOOMEN_SCAN_MARYLAND_ZENITH) - set(rows))
+    missing = sorted(set(KOOMEN_CSV_REQUIRED_DEPTHS) - set(rows))
     if missing:
         raise RuntimeError(f"4a: twilight_koomen1952.csv missing depth(s) "
                            f"{missing} -- transcription coverage broken")
