@@ -296,21 +296,35 @@ def recheck_check2(workers: int) -> None:
 
     # AOD scan: what turbidity would the CIE DHI correspond to?
     for h, base in ((30.0, "c2_h30_base"),):
+        dhi_cie = C.cie110_zenith_luminance(
+            h, 2.2) * _cie_integral_factor(90.0 - h, 37, 72)
         print("2c  DHI vs AOD scan (h=30, 37x72, albedo 0.1):")
-        for nm, aod in (("c2_h30_a020", 0.02), ("c2_h30_a035", 0.035),
-                        (base, 0.05), ("c2_h30_a080", 0.08)):
+        scan_pts = [("c2_h30_a020", 0.02), ("c2_h30_a035", 0.035),
+                    (base, 0.05), ("c2_h30_a080", 0.08)]
+        ratios = []
+        for nm, aod in scan_pts:
             s = sky[nm]
-            dhi_cie = C.cie110_zenith_luminance(
-                h, 2.2) * _cie_integral_factor(90.0 - h, 37, 72)
+            ratios.append(s["dhi"] / dhi_cie)
             print(f"    AOD550={aod:.3f}: DHI={s['dhi']/1000:7.3f} klx  "
                   f"vs CIE(T=2.2)={dhi_cie/1000:.3f} klx  "
                   f"ratio={s['dhi']/dhi_cie:.3f}")
         s = sky["c2_h30_a020b0"]
-        dhi_cie = C.cie110_zenith_luminance(
-            h, 2.2) * _cie_integral_factor(90.0 - h, 37, 72)
         print(f"    AOD550=0.020 + albedo 0.0 (both premises 'pure'): "
               f"DHI={s['dhi']/1000:7.3f} klx  ratio={s['dhi']/dhi_cie:.3f}"
               "  [measured combination point]")
+        # AOD* where the model DHI equals the CIE T=2.2 reference: log-linear
+        # extrapolation below the lowest scanned point; the spread between
+        # the four-point fit and the two-point bracket is the extrapolation
+        # uncertainty band quoted in the report.
+        aods = np.array([p[1] for p in scan_pts])
+        lnr = np.log(np.array(ratios))
+        slope4 = float(np.polyfit(aods, lnr, 1)[0])
+        aod_star_4pt = float(aods[2] - lnr[2] / slope4)
+        slope2 = float((lnr[1] - lnr[0]) / (aods[1] - aods[0]))
+        aod_star_2pt = float(aods[0] - lnr[0] / slope2)
+        print(f"2c  AOD* (DHI ratio = 1, log-linear extrapolation): "
+              f"4-point fit -> {aod_star_4pt:.4f}; two-point [0.02,0.035] "
+              f"-> {aod_star_2pt:.4f}  [report quotes this range]")
 
     # model effective Linke turbidity: independent transcription of the
     # Kasten-96 pyrheliometric formula -- constants checked verbatim against
@@ -478,17 +492,20 @@ def recheck_check6(workers: int) -> None:
         raise RuntimeError(f"4a: twilight_koomen1952.csv missing depth(s) "
                            f"{missing} -- transcription coverage broken")
     print("4a  CSV vs original scan (Maryland zenith, cd/ft^2):")
-    ok = True
+    mismatched = []
     n_checked = 0
     for h, scan in sorted(KOOMEN_SCAN_MARYLAND_ZENITH.items(), reverse=True):
         if h not in rows:
             continue
         csvv = float(rows[h]["I_cd_ft2"])
         match = abs(csvv - scan) <= 1e-12 + 1e-9 * abs(scan)
-        ok &= match
         n_checked += 1
         print(f"    h={h:+5.1f}: scan={scan:<10g} csv={csvv:<10g} "
               f"{'OK' if match else 'MISMATCH'}")
+        if not match:
+            # same failure class as a missing row: a changed value must fail
+            # as loudly as missing coverage, never only print
+            mismatched.append(h)
     cd_ft2 = 1.0 / 0.09290304
     print(f"4a  unit chain: 1 cd/ft2 = {cd_ft2:.5f} cd/m2 "
           f"(=1/0.09290304); scan -6 deg 0.06 -> {0.06*cd_ft2:.6f} "
@@ -497,8 +514,10 @@ def recheck_check6(workers: int) -> None:
         mag = -2.5 * math.log10(csvv) + 9.9846
         print(f"4a  Nawar mag conversion h={h:+.0f}: m={mag:.4f} "
               f"(CSV V_mag_arcsec2_source={rows[h]['V_mag_arcsec2_source']})")
-    print(f"4a  full-depth transcription vs original scan: "
-          f"{'ALL MATCH' if ok else 'DIFFERENCES FOUND'} "
+    if mismatched:
+        raise RuntimeError(f"4a: transcription value mismatch at depth(s) "
+                           f"{mismatched} -- CSV no longer matches the scan")
+    print(f"4a  full-depth transcription vs original scan: ALL MATCH "
           f"(checked {n_checked}/{len(KOOMEN_SCAN_MARYLAND_ZENITH)} depths)")
 
     # -- 4c: site vertical transmission ------------------------------------
