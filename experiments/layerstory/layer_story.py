@@ -142,7 +142,7 @@ def _assert_single_ingredient_step(media):
 
 
 def _solves(quick: bool):
-    """The solve inventory: 11 deterministic + 1 MC, in cold-to-warm order.
+    """The solve inventory: 10 deterministic + 1 MC (11 total), cold-to-warm.
 
     Comparison baselines are solved states, per the plan's contrast protocol:
     L2 contrasts L1 (reused), L3 bridges its predecessor's medium at its own
