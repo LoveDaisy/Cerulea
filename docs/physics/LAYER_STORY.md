@@ -29,7 +29,8 @@
   （阴天地板是叙事的一部分）。渲染图地平以下的像素是生产显示行为（穹顶
   采样在地平处的截断外推），不表示地面物理。
 
-总览图（每层一个面板）：
+总览图（八面板：上排 L1 / L2 / L4 反日侧 / L6 云四张渲染，下排 L3 天顶谱与
+L5 三态——single / MC / 平面世界）：
 
 ![layer story overview](../../figures/layer_story_overview.png)
 
@@ -151,7 +152,7 @@ overlay（生产契约：overlay 只与 `hybrid-sos` 组合，观察者必须在
   [STATUS](../STATUS.md) validation snapshot 与
   `validation/results.json`）：Rayleigh 光学深度 vs Bodhaine 通过；
   **直射/漫射照度 vs CIE 110 失败**（DNI +4–6%，DHI +41–46%）；**CIE 相对
-  亮度分布失败**（上空 RMS 10.6%、向日地平 +142%）；**Koomen 暮光失败**
+  亮度分布失败**（上空 RMS 10.5%、向日地平 +141%）；**Koomen 暮光失败**
   （−6° 确定性 0.55×）。也就是说：本阶梯的**谱形与色度叙事**有独立核查，
   **绝对亮度分布**还没有。
 - 统一太阳源的已知偏差（深暮光记录性、dome 5.9–6.6× 等）逐条带实测值与

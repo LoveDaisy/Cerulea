@@ -98,7 +98,7 @@ with np.load('experiments/layerstory/data/layer_story.npz', allow_pickle=False) 
 | 层 | 载体入口 | 结论 | 证据 |
 |---|---|---|---|
 | L1 | solve_dome + plane-sos single-only | 可表达 | 天顶 λ⁻⁴ 斜率 −3.74（420–680 nm 拟合） |
-| L2 | 同上 | 可表达 | AOD 0.05 可见性充分：地平 Lv ×2.6、45° 向日 ×3.8；不需「加浊变体」 |
+| L2 | 同上 | 可表达 | AOD 0.05 可见性充分：地平 Lv ×2.6、45° 向日 ×3.8（Step 0 探针 46×91 默认网格读数；生产 25×37 网格为 ×2.59/×3.92——探针网格在地平附近无 86.25° 节点，两者非严格同一观察量）；不需「加浊变体」 |
 | L3 | rt.solver.solve 天顶行 | 可表达 | Chappuis 带：560–610 nm 比值 0.674（相对无 O₃ 桥接态）；NO₂ 天顶最大相对变化 2.6%（可见、次要，如实声明） |
 | L4 | solve_dome + plane-sos 双阶 | 可表达 | 反太阳侧多次散射占比 24–37%（550 nm） |
 | L5 | solve_dome + spherical-single / spherical-mc | 可表达 | −4° 实跑通过；single 天顶 Lv 4.41、MC 6.08 cd m⁻²（+38% 填充） |
