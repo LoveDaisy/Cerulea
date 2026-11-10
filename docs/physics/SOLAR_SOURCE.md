@@ -204,16 +204,35 @@ them further is a separate user decision.
    failures; raising the budget or deleting the deep points is out of
    scope.
 3. **Availability gate: dome query cost.** Reference-machine measurement
-   after the round-6 rewrite and the gen2-R1 fixes: source cold build
-   9.3-10.0 s (budget 10 s), warm single 81wl single-direction 0.015 s
-   (budget 1 s), MC 3wl x 20k 3.1-3.5x legacy (budget 4x), SOS 0.03x,
-   cold peak RSS 0.34 GiB (budget +0.5 GiB). The standing breach is the
-   standard clear dome: 5.9-6.6x the legacy wall time (budget 3x), i.e.
-   6.6-7.3 s for the 46x91 3-wavelength warm dome vs the legacy 1.12 s.
-   The cost is structural to the per-beam contract (`n_beams` table
-   queries per scattering point) together with the contact-band adaptive
-   disk from the rounds 4-6 accuracy fixes. Accepted as a recorded
-   deviation; for interactive use lower
+   after the round-6 rewrite, the gen2-R1 fixes and the task-dome-kernel
+   vectorization: source cold build 9.3-10.0 s (budget 10 s; the
+   task-dome-kernel record reads 10.06 s, marginally over budget with the
+   build path untouched by that task -- +3% window noise, the same scale
+   as the +8% dome re-measure of the branch point), warm single 81wl
+   single-direction 0.011-0.015 s (budget 1 s), MC 3wl x 20k 2.9-3.5x
+   legacy (budget 4x), SOS 0.03x, cold-block peak RSS 0.34-0.35 GiB
+   (budget +0.5 GiB, unchanged from perf-final) while the warm process
+   peak RSS grows 1.29 -> 1.44 GiB with the vectorized kernel's per-point
+   index intermediates and per-call block scratch.  The standing breach is
+   the standard clear dome: 5.5x the
+   legacy wall time (budget 3x), i.e. 6.1 s for the 46x91 3-wavelength
+   warm dome vs the legacy 1.12 s (6.7x / 7.45 s on the branch point in
+   the same idle window; evidence pair in
+   `validation/data/production_solar_source/perf-dome-kernel.json`).  The
+   per-height query kernel itself is no longer the bottleneck: its
+   row-group Python loop was replaced by a bitwise-equal vectorized core
+   (argsort row groups with C `searchsorted` segment probes, cache-blocked
+   flat coefficient gathers).  What remains is contractual volume, not
+   dispatch overhead: (a) the per-point head/tail work of the broadcast
+   (height x beam) grid -- height dedup, grazing interpolation, angular
+   clipping, and the tail cos/expm1 field transforms -- which the plan's
+   cProfile probe understated because the profiler inflated the old
+   small-call kernel about 2x, and (b) the same gather+Horner arithmetic
+   the row-group implementation performed point for point.  The second
+   tier (aerosol phase kernel, `_geometry_arrays` fusion) was evaluated
+   and rejected for this task: even fully removed it lands near 4x, and
+   it is a different root cause.  Accepted as a recorded deviation; for
+   interactive use lower
    `skycolor.render.sky_dome(n_zenith, n_azimuth)` (default 46/91) -- the
    dome grid, not the image size, dominates this cost.
 4. **Ray-tube referee not built.** Rays whose turning point lands within

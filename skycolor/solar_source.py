@@ -117,6 +117,13 @@ _CAUSTIC_GUARD_DEG = 1e-3
 #: true-elevation span below which an interval is caustic-flat [deg]
 _CAUSTIC_NOISE_DEG = 2e-4
 
+#: query-kernel evaluation block size [points].  The flat gather+Horner pass
+#: runs on chunks of this many lit points: full-batch temporaries
+#: ((4, P, n_species) coefficient gathers) spill the cache and measured
+#: ~30% slower on the dome benchmark; 64k points keep the working set
+#: on-chip while still amortizing the per-block numpy overhead.
+_QUERY_BLOCK = 1 << 16
+
 
 # ---------------------------------------------------------------------------
 # 1. radial field: n(r) and the ray integrals
@@ -669,8 +676,33 @@ class _TableRow:
     """One height row: knots in normalised true-elevation space."""
 
     t: np.ndarray                 # (true - critical) / (90 - critical), ascending
-    direction: np.ndarray         # PCHIP coefficients, (4, n_knot)
-    columns: np.ndarray           # PCHIP coefficients, (4, n_knot, n_species)
+    direction: np.ndarray         # PCHIP coefficients, (4, n_knot - 1) segments
+    columns: np.ndarray           # PCHIP coefficients, (4, n_knot - 1, n_species)
+
+
+@dataclass
+class _FlatRows:
+    """All rows' knots and PCHIP coefficients concatenated, with offsets.
+
+    One flat copy per table so a query can gather every point's coefficient
+    stencil with contiguous first-axis takes instead of looping over row
+    groups (the row-group Python loop dominated wide dome-shaped batches).
+    The arrays are bitwise copies of the row arrays -- concatenation and
+    transpose only move bytes -- and ``knot_base`` / ``coef_base`` locate
+    each row's first knot / segment inside the flat arrays (a row has
+    ``row_len`` knots and ``row_len - 1`` segments, so the two offsets
+    differ).  The coefficient layout puts each segment's four coefficients
+    side by side (``(M, 4[, n_species])``, transposed from the row-major
+    ``(4, M, ...)`` PCHIP layout): a gather then reads whole stencils with
+    one take, which measured ~2.5x faster than gathering a middle axis.
+    """
+
+    t: np.ndarray          # (K_total,) concatenated row knots
+    direction: np.ndarray  # (4, M_total,) per-plane direction coefficients
+    columns: np.ndarray    # (M_total, 4, n_species,) per-segment stencils
+    knot_base: np.ndarray  # (n_rows,) flat offset of each row's first knot
+    coef_base: np.ndarray  # (n_rows,) flat offset of each row's first segment
+    row_len: np.ndarray    # (n_rows,) knots per row
 
 
 def _anchor_extinction(medium, wl_nm: float) -> np.ndarray:
@@ -770,8 +802,12 @@ class PointSourceTable:
             self.build_diagnostics.append(diagnostic)
             if progress:
                 print(f"solar table row h={height:.2f}: {diagnostic}", flush=True)
+        # Rows are READ-ONLY after construction: the flat query cache
+        # (:meth:`_flat_rows`) is materialized once from them and relies on
+        # the row arrays never being mutated afterwards.
         self.rows = rows
         self.critical = np.asarray(criticals)
+        self._flat_rows_cache: _FlatRows | None = None
         self.build_seconds = time.perf_counter() - started
 
     # -- construction ---------------------------------------------------------
@@ -957,17 +993,61 @@ class PointSourceTable:
         return row, critical, diagnostic
 
     # -- queries --------------------------------------------------------------
+    def _flat_rows(self) -> _FlatRows:
+        """Lazily materialize the flattened query arrays (once per table).
+
+        Cheap relative to the build (~ms of concatenation for ~13k knots);
+        like the row arrays themselves the flat copy lives and dies with the
+        table object, whose ownership is the geometry cache's token contract.
+        """
+        if self._flat_rows_cache is None:
+            lens = np.fromiter((row.t.size for row in self.rows), dtype=np.intp,
+                               count=len(self.rows))
+            knot_base = np.zeros(lens.size, dtype=np.intp)
+            np.cumsum(lens[:-1], out=knot_base[1:])
+            coef_base = np.zeros(lens.size, dtype=np.intp)
+            np.cumsum(lens[:-1] - 1, out=coef_base[1:])
+            self._flat_rows_cache = _FlatRows(
+                t=np.concatenate([row.t for row in self.rows]),
+                direction=np.concatenate([row.direction for row in self.rows],
+                                         axis=1),
+                columns=np.concatenate(
+                    [np.ascontiguousarray(row.columns.transpose(1, 0, 2))
+                     for row in self.rows]),
+                knot_base=knot_base, coef_base=coef_base, row_len=lens)
+        return self._flat_rows_cache
+
     @staticmethod
-    def _evaluate_row(row: _TableRow, t):
-        i = np.clip(np.searchsorted(row.t, t, side="right") - 1, 0, len(row.t) - 2)
-        dx = t - row.t[i]
-        c = row.direction[:, i]
-        value = ((c[0] * dx + c[1]) * dx + c[2]) * dx + c[3]
-        derivative = (3 * c[0] * dx + 2 * c[1]) * dx + c[2]
-        c = row.columns[:, i, :]
-        x = dx[:, None]
-        columns = ((c[0] * x + c[1]) * x + c[2]) * x + c[3]
-        return value, derivative, columns
+    def _segment_indices(flat: _FlatRows, row, t):
+        """Per-point in-row segment index, bitwise-equal to the per-row probe.
+
+        For each point, the index ``np.clip(np.searchsorted(its row's knots,
+        t, side="right") - 1, 0, row_len - 2)`` returns.  Points are grouped
+        by row with a stable argsort so each group's probe runs through the
+        C ``searchsorted`` on a zero-copy view of that row's knots inside
+        the flat array -- the exact primitive and comparison semantics of
+        the per-row implementation, hence identical segment selection by
+        construction.  ``row`` indexes the table rows, ``t`` holds the
+        normalised true elevations of the same points.
+        """
+        order = np.argsort(row, kind="stable")
+        sorted_rows = row[order]
+        t_sorted = t[order]
+        knot_base, row_len = flat.knot_base, flat.row_len
+        boundaries = np.flatnonzero(np.diff(sorted_rows)) + 1
+        starts = np.concatenate(([0], boundaries))
+        ends = np.concatenate((boundaries, [row.size]))
+        j_sorted = np.empty(row.size, dtype=np.intp)
+        for s0, e0 in zip(starts, ends):
+            r = int(sorted_rows[s0])
+            n = int(row_len[r])
+            knots = flat.t[knot_base[r]:knot_base[r] + n]
+            j_sorted[s0:e0] = np.clip(
+                np.searchsorted(knots, t_sorted[s0:e0], side="right") - 1,
+                0, n - 2)
+        j = np.empty_like(j_sorted)
+        j[order] = j_sorted
+        return j
 
     def query_fields(self, height_km, true_elevation_deg):
         """Return ``(app_deg, columns, gain_local, lit)`` with broadcasting.
@@ -1019,24 +1099,75 @@ class PointSourceTable:
             value = np.zeros(len(ind))
             derivative = np.zeros(len(ind))
             col = np.zeros((len(ind), len(self.column_scale)))
+            flat = self._flat_rows()
+            t_lit = t[ind]
+            row0 = i[ind]
+            nsp = len(self.column_scale)
+            P = ind.size
+            bs = min(_QUERY_BLOCK, P)
+            # Block scratch lifecycle: allocated ONCE at this size, reused
+            # across both sides and every block, fully overwritten by each
+            # block's take(out=)/ufunc out= before any read of that block.
+            # Slicing to [:b] per block; do not move the allocation inside
+            # the loop or repurpose a buffer mid-block.
+            cc_sten = np.empty((bs, 4, nsp))
+            b_c0, b_c1, b_c2, b_c3 = (np.empty(bs) for _ in range(4))
+            b_val, b_der, b_t = np.empty(bs), np.empty(bs), np.empty(bs)
+            tmp = np.empty((bs, nsp))
+            dir0, dir1, dir2, dir3 = (flat.direction[k] for k in range(4))
+            # Side 0 runs to completion before side 1 and each point sees
+            # exactly one multiply-add per side -- the row-group loop's
+            # per-point floating-point order, bitwise.  Inside a side, one
+            # flat vectorized pass over cache-sized blocks with per-block
+            # scratch reused across blocks (take(out=) / ufunc out=):
+            # allocating the (block, 4, n_species) gathers per block cost
+            # more in page faults than the arithmetic itself.  The Horner
+            # chains keep the row-group implementation's exact operation
+            # sequence; only the grouping of the Python-level work moved.
             for side in (0, 1):
-                rows = i[ind] + side
                 weight = (1 - w[ind]) if side == 0 else w[ind]
-                # contiguous per-row groups via argsort: the boolean-mask
-                # variant cost O(rows x points) and dominated wide queries
-                # (dome-shaped batches span ~all height rows)
-                order = np.argsort(rows, kind="stable")
-                sorted_rows = rows[order]
-                boundaries = np.flatnonzero(np.diff(sorted_rows)) + 1
-                starts = np.concatenate([[0], boundaries])
-                ends = np.concatenate([boundaries, [rows.size]])
-                for s0, e0 in zip(starts, ends):
-                    ids = order[s0:e0]
-                    val, der, cc = self._evaluate_row(self.rows[sorted_rows[s0]],
-                                                      t[ind[ids]])
-                    value[ids] += weight[ids] * val
-                    derivative[ids] += weight[ids] * der
-                    col[ids] += weight[ids, None] * cc
+                row = row0 + side
+                j = self._segment_indices(flat, row, t_lit)
+                cb = flat.coef_base[row] + j
+                dx = t_lit - flat.t[flat.knot_base[row] + j]
+                for s in range(0, P, _QUERY_BLOCK):
+                    e = min(s + _QUERY_BLOCK, P)
+                    b = e - s
+                    cbs = cb[s:e]
+                    dxb = dx[s:e]
+                    # per-plane direction take -> contiguous (b,) buffers
+                    c0 = dir0.take(cbs, out=b_c0[:b])
+                    c1 = dir1.take(cbs, out=b_c1[:b])
+                    c2 = dir2.take(cbs, out=b_c2[:b])
+                    c3 = dir3.take(cbs, out=b_c3[:b])
+                    val = b_val[:b]
+                    np.multiply(c0, dxb, out=val)
+                    np.add(val, c1, out=val)
+                    np.multiply(val, dxb, out=val)
+                    np.add(val, c2, out=val)
+                    np.multiply(val, dxb, out=val)
+                    np.add(val, c3, out=val)
+                    der = b_der[:b]
+                    np.multiply(3.0, c0, out=der)
+                    np.multiply(der, dxb, out=der)
+                    np.multiply(2.0, c1, out=b_t[:b])
+                    np.add(der, b_t[:b], out=der)
+                    np.multiply(der, dxb, out=der)
+                    np.add(der, c2, out=der)
+                    # column stencils: one first-axis take of (b, 4, nsp)
+                    cc = np.take(flat.columns, cbs, axis=0, out=cc_sten[:b])
+                    x = dxb[:, None]
+                    cols_val = tmp[:b]
+                    np.multiply(cc[:, 0], x, out=cols_val)
+                    np.add(cols_val, cc[:, 1], out=cols_val)
+                    np.multiply(cols_val, x, out=cols_val)
+                    np.add(cols_val, cc[:, 2], out=cols_val)
+                    np.multiply(cols_val, x, out=cols_val)
+                    np.add(cols_val, cc[:, 3], out=cols_val)
+                    wb = weight[s:e]
+                    value[s:e] += wb * val
+                    derivative[s:e] += wb * der
+                    col[s:e] += wb[:, None] * cols_val
             app[ind] = lower[ind] + (90.0 - lower[ind]) * value
             # d(app)/d(true) from the same interpolant that produced app.
             slope = (90.0 - lower[ind]) / (90.0 - critical[ind]) * derivative

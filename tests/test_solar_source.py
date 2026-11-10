@@ -511,6 +511,95 @@ def test_scatter_frame_equivariant_and_batch_invariant():
     assert np.array_equal(vm[0], v1) and np.array_equal(vm[1], v2)
 
 
+def test_flat_query_cache_gather_matches_rows(small_source):
+    """The flat query cache is a bitwise copy of the per-row arrays.
+
+    Every row's knot / coefficient block must be recoverable exactly from
+    the flat arrays at the recorded offsets (plan Step 2): the vectorized
+    query core gathers stencils from these arrays, so any drift here would
+    silently change the interpolated field.  Includes vacuum rows (3 knots)
+    and the prefix-sum identities between the two offset families.
+    """
+    _atmo, _geom, table = small_source
+    flat = table._flat_rows()
+    assert table._flat_rows() is flat  # cached identity: built once per table
+    assert flat.t.size == sum(len(r.t) for r in table.rows)
+    assert np.array_equal(
+        flat.coef_base + (flat.row_len - 1),
+        np.concatenate([flat.coef_base[1:], [flat.direction.shape[1]]]))
+    for r, row in enumerate(table.rows):
+        n = row.t.size
+        kb, cb = int(flat.knot_base[r]), int(flat.coef_base[r])
+        assert np.array_equal(flat.t[kb:kb + n], row.t)
+        assert np.array_equal(flat.direction[:, cb:cb + n - 1], row.direction)
+        assert np.array_equal(flat.columns[cb:cb + n - 1].transpose(1, 0, 2),
+                              row.columns)
+
+
+def test_segment_indices_match_searchsorted(small_source):
+    """The grouped segment probe is exactly the per-row searchsorted.
+
+    For every row (vacuum 3-knot rows included), probing the knots
+    themselves, interval midpoints, just-outside values and random draws,
+    the flat-kernel segment index must equal
+    ``clip(searchsorted(row.t, t, 'right') - 1, 0, len-2)`` pointwise --
+    this is the determinism half of the bitwise contract (plan judgement 2;
+    the vectorization keeps the C searchsorted primitive per row group, it
+    does not reimplement the probe).
+    """
+    _atmo, _geom, table = small_source
+    flat = table._flat_rows()
+    rng = np.random.default_rng(42)
+    for r, row in enumerate(table.rows):
+        knots = row.t
+        t = np.concatenate([
+            knots, 0.5 * (knots[:-1] + knots[1:]),
+            [knots[0] - 1e-9, knots[-1] + 1e-9],
+            rng.uniform(knots[0] - 0.05, knots[-1] + 0.05, 200)])
+        rows = np.full(t.size, r, dtype=np.intp)
+        j = PointSourceTable._segment_indices(flat, rows, t)
+        expected = np.clip(np.searchsorted(knots, t, side="right") - 1,
+                           0, knots.size - 2)
+        np.testing.assert_array_equal(j, expected)
+
+
+def test_query_batch_matches_per_point_bitwise(small_source):
+    """Batch queries across row boundaries equal per-point queries bitwise.
+
+    The flat kernel gathers every point's stencil from shared arrays; this
+    pins the gather/bisection against the degenerate single-point path on
+    the nasty grid: exact row heights and row-gap midpoints crossed with
+    each row's critical elevation (+-ulp neighbours, the lit boundary),
+    poles, and a random sweep.  Shadowed points ride along (lit=False).
+    """
+    _atmo, geom, table = small_source
+    field = geom.field
+    rng = np.random.default_rng(7)
+    heights = np.concatenate([
+        table.heights, 0.5 * (table.heights[:-1] + table.heights[1:])])
+    per_h = [np.array([-90.0, 90.0, 0.0])]
+    for h in table.heights:
+        lower = float(field.grazing_apparent_elevation(np.array([h]))[0]) + 1e-6
+        crit = float(field.forward(np.array([h]), np.array([lower + 1e-9]))[0])
+        per_h.append(np.array([crit - 1e-9, crit, crit + 1e-9, crit + 1e-6]))
+    common = rng.uniform(-12.0, 90.0, 300)
+    Z, E = np.meshgrid(heights, np.unique(np.concatenate(per_h + [common])),
+                       indexing="ij")
+    zq, eq = Z.ravel(), E.ravel()
+    app_b, cols_b, gain_b, lit_b = table.query_fields(zq, eq)
+    app_p = np.empty_like(app_b)
+    cols_p = np.empty_like(cols_b)
+    gain_p = np.empty_like(gain_b)
+    lit_p = np.empty_like(lit_b)
+    for k in range(zq.size):
+        app_p[k], cols_p[k], gain_p[k], lit_p[k] = table.query_fields(
+            zq[k], eq[k])
+    assert np.array_equal(app_b, app_p)
+    assert np.array_equal(cols_b, cols_p)
+    assert np.array_equal(gain_b, gain_p)
+    assert np.array_equal(lit_b, lit_p)
+
+
 def test_table_build_independent_of_query_order():
     """Build anchors make the shared table registration-order free.
 
