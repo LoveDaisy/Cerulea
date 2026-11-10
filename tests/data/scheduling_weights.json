@@ -1,5 +1,5 @@
 {
-  "comment": "Measured wall seconds (sum of setup+call+teardown). One scheduling group per module; tests/test_twilight.py is split into per-nodeid groups. Regenerate with tools/make_scheduling_weights.py from a FULL --durations=0 listing. Tests absent from this table are scheduled with the default weight.",
+  "comment": "Measured wall seconds (sum of setup+call+teardown). One scheduling group per light module (listed in `modules`); hot modules (measured total >= 100 s) and tests/test_twilight.py are split into per-nodeid groups (listed in `nodes`). Collected tests absent from this table attach to their module group; a module without any measured entry gets the 5.0 s default weight. Regenerate with tools/make_scheduling_weights.py from a FULL parallel --durations=0 listing.",
   "measured": "2026-11-10 from recert-durations-526.txt: per-test wall seconds under the parallel configuration",
   "modules": {
     "tests/test_aerosol.py": 25.58,

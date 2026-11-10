@@ -249,7 +249,15 @@ individually scheduled nodes, regenerated via
 `tools/make_scheduling_weights.py`, no `@bin` keys). Offline preview
 (`recert-scheduling-assignment.json`): 12 bins at 380.46–380.47 s predicted
 load, max/min ratio 1.00003; `tests/test_validation_harness.py` structural
-tests 24 passed; `--collect-only` still 526, exit 0.
+tests 24 passed; `--collect-only` still 526, exit 0.  Both the listing and
+the table are a **single** parallel sample: entry-level contention noise
+swings by orders of magnitude between samples (e.g. `test_underlit_base_turns_red`
+0.30 s in the 2026-11-08 table vs 18.14 s here; `test_output_shape_matches_solver`
+15.60 → 0.59 s), so the 1.00003 ratio is paper balance — real scheduling
+balance is dominated by this noise, and a median-of-K listing is the natural
+upgrade for the next recertification.  Top modules: `test_twilight.py` 882.4 s
+and `test_simulation_entry.py` 822.6 s, ~38% of the listed total — the
+headline targets for any future split decision.
 
 **Formal pairs — four sequential runs, all 526 passed / exit 0, all over the
 360 s guard: certification not achieved, escalated under the standing
@@ -258,11 +266,11 @@ clause.**
 | pair | runs (outer wall s) | window load (1-min start → end) | logs |
 |---|---|---|---|
 | recert | **425.20 ✗ / 446.86 ✗** | 5.91 → 47.23 (15-min avg 21 → 41) | `recert-pytest-run{1,2}.log` |
-| recert2 (pre-registered single retake) | **376.54 ✗ / 397.04 ✗** | 5.05 → 78.81 (sampler peak 129.3) | `recert2-pytest-run{1,2}.log`, `memory-sample-during-pytest-recert2.log` |
+| recert2 (pre-registered single retake) | **376.54 ✗ / 397.04 ✗** | 5.05 → 78.81 (sampler peak 151.4) | `recert2-pytest-run{1,2}.log`, `memory-sample-during-pytest-recert2.log` |
 
 Measurement-window attribution: the machine hosts concurrent agent sessions
 and every measurement window overlapped a sustained load wave (sampled
-1-minute averages peaked at 129, ≈10.8× the 12-core capacity). pytest's own
+1-minute averages peaked at 151.4, ≈12.6× the 12-core capacity). pytest's own
 CPU accounting (recert2 run1: user+sys 3392.5 s ⇒ ~283 s across 12 cores,
 plus ~40 s startup/collection/report overhead ≈ 320–330 s) suggests an
 idle-machine run might land near or below the line, but no uncontended

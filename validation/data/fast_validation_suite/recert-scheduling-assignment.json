@@ -1,5 +1,6 @@
 {
   "accounting": {
+    "default_group_semantics": "the 94 unlisted tests in hot modules do NOT add 94 x 5.0 s: tests/scheduling.group_weights collapses them to one default group per module key (15 x 5.0 s here), already included in group_weight_sum_s = 4565.53",
     "default_module_groups_5s": 15,
     "group_weight_sum_s": 4565.53,
     "listed_nodeids": 213,
@@ -554,6 +555,6 @@
   "n_groups": 235,
   "n_nodeids": 526,
   "n_workers": 12,
-  "predicted_wall_note": "bin load is the sum of per-test walls measured under the STALE 436-population schedule; task-12 history (218.4 s predicted -> 257.4 s wall incl. overhead) shows the measurement-to-run transfer is not 1:1. Formal pair decides, no prediction claimed.",
+  "predicted_wall_note": "bin load is the sum of per-test walls measured under the STALE 436-population schedule; task-12 history (218.4 s predicted -> 257.4 s wall incl. overhead) shows the measurement-to-run transfer is not 1:1. Entry-level weights are a SINGLE parallel sample with order-of-magnitude contention noise (e.g. 0.30 s vs 18.14 s for the same test across the 2026-11-08 and 2026-11-10 samples), so bin loads are paper balance only. Formal pair decides, no prediction claimed.",
   "source": "tests/data/scheduling_weights.json regenerated 2026-11-10 from recert-durations-526.txt (526-population parallel measurement, 4490.5 s table total)"
 }

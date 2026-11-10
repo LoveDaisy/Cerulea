@@ -56,6 +56,19 @@ def _raw_nodeid(nodeid):
 NODE_SPLIT_THRESHOLD_S = 100.0
 ALWAYS_SPLIT = {"tests/test_twilight.py"}
 
+#: Self-description written into the table's ``comment`` field.  Owned here
+#: (not inherited from the previous table) so the described policy cannot
+#: drift from the policy this tool actually implements.
+TABLE_COMMENT = (
+    "Measured wall seconds (sum of setup+call+teardown). One scheduling group "
+    "per light module (listed in `modules`); hot modules (measured total >= "
+    "100 s) and tests/test_twilight.py are split into per-nodeid groups "
+    "(listed in `nodes`). Collected tests absent from this table attach to "
+    "their module group; a module without any measured entry gets the 5.0 s "
+    "default weight. Regenerate with tools/make_scheduling_weights.py from a "
+    "FULL parallel --durations=0 listing."
+)
+
 
 def parse_durations(text):
     """``--durations=0`` listing -> {nodeid: total seconds}.
@@ -111,9 +124,8 @@ def main():
     if not totals:
         raise SystemExit("no durations lines found in the input")
     modules, nodes = build(totals)
-    old = json.loads(WEIGHTS_PATH.read_text())
     payload = {
-        "comment": old.get("comment", ""),
+        "comment": TABLE_COMMENT,
         "measured": (
             f"{datetime.date.today().isoformat()} from {pathlib.Path(sys.argv[1]).name}: "
             f"per-test wall seconds under the parallel configuration"

@@ -88,7 +88,7 @@
   },
   "n_collected": 526,
   "n_nodeids_parsed": 319,
-  "note_missing": "pytest hides phases below 5 ms from --durations; nodeids absent here weigh ~0 and get the scheduling default when absent from the listing-derived table",
+  "note_missing": "pytest hides phases below 5 ms from --durations; absent nodeids are the sub-5ms fast bucket. They do NOT get a per-test default weight: per tests/scheduling.group_weights a collected test absent from the table attaches to its module group, and only a module with no measured entry gets one 5.0 s default group",
   "parser": "tools/make_scheduling_weights.parse_durations",
   "per_nodeid": {
     "tests/test_aerosol.py::test_aerosol_delta_m_matches_standalone": 1.69,
