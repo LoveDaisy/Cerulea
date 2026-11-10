@@ -169,10 +169,11 @@ below 1 ms.  Ten saved output arrays were bit-identical; the milestone's
 full test run passed.  Peak RSS rose from 171 to 194 MiB.  These are historical
 measurements, not timing requirements for every machine.
 
-*Limits:* cold Mie construction was unchanged by M11 itself (batch
-vectorisation landed later in task-cold-optics: the dusty moment build fell
-from about 40 s to under 0.2 s and cold dusty `delta_m(32)` from 39.4 s to
-about 3 s).  A 401-wavelength grid exceeds the 256-state capacity.
+*Limits:* cold Mie construction was unchanged by M11 itself; batch
+vectorisation landed later in task-cold-optics, bringing cold dusty
+`delta_m(32)` from 39.4 s to about 3.1 s (the figure AGENTS.md and
+`validation/FAST_SUITE.md` record).  A 401-wavelength grid exceeds the
+256-state capacity.
 Refraction-table interpolation was measured at sub-millisecond cost for the
 single-scattering query size, so the proposed interpolation rewrite was
 withdrawn.  No reduction in the default moment order was used.

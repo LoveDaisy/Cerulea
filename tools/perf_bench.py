@@ -12,9 +12,11 @@ Scenarios (81-wavelength working grid, ``skycolor.constants.WL_COARSE``):
 
 1. warm ``single`` sky_radiance, clear preset, one viewing direction; the
    cold call is acceptance-relevant for the batched Mie kernels since
-   task-cold-optics (cold dusty ``delta_m(32)`` is the headline number,
-   >= 10x over the task's Step-1 baseline; the clear-scene cold call is
-   dominated by the out-of-scope solar-source table construction);
+   task-cold-optics: the headline gate is cold dusty ``delta_m(32)`` at
+   >= 10x over that task's Step-1 baseline (measured 39.4 -> 3.1 s, ~13x,
+   as recorded in AGENTS.md and ``validation/FAST_SUITE.md``; the
+   clear-scene cold call is dominated by the out-of-scope solar-source
+   table construction);
 2. the second ``Atmosphere.delta_m_properties(32)`` on the *same* clear
    atmosphere -- with per-wavelength states and cached moments this
    should be nearly free;
