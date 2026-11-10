@@ -511,6 +511,30 @@ def test_scatter_frame_equivariant_and_batch_invariant():
     assert np.array_equal(vm[0], v1) and np.array_equal(vm[1], v2)
 
 
+def test_flat_rows_gather_matches_rows(small_source):
+    """The flat query cache is a bitwise copy of the per-row arrays.
+
+    Every row's knot / coefficient block must be recoverable exactly from
+    the flat arrays at the recorded offsets (plan Step 2): the vectorized
+    query core gathers stencils from these arrays, so any drift here would
+    silently change the interpolated field.  Includes vacuum rows (3 knots)
+    and the prefix-sum identities between the two offset families.
+    """
+    _atmo, _geom, table = small_source
+    flat = table.flat_rows()
+    assert table.flat_rows() is flat  # cached identity: built once per table
+    assert flat.t.size == sum(len(r.t) for r in table.rows)
+    assert np.array_equal(
+        flat.coef_base + (flat.row_len - 1),
+        np.concatenate([flat.coef_base[1:], [flat.direction.shape[1]]]))
+    for r, row in enumerate(table.rows):
+        n = row.t.size
+        kb, cb = int(flat.knot_base[r]), int(flat.coef_base[r])
+        assert np.array_equal(flat.t[kb:kb + n], row.t)
+        assert np.array_equal(flat.direction[:, cb:cb + n - 1], row.direction)
+        assert np.array_equal(flat.columns[:, cb:cb + n - 1, :], row.columns)
+
+
 def test_table_build_independent_of_query_order():
     """Build anchors make the shared table registration-order free.
 

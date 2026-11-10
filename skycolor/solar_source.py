@@ -673,6 +673,27 @@ class _TableRow:
     columns: np.ndarray           # PCHIP coefficients, (4, n_knot, n_species)
 
 
+@dataclass
+class _FlatRows:
+    """All rows' knots and PCHIP coefficients concatenated, with offsets.
+
+    One flat copy per table so a query can gather every point's coefficient
+    stencil in a single vectorized pass instead of looping over row groups
+    (the row-group Python loop dominated wide dome-shaped batches).  The
+    arrays are bitwise copies of the row arrays -- ``np.concatenate`` never
+    re-rounds -- and ``knot_base`` / ``coef_base`` locate each row's first
+    knot / segment inside the flat arrays (a row has ``row_len`` knots and
+    ``row_len - 1`` segments, so the two offsets differ).
+    """
+
+    t: np.ndarray          # (K_total,) concatenated row knots
+    direction: np.ndarray  # (4, M_total,) concatenated direction coefficients
+    columns: np.ndarray    # (4, M_total, n_species,) concatenated column coefficients
+    knot_base: np.ndarray  # (n_rows,) flat offset of each row's first knot
+    coef_base: np.ndarray  # (n_rows,) flat offset of each row's first segment
+    row_len: np.ndarray    # (n_rows,) knots per row
+
+
 def _anchor_extinction(medium, wl_nm: float) -> np.ndarray:
     """Species extinction evaluated at one fixed anchor wavelength.
 
@@ -770,8 +791,12 @@ class PointSourceTable:
             self.build_diagnostics.append(diagnostic)
             if progress:
                 print(f"solar table row h={height:.2f}: {diagnostic}", flush=True)
+        # Rows are READ-ONLY after construction: the flat query cache
+        # (:meth:`flat_rows`) is materialized once from them and relies on
+        # the row arrays never being mutated afterwards.
         self.rows = rows
         self.critical = np.asarray(criticals)
+        self._flat_rows_cache: _FlatRows | None = None
         self.build_seconds = time.perf_counter() - started
 
     # -- construction ---------------------------------------------------------
@@ -957,6 +982,29 @@ class PointSourceTable:
         return row, critical, diagnostic
 
     # -- queries --------------------------------------------------------------
+    def flat_rows(self) -> _FlatRows:
+        """Lazily materialize the flattened query arrays (once per table).
+
+        Cheap relative to the build (~ms of concatenation for ~13k knots);
+        like the row arrays themselves the flat copy lives and dies with the
+        table object, whose ownership is the geometry cache's token contract.
+        """
+        if self._flat_rows_cache is None:
+            lens = np.fromiter((row.t.size for row in self.rows), dtype=np.intp,
+                               count=len(self.rows))
+            knot_base = np.zeros(lens.size, dtype=np.intp)
+            np.cumsum(lens[:-1], out=knot_base[1:])
+            coef_base = np.zeros(lens.size, dtype=np.intp)
+            np.cumsum(lens[:-1] - 1, out=coef_base[1:])
+            self._flat_rows_cache = _FlatRows(
+                t=np.concatenate([row.t for row in self.rows]),
+                direction=np.concatenate([row.direction for row in self.rows],
+                                         axis=1),
+                columns=np.concatenate([row.columns for row in self.rows],
+                                       axis=1),
+                knot_base=knot_base, coef_base=coef_base, row_len=lens)
+        return self._flat_rows_cache
+
     @staticmethod
     def _evaluate_row(row: _TableRow, t):
         i = np.clip(np.searchsorted(row.t, t, side="right") - 1, 0, len(row.t) - 2)
