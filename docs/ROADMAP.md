@@ -169,9 +169,10 @@ below 1 ms.  Ten saved output arrays were bit-identical; the milestone's
 full test run passed.  Peak RSS rose from 171 to 194 MiB.  These are historical
 measurements, not timing requirements for every machine.
 
-*Limits:* cold Mie construction was unchanged; the dusty moment build still
-cost about 40 s and a full cold dusty one-direction solve about 178 s in the
-recorded workloads.  A 401-wavelength grid exceeds the 256-state capacity.
+*Limits:* cold Mie construction was unchanged by M11 itself (batch
+vectorisation landed later in task-cold-optics: the dusty moment build fell
+from about 40 s to under 0.2 s and cold dusty `delta_m(32)` from 39.4 s to
+about 3 s).  A 401-wavelength grid exceeds the 256-state capacity.
 Refraction-table interpolation was measured at sub-millisecond cost for the
 single-scattering query size, so the proposed interpolation rewrite was
 withdrawn.  No reduction in the default moment order was used.
@@ -405,9 +406,11 @@ session handoffs are not a substitute for this record.
    of two; a measured clear-sky spectral/luminance scan is needed to distinguish
    model and reference error. Mie/delta-M are present, but 32-moment aureole
    resolution and delta-fit remain open.
-5. **Runtime to a reliable result.** M11 removed repeated optical work. Cold
-   Mie construction and rare-path MC variance are separate remaining costs;
-   profile them separately and judge changes by time to a stable estimate.
+5. **Runtime to a reliable result.** M11 removed repeated optical work and
+   task-cold-optics batch-vectorised the cold Mie build (cold dusty
+   `delta_m(32)` 39.4 s -> ~3 s, coefficient kernels bitwise, moment/table
+   kernels within declared ulp-level tolerances).  Rare-path MC variance
+   remains a separate cost; judge changes by time to a stable estimate.
 
 ---
 
@@ -447,9 +450,11 @@ tractable; a cumulus field is not.
 
 ### D. Faster cold optics and twilight transport
 
-For cold dusty scenes, Mie tables and moments dominate; warm/repeat optical
-work is largely cached (M11).  Vectorised kernels or validated lookup tables
-target that startup cost.  Deep-twilight MC has a different bottleneck: rare
+Cold dusty Mie construction is vectorised (task-cold-optics, 2026-11-10):
+batched coefficient/moment/table kernels, bitwise coefficients, ulp-level
+declared tolerances for moments and tables.  Remaining headroom lives in the
+phase-table kernel (still per-wavelength) and in a LPT-weight regression for
+the suite.  Deep-twilight MC has a different bottleneck: rare
 light-carrying paths and high variance.  Better estimators, wavelength reuse
 or GPU transport should be judged on time to a stable estimate.  A faster SOS
 alone would not remove either bottleneck; profile each intended workload

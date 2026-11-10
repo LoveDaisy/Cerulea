@@ -107,6 +107,9 @@ These backends have not replaced production defaults.
   a better fit does not identify missing scattering or calibration error.
 - Horizon luminance and the 32-moment aureole remain unresolved; delta-fit,
   polarisation, structured clouds and ice-crystal halos are absent.
-- M11 removed repeated Mie work through shared optics and a 256-state cache.
-  Cold dusty optics still need optimisation; [M11 measurements](ROADMAP.md#m11--mie-working-set-caching-and-shared-preset-optics-2026-10-31)
-  and `tools/perf_bench.py` separate startup from warm calls.
+- M11 removed repeated Mie work through shared optics and a 256-state cache;
+  task-cold-optics then batch-vectorised the cold build itself (bitwise
+  coefficient kernels, ulp-level declared-tolerance moment/table kernels).
+  Cold dusty `delta_m(32)` fell from 39.4 s to about 3 s; see
+  [M11 measurements](ROADMAP.md#m11--mie-working-set-caching-and-shared-preset-optics-2026-10-31)
+  and `tools/perf_bench.py`, which separates startup from warm calls.

@@ -11,8 +11,10 @@ handoff 2026-10-30 §3.6), not here.
 Scenarios (81-wavelength working grid, ``skycolor.constants.WL_COARSE``):
 
 1. warm ``single`` sky_radiance, clear preset, one viewing direction; the
-   first, cold call is printed for context but is *not* an acceptance
-   number (cold Mie builds need vectorisation/LUT, a separate effort);
+   cold call is acceptance-relevant for the batched Mie kernels since
+   task-cold-optics (cold dusty ``delta_m(32)`` is the headline number,
+   >= 10x over the task's Step-1 baseline; the clear-scene cold call is
+   dominated by the out-of-scope solar-source table construction);
 2. the second ``Atmosphere.delta_m_properties(32)`` on the *same* clear
    atmosphere -- with per-wavelength states and cached moments this
    should be nearly free;

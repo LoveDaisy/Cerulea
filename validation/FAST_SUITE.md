@@ -293,3 +293,18 @@ Freeze tags created (local only; pushing is an owner action):
 `freeze/cssp-inputs-5ac0c74` → 5ac0c74,
 `freeze/deep-twilight-dda8673` → dda8673,
 `freeze/task7-exec-2756b2f` → 2756b2f.
+## Later tree: cold-optics batch kernels (2026-11-10)
+
+Task-cold-optics added six default-collected tests (`tests/test_mie_batch.py`,
+anchor/binary-equivalence for the batched Mie kernels) and regenerated the
+scheduling weights from a parallel `--durations=0` run on the changed tree
+(`scratchpad/task-cold-optics/durations_parallel3.log`, 3918.7 s total over
+8 module groups + 195 individual nodes).  Formal pair on the green tree:
+
+| entry | result | verdict |
+|---|---|---|
+| `uv run pytest --collect-only -q` | 533 collected | +6 vs the 526-test tree above |
+| `uv run pytest -q` (formal pair) | **533 passed, 368.76 / 370.86 s** (`formal_run{1,2}.log`, real 368.94 / 371.06) | green, **over the 360 s guard**: the pre-task tree already sat at 364.54 s (escalated), per-test cost is unchanged (0.69 s/test both trees); the delta is the added tests' own work. Standing escalation clause applies, owned together with the suite-recert task |
+
+Performance context for the same task: cold dusty `delta_m(32)` 39.4 -> 3.1 s
+(`scratchpad/task-cold-optics/bench_{baseline,after}.log`).
