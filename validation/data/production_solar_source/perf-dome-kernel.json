@@ -1,0 +1,72 @@
+{
+  "git_head": "792254f079faffd868615a55360b700806981b12",
+  "machine": {
+    "python": "3.12.11",
+    "numpy": "2.5.4"
+  },
+  "baseline": {
+    "mie_build_81wl_cold_s": 0.000382833881303668,
+    "source_table_build_3wl_s": 10.05925816600211,
+    "single_3wl_1view_warm_s": 0.0031684578862041235,
+    "single_81wl_1view_warm_s": 0.010810083942487836,
+    "sos_3wl_warm_s": 0.0785935411695391,
+    "mc_3wl_20k_warm_s": 0.2092447078321129,
+    "single_3wl_dome46x91_warm_s": 6.105680542066693,
+    "refraction_tables_cold_s": 2.3455317500047386
+  },
+  "gate": {
+    "passed": false,
+    "rows": {
+      "cold_source_build_s": {
+        "value": 10.05925816600211,
+        "budget": 10.0
+      },
+      "single_81wl_1view_warm_s": {
+        "value": 0.010810083942487836,
+        "budget": 1.0
+      },
+      "mc_3wl_20k_warm_s_ratio": {
+        "value": 2.8702977754748,
+        "budget": 4.0,
+        "legacy": 0.0729
+      },
+      "sos_3wl_warm_s_ratio": {
+        "value": 0.03127852157819839,
+        "budget": 4.0,
+        "legacy": 2.5127
+      },
+      "single_3wl_dome46x91_warm_s_ratio": {
+        "value": 5.45539719627117,
+        "budget": 3.0,
+        "legacy": 1.1192
+      }
+    }
+  },
+  "peak_rss_gib": 1.4375,
+  "provenance": {
+    "task": "task-dome-kernel",
+    "what_changed": "query kernel vectorization: row-group Python loop -> argsort row groups + per-group C searchsorted segment indices + 64k-block flat take(out=)/out= Horner evaluation; bitwise-identical outputs (2.11M-point migration reference + golden)",
+    "measurement": "clear preset, 3 wavelengths (450/550/650), sun elevation 30 deg, 46x91 dome grid, chunk=512, warm (--skip-cold); single machine, single script (tools/benchmark_solar_source.py)",
+    "window": "idle window, loadavg 1min < 8 (earlier loaded-window runs at loadavg ~150-190 were discarded: dome ratio measured 5.9-11.0x there and is machine-load-contaminated, not code)",
+    "pair": {
+      "before": {
+        "git_head": "286486e3a380bd810ac347aa1b53cc3963b504d8",
+        "single_3wl_dome46x91_warm_s": 7.446184040978551,
+        "dome_ratio_vs_legacy": 6.653130844333945
+      },
+      "after": {
+        "git_head": "792254f079faffd868615a55360b700806981b12",
+        "single_3wl_dome46x91_warm_s": 6.105680542066693,
+        "dome_ratio_vs_legacy": 5.45539719627117
+      },
+      "delta_dome": "-18%"
+    },
+    "baseline_record": {
+      "file": "perf-final.json",
+      "git_head": "fae5238981aeaaad65f33541588d601ed90c4285",
+      "dome_ratio": 5.93471765555468,
+      "note": "task-production-solar-source acceptance record (legacy anchor 1.1192 s, budget 3x); kept unchanged, not overwritten"
+    },
+    "verdict": "gate still breached (5.46x vs 3x budget); residual attributed in docs/physics/SOLAR_SOURCE.md item 3 and task-dome-kernel SUMMARY"
+  }
+}
