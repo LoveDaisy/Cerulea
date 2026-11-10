@@ -33,6 +33,11 @@ THEME = Path(__file__).resolve().parent
 #: the working spectral grid (380-780 nm, 5 nm), same as the other themes
 WL = WL_COARSE
 
+#: the clean-continental aerosol load every rung from L2 on shares
+AOD_CLEAR = 0.05
+#: its exponential boundary-layer scale height [km]
+HAZE_SCALE_H_KM = 1.5
+
 #: Mid-latitude stratospheric NO2 column [m^-2] (4e15 cm^-2, mid-range of the
 #: literature-typical 2-6e15 cm^-2).  The built-in profile *shape* is scaled
 #: to this column; the shape's own natural column (~3e16 cm^-2) is an order
@@ -77,8 +82,9 @@ DISPLAY_GROUPS = {"day": DISPLAY_DAY, "twilight": DISPLAY_TWILIGHT,
                   "cloud": DISPLAY_CLOUD}
 
 
-def _hinterland(aod: float) -> AerosolLayer:
-    return AerosolLayer(shared(HinterlandAerosol), aod, ExponentialProfile(1.5))
+def _hinterland(aod: float = AOD_CLEAR) -> AerosolLayer:
+    return AerosolLayer(shared(HinterlandAerosol), aod,
+                        ExponentialProfile(HAZE_SCALE_H_KM))
 
 
 def build_media():
@@ -91,20 +97,48 @@ def build_media():
     """
     return {
         "l1": presets.pristine(WL, ozone_du=0.0),
-        "l2": presets.clear(WL, aod=0.05, ozone_du=0.0),
+        "l2": presets.clear(WL, aod=AOD_CLEAR, ozone_du=0.0),
         "l3": Atmosphere(WL, ozone_du=300.0, no2_column=NO2_COLUMN,
-                         aerosols=[_hinterland(0.05)]),
+                         aerosols=[_hinterland()]),
     }
 
 
 MEDIA_DESC = {
     "l1": "pristine: Rayleigh only, ozone_du=0, no2_column=0, aerosols=(), "
           "albedo=0.1, sea-level observer, refraction=True",
-    "l2": "clear family minus ozone: HinterlandAerosol AOD550=0.05, "
-          "exponential H=1.5 km, ozone_du=0, no2_column=0, albedo=0.1",
-    "l3": f"HinterlandAerosol AOD550=0.05 (H=1.5 km), ozone_du=300, "
-          f"no2_column={NO2_COLUMN:.3e} m^-2 (4e15 cm^-2), albedo=0.1",
+    "l2": f"clear family minus ozone: HinterlandAerosol AOD550={AOD_CLEAR}, "
+          f"exponential H={HAZE_SCALE_H_KM} km, ozone_du=0, no2_column=0, "
+          "albedo=0.1",
+    "l3": f"HinterlandAerosol AOD550={AOD_CLEAR} (H={HAZE_SCALE_H_KM} km), "
+          f"ozone_du=300, no2_column={NO2_COLUMN:.3e} m^-2 (4e15 cm^-2), "
+          "albedo=0.1",
 }
+
+
+def _assert_single_ingredient_step(media):
+    """Mechanism evidence for the ladder narrative (review code-r1 Minor).
+
+    The whole story rests on "L3 = L2 plus exactly {O3, NO2}"; presets build
+    L2 while L3 is hand-constructed, so this is asserted from the objects
+    instead of trusted from the constructor calls.
+    """
+    l2, l3 = media["l2"], media["l3"]
+    np.testing.assert_array_equal(l2.ground_albedo, l3.ground_albedo)
+    for attr in ("elevation_km", "refraction", "surface_pressure"):
+        assert getattr(l2, attr) == getattr(l3, attr), attr
+    assert l2.ozone_du == 0.0 and l3.ozone_du == 300.0
+    assert l2.no2_column == 0.0 and l3.no2_column == NO2_COLUMN
+    assert len(l2.aerosols) == len(l3.aerosols) == 1
+    a2, a3 = l2.aerosols[0], l3.aerosols[0]
+    assert a2.aerosol is a3.aerosol, "the shared member object must be reused"
+    assert a2.aod550 == a3.aod550
+    assert vars(a2.profile) == vars(a3.profile)
+    assert vars(a2.horizontal) == vars(a3.horizontal)
+    return ("L3 = L2 + {O3, NO2} verified by object readback: equal albedo "
+            "array, elevation/refraction/pressure, the same shared aerosol "
+            f"object at AOD550={a3.aod550} with identical profile/horizontal "
+            "parameters; only the gas columns differ (0 -> 300 DU, "
+            f"0 -> {NO2_COLUMN:.3e} m^-2)")
 
 
 def _solves(quick: bool):
@@ -192,11 +226,14 @@ def display_kwargs(spec):
 def compute(quick=False):
     """Run the ladder once, for real.  Every rung really calls production."""
     media = build_media()
+    step_evidence = _assert_single_ingredient_step(media)
+    print(f"medium step check: {step_evidence}", flush=True)
     deck = cloud.stratus()  # tau550=20, base 0.5 km, top 1.5 km; observer below
     version = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     data = dict(
         wl=np.asarray(WL), runs=[], quick=np.asarray(bool(quick)),
         version=version,
+        medium_step_check=np.asarray(step_evidence),
         config=repr(dict(day_grid=DAY_GRID, twilight_grid=TWILIGHT_GRID,
                          cloud_grid=CLOUD_GRID, mc_grid=MC_GRID,
                          no2_column=NO2_COLUMN,
@@ -234,6 +271,7 @@ def compute(quick=False):
         data[f"{key}/elevation"] = spec["elevation"]
         data[f"{key}/medium"] = spec["medium"]
         data[f"{key}/approximation"] = spec["approximation"]
+        data[f"{key}/method"] = res.method
         data[f"{key}/zenith"] = zenith
         data[f"{key}/azimuth_rel"] = azimuth
         data[f"{key}/view_zenith"] = np.repeat(zenith, azimuth.size)
@@ -310,7 +348,11 @@ def check(data):
 
 def bind(data, key, part="total"):
     """Bind saved spectra with the production carrier, with no new solve."""
-    res = SkyResult(radiance=data[f"{key}/{part}"], wl=data["wl"], method="clear")
+    # the run's own legacy method tag rides along so the rebound presentation
+    # stays faithful to the first solve (older archives without the key fall
+    # back to "clear" -- display behaviour is identical either way)
+    method = str(data[f"{key}/method"]) if f"{key}/method" in data else "clear"
+    res = SkyResult(radiance=data[f"{key}/{part}"], wl=data["wl"], method=method)
     kwargs = {}
     if f"{key}/ground_supported" in data and bool(data[f"{key}/ground_supported"]):
         kwargs = dict(ground_supported=True,
@@ -339,7 +381,15 @@ def write_tables(data, directory):
         for key in data["runs"]:
             key = str(key)
             zen, az = data[f"{key}/zenith"], data[f"{key}/azimuth_rel"]
-            for name, z, a in DIRECTIONS:
+            if az.size == 1:
+                # spectral-row solves: report only the actually solved
+                # directions -- five DIRECTIONS labels would silently alias
+                # the zenith row and break cross-run direction comparisons
+                dirs = tuple((f"solved-view-{i}", float(zz), float(aa))
+                             for i, (zz, aa) in enumerate(zip(zen, az)))
+            else:
+                dirs = DIRECTIONS
+            for name, z, a in dirs:
                 i = int(np.argmin(np.abs(zen - z)))
                 j = int(np.argmin(np.abs(az - a)))
                 row = i * len(az) + j

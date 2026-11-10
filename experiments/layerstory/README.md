@@ -6,7 +6,7 @@
 [生产图录](../../figures/README.md)。
 
 ```bash
-# 默认：全阶梯 12 次生产 solve（11 确定性 + 1 MC），只写本主题 out/ 和 figures/（不进 Git）
+# 默认：全阶梯 11 次生产 solve（10 确定性 + 1 MC），只写本主题 out/ 和 figures/（不进 Git）
 uv run python -m experiments.layerstory.layer_story
 # 缩格冒烟（同一 solve 清单，几何缩格）
 uv run python -m experiments.layerstory.layer_story --quick
@@ -105,6 +105,12 @@ with np.load('experiments/layerstory/data/layer_story.npz', allow_pickle=False) 
 | L5 对照 | solve_dome + plane-sos @−4° | 可表达（采纳） | plane 族**不拒绝**负太阳角且物理可判读：连续柱透射让高层在地平下仍被「照亮」。天顶量级与球面几乎相同（550 nm 5.887×10⁻⁵ vs 5.870×10⁻⁵，×1.003——单点量级可「碰对」），但角向结构全错：严格地平（90° 天顶节点）平面世界精确为零，而球面 single 同方向保留 2.70×10⁻⁵（向日侧）——没有地影、没有暮光弧 |
 | L6 | solve_dome + hybrid-sos ± cloud_layer | 可表达 | 契约匹配对跑通；云下天顶 ×4.7、谱平坦度 0.068（近白）；观察者低于云底成立 |
 | L7 | — | 无新计算 | 引用既有 validation 证据（阶梯文档） |
+
+介质步进核查（对象回读断言，`compute()` 每次运行执行）：L3 = L2 + {O₃, NO₂}
+逐项成立——albedo 数组、观察者高度、折射开关、地面气压相等；两者复用同一个
+共享 Hinterland 气溶胶对象（AOD550=0.05，廓线与水平场参数逐项相等）；仅气体
+柱量不同（0 → 300 DU，0 → 4×10¹⁹ m⁻²）。「每层只叠加一个要素」由机制证据
+而非构造调用信任支撑。
 
 架构反馈：**无**——七层全部经现有 `Medium`/`Scene`/四近似契约干净表达，
 `skycolor/` 零 diff。
