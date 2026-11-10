@@ -295,14 +295,24 @@ def mie_coefficients_batch(x, m) -> MieCoefficientsBatch:
     # branch 1; a branch-2 pair, if one ever appears, is patched column-wise.
     n_val = np.arange(nmx_pad + 1, dtype=float)
     with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
-        n_over_rho = (n_val[:, None] / denom1[None, :]) + 1j * (
-            -(n_val[:, None] * ratio1[None, :]) / denom1[None, :])
+        # built into preallocated slots: a chained expression here
+        # materialises ~5 full-size temporaries per call
+        n_over_rho = np.empty((nmx_pad + 1, P), dtype=complex)
+        scr = np.empty((nmx_pad + 1, P))
+        np.divide(n_val[:, None], denom1[None, :], out=n_over_rho.real)
+        np.multiply(n_val[:, None], ratio1[None, :], out=scr)
+        np.divide(scr, denom1[None, :], out=scr)
+        np.negative(scr, out=scr)
+        n_over_rho.imag = scr
     if not big.all():
         idx2 = np.nonzero(~big)[0]
         with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
-            n_over_rho[:, idx2] = (
-                (n_val[:, None] * ratio2[None, idx2] / denom2[None, idx2])
-                + 1j * (-(n_val[:, None] / denom2[None, idx2])))
+            np.multiply(n_val[:, None], ratio2[None, idx2], out=scr)
+            np.divide(scr, denom2[None, idx2], out=scr)
+            n_over_rho[:, idx2].real = scr
+            np.divide(n_val[:, None], denom2[None, idx2], out=scr)
+            np.negative(scr, out=scr)
+            n_over_rho[:, idx2].imag = scr
 
     # --- D down-recurrence, one masked step per n --------------------------
     # rows beyond a pair's nmx keep their zero seed: the masked updates leave
@@ -514,6 +524,25 @@ def _gaunt_bands(l_max: int, a_max: int):
     return tuple(bands)
 
 
+#: cached squared-Wigner weight rows for the per-shift moment reduction:
+#: ``G_l(a, a+d)`` depends only on ``(a, d, l)``, so rows are built once for
+#: the longest requested ``a`` range and sliced (bitwise-identical prefixes)
+_GAUNT_WEIGHT_CACHE: dict[tuple[int, int], np.ndarray] = {}
+
+
+def _gaunt_weights(d: int, l: int, a_hi: int) -> np.ndarray:
+    """Cached ``G_l(a, a+d)`` for ``a`` in ``[max(0, -d), a_hi]``."""
+    a0 = max(0, -d)
+    key = (d, l)
+    arr = _GAUNT_WEIGHT_CACHE.get(key)
+    need = a_hi - a0 + 1
+    if arr is None or arr.size < need:
+        a_arr = np.arange(a0, a_hi + 1, dtype=float)
+        arr = _gaunt_sq(a_arr, a_arr + d, l)
+        _GAUNT_WEIGHT_CACHE[key] = arr
+    return arr[:need]
+
+
 def mie_moment_numerators(
     coeff: MieCoefficients, n_moments: int
 ) -> np.ndarray:
@@ -694,6 +723,12 @@ def mie_moment_numerators_batch(
         Cb = C[idx]
         Lm1 = n_moments - 1
         acc = np.zeros((n_moments, rows))
+        # preallocated product buffers: the same (n_here, rows) temporaries
+        # are reused across all 63 shifts (without this, hundreds of per-shift
+        # full-size allocations churn the allocator's lazy-free pool, which
+        # ru_maxrss counts even though nothing is live)
+        pbuf = np.empty((hi + 1, rows))
+        pbuf2 = np.empty((hi + 1, rows))
         for d in range(-Lm1, Lm1 + 1):
             a0 = max(0, -d)
             a_hi = min(hi, hi - d)
@@ -701,15 +736,20 @@ def mie_moment_numerators_batch(
                 continue
             s1 = slice(a0, a_hi + 1)
             s2 = slice(a0 + d, a_hi + 1 + d)
-            prod = Pr[s1] * Pr[s2]
-            prod += Pi[s1] * Pi[s2]
-            prod += Qr[s1] * Qr[s2]
-            prod += Qi[s1] * Qi[s2]
-            a_arr = np.arange(a0, a_hi + 1, dtype=float)
-            Gd = np.empty((a_arr.size, n_moments))
+            n_here = a_hi - a0 + 1
+            pb = pbuf[:n_here]
+            pb2 = pbuf2[:n_here]
+            np.multiply(Pr[s1], Pr[s2], out=pb)
+            np.multiply(Pi[s1], Pi[s2], out=pb2)
+            pb += pb2
+            np.multiply(Qr[s1], Qr[s2], out=pb2)
+            pb += pb2
+            np.multiply(Qi[s1], Qi[s2], out=pb2)
+            pb += pb2
+            Gd = np.empty((n_here, n_moments))
             for l in range(n_moments):
-                Gd[:, l] = _gaunt_sq(a_arr, a_arr + d, l)
-            acc += Gd.T @ prod
+                Gd[:, l] = _gaunt_weights(d, l, a_hi)
+            acc += Gd.T @ pb
         out[idx, :] = (Cb[None, :] * acc).T
     return out
 
@@ -805,23 +845,46 @@ def mie_phase_batch(
         return np.zeros((P, th.size))
     nmax_pad = int(n_max_arr.max())
     mu_arr = np.cos(th)
-    pi, tau = _angular_functions(mu_arr, nmax_pad)
+    pi, _ = _angular_functions(mu_arr, nmax_pad)
+    # tau rows are recomputed per step from the stored pi rows (two
+    # (n_angle,) vector ops) instead of precomputing a second full table --
+    # same values, half the angular-table memory
     s1 = np.zeros((P, th.size), dtype=complex)
     s2 = np.zeros((P, th.size), dtype=complex)
+    # preallocated step buffers, no per-step mask: rows beyond their n_max
+    # hold exact zeros in a/b, so their terms are exact zeros and the full
+    # adds leave every row's accumulation bitwise identical to the masked
+    # form (and hundreds of full-size temporaries per build do not churn the
+    # allocator's lazy-free pool, which ru_maxrss counts)
+    t1 = np.empty((P, th.size), dtype=complex)
     for n in range(1, nmax_pad + 1):
         cf = (2 * n + 1) / (n * (n + 1))
-        mask = n_max_arr >= n
         pi_n = pi[n][None, :]
-        tau_n = tau[n][None, :]
-        a_n = a_mat[mask, n][:, None]
-        b_n = b_mat[mask, n][:, None]
-        s1[mask] += cf * (a_n * pi_n + b_n * tau_n)
-        s2[mask] += cf * (a_n * tau_n + b_n * pi_n)
+        tau_n = (n * mu_arr * pi[n] - (n + 1) * pi[n - 1])[None, :]
+        a_n = a_mat[:, n][:, None]
+        b_n = b_mat[:, n][:, None]
+        np.multiply(a_n, pi_n, out=t1)
+        t1 += b_n * tau_n
+        t1 *= cf
+        s1 += t1
+        np.multiply(a_n, tau_n, out=t1)
+        t1 += b_n * pi_n
+        t1 *= cf
+        s2 += t1
+    # |s|^2 assembled in-place into two real scratch rows instead of a chain
+    # of full-size complex temporaries
+    rbuf = np.empty((P, th.size))
+    rbuf2 = np.empty((P, th.size))
+    np.multiply(s1.real, s1.real, out=rbuf)
+    rbuf += s1.imag * s1.imag
+    np.multiply(s2.real, s2.real, out=rbuf2)
+    rbuf2 += s2.imag * s2.imag
+    rbuf += rbuf2
+    rbuf *= 2.0
     with np.errstate(divide="ignore", invalid="ignore"):
-        p = 2.0 * (np.abs(s1) ** 2 + np.abs(s2) ** 2) \
-            / (x_arr[:, None] ** 2 * qsca_arr[:, None])
-    p[~np.isfinite(p)] = 0.0
-    return p
+        rbuf /= (x_arr[:, None] ** 2 * qsca_arr[:, None])
+    rbuf[~np.isfinite(rbuf)] = 0.0
+    return rbuf
 
 
 # ===========================================================================

@@ -50,7 +50,6 @@ import numpy as np
 
 from .mie import (
     MieCoefficients,
-    MieCoefficientsBatch,
     log_normal_nodes,
     mie_coefficients,
     mie_coefficients_batch,
@@ -458,9 +457,12 @@ class MieAerosol(Aerosol):
 
     # -- per-wavelength state ------------------------------------------------
     #: wavelengths per vectorised coefficient/moment fill; bounds the chunk's
-    # transient matrices to ~30 MB while amortising numpy dispatch across the
-    # requested grid (K3: the fill range IS the requested lambda set)
-    _FILL_GROUP = 12
+    # transient matrices (the RSS gate allows ~70 MB of them) while amortising
+    # numpy dispatch across the requested grid (K3: the fill range IS the
+    # requested lambda set).  States keep exact-length per-pair coefficient
+    # copies -- the scalar path's memory profile -- so the padded group
+    # matrices are pure transients.
+    _FILL_GROUP = 2
 
     def _state(self, wl_nm: float) -> "_State":
         return self._states_for([wl_nm])[0]
@@ -521,22 +523,46 @@ class MieAerosol(Aerosol):
         off = 0
         for k, kept in zip(keys, kept_all):
             n = len(kept)
+            if n == 0:
+                # no node above the Rayleigh cutoff: empty state
+                states.append(_State(
+                    wl=k, coeffs=[], ce=0.0, cs=0.0, g=0.0, x_max=0.0,
+                    xs=np.empty(0), qs=np.empty(0),
+                    nmaxs=np.empty(0, dtype=int), wts=np.empty(0)))
+                continue
             coeffs = []
             ce = cs = gnum = 0.0
             x_max = 0.0
             wts = np.empty(n)
+            xs_s = np.empty(n)
+            qs_s = np.empty(n)
+            nmx_s = np.empty(n, dtype=int)
+            # exact-length copies via one ragged concatenation per state:
+            # the retained per-pair storage matches the scalar path's memory
+            # profile, without tens of thousands of tiny allocations
+            a_flat = np.concatenate(
+                [batch.a[gj, : int(batch.n_max[gj]) + 1]
+                 for gj in range(off, off + n)])
+            b_flat = np.concatenate(
+                [batch.b[gj, : int(batch.n_max[gj]) + 1]
+                 for gj in range(off, off + n)])
+            o2 = 0
             for j in range(n):
                 gj = off + j
                 nx = int(batch.n_max[gj])
                 c = MieCoefficients(
                     x=float(batch.x[gj]),
                     m=complex(batch.m[gj]),
-                    a=batch.a[gj, : nx + 1],
-                    b=batch.b[gj, : nx + 1],
+                    a=a_flat[o2: o2 + nx + 1],
+                    b=b_flat[o2: o2 + nx + 1],
                     qext=float(batch.qext[gj]),
                     qsca=float(batch.qsca[gj]),
                     nmax=nx,
                 )
+                o2 += nx + 1
+                xs_s[j] = batch.x[gj]
+                qs_s[j] = batch.qsca[gj]
+                nmx_s[j] = nx
                 r, w = kept[j]
                 area = np.pi * (r * 1e-6) ** 2
                 wt = w * area
@@ -549,7 +575,7 @@ class MieAerosol(Aerosol):
             g = float(gnum / cs) if cs > 0.0 else 0.0
             states.append(_State(
                 wl=k, coeffs=coeffs, ce=float(ce), cs=float(cs), g=g,
-                x_max=x_max, batch=batch, wts=wts, batch_offset=off))
+                x_max=x_max, xs=xs_s, qs=qs_s, nmaxs=nmx_s, wts=wts))
             off += n
         return states
 
@@ -603,7 +629,7 @@ class MieAerosol(Aerosol):
                 s.beta = out
         if not live:
             return
-        pad = max(int(s.batch.n_max.max()) for s in live) + 1
+        pad = max(int(s.nmaxs.max()) for s in live) + 1
         n_total = sum(len(s.coeffs) for s in live)
         xs = np.empty(n_total)
         qsca = np.empty(n_total)
@@ -613,13 +639,12 @@ class MieAerosol(Aerosol):
         o = 0
         for s in live:
             m = len(s.coeffs)
-            b0 = s.batch_offset
-            xs[o: o + m] = s.batch.x[b0: b0 + m]
-            qsca[o: o + m] = s.batch.qsca[b0: b0 + m]
-            nmx[o: o + m] = s.batch.n_max[b0: b0 + m]
-            w = min(s.batch.a.shape[1], pad)
-            a_mat[o: o + m, :w] = s.batch.a[b0: b0 + m, :w]
-            b_mat[o: o + m, :w] = s.batch.b[b0: b0 + m, :w]
+            xs[o: o + m] = s.xs
+            qsca[o: o + m] = s.qs
+            nmx[o: o + m] = s.nmaxs
+            for j, (c, _r, _w, _area) in enumerate(s.coeffs):
+                a_mat[o + j, : c.nmax + 1] = c.a
+                b_mat[o + j, : c.nmax + 1] = c.b
             o += m
         U = mie_moment_numerators_batch(xs, qsca, a_mat, b_mat, nmx, n_moments)
         o = 0
@@ -666,20 +691,10 @@ class MieAerosol(Aerosol):
             n_back=self.table_back_points,
         )
         th = np.radians(theta)
-        if state.batch is None or state.wts is None:
-            raise RuntimeError(
-                "state was built without the batched coefficient kernel; "
-                "rebuild the aerosol state")
-        # the state's rows inside its (possibly group-wide) coefficient batch
-        b0 = state.batch_offset
         m = len(state.coeffs)
-        # contiguous copies: the group-batch row slices are strided, and the
-        # kernel's per-step column ops would pay the stride on every access
-        p_batch = mie_phase_batch(
-            np.ascontiguousarray(state.batch.a[b0: b0 + m]),
-            np.ascontiguousarray(state.batch.b[b0: b0 + m]),
-            state.batch.x[b0: b0 + m], state.batch.qsca[b0: b0 + m],
-            state.batch.n_max[b0: b0 + m], th)
+        a_mat, b_mat = _coeff_matrices(state)
+        p_batch = mie_phase_batch(a_mat, b_mat, state.xs, state.qs,
+                                  state.nmaxs, th)
         # node-order weighted sum, same accumulation sequence as the scalar
         # path (only the per-node p values differ, at <= 1 ulp, D2)
         psum = np.zeros_like(th)
@@ -695,17 +710,9 @@ class MieAerosol(Aerosol):
 
     def _phase_direct(self, state: "_State", mu: np.ndarray) -> np.ndarray:
         theta = np.arccos(np.clip(mu, -1.0, 1.0))
-        if state.batch is None or state.wts is None:
-            raise RuntimeError(
-                "state was built without the batched coefficient kernel; "
-                "rebuild the aerosol state")
-        b0 = state.batch_offset
-        m = len(state.coeffs)
-        p_batch = mie_phase_batch(
-            np.ascontiguousarray(state.batch.a[b0: b0 + m]),
-            np.ascontiguousarray(state.batch.b[b0: b0 + m]),
-            state.batch.x[b0: b0 + m], state.batch.qsca[b0: b0 + m],
-            state.batch.n_max[b0: b0 + m], theta)
+        a_mat, b_mat = _coeff_matrices(state)
+        p_batch = mie_phase_batch(a_mat, b_mat, state.xs, state.qs,
+                                  state.nmaxs, theta)
         psum = np.zeros_like(theta)
         den = 0.0
         for j, (c, _r, _w, _area) in enumerate(state.coeffs):
@@ -758,6 +765,22 @@ class MieAerosol(Aerosol):
         return water_cloud(r_eff_um=r_eff_um)
 
 
+def _coeff_matrices(state: "_State") -> tuple[np.ndarray, np.ndarray]:
+    """Assemble the state's (n_nodes, pad) coefficient matrices.
+
+    The retained per-pair arrays are exact length; the batched moment/table
+    kernels want one padded 2-D block, so build it here as a transient.
+    """
+    m = len(state.coeffs)
+    pad = int(state.nmaxs.max()) + 1
+    a_mat = np.zeros((m, pad), dtype=complex)
+    b_mat = np.zeros((m, pad), dtype=complex)
+    for j, (c, _r, _w, _area) in enumerate(state.coeffs):
+        a_mat[j, : c.nmax + 1] = c.a
+        b_mat[j, : c.nmax + 1] = c.b
+    return a_mat, b_mat
+
+
 @dataclass
 class _State:
     """Cached per-wavelength optical state of a :class:`MieAerosol`."""
@@ -769,13 +792,13 @@ class _State:
     g: float
     x_max: float
     beta: np.ndarray | None = None
-    # batched coefficient build behind ``coeffs``: the per-pair a/b arrays in
-    # coeffs are views into batch.a/b, at rows batch_offset..+len(coeffs).
-    # The batch may cover a whole fill group (up to _FILL_GROUP wavelengths),
-    # not just this state's wavelength.
-    batch: "MieCoefficientsBatch | None" = None
-    batch_offset: int = 0
-    wts: np.ndarray | None = None  # (n_nodes,) number weight * geometric area
+    # per-pair kernel headers (the coefficient arrays live in coeffs, exact
+    # length per pair); matrices for the batched moment/table kernels are
+    # assembled from coeffs on the fly as transients
+    xs: np.ndarray | None = None       # (n_nodes,) size parameters
+    qs: np.ndarray | None = None       # (n_nodes,) scattering efficiencies
+    nmaxs: np.ndarray | None = None    # (n_nodes,) per-pair truncation
+    wts: np.ndarray | None = None      # (n_nodes,) number weight * area
 
 
 # ===========================================================================
