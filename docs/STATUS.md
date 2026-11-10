@@ -4,6 +4,8 @@ Current production behavior and limits (2026-11-08, unified production/presentat
 Methods and frozen evidence are linked in [the documentation guide](README.md);
 completed work and proposed next scopes are in [ROADMAP.md](ROADMAP.md).
 
+A reader-level mainline narrative (Chinese) lives in [physics/MAINLINE.zh.md](physics/MAINLINE.zh.md); this file stays the single source for current behavior and validation limits.
+
 ## What works
 
 | Component | Production behavior |

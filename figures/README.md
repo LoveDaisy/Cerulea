@@ -10,6 +10,8 @@ The two [layer story](#layer-story-figures-2026-11-10) figures (2026-11-10)
 carry their own provenance block below; their `skycolor/` tree is identical
 to the four above (zero diff from `286486e` through the theme commit).
 
+A reader-level guide to these figures (Chinese): [docs/physics/MAINLINE.zh.md](../docs/physics/MAINLINE.zh.md).
+
 | Figure | Purpose / what to compare | Numeric source |
 |---|---|---|
 | [sky_30.png](sky_30.png) | Daylight, sun 30°; default hybrid-sos | `e30_hybrid-sos/total` |
