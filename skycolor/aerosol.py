@@ -49,10 +49,13 @@ from typing import Callable, Sequence
 import numpy as np
 
 from .mie import (
+    MieCoefficients,
     log_normal_nodes,
     mie_coefficients,
-    mie_moment_numerators,
+    mie_coefficients_batch,
+    mie_moment_numerators_batch,
     mie_phase,
+    mie_phase_batch,
     phase_table_angles,
 )
 
@@ -453,44 +456,133 @@ class MieAerosol(Aerosol):
         return complex(mi)
 
     # -- per-wavelength state ------------------------------------------------
-    def _state(self, wl_nm: float) -> "_State":
-        key = round(float(wl_nm), 6)
-        state = self._states.get(key)
-        if state is not None:
-            self._states.move_to_end(key)
-            return state
+    #: wavelengths per vectorised coefficient/moment fill; bounds the chunk's
+    # transient matrices (the RSS gate allows ~70 MB of them) while amortising
+    # numpy dispatch across the requested grid (K3: the fill range IS the
+    # requested lambda set).  States keep exact-length per-pair coefficient
+    # copies -- the scalar path's memory profile -- so the padded group
+    # matrices are pure transients.
+    _FILL_GROUP = 2
 
-        coeffs = []
-        ce = cs = gnum = 0.0
-        x_max = 0.0
-        for r, w, mi in self._nodes:
-            x = 2.0 * np.pi * r / (float(wl_nm) * 1e-3)
-            if x < 1e-4:
-                # far below the Rayleigh regime the cross section is
-                # negligible; skipping avoids ill-conditioned Bessel recurrences
+    def _state(self, wl_nm: float) -> "_State":
+        return self._states_for([wl_nm])[0]
+
+    def _states_for(self, wl_nm_array) -> list["_State"]:
+        """Per-wavelength states for a requested grid, filling in groups.
+
+        Missing states are built in chunks of ``_FILL_GROUP`` wavelengths
+        through one batched coefficient call each; the per-wavelength LRU
+        cache and its eviction semantics are unchanged (K3).
+        """
+        wl = np.atleast_1d(np.asarray(wl_nm_array, dtype=float))
+        keys = [round(float(w), 6) for w in wl]
+        out: list[_State | None] = [None] * len(keys)
+        missing = []
+        for i, k in enumerate(keys):
+            s = self._states.get(k)
+            if s is not None:
+                self._states.move_to_end(k)
+                out[i] = s
+            else:
+                missing.append(i)
+        for start in range(0, len(missing), self._FILL_GROUP):
+            chunk = missing[start: start + self._FILL_GROUP]
+            built = self._build_states([keys[i] for i in chunk])
+            for i, s in zip(chunk, built):
+                out[i] = s
+                self._states[keys[i]] = s
+            while len(self._states) > max(int(self.max_cached_wavelengths), 1):
+                self._states.popitem(last=False)
+        return out  # type: ignore[return-value]
+
+    def _build_states(self, keys: list[float]) -> list["_State"]:
+        """Build one group of states through a single batched coefficient call.
+
+        The nodes of all wavelengths in the group form one (pair,) table; the
+        per-state accumulations (ce/cs/g, node order) and the LRU-visible
+        state layout are identical to the per-wavelength build.
+        """
+        xs: list[float] = []
+        ms: list[complex] = []
+        kept_all: list[list[tuple[float, float]]] = []
+        for k in keys:
+            kept: list[tuple[float, float]] = []
+            for r, w, mi in self._nodes:
+                x = 2.0 * np.pi * r / (float(k) * 1e-3)
+                if x < 1e-4:
+                    # far below the Rayleigh regime the cross section is
+                    # negligible; skipping avoids ill-conditioned recurrences
+                    continue
+                xs.append(x)
+                ms.append(self._index(mi, k))
+                kept.append((r, w))
+            kept_all.append(kept)
+        batch = mie_coefficients_batch(np.array(xs), np.array(ms, dtype=complex))
+
+        states: list[_State] = []
+        off = 0
+        for k, kept in zip(keys, kept_all):
+            n = len(kept)
+            if n == 0:
+                # no node above the Rayleigh cutoff: empty state
+                states.append(_State(
+                    wl=k, coeffs=[], ce=0.0, cs=0.0, g=0.0, x_max=0.0,
+                    xs=np.empty(0), qs=np.empty(0),
+                    nmaxs=np.empty(0, dtype=int), wts=np.empty(0)))
                 continue
-            m = self._index(mi, wl_nm)
-            c = mie_coefficients(x, m)
-            area = np.pi * (r * 1e-6) ** 2
-            wt = w * area
-            ce += wt * c.qext
-            cs += wt * c.qsca
-            gnum += wt * c.qsca * c.g
-            coeffs.append((c, r, w, area))
-            x_max = max(x_max, c.x)
-        g = float(gnum / cs) if cs > 0.0 else 0.0
-        state = _State(
-            wl=key, coeffs=coeffs, ce=float(ce), cs=float(cs), g=g, x_max=x_max
-        )
-        self._states[key] = state
-        while len(self._states) > max(int(self.max_cached_wavelengths), 1):
-            self._states.popitem(last=False)
-        return state
+            coeffs = []
+            ce = cs = gnum = 0.0
+            x_max = 0.0
+            wts = np.empty(n)
+            xs_s = np.empty(n)
+            qs_s = np.empty(n)
+            nmx_s = np.empty(n, dtype=int)
+            # exact-length copies via one ragged concatenation per state:
+            # the retained per-pair storage matches the scalar path's memory
+            # profile, without tens of thousands of tiny allocations
+            a_flat = np.concatenate(
+                [batch.a[gj, : int(batch.n_max[gj]) + 1]
+                 for gj in range(off, off + n)])
+            b_flat = np.concatenate(
+                [batch.b[gj, : int(batch.n_max[gj]) + 1]
+                 for gj in range(off, off + n)])
+            o2 = 0
+            for j in range(n):
+                gj = off + j
+                nx = int(batch.n_max[gj])
+                c = MieCoefficients(
+                    x=float(batch.x[gj]),
+                    m=complex(batch.m[gj]),
+                    a=a_flat[o2: o2 + nx + 1],
+                    b=b_flat[o2: o2 + nx + 1],
+                    qext=float(batch.qext[gj]),
+                    qsca=float(batch.qsca[gj]),
+                    nmax=nx,
+                )
+                o2 += nx + 1
+                xs_s[j] = batch.x[gj]
+                qs_s[j] = batch.qsca[gj]
+                nmx_s[j] = nx
+                r, w = kept[j]
+                area = np.pi * (r * 1e-6) ** 2
+                wt = w * area
+                wts[j] = wt
+                ce += wt * c.qext
+                cs += wt * c.qsca
+                gnum += wt * c.qsca * c.g
+                coeffs.append((c, r, w, area))
+                x_max = max(x_max, c.x)
+            g = float(gnum / cs) if cs > 0.0 else 0.0
+            states.append(_State(
+                wl=k, coeffs=coeffs, ce=float(ce), cs=float(cs), g=g,
+                x_max=x_max, xs=xs_s, qs=qs_s, nmaxs=nmx_s, wts=wts))
+            off += n
+        return states
 
     # -- public interface ----------------------------------------------------
     def relative_coefficients(self, wl_nm):
         wl = np.atleast_1d(np.asarray(wl_nm, dtype=float))
-        states = [self._state(w) for w in wl]
+        states = self._states_for(wl)
         ce = np.array([s.ce for s in states])
         cs = np.array([s.cs for s in states])
         if ce.size == 0:
@@ -503,49 +595,93 @@ class MieAerosol(Aerosol):
 
     def asymmetry(self, wl_nm) -> np.ndarray:
         wl = np.atleast_1d(np.asarray(wl_nm, dtype=float))
-        return np.array([self._state(w).g for w in wl])
+        return np.array([s.g for s in self._states_for(wl)])
 
     def legendre_moments(self, wl_nm, n_moments: int = 32) -> np.ndarray:
         wl = np.atleast_1d(np.asarray(wl_nm, dtype=float))
         n_moments = int(n_moments)
+        states = self._states_for(wl)
+        # refill trigger compares against ``need`` (cache-sized), not the
+        # caller's n_moments: fills always produce ``need``-length beta, so
+        # the two comparisons coincide for every reachable state -- the
+        # tighter form just keeps the trigger and the fill width consistent.
+        need = max(n_moments, int(self.moments_cache_size))
+        missing = [i for i, s in enumerate(states)
+                   if s.beta is None or s.beta.size < need]
+        for start in range(0, len(missing), self._FILL_GROUP):
+            self._fill_moments([states[i] for i in
+                                missing[start: start + self._FILL_GROUP]], need)
         out = np.zeros((n_moments, wl.size))
-        for i, w in enumerate(wl):
-            state = self._state(w)
-            need = max(n_moments, int(self.moments_cache_size))
-            if state.beta is None or state.beta.size < n_moments:
-                state.beta = self._size_averaged_moments(state, need)
-            out[:, i] = state.beta[:n_moments]
+        for i, s in enumerate(states):
+            out[:, i] = s.beta[:n_moments]
         return out
 
-    def _size_averaged_moments(self, state: "_State", n_moments: int) -> np.ndarray:
-        if not state.coeffs or state.cs <= 0.0:
-            out = np.zeros(n_moments)
-            out[0] = 1.0
-            return out
-        num = np.zeros(n_moments)
-        den = 0.0
-        for c, r, w, area in state.coeffs:
-            U = mie_moment_numerators(c, n_moments)  # = qsca * beta_l
-            num += (w * area) * U
-            den += (w * area) * c.qsca
-        if den <= 0.0:
-            out = np.zeros(n_moments)
-            out[0] = 1.0
-            return out
-        beta = num / den
-        # beta_0 = 1 analytically; remove round-off so delta-M is exactly
-        # energy conserving.
-        beta[0] = 1.0
-        return beta
+    def _fill_moments(self, states: list["_State"], n_moments: int) -> None:
+        """Moment fill for a group of states through one vectorised call.
+
+        The states' node pairs are concatenated (zero-padded to the chunk's
+        widest coefficient rows) so the bucketed moment kernel amortises its
+        band loop over the group; the per-state node-order weighted sums are
+        unchanged from the scalar path.
+        """
+        live = [s for s in states if s.coeffs and s.cs > 0.0]
+        live_ids = {id(s) for s in live}
+        for s in states:
+            if id(s) not in live_ids:
+                out = np.zeros(n_moments)
+                out[0] = 1.0
+                s.beta = out
+        if not live:
+            return
+        pad = max(int(s.nmaxs.max()) for s in live) + 1
+        n_total = sum(len(s.coeffs) for s in live)
+        xs = np.empty(n_total)
+        qsca = np.empty(n_total)
+        nmx = np.empty(n_total, dtype=int)
+        a_mat = np.zeros((n_total, pad), dtype=complex)
+        b_mat = np.zeros((n_total, pad), dtype=complex)
+        o = 0
+        for s in live:
+            m = len(s.coeffs)
+            xs[o: o + m] = s.xs
+            qsca[o: o + m] = s.qs
+            nmx[o: o + m] = s.nmaxs
+            for j, (c, _r, _w, _area) in enumerate(s.coeffs):
+                a_mat[o + j, : c.nmax + 1] = c.a
+                b_mat[o + j, : c.nmax + 1] = c.b
+            o += m
+        U = mie_moment_numerators_batch(xs, qsca, a_mat, b_mat, nmx, n_moments)
+        o = 0
+        for s in live:
+            m = len(s.coeffs)
+            U_s = U[o: o + m]
+            o += m
+            num = np.zeros(n_moments)
+            den = 0.0
+            for j, (c, _r, _w, _area) in enumerate(s.coeffs):
+                # node-order scalar accumulation, same sequence as the scalar
+                num += s.wts[j] * U_s[j]
+                den += s.wts[j] * c.qsca
+            if den <= 0.0:
+                out = np.zeros(n_moments)
+                out[0] = 1.0
+            else:
+                out = num / den
+                # beta_0 = 1 analytically; remove round-off so delta-M is
+                # exactly energy conserving.
+                out[0] = 1.0
+            s.beta = out
 
     # -- phase function ------------------------------------------------------
-    def _get_table(self, wl_nm: float) -> PhaseTable:
+    def _get_table(self, wl_nm: float, state: "_State | None" = None) -> PhaseTable:
         key = round(float(wl_nm), 6)
         table = self._tables.get(key)
         if table is not None:
             self._tables.move_to_end(key)
             return table
-        table = self._build_table(self._state(key))
+        if state is None:
+            state = self._state(key)
+        table = self._build_table(state)
         self._tables[key] = table
         while len(self._tables) > self._max_tables:
             self._tables.popitem(last=False)
@@ -559,11 +695,17 @@ class MieAerosol(Aerosol):
             n_back=self.table_back_points,
         )
         th = np.radians(theta)
+        m = len(state.coeffs)
+        a_mat, b_mat = _coeff_matrices(state)
+        p_batch = mie_phase_batch(a_mat, b_mat, state.xs, state.qs,
+                                  state.nmaxs, th)
+        # node-order weighted sum, same accumulation sequence as the scalar
+        # path (only the per-node p values differ, at <= 1 ulp, D2)
         psum = np.zeros_like(th)
         den = 0.0
-        for c, r, w, area in state.coeffs:
-            psum += (w * area * c.qsca) * mie_phase(c, th)
-            den += w * area * c.qsca
+        for j, (c, _r, _w, _area) in enumerate(state.coeffs):
+            psum += state.wts[j] * c.qsca * p_batch[j]
+            den += state.wts[j] * c.qsca
         if den <= 0.0:
             # no scattering: isotropic normalised phase function
             psum = np.ones_like(th)
@@ -572,22 +714,26 @@ class MieAerosol(Aerosol):
 
     def _phase_direct(self, state: "_State", mu: np.ndarray) -> np.ndarray:
         theta = np.arccos(np.clip(mu, -1.0, 1.0))
+        a_mat, b_mat = _coeff_matrices(state)
+        p_batch = mie_phase_batch(a_mat, b_mat, state.xs, state.qs,
+                                  state.nmaxs, theta)
         psum = np.zeros_like(theta)
         den = 0.0
-        for c, r, w, area in state.coeffs:
-            psum += (w * area * c.qsca) * mie_phase(c, theta)
-            den += w * area * c.qsca
+        for j, (c, _r, _w, _area) in enumerate(state.coeffs):
+            psum += state.wts[j] * c.qsca * p_batch[j]
+            den += state.wts[j] * c.qsca
         return psum / den if den > 0.0 else np.ones_like(theta)
 
     def phase(self, mu, wl_nm):
         mu_arr = np.atleast_1d(np.asarray(mu, dtype=float))
         wl = np.atleast_1d(np.asarray(wl_nm, dtype=float))
+        states = self._states_for(wl)
         out = np.empty((mu_arr.size, wl.size))
         for i, w in enumerate(wl):
             if self.use_phase_table:
-                out[:, i] = self._get_table(w)(mu_arr)
+                out[:, i] = self._get_table(w, states[i])(mu_arr)
             else:
-                out[:, i] = self._phase_direct(self._state(w), mu_arr)
+                out[:, i] = self._phase_direct(states[i], mu_arr)
         if np.ndim(mu) == 0 and np.ndim(wl_nm) == 0:
             return float(out[0, 0])
         return out
@@ -623,6 +769,33 @@ class MieAerosol(Aerosol):
         return water_cloud(r_eff_um=r_eff_um)
 
 
+def _coeff_matrices(state: "_State") -> tuple[np.ndarray, np.ndarray]:
+    """Assemble the state's (n_nodes, pad) coefficient matrices.
+
+    The retained per-pair arrays are exact length; the batched moment/table
+    kernels want one padded 2-D block, so build it here as a transient.
+    """
+    m = len(state.coeffs)
+    if m == 0:
+        # empty state (every node below the Rayleigh cutoff): the batched
+        # kernels handle zero rows and _build_table falls through to the
+        # isotropic fallback, matching the scalar path
+        return (np.zeros((0, 1), dtype=complex),
+                np.zeros((0, 1), dtype=complex))
+    pad = int(state.nmaxs.max()) + 1
+    a_mat = np.zeros((m, pad), dtype=complex)
+    b_mat = np.zeros((m, pad), dtype=complex)
+    for j, (c, _r, _w, _area) in enumerate(state.coeffs):
+        # header/coeffs single-source contract, mechanically enforced (a50):
+        # xs/qs/nmaxs/wts may only be written by _build_states from the same
+        # node facts as coeffs -- a mismatch here means someone assigned a
+        # header independently.
+        assert c.nmax == int(state.nmaxs[j])
+        a_mat[j, : c.nmax + 1] = c.a
+        b_mat[j, : c.nmax + 1] = c.b
+    return a_mat, b_mat
+
+
 @dataclass
 class _State:
     """Cached per-wavelength optical state of a :class:`MieAerosol`."""
@@ -634,6 +807,18 @@ class _State:
     g: float
     x_max: float
     beta: np.ndarray | None = None
+    # per-pair kernel headers (xs/qs/nmaxs/wts are derived copies of the same
+    # node facts stored per pair in coeffs -- qext/qsca/nmax/w*area).  They
+    # exist so the batched moment/table kernels get contiguous headers without
+    # unzipping coeffs; the padded matrices themselves are assembled from
+    # coeffs on the fly as transients.  Contract: the headers must only ever
+    # be written by _build_states from the same node facts as coeffs -- never
+    # assigned independently (this is the single-source guarantee behind the
+    # shared-instance read-only contract).
+    xs: np.ndarray | None = None       # (n_nodes,) size parameters
+    qs: np.ndarray | None = None       # (n_nodes,) scattering efficiencies
+    nmaxs: np.ndarray | None = None    # (n_nodes,) per-pair truncation
+    wts: np.ndarray | None = None      # (n_nodes,) number weight * area
 
 
 # ===========================================================================

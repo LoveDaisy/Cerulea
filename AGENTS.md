@@ -99,9 +99,12 @@ uv run python -m experiments.approximations.compare
   与一次散射的域一致性是已知边界（高度响应审计时要看）。
 - `rt/twilight.py` + `rt/mc.py`：深暮光球面 Monte Carlo，split estimator（一次散射
   确定性、二次以上 MC）。引擎耗时按光子数线性。
-- `aerosol.py` / `mie.py`：Mie 光学是 cold-start 的主要开销。`max_cached_wavelengths`
-  默认 256，覆盖 81 波长工作网格；预设气溶胶通过 `shared()` 跨 `Atmosphere` 复用，
-  因此 warm / 重复调用的 Mie 预处理接近零。冷启动仍需向量化/LUT（后续任务）。
+- `aerosol.py` / `mie.py`：冷启动已批式向量化（task-cold-optics）：系数核与标量
+  路径逐位等价（CPython 除法站点按 Smith+FMA 常量提升复现），矩/表核为 D2 声明
+  容差（ulp 级，锚测试钉死）；冷 dusty `delta_m(32)` 实测 39.4→3.1 s（~13×）。
+  `max_cached_wavelengths` 默认 256，覆盖 81 波长工作网格；预设气溶胶通过
+  `shared()` 跨 `Atmosphere` 复用，warm / 重复调用的 Mie 预处理接近零。填充按
+  请求 λ 集分组批，状态保留逐 pair 精确长度系数（内存轮廓同标量）。
   共享实例是**只读契约**，不要 mutate 气溶胶属性。
   AOD550 的参考截面固定为实际550 nm状态；查询网格和 `Atmosphere._restrict`
   不得重新归一介质。单波长旧归一错误已修复，见 `docs/twilight/AEROSOL_GRID_AUDIT.md`。

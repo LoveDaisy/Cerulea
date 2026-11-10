@@ -1,0 +1,7 @@
+{
+  "generated_at": "2026-11-10T21:07:55+08:00",
+  "git_head_at_generation": "ed44f61 (perf: 内存轮廓收口; the 9-wavelength table-anchor slimming was uncommitted working-tree state, committed as 66cbf84)",
+  "numpy": "2.5.4 (uv.lock-locked venv, unchanged between generation and this sidecar)",
+  "provenance": "pre-sidecar generation; file mtime is the generation time. Kernel-level coef_* arrays are scalar-path truth. Preset-level arrays were regenerated from the batched production tree during the table-anchor slimming (task-cold-optics progress 2026-11-10 21:05 entry); scalar equivalence at that point was evidenced by the dev-period ref_checkpoint (24/24), which retires with the task scratchpad per the D3 ruling.",
+  "regeneration_rule": "regenerate only with an explicit recorded reason in the task progress log -- never to make a failing comparison pass (same rule as the golden fixtures)"
+}
