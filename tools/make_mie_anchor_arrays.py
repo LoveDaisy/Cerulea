@@ -1,33 +1,38 @@
 """Generate the in-repo Mie anchor arrays for task-cold-optics (plan D3).
 
 The batch-vectorised Mie kernels (``mie_coefficients_batch`` and the batched
-moment / phase-table kernels) are verified against arrays pinned while the
-scalar path is still in place, so the anchor values are the pre-change
-production truth.  Regenerate ONLY with an explicit recorded reason in the
-task progress log -- never to make a failing comparison pass (same rule as
-the golden fixtures).
+moment / phase-table kernels) are verified against arrays pinned in
+``tests/data/mie_anchor.npz``.  Two provenance classes live in that file:
 
-Two pinning levels:
+* kernel level (``coef_*``) -- a representative (x, m) grid through the
+  scalar ``mie_coefficients`` (bitwise class; the scalar kernel is unchanged
+  by the task, so these stay scalar-path truth across regenerations);
+* aerosol level -- the clear/dusty production surfaces through ``presets``
+  (rc_ext/rc_sca/asym bitwise class; delta_m beta/f, phase-table and single
+  radiance tolerance class under the task's D2 declared-tolerance route).
+  These are generated through the *current* production path, so after the
+  batch-vectorisation each regeneration re-pins them to the batched tree;
+  the scalar equivalence at re-pin time must be evidenced in the recorded
+  reason (dev period: ref_checkpoint 24/24).
 
-* kernel level -- a representative (x, m) grid through the scalar
-  ``mie_coefficients`` (bitwise class; the batched kernel must reproduce
-  these exactly);
-* aerosol level -- the clear/dusty production surfaces through
-  ``presets`` (rt_ext/rc_sca/asym bitwise class; delta_m beta/f,
-  phase-table and single radiance tolerance class under the task's D2
-  declared-tolerance route; see tests/test_mie_batch.py for the numbers).
+Regenerate ONLY with an explicit recorded reason in the task progress log --
+never to make a failing comparison pass (same rule as the golden fixtures).
 
 Run from the repository root:
 
     uv run python tools/make_mie_anchor_arrays.py
 
-Writes ``tests/data/mie_anchor.npz`` plus a manifest with the generating tree.
+Writes ``tests/data/mie_anchor.npz`` plus ``tests/data/mie_anchor.meta.json``
+(generating tree, numpy version, UTC+8 timestamp) so the provenance of the
+Git-tracked arrays stays retrievable in-repo.
 """
 from __future__ import annotations
 
+import json
 import pathlib
 import subprocess
 import sys
+from datetime import datetime, timedelta, timezone
 
 import numpy as np
 
@@ -135,6 +140,14 @@ def main() -> None:
     np.savez(OUT, **data)
     tree = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT,
                           capture_output=True, text=True).stdout.strip()
+    meta = {
+        "generated_at": datetime.now(timezone(timedelta(hours=8))
+                                     ).isoformat(timespec="seconds"),
+        "git_head_at_generation": tree,
+        "numpy": np.__version__,
+    }
+    (ROOT / "tests" / "data" / "mie_anchor.meta.json").write_text(
+        json.dumps(meta, indent=2) + "\n", encoding="utf-8")
     print(f"wrote {OUT} ({len(data)} arrays)")
     print(f"tree: {tree}")
     print(f"numpy: {np.__version__}")
