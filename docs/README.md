@@ -21,6 +21,7 @@ Setup and run commands live in [the project README](../README.md) and
 
 | Location | Scope |
 |---|---|
+| [Layer story](physics/LAYER_STORY.md) | The progressive ladder: each rung adds one ingredient from Rayleigh to the measured sky; figures and data via the [layerstory theme](../experiments/layerstory/README.md) |
 | [Approximation story](physics/APPROXIMATIONS.md) | Shared target, branch map and actual controlled comparison; [production figures](../figures/README.md) own versions/commands |
 | [physics/](physics/README.md) | Aerosol/Mie, clouds, refraction, successive orders and independent MC methods |
 | [twilight/](twilight/README.md) | Production twilight engine, historical profile sweeps and M13–M18 audit sequence |
