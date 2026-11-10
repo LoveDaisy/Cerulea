@@ -1,0 +1,184 @@
+{
+  "meta": {
+    "seed": 0,
+    "mc_quality": "low",
+    "wl_subset_stride": 6,
+    "near_gamma": [
+      1.0,
+      1.5,
+      2.0,
+      3.0,
+      4.0,
+      6.0,
+      8.0
+    ],
+    "t2_band": [
+      1.0,
+      10.0
+    ],
+    "t2_threshold": 0.2,
+    "band": 0.05,
+    "gates": [
+      0.3333333333333333,
+      0.25
+    ],
+    "worker_isolation": "MC configs run in fresh subprocesses (heap-corruption containment, see docstring)"
+  },
+  "configs": {
+    "b0": {
+      "wall_s_clean": 34.80484816594981,
+      "wall_s_instrumented": 26.52638362511061,
+      "mem_peak_mb": 1058.26332,
+      "ratio": 8.81523527413475,
+      "dev_vs_cie": 141.40606682437675,
+      "lz": 1989.508343897231,
+      "map_shape": [
+        37,
+        72
+      ],
+      "anchor_ok": true
+    },
+    "b0c": {
+      "wall_s_clean": 1.2050589171703905,
+      "wall_s_instrumented": 1.5741180421318859,
+      "mem_peak_mb": 223.611372,
+      "ratio": 8.81523527413475,
+      "dev_vs_cie": 141.40606682437675,
+      "n_mu_eff": 32,
+      "n_moments_eff": 32,
+      "n_moments_optics": 32,
+      "delta_m": true,
+      "orders": 10,
+      "converged": true,
+      "cross_check_max_rel": 1.1129632321148055e-16,
+      "cross_check_ok": true
+    },
+    "p1": {
+      "wall_s_clean": 3.177552750101313,
+      "wall_s_instrumented": 3.4459362500347197,
+      "mem_peak_mb": 387.094537,
+      "ratio": 8.811875420257813,
+      "dev_vs_cie": 141.3140569024277,
+      "n_mu_eff": 64,
+      "n_moments_eff": 128,
+      "n_moments_optics": 128,
+      "delta_m": true,
+      "orders": 10,
+      "converged": true
+    },
+    "p2": {
+      "wall_s_clean": 1.3013712079264224,
+      "wall_s_instrumented": 1.5987569999415427,
+      "mem_peak_mb": 223.61135,
+      "ratio": 8.815235274134752,
+      "dev_vs_cie": 141.4060668243768,
+      "n_mu_eff": 32,
+      "n_moments_eff": 32,
+      "n_moments_optics": null,
+      "delta_m": false,
+      "orders": 10,
+      "converged": true
+    },
+    "p3": {
+      "wall_s_clean": 261.44852091604844,
+      "wall_s_instrumented": 438.9353308749851,
+      "mem_peak_mb": 1073.415334,
+      "ratio": 8.775991161879439,
+      "sigma_ratio": 0.04178553857146513,
+      "wl_subset": [
+        380.0,
+        410.0,
+        440.0,
+        470.0,
+        500.0,
+        530.0,
+        560.0,
+        590.0,
+        620.0,
+        650.0,
+        680.0,
+        710.0,
+        740.0,
+        770.0
+      ],
+      "mc_quality": "low",
+      "seed": 0,
+      "n_zen_run": 6,
+      "n_az_run": 8,
+      "n_anchor_run": 5,
+      "n_photons_run": 3999984,
+      "bandwidth": 0.06981317007977188,
+      "rel_stderr_max": 0.03178949757234343,
+      "rel_stderr_median": 0.002538377921541229,
+      "sigma_share": 0.00809230482904395
+    }
+  },
+  "invariants": {
+    "aod_before": {
+      "layers": [
+        [
+          "rural(RH=50%)",
+          0.05
+        ]
+      ],
+      "column_550": 5.0004629543898014e-05
+    },
+    "aod_after": {
+      "layers": [
+        [
+          "rural(RH=50%)",
+          0.05
+        ]
+      ],
+      "column_550": 5.0004629543898014e-05
+    },
+    "aod_invariant_ok": true,
+    "energy_identity_b0": 1.5987211554602254e-14,
+    "energy_identity_p1": 1.5543122344752192e-15,
+    "energy_identity_p2": 1.5987211554602254e-14
+  },
+  "g1": {
+    "B0_minus_CIE": 5.163614007902098,
+    "shares": {
+      "p1": 0.0006506787439562868,
+      "p2": -3.440142575881575e-16,
+      "p3": 0.007600125066523941,
+      "p3_sigma": 0.00809230482904395,
+      "p3_counted": false
+    },
+    "notes": [],
+    "R": 0.0006506787439562868,
+    "branch": 4,
+    "verdict": "P3 not counted (<= 3 sigma); R < 1/4 -> stop-loss: axis B dominant"
+  },
+  "t2": {
+    "32": {
+      "denominator": 0.14056025957704277,
+      "numerator": 1.7539877615114627e-05,
+      "t2": 0.0001247854668730233,
+      "layer": 0,
+      "wl_nm": 550.0
+    },
+    "128": {
+      "denominator": 0.14056025957704277,
+      "numerator": 1.7539877615114627e-05,
+      "t2": 0.0001247854668730233,
+      "layer": 0,
+      "wl_nm": 550.0
+    }
+  },
+  "anchor": {
+    "results_json_dev": 141.40606682437675,
+    "results_json_model": 8.81523527413475,
+    "results_json_reference": 3.6516212662326524,
+    "probe_dev": 141.40606682437675
+  },
+  "cut": {
+    "n_views": 88,
+    "n_views_gamma_1_90": 67
+  },
+  "ratio_cie": 3.6516212662326524,
+  "ratio_b0": 8.81523527413475,
+  "ratio_b0_cut": 8.81523527413475,
+  "ratio_p3": 8.775991161879439
+}

@@ -1,0 +1,22 @@
+{
+ "closure_max_rel": 0.0,
+ "zenith": {
+  "single": 1604.1573289558962,
+  "multiple": 385.35101494133465,
+  "total": 1989.508343897231,
+  "mult_frac_of_total": 0.1936915801953732
+ },
+ "horizon_sun": {
+  "single": 12087.523530617234,
+  "multiple": 5450.460600691045,
+  "total": 17537.98413130828,
+  "mult_frac_of_total": 0.3107803359772146
+ },
+ "ratio_single_only": 7.535123464781778,
+ "ratio_multiple_only": 14.14414492075703,
+ "ratio_total": 8.81523527413475,
+ "mult_enhancement": {
+  "zenith": 1.2402202128092696,
+  "horizon": 1.4509162349827271
+ }
+}
