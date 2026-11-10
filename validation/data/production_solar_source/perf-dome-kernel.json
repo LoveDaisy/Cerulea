@@ -76,6 +76,7 @@
       "dome_ratio": 5.93471765555468,
       "note": "task-production-solar-source acceptance record (legacy anchor 1.1192 s, budget 3x); kept unchanged, not overwritten"
     },
-    "verdict": "gate still breached (5.46x vs 3x budget); residual attributed in docs/physics/SOLAR_SOURCE.md item 3 and task-dome-kernel SUMMARY"
+    "verdict": "gate still breached (5.46x vs 3x budget); residual attributed in docs/physics/SOLAR_SOURCE.md item 3 and task-dome-kernel SUMMARY",
+    "head_note": "measured at git_head 792254f; the post-measurement commits (ebff1ee, and the scheduling-weights re-sync) touch comments, test names, docs and the LPT weight table only -- the numeric kernel path is unchanged, so the recorded rows remain valid for HEAD"
   }
 }
