@@ -6,6 +6,7 @@ physical-check limits in [STATUS.md](../STATUS.md).
 
 | Document | Scope |
 |---|---|
+| [MAINLINE.zh.md](MAINLINE.zh.md) | Reader-level mainline (Chinese): coarse-to-fine chapter arc with figures; the evidence-level ladder is the row below |
 | [LAYER_STORY.md](LAYER_STORY.md) | The progressive layer ladder (Rayleigh → … → observation comparison); each rung's visible difference attributed against its pinned baseline |
 | [APPROXIMATIONS.md](APPROXIMATIONS.md) | Common target, finite branches, real same-entry comparisons and interpretation limits |
 | [SOLAR_SOURCE.md](SOLAR_SOURCE.md) | The unified finite-disk solar source: contract, per-backend consumption and validation entry points |
