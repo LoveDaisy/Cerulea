@@ -301,6 +301,14 @@ def recheck_check2(workers: int) -> None:
         print(f"2c  h={h:.0f}: model scene effective TL (CIE Yz metric) = {t_eff:.3f}; "
               f"DHI dev at scene-matched T: "
               f"{100*(b['dhi']/dhi_cie_eff-1):+.1f}%")
+        # sun-axis probe: the same scene with the solar elevation raised by
+        # the Saemundsson refraction at this elevation (true-vs-apparent
+        # convention absorbed as an input shift).  Dedicated prints because
+        # the deltas are at/below the [sky] progress-line resolution.
+        so = sky[f"c2_h{int(h)}_soff"]
+        print(f"2c  h={h:.0f} sun-axis probe (+{saemundsson_refraction_arcmin(h)/60.0:.3f} deg "
+              f"elevation): DHI {100*(so['dhi']/b['dhi']-1):+.2f}%, "
+              f"Lz {100*(so['lz']/b['lz']-1):+.2f}%")
 
     # AOD scan: what turbidity would the CIE DHI correspond to?
     for h, base in ((30.0, "c2_h30_base"),):
@@ -382,6 +390,9 @@ def recheck_check2(workers: int) -> None:
               f"0.1={b['dhi']/1000:.4f} 0.2={z2['dhi']/1000:.4f} klx; "
               f"0.2 vs 0.1 = {100*(z2['dhi']/b['dhi']-1):+.2f}%, "
               f"0.0 vs 0.1 = {100*(z0['dhi']/b['dhi']-1):+.2f}%")
+        print(f"2d  h={h:.0f}: Lz(albedo) 0.0 vs 0.1 = "
+              f"{100*(z0['lz']/b['lz']-1):+.2f}%, 0.2 vs 0.1 = "
+              f"{100*(z2['lz']/b['lz']-1):+.2f}%")
 
 
 # ---------------------------------------------------------------------------
