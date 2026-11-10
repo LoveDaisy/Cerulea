@@ -50,6 +50,11 @@ in [CURVED_TRANSPORT_AUDIT.md](twilight/CURVED_TRANSPORT_AUDIT.md).
 | 5 — Twilight, first order only | FAIL in deep twilight; does not test the full engine |
 | 6 — Koomen twilight | FAIL; −6° deterministic 0.55×, −9°/−12° engine 1.15×/0.75× — the round-4 contact-band disk fix raised the deep-twilight MC NEE (old 2×8 disk under-integrated partially occulted beams; deterministic SS unchanged) |
 
+Read-only audit of the reference contracts behind checks 2/3/6 (premises,
+definitions, solar-axis conventions, transcription): 2026-11-10, see
+[validation/RULER_AUDIT.md](../validation/RULER_AUDIT.md) — **conclusions live
+there** (this pointer is not a second source; no physical numbers changed).
+
 Check6's deep points are one low-budget seed, not converged predictions. The
 [deep-twilight reference](twilight/DEEP_TWILIGHT_REFERENCE.md) quantifies
 what those points actually are: at 16 seeds × 1.6M photons/λ the −9°/−12°
