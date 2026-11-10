@@ -49,6 +49,7 @@ __all__ = [
     "mie_coefficients_batch",
     "mie_asymmetry",
     "mie_phase",
+    "mie_phase_batch",
     "mie_moment_numerators",
     "mie_moment_numerators_batch",
     "mie_legendre_moments",
@@ -710,6 +711,69 @@ def mie_phase(
         s2 += cf * (a[n] * tau[n] + b[n] * pi[n])
     p = 2.0 * (np.abs(s1) ** 2 + np.abs(s2) ** 2) / (coeff.x**2 * coeff.qsca)
     return p.reshape(theta.shape)
+
+
+def mie_phase_batch(
+    a: np.ndarray,
+    b: np.ndarray,
+    x: np.ndarray,
+    qsca: np.ndarray,
+    n_max: np.ndarray,
+    theta_rad: np.ndarray,
+) -> np.ndarray:
+    """Batched :func:`mie_phase` over one wavelength's nodes.
+
+    The angular functions ``pi_n``/``tau_n`` depend on ``mu`` only, so the
+    scalar path recomputing them per size node is pure waste: this kernel
+    builds the shared table once at the batch's ``n_max`` (row ``n`` is
+    bitwise-equal to the per-node recurrence, which only consumes earlier
+    rows) and accumulates ``s1``/``s2`` with a per-step mask.
+
+    Parameters
+    ----------
+    a, b : ndarray (n_pair, n_max_pad + 1) complex
+    x, qsca : ndarray (n_pair,)
+    n_max : ndarray (n_pair,) int
+    theta_rad : ndarray (n_angle,)
+
+    Returns
+    -------
+    ndarray (n_pair, n_angle)
+        Phase function per pair; rows with ``qsca <= 0`` are zero.
+
+    Equivalence note (task-cold-optics): measured <= 1 ulp (3.1e-16 relative)
+    on at most one node per wavelength against the scalar path (probe C);
+    the residual is covered by the D2 declared tolerances together with the
+    batched moment kernel.
+    """
+    a_mat = np.asarray(a, dtype=complex)
+    b_mat = np.asarray(b, dtype=complex)
+    x_arr = np.asarray(x, dtype=float)
+    qsca_arr = np.asarray(qsca, dtype=float)
+    n_max_arr = np.asarray(n_max, dtype=int)
+    th = np.asarray(theta_rad, dtype=float)
+    P = x_arr.size
+    if P == 0 or th.size == 0:
+        return np.zeros((P, th.size))
+    nmax_pad = int(n_max_arr.max())
+    mu_arr = np.cos(th)
+    pi, tau = _angular_functions(mu_arr, nmax_pad)
+    s1 = np.zeros((P, th.size), dtype=complex)
+    s2 = np.zeros((P, th.size), dtype=complex)
+    for n in range(1, nmax_pad + 1):
+        cf = (2 * n + 1) / (n * (n + 1))
+        mask = n_max_arr >= n
+        pi_n = pi[n][None, :]
+        tau_n = tau[n][None, :]
+        a_n = a_mat[mask, n][:, None]
+        b_n = b_mat[mask, n][:, None]
+        s1[mask] += cf * (a_n * pi_n + b_n * tau_n)
+        s2[mask] += cf * (a_n * tau_n + b_n * pi_n)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        p = 2.0 * (np.abs(s1) ** 2 + np.abs(s2) ** 2) \
+            / (x_arr[:, None] ** 2 * qsca_arr[:, None])
+    p[~np.isfinite(p)] = 0.0
+    return p
 
 
 # ===========================================================================

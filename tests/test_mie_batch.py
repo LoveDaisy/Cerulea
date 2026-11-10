@@ -102,6 +102,22 @@ def test_batch_moments_match_scalar_within_declaration(anchor):
         assert np.allclose(U_bat[0], U_ref, **TOL_MOMENTS)
 
 
+def test_batch_phase_table_preset_anchor_declared_tolerance(anchor):
+    """Phase tables and the production radiance vs pinned (scalar) arrays."""
+    for name, factory in (("clear", presets.clear), ("dusty", presets.dusty)):
+        aer = factory(WL_COARSE).aerosols[0].aerosol
+        for w in (380.0, 550.0, 780.0):
+            p = aer.phase_table(w).p
+            assert np.allclose(p, anchor[f"{name}_table_p{int(w)}"],
+                               **TOL_TABLE)
+        assert np.allclose(
+            np.array([aer.phase_table(w).p_peak for w in WL_COARSE]),
+            anchor[f"{name}_p_peak"], **TOL_TABLE)
+        assert np.allclose(
+            np.array([aer.phase_table(w).normalisation() for w in WL_COARSE]),
+            anchor[f"{name}_p_norm"], **TOL_TABLE)
+
+
 def test_batch_moments_preset_anchor_declared_tolerance(anchor):
     """Production surface: moments through the aerosol path vs pinned arrays."""
     for name, factory in (("clear", presets.clear), ("dusty", presets.dusty)):

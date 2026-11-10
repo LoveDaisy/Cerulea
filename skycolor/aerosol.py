@@ -56,6 +56,7 @@ from .mie import (
     mie_coefficients_batch,
     mie_moment_numerators_batch,
     mie_phase,
+    mie_phase_batch,
     phase_table_angles,
 )
 
@@ -593,11 +594,20 @@ class MieAerosol(Aerosol):
             n_back=self.table_back_points,
         )
         th = np.radians(theta)
+        if state.batch is None or state.wts is None:
+            raise RuntimeError(
+                "state was built without the batched coefficient kernel; "
+                "rebuild the aerosol state")
+        p_batch = mie_phase_batch(
+            state.batch.a, state.batch.b, state.batch.x, state.batch.qsca,
+            state.batch.n_max, th)
+        # node-order weighted sum, same accumulation sequence as the scalar
+        # path (only the per-node p values differ, at <= 1 ulp, D2)
         psum = np.zeros_like(th)
         den = 0.0
-        for c, r, w, area in state.coeffs:
-            psum += (w * area * c.qsca) * mie_phase(c, th)
-            den += w * area * c.qsca
+        for j, (c, _r, _w, _area) in enumerate(state.coeffs):
+            psum += state.wts[j] * c.qsca * p_batch[j]
+            den += state.wts[j] * c.qsca
         if den <= 0.0:
             # no scattering: isotropic normalised phase function
             psum = np.ones_like(th)
@@ -606,11 +616,18 @@ class MieAerosol(Aerosol):
 
     def _phase_direct(self, state: "_State", mu: np.ndarray) -> np.ndarray:
         theta = np.arccos(np.clip(mu, -1.0, 1.0))
+        if state.batch is None or state.wts is None:
+            raise RuntimeError(
+                "state was built without the batched coefficient kernel; "
+                "rebuild the aerosol state")
+        p_batch = mie_phase_batch(
+            state.batch.a, state.batch.b, state.batch.x, state.batch.qsca,
+            state.batch.n_max, theta)
         psum = np.zeros_like(theta)
         den = 0.0
-        for c, r, w, area in state.coeffs:
-            psum += (w * area * c.qsca) * mie_phase(c, theta)
-            den += w * area * c.qsca
+        for j, (c, _r, _w, _area) in enumerate(state.coeffs):
+            psum += state.wts[j] * c.qsca * p_batch[j]
+            den += state.wts[j] * c.qsca
         return psum / den if den > 0.0 else np.ones_like(theta)
 
     def phase(self, mu, wl_nm):
