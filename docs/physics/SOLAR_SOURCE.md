@@ -205,10 +205,16 @@ them further is a separate user decision.
    scope.
 3. **Availability gate: dome query cost.** Reference-machine measurement
    after the round-6 rewrite, the gen2-R1 fixes and the task-dome-kernel
-   vectorization: source cold build 9.3-10.4 s (budget 10 s), warm single
-   81wl single-direction 0.011-0.015 s (budget 1 s), MC 3wl x 20k 2.9-3.5x
-   legacy (budget 4x), SOS 0.03x, cold peak RSS 0.34-0.38 GiB (budget
-   +0.5 GiB).  The standing breach is the standard clear dome: 5.5x the
+   vectorization: source cold build 9.3-10.0 s (budget 10 s; the
+   task-dome-kernel record reads 10.06 s, marginally over budget with the
+   build path untouched by that task -- +3% window noise, the same scale
+   as the +8% dome re-measure of the branch point), warm single 81wl
+   single-direction 0.011-0.015 s (budget 1 s), MC 3wl x 20k 2.9-3.5x
+   legacy (budget 4x), SOS 0.03x, cold-block peak RSS 0.34-0.35 GiB
+   (budget +0.5 GiB, unchanged from perf-final) while the warm process
+   peak RSS grows 1.29 -> 1.44 GiB with the vectorized kernel's per-point
+   index intermediates and per-call block scratch.  The standing breach is
+   the standard clear dome: 5.5x the
    legacy wall time (budget 3x), i.e. 6.1 s for the 46x91 3-wavelength
    warm dome vs the legacy 1.12 s (6.7x / 7.45 s on the branch point in
    the same idle window; evidence pair in

@@ -43,6 +43,13 @@
     }
   },
   "peak_rss_gib": 1.4375,
+  "cold": {
+    "import_s": 0.29389375005848706,
+    "mie81_cold_s": 0.001950958976522088,
+    "single81_first_call_s": 11.14272699994035,
+    "sos81_first_call_s": 5.7978815420065075,
+    "peak_rss_gib": 0.3428802490234375
+  },
   "provenance": {
     "task": "task-dome-kernel",
     "what_changed": "query kernel vectorization: row-group Python loop -> argsort row groups + per-group C searchsorted segment indices + 64k-block flat take(out=)/out= Horner evaluation; bitwise-identical outputs (2.11M-point migration reference + golden)",
@@ -61,6 +68,8 @@
       },
       "delta_dome": "-18%"
     },
+    "baseline_key_note": "the top-level 'baseline' block holds THIS record's measured rows (after); pre-change values live in provenance.pair.before",
+    "cold_block_note": "the 'cold' block is from a separate full run of the same tree in a mildly loaded window (loadavg 1min ~27): cold build 10.39 s vs 10.06 s in the idle window -- the source_table_build row reads 10.06 here (idle window), marginally over its 10 s budget with the build path untouched by this task (+3% window noise, same scale as the +8% dome before re-measure); cold peak RSS 0.34 GiB vs perf-final 0.35 GiB unchanged, while process-level peak_rss_gib 1.44 vs 1.29 GiB grows with the kernel's per-point index intermediates and per-call block scratch",
     "baseline_record": {
       "file": "perf-final.json",
       "git_head": "fae5238981aeaaad65f33541588d601ed90c4285",

@@ -511,7 +511,7 @@ def test_scatter_frame_equivariant_and_batch_invariant():
     assert np.array_equal(vm[0], v1) and np.array_equal(vm[1], v2)
 
 
-def test_flat_rows_gather_matches_rows(small_source):
+def test_flat_query_cache_gather_matches_rows(small_source):
     """The flat query cache is a bitwise copy of the per-row arrays.
 
     Every row's knot / coefficient block must be recoverable exactly from
@@ -521,8 +521,8 @@ def test_flat_rows_gather_matches_rows(small_source):
     and the prefix-sum identities between the two offset families.
     """
     _atmo, _geom, table = small_source
-    flat = table.flat_rows()
-    assert table.flat_rows() is flat  # cached identity: built once per table
+    flat = table._flat_rows()
+    assert table._flat_rows() is flat  # cached identity: built once per table
     assert flat.t.size == sum(len(r.t) for r in table.rows)
     assert np.array_equal(
         flat.coef_base + (flat.row_len - 1),
@@ -536,17 +536,19 @@ def test_flat_rows_gather_matches_rows(small_source):
                               row.columns)
 
 
-def test_segment_bisection_matches_searchsorted(small_source):
-    """The vectorized bisection is exactly the searchsorted it replaced.
+def test_segment_indices_match_searchsorted(small_source):
+    """The grouped segment probe is exactly the per-row searchsorted.
 
     For every row (vacuum 3-knot rows included), probing the knots
     themselves, interval midpoints, just-outside values and random draws,
     the flat-kernel segment index must equal
     ``clip(searchsorted(row.t, t, 'right') - 1, 0, len-2)`` pointwise --
-    this is the determinism half of the bitwise contract (plan judgement 2).
+    this is the determinism half of the bitwise contract (plan judgement 2;
+    the vectorization keeps the C searchsorted primitive per row group, it
+    does not reimplement the probe).
     """
     _atmo, _geom, table = small_source
-    flat = table.flat_rows()
+    flat = table._flat_rows()
     rng = np.random.default_rng(42)
     for r, row in enumerate(table.rows):
         knots = row.t

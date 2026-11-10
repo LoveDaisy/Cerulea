@@ -26,10 +26,13 @@ uv run python -m tools.benchmark_solar_source --out /tmp/perf-final.json
   contract, accepted as a recorded deviation with a documented resolution
   knob; all other rows pass; see `docs/physics/SOLAR_SOURCE.md`.
 * `perf-dome-kernel.json` — dome query-kernel vectorization evidence
-  (task-dome-kernel, same measurement contract and legacy anchors).  The
-  row-group Python loop is gone (bitwise-equal vectorized kernel); the
-  standing breach is clear dome 5.5x legacy (budget 3x), measured 6.7x on
-  the branch point in the same idle window (7.45 -> 6.11 s for the 46x91
-  3-wavelength warm dome).  The JSON carries a `provenance` block with the
-  before/after pair, the loaded-window disclaimer and the baseline record;
-  residual cost attribution in `docs/physics/SOLAR_SOURCE.md` item 3.
+  (task-dome-kernel, same measurement contract and legacy anchors; the
+  top-level `baseline` block holds THIS record's measured rows, the
+  pre-change anchor lives in `provenance.pair.before`).  The row-group
+  Python loop is gone (bitwise-equal vectorized kernel); the standing
+  breach is clear dome 5.5x legacy (budget 3x), measured 6.7x on the
+  branch point in the same idle window (7.45 -> 6.11 s for the 46x91
+  3-wavelength warm dome).  The JSON carries a `provenance` block with
+  the before/after pair, the loaded-window disclaimer, the cold-block
+  note and the baseline record; residual cost attribution in
+  `docs/physics/SOLAR_SOURCE.md` item 3.

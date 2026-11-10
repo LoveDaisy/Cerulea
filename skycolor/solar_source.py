@@ -676,8 +676,8 @@ class _TableRow:
     """One height row: knots in normalised true-elevation space."""
 
     t: np.ndarray                 # (true - critical) / (90 - critical), ascending
-    direction: np.ndarray         # PCHIP coefficients, (4, n_knot)
-    columns: np.ndarray           # PCHIP coefficients, (4, n_knot, n_species)
+    direction: np.ndarray         # PCHIP coefficients, (4, n_knot - 1) segments
+    columns: np.ndarray           # PCHIP coefficients, (4, n_knot - 1, n_species)
 
 
 @dataclass
@@ -803,7 +803,7 @@ class PointSourceTable:
             if progress:
                 print(f"solar table row h={height:.2f}: {diagnostic}", flush=True)
         # Rows are READ-ONLY after construction: the flat query cache
-        # (:meth:`flat_rows`) is materialized once from them and relies on
+        # (:meth:`_flat_rows`) is materialized once from them and relies on
         # the row arrays never being mutated afterwards.
         self.rows = rows
         self.critical = np.asarray(criticals)
@@ -993,7 +993,7 @@ class PointSourceTable:
         return row, critical, diagnostic
 
     # -- queries --------------------------------------------------------------
-    def flat_rows(self) -> _FlatRows:
+    def _flat_rows(self) -> _FlatRows:
         """Lazily materialize the flattened query arrays (once per table).
 
         Cheap relative to the build (~ms of concatenation for ~13k knots);
@@ -1099,12 +1099,17 @@ class PointSourceTable:
             value = np.zeros(len(ind))
             derivative = np.zeros(len(ind))
             col = np.zeros((len(ind), len(self.column_scale)))
-            flat = self.flat_rows()
+            flat = self._flat_rows()
             t_lit = t[ind]
             row0 = i[ind]
             nsp = len(self.column_scale)
             P = ind.size
             bs = min(_QUERY_BLOCK, P)
+            # Block scratch lifecycle: allocated ONCE at this size, reused
+            # across both sides and every block, fully overwritten by each
+            # block's take(out=)/ufunc out= before any read of that block.
+            # Slicing to [:b] per block; do not move the allocation inside
+            # the loop or repurpose a buffer mid-block.
             cc_sten = np.empty((bs, 4, nsp))
             b_c0, b_c1, b_c2, b_c3 = (np.empty(bs) for _ in range(4))
             b_val, b_der, b_t = np.empty(bs), np.empty(bs), np.empty(bs)
