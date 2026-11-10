@@ -44,7 +44,9 @@ from scipy.special import gammaln
 
 __all__ = [
     "MieCoefficients",
+    "MieCoefficientsBatch",
     "mie_coefficients",
+    "mie_coefficients_batch",
     "mie_asymmetry",
     "mie_phase",
     "mie_moment_numerators",
@@ -147,6 +149,206 @@ def mie_coefficients(x: float, m: complex, n_max: int | None = None) -> MieCoeff
         (2 * n_arr + 1) * (np.abs(a[1:]) ** 2 + np.abs(b[1:]) ** 2)
     )
     return MieCoefficients(x, m, a, b, float(qext), float(qsca), n_max)
+
+
+# ---------------------------------------------------------------------------
+# Fused multiply-add without hardware FMA (see mie_coefficients_batch)
+# ---------------------------------------------------------------------------
+def _fma(a: np.ndarray, b: np.ndarray, c: np.ndarray) -> np.ndarray:
+    """``fl(a*b + c)`` with a single rounding, without hardware FMA.
+
+    The CPython build on this platform contracts ``x + y*z`` inside its
+    complex division into a fused multiply-add, so reproducing that division
+    bit-for-bit needs an FMA primitive; numpy has none.  Dekker's twoProduct
+    (veltkamp split) recovers the exact product error, and a twoSum chain
+    collapses ``p + err + c`` so that only the final addition rounds.  Verified
+    bitwise against libm ``fma`` (200k random triples) and against CPython's
+    contracted division on the real (node x wavelength) pair population
+    (task-cold-optics probe, A3c: 0/28512 pairs differ).
+    """
+    a = np.asarray(a, dtype=float)
+    b = np.asarray(b, dtype=float)
+    c = np.asarray(c, dtype=float)
+    p = a * b
+    split = 134217729.0  # 2**27 + 1 (Dekker split for IEEE double)
+    ca = split * a
+    ah = ca - (ca - a)
+    al = a - ah
+    cb = split * b
+    bh = cb - (cb - b)
+    bl = b - bh
+    err = ((ah * bh - p) + ah * bl + al * bh) + al * bl
+    s = p + c
+    bb = s - p
+    f = (p - (s - bb)) + (c - bb)  # Knuth twoSum: p + c = s + f exactly
+    u = f + err
+    bb2 = u - f
+    g = (f - (u - bb2)) + (err - bb2)  # twoSum: f + err = u + g exactly
+    return s + u + g
+
+
+def _smith_division_constants(re: np.ndarray, im: np.ndarray):
+    """Hoisted per-denominator Smith constants for CPython complex division.
+
+    CPython computes ``num / den`` (complex) by Smith's method with FMA
+    contraction; for the batched Mie kernel the only CPython-division site is
+    ``n / rho`` whose denominator ``rho`` is fixed per size node, so the
+    branch decision, ratio and (fused) denominator are computed once per pair
+    here and reused for every recurrence step.
+
+    Returns ``(big, ratio1, denom1, ratio2, denom2)``: with ``big`` selecting
+    branch 1 (``|re| >= |im|``), ``n / den`` is ``n/denom1 - i*(n*ratio1)/denom1``
+    on branch 1 and ``(n*ratio2)/denom2 - i*n/denom2`` on branch 2 (the
+    numerators' own FMA sites collapse to plain products for a real numerator).
+    """
+    re = np.asarray(re, dtype=float)
+    im = np.asarray(im, dtype=float)
+    big = np.abs(re) >= np.abs(im)
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+        ratio1 = np.where(big, im / np.where(big, re, 1.0), 0.0)
+        denom1 = np.where(big, _fma(im, ratio1, np.where(big, re, 1.0)), 1.0)
+        ratio2 = np.where(~big, re / np.where(~big, im, 1.0), 0.0)
+        denom2 = np.where(~big, _fma(re, ratio2, np.where(~big, im, 1.0)), 1.0)
+    return big, ratio1, denom1, ratio2, denom2
+
+
+@dataclass(frozen=True)
+class MieCoefficientsBatch:
+    """Mie coefficients for one wavelength's size nodes, computed in batch.
+
+    Bitwise-equal to calling :func:`mie_coefficients` on each pair
+    (task-cold-optics probe A3c, 0/28512 real pairs differing).  The two
+    division sites of the scalar path run on different engines: ``n / rho``
+    has pure-Python operands and is CPython complex division -- reproduced by
+    :func:`_smith_division_constants` -- while ``1.0 / (D[n] + n/rho)`` has a
+    numpy complex128 operand and is bitwise-equal to plain numpy array
+    division.  Rows are zero beyond each pair's ``n_max``, matching the
+    scalar zeros-padded layout.
+
+    Attributes are shaped ``(n_pair,)`` / ``(n_pair, n_max_pad + 1)``.
+    """
+
+    x: np.ndarray
+    m: np.ndarray
+    a: np.ndarray
+    b: np.ndarray
+    qext: np.ndarray
+    qsca: np.ndarray
+    n_max: np.ndarray
+    nmx: np.ndarray
+
+    @property
+    def n_pair(self) -> int:
+        return int(self.x.size)
+
+
+def mie_coefficients_batch(x, m) -> MieCoefficientsBatch:
+    """Batched :func:`mie_coefficients` over size parameters ``x``.
+
+    Parameters
+    ----------
+    x : array_like (n_pair,)
+        Size parameters; must be positive (pairs with ``x < 1e-4`` are the
+        caller's business, mirroring the scalar early-out).
+    m : array_like (n_pair,) complex
+        Refractive index per pair.
+
+    Returns
+    -------
+    MieCoefficientsBatch
+        ``a``/``b`` rows are the per-pair coefficient arrays zero-padded to a
+        common ``n_max_pad + 1`` columns; ``qext``/``qsca`` are reduced with
+        the scalar path's per-pair ``np.sum`` calls so they stay bitwise too.
+    """
+    x_arr = np.asarray(x, dtype=float)
+    m_arr = np.asarray(m, dtype=complex)
+    if x_arr.ndim != 1 or m_arr.shape != x_arr.shape:
+        raise ValueError("x and m must be 1-D arrays of equal length")
+    P = x_arr.size
+    if P == 0:
+        empty = np.zeros(0)
+        return MieCoefficientsBatch(empty, empty.astype(complex),
+                                    np.zeros((0, 1), dtype=complex),
+                                    np.zeros((0, 1), dtype=complex),
+                                    empty, empty, empty.astype(int),
+                                    empty.astype(int))
+
+    # per-pair truncation with the scalar (CPython) semantics; the loop is
+    # O(n_pair) scalar work, negligible next to the recurrences
+    n_max_arr = np.array([max(int(_nmax(float(xv))), 1) for xv in x_arr])
+    nmx_arr = np.array(
+        [max(int(n_max_arr[p]), int(abs(complex(m_arr[p]) * float(x_arr[p])))) + 15
+         for p in range(P)])
+    nmx_pad = int(nmx_arr.max())
+    n_max_pad = int(n_max_arr.max())
+
+    # --- n / rho via hoisted Smith constants (CPython division site) -------
+    rho = m_arr * x_arr
+    big, ratio1, denom1, ratio2, denom2 = _smith_division_constants(
+        np.real(rho), np.imag(rho))
+    n_val = np.arange(nmx_pad + 1, dtype=float)
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+        n_over_rho = np.where(
+            big[:, None],
+            (n_val[None, :] / denom1[:, None])
+            + 1j * (-(n_val[None, :] * ratio1[:, None]) / denom1[:, None]),
+            (n_val[None, :] * ratio2[:, None] / denom2[:, None])
+            + 1j * (-(n_val[None, :] / denom2[:, None])),
+        )
+
+    # --- D down-recurrence, one masked step per n --------------------------
+    D = np.zeros((P, nmx_pad + 1), dtype=complex)
+    for n in range(nmx_pad, 0, -1):
+        mask = nmx_arr >= n
+        tm = n_over_rho[mask, n]
+        # 1.0/(D[n] + n/rho): the scalar path's operand is a numpy complex128
+        # scalar, i.e. numpy scalar division -- bitwise-equal to array division
+        D[mask, n - 1] = tm - 1.0 / (D[mask, n] + tm)
+
+    # --- psi / chi up-recurrence (real arithmetic) --------------------------
+    psi = np.zeros((P, n_max_pad + 2))
+    chi = np.zeros((P, n_max_pad + 2))
+    sx = np.sin(x_arr)
+    cx = np.cos(x_arr)
+    psi[:, 0] = sx
+    chi[:, 0] = cx
+    psi[:, 1] = sx / x_arr - cx
+    chi[:, 1] = cx / x_arr + sx
+    for n in range(1, n_max_pad + 1):
+        mask = n_max_arr >= n
+        f = (2 * n + 1) / x_arr
+        psi[mask, n + 1] = f[mask] * psi[mask, n] - psi[mask, n - 1]
+        chi[mask, n + 1] = f[mask] * chi[mask, n] - chi[mask, n - 1]
+
+    xi = psi - 1j * chi
+
+    # --- a / b combination ---------------------------------------------------
+    a = np.zeros((P, n_max_pad + 1), dtype=complex)
+    b = np.zeros((P, n_max_pad + 1), dtype=complex)
+    for n in range(1, n_max_pad + 1):
+        mask = n_max_arr >= n
+        dn = D[mask, n]
+        pa = dn / m_arr[mask] + n / x_arr[mask]
+        pb = m_arr[mask] * dn + n / x_arr[mask]
+        a[mask, n] = (pa * psi[mask, n] - psi[mask, n - 1]) \
+            / (pa * xi[mask, n] - xi[mask, n - 1])
+        b[mask, n] = (pb * psi[mask, n] - psi[mask, n - 1]) \
+            / (pb * xi[mask, n] - xi[mask, n - 1])
+
+    # --- cheap reductions stay per-pair (K2): same np.sum calls as scalar ---
+    qext = np.empty(P)
+    qsca = np.empty(P)
+    for j in range(P):
+        xv = float(x_arr[j])
+        nx = int(n_max_arr[j])
+        n_arr = np.arange(1, nx + 1)
+        aj = a[j, 1: nx + 1]
+        bj = b[j, 1: nx + 1]
+        qext[j] = 2.0 / xv**2 * np.sum((2 * n_arr + 1) * np.real(aj + bj))
+        qsca[j] = 2.0 / xv**2 * np.sum(
+            (2 * n_arr + 1) * (np.abs(aj) ** 2 + np.abs(bj) ** 2))
+    return MieCoefficientsBatch(x_arr, m_arr, a, b, qext, qsca,
+                                n_max_arr, nmx_arr)
 
 
 def mie_asymmetry(
