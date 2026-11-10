@@ -141,10 +141,32 @@ def test_batch_coefficients_mixed_branch_population_bitwise():
     uniform branch-2 is covered by the absorbing-index test above, but a
     mixed population previously crashed on the full-width scratch
     (ValueError at the write-through assignment).  Two of the four pairs
-    here are branch 2, so both the k=1 and 1<k<P shapes are exercised.
+    here are branch 2, exercising the 1<k<P shape (the broadcast-multiply
+    crash form); the k=1 assignment-crash form is pinned separately by
+    ``test_batch_coefficients_single_branch2_pair_bitwise`` below.
     """
     xs = np.array([0.5, 2.0, 8.0, 40.0])
     ms = np.array([1.5 + 0.1j, 0.2 + 5.0j, 1.75 + 0.45j, 0.2 + 5.0j])
+    bat = mie_coefficients_batch(xs, ms)
+    for j in range(xs.size):
+        ref = mie_coefficients(float(xs[j]), complex(ms[j]))
+        nx = ref.nmax
+        assert np.array_equal(bat.a[j, : nx + 1], ref.a)
+        assert np.array_equal(bat.b[j, : nx + 1], ref.b)
+        assert bat.qext[j] == ref.qext
+        assert bat.qsca[j] == ref.qsca
+
+
+def test_batch_coefficients_single_branch2_pair_bitwise():
+    """Exactly one branch-2 pair in a mixed batch (the k=1 crash shape).
+
+    Second form of the full-width-scratch defect: with a single branch-2
+    pair the broadcast multiply fills the scratch without complaint and the
+    ValueError fires at the write-through assignment.  The shape is the
+    round-1 reproduction input; the scalar path handles both pairs.
+    """
+    xs = np.array([0.5, 2.0])
+    ms = np.array([1.5 + 0.01j, 0.2 + 5.0j])
     bat = mie_coefficients_batch(xs, ms)
     for j in range(xs.size):
         ref = mie_coefficients(float(xs[j]), complex(ms[j]))
