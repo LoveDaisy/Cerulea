@@ -111,7 +111,6 @@ class FigureDef:
 
 
 _FISH = "fisheye (equidistant, zenith-centred, 180°)"
-_RECT = "perspective (archived camera)"
 
 FIGURES: dict[str, FigureDef] = {
     "rayleigh": FigureDef(
@@ -123,7 +122,7 @@ FIGURES: dict[str, FigureDef] = {
             loglog=True,
             title="L1 · Rayleigh spectrum (log-log): zenith vs near-horizon"),
         (ViewPanelDef("l1_rayleigh_30", "total", "rect", False,
-                      f"L1 · Rayleigh only — {_RECT}"),
+                      "L1 · Rayleigh only"),
          ViewPanelDef("l1_rayleigh_30", "total", "fisheye", False,
                       f"L1 · Rayleigh only — {_FISH}")),
         ("docs/physics/LAYER_STORY.md §L1", "docs/physics/MAINLINE.zh.md 图2"),
@@ -163,11 +162,11 @@ FIGURES: dict[str, FigureDef] = {
         "twilight", "layer_story_twilight_v2.png", "triple_pair",
         None,
         (ViewPanelDef("l5_single_-4", "total", "rect", False,
-                      "L5 · spherical single — " + _RECT),
+                      "L5 · spherical single"),
          ViewPanelDef("l5_mc_-4", "total", "rect", False,
-                      "L5 · + MC higher orders — " + _RECT),
+                      "L5 · + MC higher orders"),
          ViewPanelDef("l5_plane_-4", "total", "rect", False,
-                      "L5 · plane-parallel world — " + _RECT),
+                      "L5 · plane-parallel world"),
          ViewPanelDef("l5_single_-4", "total", "fisheye", False,
                       "spherical single\n" + _FISH),
          ViewPanelDef("l5_mc_-4", "total", "fisheye", False,
@@ -181,9 +180,9 @@ FIGURES: dict[str, FigureDef] = {
         "cloud", "layer_story_cloud_v2.png", "rect_pair",
         None,
         (ViewPanelDef("l6_clear_30", "total", "rect", True,
-                      "L6 · clear (same contract) — " + _RECT),
+                      "L6 · clear (same contract)"),
          ViewPanelDef("l6_cloud_30", "total", "rect", True,
-                      "L6 · + stratus deck — " + _RECT)),
+                      "L6 · + stratus deck")),
         ("docs/physics/LAYER_STORY.md §L6", "docs/physics/MAINLINE.zh.md 图7"),
         "contract-matched pair, each with its own solve-bound floor lighting, "
         "locked cloud exposure 0.03; no fisheye (no ground in a 180° dome)"),
@@ -203,7 +202,7 @@ FIGURES: dict[str, FigureDef] = {
         "pipeline-view", "layer_story_pipeline_view_v2.png", "single_rect",
         None,
         (ViewPanelDef("l6_clear_30", "total", "rect", False,
-                      "hybrid-sos @ sun 30° — " + _RECT + ", no ground"),),
+                      "hybrid-sos @ sun 30°, no ground"),),
         ("docs/physics/MAINLINE.zh.md 图9",),
         "same run/component as pipeline-spectrum (single source pair); "
         "ground=False like the day display convention"),
@@ -623,7 +622,9 @@ def annotate_fisheye(ax, az, el, mask, sun_az: float, sun_el: float,
         dx, dy = p[0] - cx, p[1] - cy
         n = np.hypot(dx, dy)
         u = (dx / n, dy / n)
-        ax.plot([p[0], p[0] + 6 * u[0]], [p[1], p[1] + 6 * u[1]],
+        # ticks point INTO the disk: the panel's data limits stay exactly the
+        # image bounds, so outward stubs would clip at the square's edge
+        ax.plot([p[0], p[0] - 6 * u[0]], [p[1], p[1] - 6 * u[1]],
                 color=_ANN_INK, linewidth=1.1)
         # labels sit just inside the rim: always inside the image, never
         # clipped at the square's edge, bbox keeps them readable on sky
@@ -639,6 +640,90 @@ def _display_of(data, key: str) -> dict:
 def _sun_of(data, key: str) -> tuple[float, float]:
     opts = _run_options(data, key)
     return float(opts["sun_azimuth_deg"]), 90.0 - float(opts["sun_zenith_deg"])
+
+
+def _compact_spans(az_values: np.ndarray) -> str:
+    """Compact azimuth list: a run of evenly spaced nodes becomes a range."""
+    if az_values.size > 2 and np.allclose(np.diff(az_values), np.diff(az_values)[0],
+                                          rtol=1e-3):
+        return f"{az_values[0]:.0f}–{az_values[-1]:.0f}"
+    return ", ".join(f"{v:.1f}" for v in az_values)
+
+
+def _zero_note(data, key: str) -> str | None:
+    """The archive-content sentence for one run's horizon-row zeros, if any.
+
+    Generated from the run's own arrays and camera record: where the zero
+    cells sit (relative azimuth), and whether that side is inside the rect
+    frame's azimuth window (yaw ± hfov/2).  An out-of-window zero side is
+    reported as such -- the perspective view does not face that side; this
+    replaces the retired blanket "compressed by the perspective camera"
+    wording (owner probe, 2026-11-12: the anti-solar zeros are outside the
+    yaw-0° frame's sun-side window, both cameras sample the sun side at
+    comparable azimuth resolution).
+    """
+    zen = np.asarray(data[f"{key}/zenith"], dtype=float)
+    az = np.asarray(data[f"{key}/azimuth_rel"], dtype=float)
+    if zen.size * az.size < 4 or zen[-1] < 90.0:
+        return None
+    total = np.asarray(data[f"{key}/total"], dtype=float).reshape(
+        zen.size, az.size, -1)
+    zero = np.all(total[-1] == 0.0, axis=-1)
+    if not zero.any():
+        return None
+    if zero.all():
+        return (f"{key}: horizon row zero at all azimuths (plane-parallel "
+                "construction -- no horizon radiance in the plane world)")
+    zaz = az[zero]
+    display = _display_of(data, key)
+    yaw = float(display.get("yaw_deg", 0.0))
+    hfov = float(display.get("hfov_deg", 90.0))
+    inside = bool(np.any(np.abs((zaz - yaw + 180.0) % 360.0 - 180.0)
+                         <= hfov / 2.0))
+    where = ("inside the rect frame's azimuth window"
+             if inside else
+             "outside the rect frame's azimuth window (yaw "
+             f"{yaw:.0f}°, ±{hfov / 2.0:.0f}° sun-side) -- the perspective "
+             "view does not face that side")
+    return (f"{key}: horizon-row truncation zeros at rel-az "
+            f"{_compact_spans(zaz)}° are archive content, {where}")
+
+
+def angle_axes(ax, display: dict) -> dict:
+    """Honest camera-relative angle ticks for the archived pinhole camera.
+
+    The archive's own ``size``/``hfov_deg`` map through the production
+    pixel-centre convention (``render.perspective_grid``): the optical axis
+    hits pixel centre ((w-1)/2, (h-1)/2), f = (w/2)/tan(hfov/2), so column c
+    sits at horizontal angle atan((c - (w-1)/2)/f) and row r at vertical
+    angle atan(((h-1)/2 - r)/f).  Integer-degree ticks are placed by the
+    inverse mapping -- their uneven pixel spacing is the honest pinhole
+    nonlinearity, never relabelled linear pixels.  alpha/beta are angles
+    relative to the *camera axis*; pitch/yaw still steer the production
+    direction field, and horizon/sun annotations stay absolute directions.
+    Returns the tick mapping for tests and the manifest.
+    """
+    w, h = display["size"]
+    f = (w / 2.0) / np.tan(np.radians(display["hfov_deg"]) / 2.0)
+    cx, cy = (w - 1) / 2.0, (h - 1) / 2.0
+    a_lo, a_hi = np.degrees(np.arctan((np.array([0.0, w - 1.0]) - cx) / f))
+    # row h-1 is the image bottom -> beta negative: subtract, don't add
+    b_lo, b_hi = np.degrees(np.arctan((cy - np.array([h - 1.0, 0.0])) / f))
+    a_ticks = [a for a in range(-180, 181, 20) if a_lo < a < a_hi]
+    b_ticks = [b for b in range(-180, 181, 20) if b_lo < b < b_hi]
+    ax.set_xticks([cx + f * np.tan(np.radians(a)) for a in a_ticks])
+    ax.set_xticklabels([f"{a}°" for a in a_ticks], fontsize=8)
+    ax.set_yticks([cy - f * np.tan(np.radians(b)) for b in b_ticks])
+    ax.set_yticklabels([f"{b}°" for b in b_ticks], fontsize=8)
+    ax.set_xlabel("camera-relative horizontal angle α [deg]", fontsize=8,
+                  labelpad=2)
+    ax.set_ylabel("camera-relative vertical angle β [deg]", fontsize=8,
+                  labelpad=2)
+    return dict(focal_px=f,
+                horizontal=[(a, float(cx + f * np.tan(np.radians(a))))
+                            for a in a_ticks],
+                vertical=[(b, float(cy - f * np.tan(np.radians(b))))
+                          for b in b_ticks])
 
 
 def rect_panel(ax, data, vdef: ViewPanelDef, overrides=None) -> dict:
@@ -668,6 +753,11 @@ def rect_panel(ax, data, vdef: ViewPanelDef, overrides=None) -> dict:
                                      display["pitch_deg"],
                                      display["yaw_deg"])
     annotate_rect(ax, az, el, *_sun_of(data, key))
+    # the annotations must not stretch the displayed field: the panel shows
+    # exactly the archived camera's pixels, with camera-relative angle ticks
+    angle_axes(ax, display)
+    ax.set_xlim(-0.5, w - 0.5)
+    ax.set_ylim(h - 0.5, -0.5)
     ax.set_title(vdef.title, fontsize=10)
     return dict(camera="rect", key=key, part=vdef.part, ground=vdef.ground,
                 display=display, pixel_size=[w, h])
@@ -694,6 +784,16 @@ def fisheye_panel(ax, data, vdef: ViewPanelDef, size: int = 640) -> dict:
                     bbox=dict(boxstyle="round,pad=0.25", fc="white",
                               ec=_ANN_INK, lw=0.6, alpha=0.85))
     ax.set_title(vdef.title, fontsize=10)
+    # square axis box with symmetric image bounds: equal aspect + exact image
+    # limits + no pixel ticks (the rim degree labels carry direction), so the
+    # saved panel shows the square image hugging its axes box on all four
+    # sides -- annotation artists never stretch the displayed field
+    ax.set_xlim(-0.5, size - 0.5)
+    ax.set_ylim(size - 0.5, -0.5)
+    ax.set_aspect("equal", adjustable="box")
+    ax.set_anchor("C")
+    ax.set_xticks([])
+    ax.set_yticks([])
     return dict(camera="fisheye", key=vdef.key, part=vdef.part, ground=False,
                 display=dict(exposure=display["exposure"],
                              tonemap=display["tonemap"],
@@ -717,18 +817,43 @@ _STYLE = {"figure.facecolor": "#fcfcfb", "axes.facecolor": "#fcfcfb",
           "text.color": "#0b0b0b", "axes.labelcolor": "#52514e"}
 
 
+def run_footnote(data, keys) -> str:
+    """Per-run dome-grid footnote, generated from the archive -- never blanket.
+
+    One grid line per distinct (zenith x azimuth) grid (naming its runs), then
+    one archive-content sentence per run that actually has horizon-row zero
+    cells.  A 25 x 37 day figure says 25 x 37; only runs with zeros get the
+    truncation sentence (see _zero_note for the retired "compressed" wording's
+    replacement).
+    """
+    grids: dict[tuple[int, int], list[str]] = {}
+    for k in keys:
+        cap = run_capability(data, k)
+        grids.setdefault((cap["zenith_nodes"], cap["azimuth_nodes"]),
+                         []).append(k)
+    lines = []
+    for (nz, na), ks in grids.items():
+        names = "/".join(ks) if len(ks) > 1 else ks[0]
+        lines.append(f"dome grid {nz} x {na} ({180.0 / (na - 1):.1f}-deg "
+                     f"azimuth cells; {names})")
+    lines += [note for k in keys if (note := _zero_note(data, k))]
+    return "\n".join(lines)
+
+
 def build_figure(data, fig_id: str):
     """Assemble one registered figure from the archive (matplotlib, no solve)."""
     plt = _plt()
     fig_def = FIGURES[fig_id]
     with plt.rc_context(_STYLE):
         if fig_def.layout == "spectrum_pair":
-            fig = plt.figure(figsize=(10.8, 8.2), layout="constrained")
+            # acceptance ⑥ layout: spectrum top-left, rect bottom-left (the
+            # left column), the square fisheye owning the right column
+            fig = plt.figure(figsize=(10.8, 6.6), layout="constrained")
             gs = fig.add_gridspec(2, 2, width_ratios=(1.15, 1.0),
                                   height_ratios=(0.62, 1.0))
-            spectrum_panel(fig.add_subplot(gs[:, 0]), data, fig_def.spectrum)
-            rect_panel(fig.add_subplot(gs[0, 1]), data, fig_def.views[0])
-            fisheye_panel(fig.add_subplot(gs[1, 1]), data, fig_def.views[1])
+            spectrum_panel(fig.add_subplot(gs[0, 0]), data, fig_def.spectrum)
+            rect_panel(fig.add_subplot(gs[1, 0]), data, fig_def.views[0])
+            fisheye_panel(fig.add_subplot(gs[:, 1]), data, fig_def.views[1])
         elif fig_def.layout == "spectrum":
             fig = plt.figure(figsize=(7.4, 4.8), layout="constrained")
             spectrum_panel(fig.add_subplot(), data, fig_def.spectrum)
@@ -749,10 +874,9 @@ def build_figure(data, fig_id: str):
         else:
             raise ValueError(f"unknown layout {fig_def.layout}")
         title = fig_def.note
-        if fig_def.layout in ("spectrum_pair", "triple_pair"):
-            title += ("\nFish-eye rim: the archived dome grid is 11 x 23 "
-                      "(8.2-deg azimuth cells); horizon-row truncation zeros "
-                      "are archive content, rendered as-is.")
+        fish_keys = [v.key for v in fig_def.views if v.camera == "fisheye"]
+        if fish_keys:
+            title += "\n" + run_footnote(data, fish_keys)
         fig.suptitle(title, fontsize=9.5)
     return fig
 

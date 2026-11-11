@@ -513,3 +513,132 @@ def test_augmented_archive_contract(data, v3):
     assert str(v3["source_archive_sha256"]) == pre["source_archive"]["sha256"]
     for name, sha in record["outputs"].items():
         assert rf.sha256_file(ls.V3_ARCHIVE.parent / name) == sha
+
+
+# ---------------------------------------------------------------------------
+# v3 geometry: camera-relative angle axes, square fisheye box, per-run notes
+# ---------------------------------------------------------------------------
+def test_angle_axes_analytic_anchors():
+    """α/β ticks sit exactly on the archived pinhole mapping, only inside the
+    open field, with honest signs (α rightward, β upward on shrinking rows)."""
+    from matplotlib.figure import Figure
+
+    display = dict(size=(640, 320), hfov_deg=100.0)
+    info = rf.angle_axes(Figure().add_subplot(), display)
+    f = (640 / 2.0) / np.tan(np.radians(50.0))
+    pos = dict(info["horizontal"])
+    assert set(pos) == {-40, -20, 0, 20, 40}  # ±49.98° edges exclude ±60
+    assert pos[0] == pytest.approx((640 - 1) / 2, abs=1e-9)
+    assert pos[40] == pytest.approx((640 - 1) / 2 + f * np.tan(np.radians(40)),
+                                    rel=1e-12)
+    assert pos[40] > pos[-40]
+    vert = dict(info["vertical"])
+    assert set(vert) == {-20, 0, 20}  # ±30.72° edges exclude ±40
+    assert vert[20] == pytest.approx((320 - 1) / 2 - f * np.tan(np.radians(20)),
+                                     rel=1e-12)
+    assert vert[20] < vert[0] < vert[-20]  # rows grow downward, beta upward
+
+
+def test_angle_axes_are_camera_relative():
+    """The tick mapping reads only size/hfov: identical for yaw 0 and yaw 180
+    cameras, while the production direction field points those same columns at
+    opposite world azimuths -- camera-relative axes, absolute annotations."""
+    from matplotlib.figure import Figure
+
+    display = dict(size=(640, 320), hfov_deg=100.0)
+    info0 = rf.angle_axes(Figure().add_subplot(), display)
+    info180 = rf.angle_axes(Figure().add_subplot(), display)
+    assert info0 == info180
+    az0, el0 = render.perspective_grid(640, 320, 100.0, 14.0, 0.0)
+    az180, el180 = render.perspective_grid(640, 320, 100.0, 14.0, 180.0)
+    cx = int((640 - 1) / 2)
+    cy = int((320 - 1) / 2)
+    # the alpha=0 half-pixel column aims at the camera yaw; the beta=0 row
+    # sits at the pitch -- production readback of the pixel-centre convention
+    # (integer neighbours of the 319.5 column agree within ~0.11 deg)
+    signed = lambda az: (az + 180.0) % 360.0 - 180.0
+    assert np.abs(signed(az0[:, cx])).max() == pytest.approx(0.11, abs=0.05)
+    assert np.abs(signed(az180[:, cx]) - 180.0).max() == pytest.approx(
+        0.11, abs=0.05)
+    assert el0[cy, cx] == pytest.approx(14.0, abs=0.15)
+    assert el180[cy, cx] == pytest.approx(14.0, abs=0.15)
+    # a different legal camera moves the ticks with it
+    other = rf.angle_axes(Figure().add_subplot(),
+                          dict(size=(640, 320), hfov_deg=90.0))
+    assert other["focal_px"] == pytest.approx(320.0 / np.tan(np.radians(45.0)))
+    assert dict(other["horizontal"])[20] != dict(info0["horizontal"])[20]
+
+
+def test_rect_fisheye_geometry_after_draw(data):
+    """Final drawn canvas: the fisheye axes box is square with exact symmetric
+    image limits and no pixel ticks; the rect panel keeps exact image limits
+    with the camera-relative angle tick labels."""
+    fig = rf.build_figure(data, "rayleigh")
+    fig.canvas.draw()
+    fish = rect = None
+    for ax in fig.axes:
+        if not ax.images:
+            continue
+        span = abs(ax.get_ylim()[1] - ax.get_ylim()[0])
+        if span > 600:
+            fish = ax
+        else:
+            rect = ax
+    assert fish is not None and rect is not None
+    bb = fish.get_window_extent()
+    assert bb.width == pytest.approx(bb.height, abs=1.5)
+    assert tuple(fish.get_xlim()) == (-0.5, 639.5)
+    assert tuple(fish.get_ylim()) == (639.5, -0.5)
+    assert fish.get_xticks().size == 0 and fish.get_yticks().size == 0
+    assert tuple(rect.get_xlim()) == (-0.5, 639.5)
+    assert tuple(rect.get_ylim()) == (319.5, -0.5)
+    f = (640 / 2.0) / np.tan(np.radians(50.0))
+    for axis, get_ticks, get_labels, angle_of in (
+            ("x", rect.get_xticks, lambda: [t.get_text() for t in
+                                            rect.get_xticklabels()],
+             lambda lab: np.radians(int(lab.rstrip("°")))),
+            ("y", rect.get_yticks, lambda: [t.get_text() for t in
+                                            rect.get_yticklabels()],
+             lambda lab: np.radians(int(lab.rstrip("°"))))):
+        labels = get_labels()
+        assert {lab.rstrip("°") for lab in labels} <= {"-40", "-20", "0",
+                                                       "20", "40"}
+        for x, lab in zip(get_ticks(), labels):
+            a = angle_of(lab)
+            if axis == "x":
+                expected = (640 - 1) / 2 + f * np.tan(a)
+            else:
+                expected = (320 - 1) / 2 - f * np.tan(a)
+            assert x == pytest.approx(expected, abs=1.0), (axis, lab)
+    assert "camera-relative" in rect.get_xlabel()
+    assert "camera-relative" in rect.get_ylabel()
+
+
+def test_footnote_and_labels_are_per_run(data):
+    """The figure note is generated from each run's own grid and zero cells:
+    a 25 x 37 day figure says 25 x 37, and only runs with horizon zeros get
+    the truncation sentence with the corrected out-of-window wording."""
+    ray = rf.run_footnote(data, ["l1_rayleigh_30"])
+    assert "25 x 37" in ray and "11 x 23" not in ray
+    assert "truncation" not in ray
+    twi = rf.run_footnote(data, ["l5_single_-4", "l5_mc_-4", "l5_plane_-4"])
+    assert "11 x 23" in twi
+    assert "l5_single_-4: horizon-row truncation zeros" in twi
+    assert "147–180" in twi
+    assert "outside the rect frame's azimuth window" in twi
+    assert "l5_plane_-4: horizon row zero at all azimuths" in twi
+    assert twi.count("truncation zeros") == 1  # MC run has no zero sentence
+    fig = rf.build_figure(data, "rayleigh")
+    assert "25 x 37" in fig._suptitle.get_text()
+    fig2 = rf.build_figure(data, "twilight")
+    suptitle = fig2._suptitle.get_text()
+    assert "11 x 23" in suptitle and "147–180" in suptitle
+
+
+def test_spectrum_axis_labels(data):
+    """Every spectrum panel is standalone-readable: wavelength x-label and the
+    spectral-radiance y-label (log-log and linear alike)."""
+    fig = rf.build_figure(data, "rayleigh")
+    spec = next(ax for ax in fig.axes if ax.get_legend() is not None)
+    assert spec.get_xlabel() == "Wavelength [nm]"
+    assert "W m$^{-2}$ sr$^{-1}$ nm$^{-1}$" in spec.get_ylabel()

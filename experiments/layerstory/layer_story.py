@@ -742,6 +742,9 @@ def _spectrum_axis(ax, data, curves, title, ylabel=True, loglog=False):
         else:
             ax.plot(wl, rad[row], style, color=ink, linewidth=2, label=label)
     ax.set_title(title, fontsize=11)
+    # both axis labels live here so every consumer (log-log or linear) can be
+    # read standalone; radiance stays a spectral radiance, never an integral
+    ax.set_xlabel("Wavelength [nm]")
     if ylabel:
         ax.set_ylabel("Radiance [W m$^{-2}$ sr$^{-1}$ nm$^{-1}$]")
     if not loglog:
