@@ -283,7 +283,6 @@ def test_cloud_attenuates_the_clear_sky(atmo, stratus):
     assert np.allclose(comp["clear"], expected, rtol=1e-12)
 
 
-@pytest.mark.slow(reason="cost: 12-worker xdist median 14.21 s over K=3 (suite-tier step5 listing); fast-tier budget 2 s")
 def test_output_shape_matches_solver(atmo, altostratus):
     view = np.linspace(0.0, 85.0, 7)
     clear = sky_radiance_total(atmo, 30.0, view, 0.0, multiple=False)
@@ -349,7 +348,7 @@ def test_high_clouds_stay_lit_longer(atmo, altostratus, cirrus):
                                     97.0).geometry == "none"
 
 
-@pytest.mark.slow(reason="cost: 12-worker xdist median 14.60 s over K=3 (suite-tier step5 listing); fast-tier budget 2 s")
+@pytest.mark.slow(reason="cost: slow-tier batch K=3 median 15.35 s (2026-11-11 transitional protocol, task-suite-tier step10); fast-tier budget 2 s")
 def test_underlit_base_turns_red(atmo, altostratus):
     """The cloud base goes white -> orange -> red as the sun sets."""
     from skycolor import color

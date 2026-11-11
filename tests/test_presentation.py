@@ -254,7 +254,7 @@ def test_presentation_from_result_is_pure_binding(atmo7, monkeypatch):
                                 ground=True).shape == (8, 16, 3)
 
 
-@pytest.mark.slow(reason="cost: 12-worker xdist median 13.85 s over K=3 (suite-tier step5 listing); fast-tier budget 2 s")
+@pytest.mark.slow(reason="cost: slow-tier batch K=3 median 16.82 s (2026-11-11 transitional protocol, task-suite-tier step10); fast-tier budget 2 s")
 def test_presentation_from_result_rejects_mismatch(atmo7):
     """Grid rows, wavelength count and the recorded solar direction must
     match the result; nothing is silently reshaped or re-solved."""
@@ -330,7 +330,7 @@ def test_sky_dome_thin_forward_is_bit_identical(atmo7):
     assert dome["sun_zenith_deg"] == 70.0
 
 
-@pytest.mark.slow(reason="cost: 12-worker xdist median 11.82 s over K=3 (suite-tier step5 listing); fast-tier budget 2 s")
+@pytest.mark.slow(reason="cost: slow-tier batch K=3 median 19.43 s (2026-11-11 transitional protocol, task-suite-tier step10); fast-tier budget 2 s")
 def test_sky_radiance_grid_passes_new_options_through(atmo7):
     """The keyword-only solver options reach the entry; the default request
     stays the historical one."""
@@ -465,7 +465,6 @@ def test_thick_deck_and_shadow_darken_the_ground_beam(atmo7, stratus):
     assert np.all(ground_direct_irradiance(station, stratus, 70.0) == 0.0)
 
 
-@pytest.mark.slow(reason="cost: 12-worker xdist median 12.08 s over K=3 (suite-tier step5 listing); fast-tier budget 2 s")
 def test_solve_dome_binds_deck_lighting_and_cloud_marker_off(atmo7, stratus):
     """A cloud request binds the deck's ground irradiance at preparation
     (the one library helper) and defaults to no decorative sun disk."""
@@ -714,7 +713,6 @@ def test_convenience_entries_warn_on_result_limits(atmo7, monkeypatch):
                             n_zenith=3, n_azimuth=3)
 
 
-@pytest.mark.slow(reason="cost: 12-worker xdist median 14.46 s over K=3 (suite-tier step5 listing); fast-tier budget 2 s")
 def test_carrier_path_stays_silent_and_offers_summary(atmo7):
     """The carrier path reports through the summary function, not through
     blanket warnings: a converged deterministic preparation is silent."""
@@ -836,7 +834,6 @@ def test_external_field_with_explicit_true_marker_still_raises():
                             sun_disk=True)
 
 
-@pytest.mark.slow(reason="cost: 12-worker xdist median 14.03 s over K=3 (suite-tier step5 listing); fast-tier budget 2 s")
 def test_legacy_transmittance_override_survives_on_production_path(atmo7):
     """The retired override works on the plain (no radiance_field) scene:
     converted once at the wrapper boundary to the bound irradiance, one
@@ -907,7 +904,7 @@ def test_external_field_rejects_solver_options(atmo7, monkeypatch):
 # 6. review round 2: forwarding fidelity, ground capability, unknown facts,
 #    grid sanity (R2 fixes)
 # ---------------------------------------------------------------------------
-@pytest.mark.slow(reason="cost: 12-worker xdist median 13.84 s over K=3 (suite-tier step5 listing); fast-tier budget 2 s")
+@pytest.mark.slow(reason="cost: slow-tier batch K=3 median 19.10 s (2026-11-11 transitional protocol, task-suite-tier step10); fast-tier budget 2 s")
 def test_sky_radiance_grid_forwards_explicit_legacy_settings(atmo7, monkeypatch):
     """Explicit n_gauss/chunk reach the authoritative entry even in
     new-options mode; unset defaults are not injected (no phantom

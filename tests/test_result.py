@@ -110,7 +110,6 @@ def test_twilight_diagnostics_trace_grid(atmo7):
     assert res.options["seed"] == 0
 
 
-@pytest.mark.slow(reason="cost: 12-worker xdist median 10.94 s over K=3 (suite-tier step5 listing); fast-tier budget 2 s")
 def test_cloud_components_decomposition(atmo7, stratus):
     res = solve(atmo7, 75.0, 45.0, 135.0, method="cloud", cloud_layer=stratus)
     comps = res.components
@@ -174,7 +173,7 @@ def test_render_field_matches_direct_backend_call(atmo7, stratus):
     assert np.array_equal(dome["radiance"].reshape(-1, WL7.size), direct)
 
 
-@pytest.mark.slow(reason="cost: 12-worker xdist median 14.35 s over K=3 (suite-tier step5 listing); fast-tier budget 2 s")
+@pytest.mark.slow(reason="cost: slow-tier batch K=3 median 19.59 s (2026-11-11 transitional protocol, task-suite-tier step10); fast-tier budget 2 s")
 def test_ground_radiance_direct_transmittance_override(atmo7):
     """The override replaces the clear-sky beam: E_dir scales with T."""
     dome = render.sky_dome(atmo7, 60.0, n_zenith=4, n_azimuth=5)

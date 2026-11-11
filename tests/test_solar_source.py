@@ -515,7 +515,7 @@ def test_scatter_frame_equivariant_and_batch_invariant():
     assert np.array_equal(vm[0], v1) and np.array_equal(vm[1], v2)
 
 
-@pytest.mark.slow(reason="cost: 12-worker xdist median 6.22 s over K=3 (suite-tier step5 listing); fast-tier budget 2 s")
+@pytest.mark.slow(reason="cost: slow-tier batch K=3 median 11.03 s (2026-11-11 transitional protocol, task-suite-tier step10); fast-tier budget 2 s")
 def test_flat_query_cache_gather_matches_rows(small_source):
     """The flat query cache is a bitwise copy of the per-row arrays.
 
@@ -568,7 +568,7 @@ def test_segment_indices_match_searchsorted(small_source):
         np.testing.assert_array_equal(j, expected)
 
 
-@pytest.mark.slow(reason="cost: 12-worker xdist median 14.36 s over K=3 (suite-tier step5 listing); fast-tier budget 2 s")
+@pytest.mark.slow(reason="cost: slow-tier batch K=3 median 20.21 s (2026-11-11 transitional protocol, task-suite-tier step10); fast-tier budget 2 s")
 def test_query_batch_matches_per_point_bitwise(small_source):
     """Batch queries across row boundaries equal per-point queries bitwise.
 
