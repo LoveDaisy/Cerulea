@@ -16,12 +16,55 @@ under 12-way contention, so serial measurements underbalance the bins).
 Collection is the single source of truth: tests absent from the table get a
 nonzero default weight and are still packed and executed exactly once — no
 persisted whitelist of nodeids gates execution.
+
+The module also owns the two-tier suite vocabulary (task-suite-tier): the
+``FULL_SUITE_ENV`` switch and the explicit-selection yield rules consumed by
+``tests/conftest.py``.  The tier decision must agree in the controller and in
+every xdist worker; the environment variable is the one channel guaranteed to
+cross the process boundary (xdist workers rebuild their config from forwarded
+CLI args and do not receive custom options any other way).
 """
 from __future__ import annotations
 
 import json
 import os
 import pathlib
+
+#: Environment switch selecting the full (acceptance) suite population.
+#: Unset, empty, or ``"0"`` runs the fast dev-loop tier — tests marked
+#: ``slow`` are deselected at collection; any other value keeps every
+#: collected test.  Naming follows the ``SKYCOLOR_SCHEDULING_WEIGHTS``
+#: precedent.
+FULL_SUITE_ENV = "SKYCOLOR_FULL_SUITE"
+
+
+def full_suite_selected() -> bool:
+    """Whether this invocation asked for the full acceptance population."""
+    return os.environ.get(FULL_SUITE_ENV, "") not in ("", "0")
+
+
+def slow_filter_yields(config) -> bool:
+    """Whether the default slow-tier filter must stand down for this call.
+
+    An explicit selection expresses the intent to run the matched tests,
+    slow or not — deselecting them would turn ``pytest -m slow`` or a single
+    ``path::test`` debug run into a misleading "no tests ran" (exit 5).
+    Bare paths and directories are *not* test selections: running a whole
+    file is still a fast-tier request whose slow members leave via the
+    reported ``N deselected`` summary line.
+    """
+    if config.option.markexpr or config.option.keyword:
+        return True
+    return any("::" in str(arg) for arg in getattr(config, "args", ()))
+
+
+def fast_tier_active(config) -> bool:
+    """True when this invocation must deselect ``slow``-marked tests.
+
+    Priority: explicit ``-m`` / ``-k`` / ``::`` nodeid selection > full-suite
+    environment switch > default fast tier.
+    """
+    return not slow_filter_yields(config) and not full_suite_selected()
 
 #: Weights table produced by ``tools/make_scheduling_weights.py``.
 WEIGHTS_PATH = pathlib.Path(__file__).parent / "data" / "scheduling_weights.json"

@@ -1,11 +1,21 @@
-"""Attach measured-cost scheduling groups for pytest-xdist.
+"""Fast-tier slow filter + measured-cost scheduling groups for pytest-xdist.
 
-``tests/scheduling.py`` owns the packing policy; this hook only applies it.
-Each item gets an ``xdist_group`` mark naming its bin, so ``--dist=loadgroup``
-sends the whole bin to one worker.  Assignment depends only on the collected
-nodeid list, which is identical in every xdist worker, so all workers agree
-on the grouping without coordination.  Serial runs (``-n 0``, no ``-n``, or
-no xdist plugin) skip the marking entirely.
+``tests/scheduling.py`` owns both policies; this hook only applies them, in
+one ``pytest_collection_modifyitems`` pass with a fixed order:
+
+1. *Fast-tier filter* — unless an explicit selection (``-m`` / ``-k`` /
+   ``::`` nodeid) or ``SKYCOLOR_FULL_SUITE`` says otherwise, ``slow``-marked
+   tests are deselected (in-place mutation + ``pytest_deselected`` report).
+   Filtering must run before packing so the bins below only ever cover the
+   population that will actually run, and the same decision must be reached
+   in the controller and in every xdist worker — hence the environment
+   variable channel owned by ``tests/scheduling.py``.
+2. *Group packing* — each surviving item gets an ``xdist_group`` mark naming
+   its bin, so ``--dist=loadgroup`` sends the whole bin to one worker.
+   Assignment depends only on the collected nodeid list, which is identical
+   in every xdist worker, so all workers agree on the grouping without
+   coordination.  Serial runs (``-n 0``, no ``-n``, or no xdist plugin) skip
+   the marking entirely.
 """
 from __future__ import annotations
 
@@ -21,7 +31,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scheduling import assign_bins  # noqa: E402
+from scheduling import assign_bins, fast_tier_active  # noqa: E402
 
 
 def _worker_count(config):
@@ -58,9 +68,18 @@ def _worker_count(config):
 # which is the *only* channel the controller's LoadGroupScheduling sees
 # (distributed runs block controller-side collection entirely).  Attached too
 # late, the marks exist but the suffixes are empty and ``--dist=loadgroup``
-# silently degrades to per-test load distribution.
+# silently degrades to per-test load distribution.  The slow filter shares
+# this hookimpl so "deselect, then pack" is a fixed intra-function order —
+# no cross-plugin ordering assumption.
 @pytest.hookimpl(tryfirst=True)
 def pytest_collection_modifyitems(config, items):
+    if fast_tier_active(config) and items:
+        kept, deselected = [], []
+        for item in items:
+            (deselected if item.get_closest_marker("slow") is not None else kept).append(item)
+        if deselected:
+            config.hook.pytest_deselected(items=deselected)
+            items[:] = kept
     n = _worker_count(config)
     if not n or not items:
         return
