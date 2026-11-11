@@ -1,0 +1,24 @@
+{
+ "created": "2026-11-11T18:04:08+00:00",
+ "run": "l3_o3_dome_3",
+ "head": "3b9d19c34f746e6082ac202a61d72b221a2239d9",
+ "code_fingerprint": "clean-worktree",
+ "elapsed_s": 10.28714433312416,
+ "budget_s": 300.0,
+ "zenith_crosscheck_rtol": 1e-10,
+ "source_archive": "experiments/layerstory/data/layer_story.npz",
+ "source_archive_sha256": "d4fa3daad3fb0917611d2aa381102834804d44529d3588bd91d68e8466f6f461",
+ "preregister": "l3_dome_preregister.json",
+ "preregister_sha256": "12f8617d56e0fe9a516491fe04553dbac049203d12d360dfe83b39a7ed7b2f95",
+ "medium_evidence": "l3 medium readback: ozone_du=300, no2_column=4.000e+19 m^-2, one Hinterland aerosol at AOD550=0.05 with H=1.5 km profile, albedo 0.1, sea-level observer, refraction on",
+ "verification": [
+  "shape/endpoints/finite-nonnegative ok",
+  "zenith crosscheck vs l3_o3_3 ok",
+  "old fields bit-equal, check(new) passed"
+ ],
+ "outputs": {
+  "layer_story_v3.npz": "2c11869713963893de99ba5284e97295c42ff1aa1504e722284aa053fe9f6bab",
+  "layers_v3.csv": "9e9032384a3618e0f2420b516eb07b704db5ce26daadecf185bfd9f76f76c424",
+  "layers_v3.md": "f41b3d3279ef4aba38d68a907cf6139c41a0240b749619e9d377cc4a35f69eb1"
+ }
+}

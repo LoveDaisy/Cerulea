@@ -57,6 +57,12 @@ def data():
     return rf.load(NPZ)
 
 
+@pytest.fixture(scope="module")
+def v3():
+    """The committed augmented archive (layer_story_v3.npz)."""
+    return rf.load(V3_NPZ)
+
+
 @pytest.fixture(autouse=True)
 def no_solve(monkeypatch):
     """Every solver/orchestration entry raises; the redraw must not care."""
@@ -465,3 +471,45 @@ def test_augment_refuses_bad_field_and_keeps_evidence(data, monkeypatch,
         assert (tmp_path / "l3_dome_failure.json").exists()
         assert not (tmp_path / "layer_story_v3.npz").exists()
         (tmp_path / "l3_dome_failure.json").unlink()  # next loop iteration
+
+
+# ---------------------------------------------------------------------------
+# the committed v3 archive itself (read-only: the real solve ran exactly once)
+# ---------------------------------------------------------------------------
+def test_augmented_archive_contract(data, v3):
+    """The committed v3 archive carries the old 11 runs bit-for-bit plus the
+    one preregistered L3 dome run, with per-run solve provenance and a run
+    record consistent with the tracked files."""
+    with np.load(NPZ, allow_pickle=False) as old:
+        for k in old.files:
+            if k == "runs":
+                continue
+            np.testing.assert_array_equal(v3[k], old[k], err_msg=k)
+    runs = [str(r) for r in v3["runs"]]
+    assert runs[:-1] == [str(r) for r in data["runs"]]
+    assert runs[-1] == "l3_o3_dome_3"
+    cap = rf.run_capability(v3, "l3_o3_dome_3")
+    assert cap["dome_views"] and cap["zenith_nodes"] == 25
+    assert cap["azimuth_nodes"] == 37
+    pre = json.loads(ls.PREREGISTER_PATH.read_text())
+    record = json.loads((ls.V3_ARCHIVE.parent / "l3_dome_run.json").read_text())
+    assert record["run"] == "l3_o3_dome_3"
+    assert str(v3["l3_o3_dome_3/solve_version"]) == record["head"]
+    assert record["elapsed_s"] <= ls.L3_DOME_BUDGET_S
+    assert pre["budget"]["wall_clock_s"] == ls.L3_DOME_BUDGET_S
+    assert float(v3["l3_o3_dome_3/elevation"]) == pre["run"]["sun_elevation_deg"]
+    assert v3["l3_o3_dome_3/zenith"].size == pre["run"]["grid"]["n_zenith"]
+    assert v3["l3_o3_dome_3/azimuth_rel"].size == pre["run"]["grid"]["n_azimuth"]
+    # stored preset repeatability identity, read back from the two archives
+    zen_rows = np.asarray(v3["l3_o3_dome_3/total"]).reshape(25, 37, -1)[0]
+    np.testing.assert_allclose(
+        zen_rows,
+        np.broadcast_to(np.asarray(data["l3_o3_3/total"])[0], zen_rows.shape),
+        rtol=ls.L3_DOME_ZENITH_RTOL, atol=0)
+    for r in runs[:-1]:
+        assert str(v3[f"{r}/solve_version"]) == str(data["version"])
+    assert str(v3["l3_o3_dome_3/code_fingerprint"]) == record["code_fingerprint"]
+    assert str(v3["source_archive_sha256"]) == rf.sha256_file(NPZ)
+    assert str(v3["source_archive_sha256"]) == pre["source_archive"]["sha256"]
+    for name, sha in record["outputs"].items():
+        assert rf.sha256_file(ls.V3_ARCHIVE.parent / name) == sha
