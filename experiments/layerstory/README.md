@@ -18,6 +18,13 @@ uv run python -m experiments.layerstory.layer_story \
   --from-npz experiments/layerstory/data/layer_story.npz --publish-figures
 # 显式主题测试；默认 pytest 不导入 experiments
 uv run pytest -q experiments/tests
+# 存档覆盖审计（只读提交 NPZ，写 out/audit_coverage.{md,json}）
+uv run python -m experiments.layerstory.refresh_figures \
+  --from-npz experiments/layerstory/data/layer_story.npz --audit-only
+# 逐位置专属图（v2，零 solve）：谱 / 透视 / 等距鱼眼重投影 + 计算标注；
+# 普通运行只写主题 out/figures/，--publish-figures 才写根 figures/ 的 *_v2.png
+uv run python -m experiments.layerstory.refresh_figures \
+  --from-npz experiments/layerstory/data/layer_story.npz --figure all
 ```
 
 ## 固定输入与阶梯
@@ -118,6 +125,28 @@ with np.load('experiments/layerstory/data/layer_story.npz', allow_pickle=False) 
 NO₂ 取值决策：`Medium._NO2_PROFILE` 内建廓线的自然柱量约 3.0×10¹⁶ cm⁻²，比
 文献典型平流层柱量（2–6×10¹⁵ cm⁻²）高约一个量级，不作为取值；按文献范围取
 中值 4×10¹⁹ m⁻²，廓线形状仍用内建表（`no2_column` 参数按柱量归一）。
+
+## 存档覆盖审计与逐位置专属图（v2）
+
+`refresh_figures.py`（2026-11-11，task-figures-refresh）从提交的
+`data/layer_story.npz` **零 solve** 重画两篇文档的逐层配图：每层专属谱图、
+透视渲染，以及天顶居中的 180° 等距鱼眼（`fisheye_grid` 等距分支 +
+`sample_dome` + `color.render_rgb`，同一场的显示重采样，不增加物理信息）；
+地平线/方位刻度/太阳方向标注全部由同一相机网格计算，太阳只标**折射前
+输入方向**（`sun_disk=False` 不变，地平下太阳只给地平边界指示）。
+`--audit-only` 先做覆盖审计：逐 run 网格端点/行数/地面材料/太阳元数据 +
+逐图可行性，写 `out/audit_coverage.{md,json}`；图定义（ID/曲线方向/视图/
+消费者）单源在入口的 `FIGURES` 注册表，逐图命令与参数导出
+`out/refresh_manifest.json`。普通运行只写主题 `out/`；`--publish-figures`
+才写根 `figures/` 的 `*_v2.png` 命名图。
+
+覆盖审计结论（M0）：L1/L2/L4 穹顶 25×37、L5 11×23、L6 11×21，端点完整
+可重投影；**L3 只存天顶谱行——只出谱图，不做全天视图**（不伪造无数据
+支持的色度场）。曲线方向 86.25°/45°/81° 等均为精确网格节点。
+
+v1 两张网格图的字节快照（tracked，含版本说明）在
+[historical/](historical/)；根 `figures/` 的 `layer_story_overview.png`
+仍是共享总览入口，`layer_story_spectra.png` 保留为兼容定位。
 
 ## 与 approximations 主题的偏离
 

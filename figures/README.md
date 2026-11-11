@@ -18,8 +18,8 @@ A reader-level guide to these figures (Chinese): [docs/physics/MAINLINE.zh.md](.
 | [sky_03.png](sky_03.png) | Low sun 3°; README's current scene, **not** a solar-disk image | `e3_hybrid-sos/total` |
 | [approximations.png](approximations.png) | Two scene rows × spherical-single / plane-sos total / hybrid-sos total; same display parameters | the corresponding saved total arrays |
 | [spectra.png](spectra.png) | Untonemapped spectra: plane single / spherical single / hybrid total, zenith and near-horizon sun-side; units on axes | same arrays, exact sampled zenith 0° / 86.25° |
-| [layer_story_overview.png](layer_story_overview.png) | The ladder: L1 Rayleigh → L2 aerosol → L4 multiple → L6 cloud (day row), L3 Chappuis spectrum + L5 single/MC/plane-world (twilight row); locked exposure per group | `l*/total` arrays of `layer_story.npz` |
-| [layer_story_spectra.png](layer_story_spectra.png) | Per-rung spectral signatures (log-log λ⁻⁴, aerosol whitening, Chappuis band, multiple fill, twilight fill) + zenith chromaticities | same arrays, exact sampled nodes |
+| [layer_story_overview.png](layer_story_overview.png) | The ladder: L1 Rayleigh → L2 aerosol → L4 multiple → L6 cloud (day row), L3 Chappuis spectrum + L5 single/MC/plane-world (twilight row); locked exposure per group. Still the shared whole-ladder entry | `l*/total` arrays of `layer_story.npz` |
+| [layer_story_spectra.png](layer_story_spectra.png) | Per-rung spectral signatures (v1 montage kept as a locator; the docs now use the per-position v2 figures below) + zenith chromaticities | same arrays, exact sampled nodes |
 
 ## Reproduce or redraw
 
@@ -101,6 +101,53 @@ the NPZ so redraws can rebind it), which is part of the L6 story. L3 is a
 zenith-spectrum panel (no
 render); L5 MC is qualitative, single seed, budget-limited. Media, grids and
 per-call records are single-sourced in the theme README and `data/layers.md`.
+
+## Layer story per-position figures v2 (2026-11-11)
+
+Redrawn from the **same committed archive** (solve version `286486e`,
+untouched) by [refresh_figures.py](../experiments/layerstory/refresh_figures.py)
+with zero new solves.  Each narrative position in
+[LAYER_STORY.md](../docs/physics/LAYER_STORY.md) and
+[MAINLINE.zh.md](../docs/physics/MAINLINE.zh.md) carries its own figure
+instead of a sub-panel pointer into the v1 montages; positions that read the
+whole ladder keep the shared overview, and the v1 files above keep their root
+names as locators (byte-identical tracked snapshots:
+[layerstory historical/](../experiments/layerstory/historical/)).  Per-figure
+provenance (runs, exact directions, display parameters, consumers, input
+hash) is exported to `experiments/layerstory/out/refresh_manifest.json` on
+every run.
+
+| Figure | Serves | Content |
+|---|---|---|
+| [layer_story_rayleigh_v2.png](layer_story_rayleigh_v2.png) | MAINLINE 图2 · LAYER_STORY L1 | L1 log-log spectra (zenith / 86.25° sun-side) + archived perspective + equidistant 180° fisheye pair |
+| [layer_story_aerosol_v2.png](layer_story_aerosol_v2.png) | MAINLINE 图3 · LAYER_STORY L2 | near-horizon (86.25° sun-side) same-scene spectra, L1 vs L2 |
+| [layer_story_ozone_v2.png](layer_story_ozone_v2.png) | MAINLINE 图4 · LAYER_STORY L3 | zenith spectra @ sun 3°, bridge vs +O3/NO2 (the archive has no L3 dome: spectrum only, by design) |
+| [layer_story_multiple_v2.png](layer_story_multiple_v2.png) | MAINLINE 图5 · LAYER_STORY L4 | 45° anti-solar (relative azimuth 180°, not a 90° scattering angle) bridge vs +multiple |
+| [layer_story_twilight_v2.png](layer_story_twilight_v2.png) | MAINLINE 图6 · LAYER_STORY L5 | the three −4° states, each as perspective + equidistant fisheye pair, locked exposure 10.0; MC panel single-seed / qualitative |
+| [layer_story_cloud_v2.png](layer_story_cloud_v2.png) | MAINLINE 图7 · LAYER_STORY L6 | contract-matched clear/cloud pair, both with the solve-bound floor, locked exposure 0.03 |
+| [layer_story_pipeline_spectrum_v2.png](layer_story_pipeline_spectrum_v2.png) | MAINLINE 图8 | the two hybrid-sos input spectra (zenith / 81° sun-side) of the same run imaged beside |
+| [layer_story_pipeline_view_v2.png](layer_story_pipeline_view_v2.png) | MAINLINE 图9 | that run's annotated perspective view (same single-source pair; no ground) |
+
+Display: the v1 groups' locked values, unchanged — day/cloud exposure .03,
+twilight 10.0, ACES, adaptation None, no sun disk, perspective 640×320
+pitch14°/hfov100°.  Annotations (horizon, absolute-azimuth ticks, sun marker)
+are **computed from the same camera/direction grids** the pixels came from;
+the sun marker is the pre-refraction *input* direction, never a rendered disk
+(a below-horizon sun gets a horizon indicator, an out-of-view sun a text
+note).  The fisheye is a display re-sampling of the same dome through
+`render.fisheye_grid`'s equidistant branch + `render.sample_dome` +
+`color.render_rgb` — no new physics, no extra information.
+
+```bash
+# coverage audit (read-only; writes the theme's out/audit_coverage.{md,json})
+uv run python -m experiments.layerstory.refresh_figures --audit-only
+# redraw all eight (plain run writes theme outputs only)
+uv run python -m experiments.layerstory.refresh_figures \
+  --from-npz experiments/layerstory/data/layer_story.npz --figure all
+# publish the named v2 files to this directory
+uv run python -m experiments.layerstory.refresh_figures \
+  --from-npz experiments/layerstory/data/layer_story.npz --figure all --publish-figures
+```
 
 ## Older figures: preserved, not re-certified
 
