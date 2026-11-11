@@ -143,10 +143,12 @@ _MINI_WEIGHTS = {
 # test_mini_b.py is deliberately absent from the table: unknown modules and
 # parametrized nodeids must still be scheduled (DEFAULT_WEIGHT_S path).
 
-# Slow-marker reason used by the tier-filter mini fixtures.  ``kind:`` is the
-# machine-readable species prefix (see docs/DEVELOPMENT.md "Test tiers");
-# these fixtures are marked for *behavior*, not measured cost.
-_MINI_SLOW_REASON = "kind: mini-project tier-filter fixture (behavior, not cost)"
+# Slow-marker reason used by the tier-filter mini fixtures.  ``role:`` is
+# deliberately NOT one of the suite vocabulary prefixes (kind:/cost: are
+# reserved for real-suite tier declarations, docs/DEVELOPMENT.md); these
+# synthetic markers exist to exercise filter behavior, not to classify a
+# real test.
+_MINI_SLOW_REASON = "role:fixture - synthetic slow marker for tier-filter behavior tests"
 
 _RECORDER = '''\
 def _record(request):
@@ -454,6 +456,20 @@ def test_tier_filter_keyword_expression_yields(tmp_path):
     assert set(records) == _SLOW_MINI_IDS
 
 
+# (g) xdist + -m slow: the yield engages on the worker side (the
+# reclassification measurement path runs exactly this shape under the
+# default addopts), so only slow-marked tests execute and each is
+# scheduled normally.
+@pytest.mark.slow(reason="cost: mini-project xdist subprocess scenario (~4-6 s); estimated, pre-tier marking")
+def test_tier_filter_xdist_markexpr_yields_on_workers(tmp_path):
+    weights = _mini_project(tmp_path, slow=True)
+    proc = _run_mini(tmp_path, weights, "-n", "2", "--dist=loadgroup", "-m", "slow")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    records = _read_results(tmp_path)
+    assert set(records) == _SLOW_MINI_IDS
+    assert len({w for w, _g in records.values()}) >= 2, "both workers used"
+
+
 # (f) nodeid yield boundary, both sides: an explicit :: nodeid runs even when
 # slow; a bare path keeps the fast filter (its slow member is deselected and
 # the fact is visible on the summary line).
@@ -516,6 +532,8 @@ def test_weights_tool_caliber_isolation_full_readings_never_tier():
     medians = {"tests/test_a.py::test_fast_for_real": 1.5}
     assert not WEIGHTS_TOOL.upgrade_gate_offenders(medians, set())
     # ...and the gate has no input path for full-listing readings at all.
+    # The bytecode canary below is intentionally brittle: it is the point
+    # (any future parameter on the gate must fail here and be reviewed).
     assert "full" not in WEIGHTS_TOOL.upgrade_gate_offenders.__code__.co_varnames
 
 
@@ -533,7 +551,10 @@ def test_weights_tool_predicted_wall_sums_unmarked_medians():
 
 
 def test_weights_tool_list_identity_by_content():
-    full_text = "======== 558 passed in 400.00s =========="
+    full_text = (
+        "3.00s call     tests/test_a.py::t1@bin5\n"
+        "======== 558 passed in 400.00s ==========\n"
+    )
     # serial fast listing: carries the deselected summary
     fast_text = "======== 358 passed, 201 deselected in 55.00s =========="
     # xdist fast listing: xdist does not aggregate worker-side deselected
@@ -555,26 +576,98 @@ def test_weights_tool_list_identity_by_content():
 
 
 def test_weights_tool_population_consistency_structural_only():
-    ok_full = {"tests/test_a.py::t1", "tests/test_b.py::t2",
-               "tests/test_mc.py::m1"}
-    fast1 = {"tests/test_a.py::t1", "tests/test_b.py::t2"}
-    fast2 = {"tests/test_a.py::t1", "tests/test_b.py::t2b"}  # item-level drift: fine
+    ok_full = {"tests/test_a.py::t1": 3.0, "tests/test_b.py::t2": 2.0,
+               "tests/test_mc.py::m1": 20.0}
+    fast1 = {"tests/test_a.py::t1": 3.0, "tests/test_b.py::t2": 2.0}
+    fast2 = {"tests/test_a.py::t1": 3.0, "tests/test_b.py::t2b": 2.0}  # item drift: fine
     WEIGHTS_TOOL.check_population_consistency(
-        ["full", "fast1", "fast2"], [3, 2, 2], [ok_full, fast1, fast2])
+        ["full", "fast1", "fast2"], [3, 2, 2], [ok_full, fast1, fast2],
+        slow={"tests/test_mc.py::m1"})
     # whole module missing from a fast listing -> structural
     with pytest.raises(SystemExit, match="diverges"):
         WEIGHTS_TOOL.check_population_consistency(
             ["full", "fast1", "fast2"], [3, 1, 2],
-            [ok_full, {"tests/test_a.py::t1"}, fast2])
-    # module missing from the full listing -> structural
+            [ok_full, {"tests/test_a.py::t1": 3.0}, fast2],
+            slow={"tests/test_mc.py::m1"})
+    # heavy module missing from the full listing -> structural
     with pytest.raises(SystemExit, match="full listing"):
         WEIGHTS_TOOL.check_population_consistency(
             ["full", "fast1", "fast2"], [2, 2, 2],
-            [{"tests/test_a.py::t1"}, fast1, fast2])
+            [{"tests/test_a.py::t1": 3.0}, fast1, fast2],
+            slow=set())
     # disagreeing passed counts -> partial run
     with pytest.raises(SystemExit, match="passed counts"):
         WEIGHTS_TOOL.check_population_consistency(
             ["full", "fast1", "fast2"], [3, 2, 1], [ok_full, fast1, fast2])
+    # the full slot must cover the slow tier: four fast listings (xdist
+    # summaries are shape-identical) fail here, not silently
+    with pytest.raises(SystemExit, match="slow tier"):
+        WEIGHTS_TOOL.check_population_consistency(
+            ["full", "fast1", "fast2"], [2, 2, 2],
+            [fast1, fast1, fast2], slow={"tests/test_mc.py::m1"})
+
+
+def test_weights_tool_module_boundary_drift_does_not_false_fail():
+    # A module whose entire content sits inside the ~5 ms listing-cutoff
+    # band (readings at/below BOUNDARY_BAND_S, presence drifting between
+    # samples under contention) is exempt from the structural comparison —
+    # only modules with a real (>band) best-evidence reading anywhere are
+    # compared.  A straddling module (a >band reading in some sample) is
+    # compared and its absence fires: honest fail-loud, rerun resolves it.
+    fast1 = {"tests/test_a.py::t1": 3.0, "tests/test_tiny.py::x": 0.01}
+    fast2 = {"tests/test_a.py::t1": 3.0}
+    fast3 = {"tests/test_a.py::t1": 3.0, "tests/test_tiny.py::x": 0.01}
+    WEIGHTS_TOOL.check_population_consistency(
+        ["full", "fast1", "fast2", "fast3"], [3, 2, 2, 2],
+        [{"tests/test_a.py::t1": 3.0, "tests/test_tiny.py::x": 0.01},
+         fast1, fast2, fast3])
+    # ...while a genuinely missing heavy module still fires
+    fast3_heavy_missing = {"tests/test_a.py::t1": 3.0}
+    fast1_heavy = {"tests/test_a.py::t1": 3.0, "tests/test_tiny.py::x": 0.01,
+                   "tests/test_heavy.py::t2": 2.0}
+    fast2_heavy = {"tests/test_a.py::t1": 3.0,
+                   "tests/test_heavy.py::t2": 2.0}
+    with pytest.raises(SystemExit, match="diverges"):
+        WEIGHTS_TOOL.check_population_consistency(
+            ["full", "fast1_heavy", "fast2_heavy", "fast3_heavy_missing"],
+            [3, 2, 2, 1],
+            [{"tests/test_a.py::t1": 3.0, "tests/test_tiny.py::x": 0.01,
+              "tests/test_heavy.py::t2": 2.0},
+             fast1_heavy, fast2_heavy, fast3_heavy_missing])
+
+
+def test_weights_tool_parse_summary_anchored_to_last_line():
+    # a durations line whose test name embeds "N passed" must not poison
+    # the count extraction: only the final summary line is parsed
+    text = (
+        "0.02s call     tests/test_x.py::test_2_passed_states@bin0\n"
+        "======== 559 passed, 3 warnings in 400.00s ==========\n"
+    )
+    assert WEIGHTS_TOOL.parse_summary(text) == (559, 0)
+    text_ds = (
+        "1.00s call     tests/test_y.py::test_9_deselected_cases\n"
+        "======== 358 passed, 201 deselected in 55.00s ==========\n"
+    )
+    assert WEIGHTS_TOOL.parse_summary(text_ds) == (358, 201)
+    with pytest.raises(SystemExit, match="summary line"):
+        WEIGHTS_TOOL.parse_summary("0.02s call     tests/test_z.py::test_1_passed\n")
+
+
+def test_weights_tool_full_listing_requires_loadgroup_evidence():
+    # the full-suite listing is measured under the constant 12-worker
+    # loadgroup form; a serial full listing would silently produce
+    # uncontended weights, so the slot demands @binN suffix evidence
+    serial_full = (
+        "3.00s call     tests/test_a.py::t1\n"
+        "======== 559 passed in 400.00s ==========\n"
+    )
+    with pytest.raises(SystemExit, match="loadgroup"):
+        WEIGHTS_TOOL.validate_list_identity("full (arg 1)", serial_full)
+    xdist_full = (
+        "3.00s call     tests/test_a.py::t1@bin3\n"
+        "======== 559 passed in 400.00s ==========\n"
+    )
+    assert WEIGHTS_TOOL.validate_list_identity("full (arg 1)", xdist_full) == (559, 0)
 
 
 def test_weights_tool_reuse_gate_full_must_cover_fast_readings():

@@ -15,9 +15,14 @@ regenerates the whole table in one pass.
   subprocess, so the table's mirror can never lag the live markers at regen
   time (the harness equality test then forbids lagging afterwards).
 
-    SKYCOLOR_FULL_SUITE=1 uv run pytest -q -n 12 --dist=loadgroup --durations=0 > /tmp/full.txt
+    SKYCOLOR_FULL_SUITE=1 uv run pytest -q -n 12 --dist=loadgroup --durations=0 --durations-min=0 > /tmp/full.txt
     uv run pytest -q --durations=0 > /tmp/fast1.txt   # + fast2.txt, fast3.txt
     uv run python tools/make_scheduling_weights.py /tmp/full.txt /tmp/fast1.txt /tmp/fast2.txt /tmp/fast3.txt
+
+``--durations-min=0`` on the full listing is mandatory: the bare ``=0``
+output hides <5 ms phases, which both starves the reuse gate (tests with
+real fast readings missing from the full listing) and starves the table
+(the 5.0 s default silently covering cheap tests).
 
 Parsing follows pytest's ``--durations`` listing: one line per
 setup/call/teardown phase, whose seconds are summed per nodeid.  Under
@@ -54,6 +59,12 @@ _HEADER = re.compile(r"=+ slowest(?: (\d+))? durations =+")
 _SCHED_SUFFIX = re.compile(r"@bin\d+$")
 _PASSED = re.compile(r"(\d+) passed")
 _DESELECTED = re.compile(r"(\d+) deselected")
+#: xdist loadgroup evidence on a durations line: a real listed nodeid closes
+#: with the scheduling suffix.  Required in the full slot — the full-suite
+#: listing is measured under the constant 12-worker loadgroup form, so its
+#: absence means a serial (or otherwise mis-formed) listing was passed.
+_SUFFIXED_DURATION_LINE = re.compile(
+    r"^\s*[0-9.]+s\s+(?:call|setup|teardown)\s+\S+@bin\d+\s*$", re.MULTILINE)
 
 #: Fast-tier per-test budget [s] (K=3 median, target-form measurement).
 #: The gate fails the regen when an unmarked test exceeds it; the lawful
@@ -103,8 +114,9 @@ TABLE_COMMENT = (
     "default weight. `slow` mirrors the live pytest markers at regeneration "
     "time (harness equality test forbids lagging); `fast_predicted_wall_s` "
     "sums unmarked fast-tier K=3 medians (informational). Regenerate with "
-    "tools/make_scheduling_weights.py from one FULL listing plus three "
-    "fast-tier listings, all with --durations=0."
+    "tools/make_scheduling_weights.py from one FULL listing (SKYCOLOR_"
+    "FULL_SUITE=1, 12 workers, --durations=0 --durations-min=0) plus three "
+    "fast-tier listings."
 )
 
 
@@ -135,32 +147,50 @@ def parse_durations(text):
 
 
 def parse_summary(text):
-    """Return ``(passed, deselected)`` from a pytest run's summary line."""
-    passed = _PASSED.search(text)
-    deselected = _DESELECTED.search(text)
+    """Return ``(passed, deselected)`` from the run's final summary line.
+
+    Anchored to the last non-empty line on purpose: the durations listing
+    precedes the summary, so a whole-text search could match "N passed"
+    inside a test *name* on a durations line and misparse the counts.
+    """
+    tail = text.rstrip().splitlines()[-1] if text.strip() else ""
+    passed = _PASSED.search(tail)
+    deselected = _DESELECTED.search(tail)
     if passed is None:
-        raise SystemExit("no 'N passed' summary line found in the listing")
+        raise SystemExit(
+            "no 'N passed' summary line found at the end of the listing")
     return int(passed.group(1)), (int(deselected.group(1)) if deselected else 0)
 
 
 def validate_list_identity(label, text):
-    """Reject listings whose summary contradicts their slot in the CLI.
+    """Reject listings whose content contradicts their slot in the CLI.
 
     A full-suite listing never deselects (``SKYCOLOR_FULL_SUITE=1``, no
-    ``-m``/``-k``); a fast-tier listing either reports the deselected count
-    (serial form) or — under xdist, which does not aggregate worker-side
-    deselected counts into the summary — reports nothing, so absence is
-    accepted and mis-slotted full listings are caught structurally instead
-    (module-population divergence and the reuse gate both fire on a
-    full/fast swap).  Identity is judged by content, not filename.
+    ``-m``/``-k``) and must carry xdist loadgroup evidence (``@binN``
+    scheduling suffixes on durations lines) — the full listing is measured
+    under the constant 12-worker form, so a serial listing passed here
+    would silently produce uncontended scheduling weights.  A fast-tier
+    listing either reports the deselected count (serial form) or — under
+    xdist, which does not aggregate worker-side deselected counts into the
+    summary — reports nothing, so absence is accepted and mis-slotted
+    listings are caught structurally instead (population consistency and
+    the reuse gate fire on swaps and on all-fast inputs).  Identity is
+    judged by content, not filename.
     """
     passed, deselected = parse_summary(text)
     is_full = label.startswith("full")
-    if is_full and deselected:
-        raise SystemExit(
-            f"{label}: shows {deselected} deselected — not a full-suite "
-            f"listing.  Re-measure with SKYCOLOR_FULL_SUITE=1 and no -m/-k.")
-    if not is_full and deselected == 0 and "deselected" in text:
+    if is_full:
+        if deselected:
+            raise SystemExit(
+                f"{label}: shows {deselected} deselected — not a full-suite "
+                f"listing.  Re-measure with SKYCOLOR_FULL_SUITE=1 and no -m/-k.")
+        if not _SUFFIXED_DURATION_LINE.search(text):
+            raise SystemExit(
+                f"{label}: no xdist loadgroup scheduling suffixes on any "
+                f"durations line — not a 12-worker loadgroup listing.  "
+                f"Re-measure with SKYCOLOR_FULL_SUITE=1 uv run pytest -q "
+                f"-n 12 --dist=loadgroup --durations=0 --durations-min=0.")
+    elif deselected == 0 and "deselected" in text:
         raise SystemExit(
             f"{label}: reports a zero deselected count — not a fast-tier "
             f"listing.  Re-measure with the default entry point (no "
@@ -168,29 +198,50 @@ def validate_list_identity(label, text):
     return passed, deselected
 
 
-def check_population_consistency(labels, passed_counts, nodeid_lists):
+def check_population_consistency(labels, passed_counts, totals_list, slow=()):
     """Structural consistency across the four listings.
 
-    Module-level sets must agree between the three fast listings (they run
-    the same population), the full listing must cover them all, and the
-    passed counts of the fast listings must be equal — a truncated or
-    partial run must not silently enter the medians.  Single missing tests
-    are *not* structural: the <5 ms listing cutoff makes presence drift at
-    the boundary (see ``reuse_gate``).
+    Module-level comparison is substance-gated: a module is compared only
+    when its best reading across the fast samples exceeds the listing-
+    cutoff band, so modules whose entire content flickers around the ~5 ms
+    report cutoff (presence drifting between samples under contention) are
+    exempt from the structural check, while a genuinely missing module
+    (operator error, truncated run — a heavy module has multi-second
+    readings) still fails loudly.  The full listing must cover the whole
+    slow tier: a fast listing passed in the full slot — or four fast
+    listings, whose xdist summaries are shape-identical — fails here
+    instead of silently regenerating a table without the slow weights.
+    The passed counts of the fast listings must be equal with the full
+    count above them.  Single missing tests are *not* structural: the
+    <5 ms cutoff makes per-test presence drift at the boundary (see
+    ``reuse_gate``).
     """
-    full_label, full_ids = labels[0], nodeid_lists[0]
-    fast_labels, fast_ids = labels[1:], nodeid_lists[1:]
-    full_modules = {n.split("::")[0] for n in full_ids}
-    fast_modules = [ {n.split("::")[0] for n in ids} for ids in fast_ids ]
-    for label, modules in zip(fast_labels, fast_modules):
-        missing = fast_modules[0] - modules
-        extra = modules - fast_modules[0]
+    full_label, full_totals = labels[0], totals_list[0]
+    fast_labels, fast_totals = labels[1:], totals_list[1:]
+    missing_slow = sorted(set(slow) - set(full_totals))
+    if slow and missing_slow:
+        raise SystemExit(
+            f"{full_label}: does not cover the slow tier ({len(missing_slow)} "
+            f"missing, e.g. {missing_slow[:3]}).  A full-suite listing must run "
+            f"the complete population — re-measure with SKYCOLOR_FULL_SUITE=1 "
+            f"-n 12 --dist=loadgroup --durations=0 --durations-min=0.")
+    # Best-evidence substance per module across the fast samples.
+    ref: dict[str, float] = {}
+    for totals in fast_totals:
+        for nodeid, seconds in totals.items():
+            module = nodeid.split("::")[0]
+            ref[module] = max(ref.get(module, 0.0), seconds)
+    comparable = {m for m, s in ref.items() if s > BOUNDARY_BAND_S}
+    present = [{n.split("::")[0] for n in t} for t in fast_totals]
+    for label, mods in zip(fast_labels, present):
+        missing = {m for m in comparable if m in present[0]} - mods
+        extra = {m for m in comparable if m in mods} - set(present[0])
         if missing or extra:
             raise SystemExit(
                 f"{label}: module population diverges from {fast_labels[0]} "
                 f"(missing {sorted(missing)}, extra {sorted(extra)}).  "
                 f"The fast listings must cover the same population.")
-    uncovered = fast_modules[0] - full_modules
+    uncovered = comparable - {n.split("::")[0] for n in full_totals}
     if uncovered:
         raise SystemExit(
             f"{full_label}: modules absent from the full listing: "
@@ -242,8 +293,9 @@ def reuse_gate(full_totals, medians, band_s=BOUNDARY_BAND_S):
         raise SystemExit(
             "full listing does not cover tests with fast-tier readings: "
             f"{missing}.  The population changed since the full measurement — "
-            "re-run the full-suite listing (SKYCOLOR_FULL_SUITE=1, 12 workers, "
-            "--durations=0) and pass the fresh file.")
+            "re-run the full-suite listing (SKYCOLOR_FULL_SUITE=1, "
+            "-n 12 --dist=loadgroup, --durations=0 --durations-min=0) and "
+            "pass the fresh file.")
 
 
 def predicted_wall_s(medians, slow):
@@ -321,15 +373,17 @@ def main():
     if len(args) != 4:
         raise SystemExit(
             "usage: make_scheduling_weights.py FULL_LOG FAST1 FAST2 FAST3\n"
-            "FULL_LOG: SKYCOLOR_FULL_SUITE=1 ... -n 12 --dist=loadgroup --durations=0\n"
+            "FULL_LOG: SKYCOLOR_FULL_SUITE=1 ... -n 12 --dist=loadgroup "
+            "--durations=0 --durations-min=0\n"
             "FAST{1,2,3}: default fast-tier entry, --durations=0, three samples")
     paths = [pathlib.Path(a) for a in args]
-    texts = [p.read_text() for p in paths]
-    for label, path in zip(("full (arg 1)", "fast1 (arg 2)", "fast2 (arg 3)",
-                            "fast3 (arg 4)"), paths):
+    labels = ["full (arg 1)", "fast1 (arg 2)", "fast2 (arg 3)", "fast3 (arg 4)"]
+    # existence before read: a missing file must produce the labeled
+    # SystemExit, not an unlabeled FileNotFoundError traceback
+    for label, path in zip(labels, paths):
         if not path.exists():
             raise SystemExit(f"{label}: file not found: {path}")
-    labels = ["full (arg 1)", "fast1 (arg 2)", "fast2 (arg 3)", "fast3 (arg 4)"]
+    texts = [p.read_text() for p in paths]
     passed = []
     for label, text in zip(labels, texts):
         p, _d = validate_list_identity(label, text)
@@ -337,10 +391,10 @@ def main():
     totals = [parse_durations(text) for text in texts]
     if not all(totals):
         raise SystemExit("no durations lines found in an input")
-    check_population_consistency(
-        labels, passed, [set(t) for t in totals])
     medians = fast_medians(totals[1:])
     slow = set(collect_slow_nodeids())
+    check_population_consistency(
+        labels, passed, totals, slow=slow)
     reuse_gate(totals[0], medians)
     offenders = upgrade_gate_offenders(medians, slow)
     if offenders:

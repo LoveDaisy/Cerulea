@@ -85,14 +85,22 @@ optimization lands, re-measure its median via the authority list; ≤2 s, the
 marker is removed by hand through the reclassification rule below.
 
 **Reclassification (slow → fast) is a manual operation**, reviewed in
-code-review: evidence is a target-form K=3 median ≤2 s measured via the
-yield path (`SKYCOLOR_FULL_SUITE=1 uv run pytest -m slow <nodeids>
---durations=0`), then delete the marker, then re-measure the listings
-required by the marker change and regen.  Readings from other calibers
-(durations tables, full-suite listings) are not reclassification evidence.
-Known caveat: the xdist startup transient concentrates on each scheduling
-bin's first tests (see validation/FAST_SUITE.md "suite-tier"), so a small
-candidate selection can read inflated; attribute before concluding.
+code-review: evidence is a target-form K=3 median ≤2 s, then delete the
+marker, then re-measure the listings required by the marker change and
+regen.  Readings from other calibers (durations tables, full-suite
+listings) are not reclassification evidence.  **Transitional measurement
+protocol** (until the xdist startup-transient mitigation lands — registered
+in scratchpad/backlog.md): the default `-n 12` form concentrates a ~12-17 s
+startup transient on each scheduling bin's first tests (evidence:
+validation/FAST_SUITE.md "suite-tier"), so a small `<nodeids>` selection
+would read its every member as a bin head.  Measure candidates in a batch
+instead — `SKYCOLOR_FULL_SUITE=1 uv run pytest -q -m slow --durations=0`
+(three samples): the genuinely heavy slow tests head the bins and absorb
+the transient, so candidates read near-intrinsic; their K=3 medians are
+the evidence.  A candidate that still reads >2 s may be attributed with a
+serial reference (`uv run pytest -n 0 <nodeids> --durations=0` — an
+attribution aid, never the pass/fail evidence itself); unresolved
+candidates keep their marker until the transient task lands.
 
 **Marker reasons are machine-readable** — `kind:mc` / `kind:golden` /
 `kind:grid` / `kind:render` for species-exclusive tests, `cost: <median> s
@@ -104,9 +112,15 @@ explicit selection — `-m`, `-k`, or a positional argument containing `::`
 Bare paths/directories are not test selections: running a whole file keeps
 the fast filter (its slow members leave via the deselected count, visible in
 serial and collect-only output; the xdist run summary does not aggregate
-worker-side deselected counts).  `SKYCOLOR_FULL_SUITE=1` overrides to the
-full population.  Priority: explicit `-m`/`-k`/`::` nodeid > env switch >
-default fast tier.
+worker-side deselected counts).  Running an all-slow module by bare path
+(e.g. `pytest tests/test_mc.py`) therefore deselects everything and exits 5
+with no deselected count on the xdist summary — that is the filter working
+as pinned, not a mechanism failure; use `-m slow`, the env switch, or
+explicit nodeids.  `--lf`/`--ff` cache selections are likewise NOT yield
+triggers today: re-running a previously failed slow test via `--lf` runs it
+only in serial form or under `SKYCOLOR_FULL_SUITE=1`.  `SKYCOLOR_FULL_SUITE=1`
+overrides to the full population.  Priority: explicit
+`-m`/`-k`/`::` nodeid > env switch > default fast tier.
 
 **Marker-change cost:** the table's `slow` mirror must equal the live
 markers (harness equality test).  After adding/removing markers, the only

@@ -328,13 +328,17 @@ live in docs/DEVELOPMENT.md "Test tiers".  This section records the
 measured evidence and the provenance of every number the task rewrote.
 
 **Count chain** (mechanically exported; `SKYCOLOR_FULL_SUITE=1 uv run pytest --collect-only -q`):
-issue baseline 542 + 17 tests added by this task = **559** =
-**358 fast + 201 slow** (identity guarded by
+issue baseline 542 + 21 tests added by this task = **563** =
+**361 fast + 202 slow** (identity guarded by
 `test_tier_accounting_full_equals_fast_union_slow`, no count literals).
-The 17: 8 in Step 1 (7 mini tier-filter behavior tests + 1 policy-helper
-unit test), 7 weights-tool unit tests, 2 tree guards (accounting + mirror).
+The 21: 8 in Step 1 (7 mini tier-filter behavior tests + 1 policy-helper
+unit test), 10 weights-tool unit tests, 2 tree guards (accounting + mirror),
+1 review-round addition (mini scenario (g), xdist worker-side `-m` yield).
 The mirror equality (`test_tier_slow_mirror_matches_live_markers`) is live
-since the first regen below.
+since the first regen below; it fired once for real when scenario (g) moved
+the slow population 201 → 202, and the mandated marker-change cycle (fresh
+full listing + regen) restored it — the cost model in DEVELOPMENT.md is
+mechanically enforced, not aspirational.
 
 **Slow list provenance:** mechanical draft = the cold-optics 12-worker
 durations listing (`scratchpad/task-cold-optics/durations_parallel5.log`,
@@ -380,9 +384,13 @@ tests); it is already inside the 50.5 s wall and excluded from
 the safe, reversible direction — **with the documented consequence**:
 the transient follows bin position, so future regens will flag the then-current
 bin heads (a ratchet), and the slow→fast reclassification measurement
-(small nodeid selection) is confounded by the same transient.  A
-transient-aware gate or startup mitigation needs its own task; owners of
-future regens should read this paragraph before acting on gate output.
+(small nodeid selection) is confounded by the same transient.  The
+transitional reclassification measurement protocol (batch over the slow
+tier via `-m slow`, serial readings as attribution aid only) and the
+serial-form regen guard are pinned in docs/DEVELOPMENT.md; the transient-
+aware gate / startup mitigation itself is a registered backlog entry
+(scratchpad/backlog.md "xdist 启动暂态：暂态感知升线闸与重分类测量去污染")
+pending its own task.
 
 **Weights regen (authoritative, 2026-11-11):** full listing
 `SKYCOLOR_FULL_SUITE=1 uv run pytest -q -n 12 --dist=loadgroup
@@ -390,7 +398,8 @@ future regens should read this paragraph before acting on gate output.
 recorded; scheduling weights target the 12-worker form, contention
 inflation is their accepted semantics) + the three fast samples →
 `tests/data/scheduling_weights.json`: 12 module groups + 271 individual
-nodes, 5109.2 s total, `slow` mirror 201, **`fast_predicted_wall_s` 26.4**
+nodes (5109.2 s on that listing), `slow` mirror 201, **`fast_predicted_wall_s`
+26.4**
 (sum of unmarked fast-tier medians; informational only, no assertion
 consumes it; residuals: excludes worker startup/imbalance, contains
 contention-inflated per-test readings, sub-listing-cutoff tests contribute
@@ -402,7 +411,27 @@ exhaustive for the reuse gate to be exact (suite-recert learning applied).
 
 **Regen gates:** audit gate green after the adjudication marks (zero
 unmarked >2 s); reuse gate green; slow mirror equality green (live since
-this regen); accounting identity green.
+this regen); accounting identity green.  A second authoritative regen
+(2026-11-11 12:15, full listing re-measured for the mirror delta after
+review-round additions) refreshed the table: 12 module groups + 271 nodes,
+4651.5 s total, **mirror 202**, `fast_predicted_wall_s` 26.4 — audit and
+reuse gates green on its inputs (the standing fast-tier authority samples;
+the fast population had not changed, only the slow tier grew by one).
+The three fast-tier tool-unit tests added in the same review round fall in
+the accepted inter-regen blind spot (plan 待补全项 ①): unmeasured by the
+authority samples, invisible to the gate and the predicted sum.
+
+**The ratchet fired live (2026-11-11 12:16-12:18).**  A post-review
+re-measurement of the fast tier (three samples over the 361-test population,
+`scratchpad/task-suite-tier/step8/fast2_*.log`) hit the audit gate on
+exactly 12 tests at medians 7.16-12.71 s — the NEW scheduling-bin heads
+predicted by the deselect probe, including a 0.02 s-intrinsic test reading
+12.71 s.  Marking them slow would start the removal spiral (~12 tests per
+regen cycle, no convergence), so the table was kept from its authoritative
+regen and the flagged set is recorded as live evidence for the registered
+backlog task ("xdist 启动暂态").  Until that task lands, a maintenance regen
+whose gate output is a ~12-item bin-head set should be read against this
+paragraph BEFORE any markers are changed.
 
 **Caller inventory (default-entry semantics):** `validation/` and `tools/`
 contain no pytest invocation (`ruler_audit_recheck.py` mentions pytest only
@@ -432,10 +461,12 @@ the 90 s aggregate budget assertion (per-test ≤2 s enforced by the regen
 audit gate, aggregate stays informational), pin the explicit-nodeid yield
 semantics.
 
-**Final verification (this task, 2026-11-11 11:24-11:42, window load 8-24):**
-fast tier 358 passed ×2 (outer wall 62.50 / 56.70 s), harness serial
-diagnostics 41 passed (30.67 s), full tier **559 passed, zero skips**,
-exit 0 (576.73 s).  The fast walls sit above the 50.5 s form-measurement
+**Final verification (this task, 2026-11-11):** fast tier 358 passed ×2
+(outer wall 62.50 / 56.70 s, window load 8-24), harness serial diagnostics
+41 passed (30.67 s); post-review-round verification on the refreshed table:
+fast tier 361 passed ×3 (outer wall 38.74 / 38.52 / 37.94 s — the
+tier-updated packing distributes startup cost better than the pre-tier
+table), full tier **563 passed, zero skips**, exit 0 (393.70 s).  The fast walls sit above the 50.5 s form-measurement
 median with a loaded window (1-min load 8→24 during the run) — recorded
 attribution per the measurement-window protocol, informational only (no
 aggregate assertion exists by adjudication); the full-tier wall likewise
