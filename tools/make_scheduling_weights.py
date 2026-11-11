@@ -65,6 +65,17 @@ _PASSED = re.compile(r"(\d+) passed")
 _DESELECTED = re.compile(r"(\d+) deselected")
 _FAILED = re.compile(r"\b(\d+) (?:failed|error(?:s)?)\b")
 _SKIPPED = re.compile(r"\b(\d+) skipped\b")
+_FAILED_LINE = re.compile(r"^FAILED (\S+)", re.MULTILINE)
+
+#: The designed marker-change window: between a marker flip and the regen it
+#: feeds, the table's slow mirror lags the live markers, so the harness
+#: mirror-equality guard fails on every full-tier run — that red is the
+#: transition state the regen exists to close, not suite unhealthiness.  A
+#: full listing whose sole failure is exactly this guard is accepted as
+#: authority input (the guard re-arms on the table this run feeds); any
+#: other failure still rejects the listing.
+MIRROR_GUARD_NODEID = (
+    "tests/test_validation_harness.py::test_tier_slow_mirror_matches_live_markers")
 #: xdist loadgroup evidence on a durations line: a real listed nodeid closes
 #: with the scheduling suffix.  Required in the full slot — the full-suite
 #: listing is measured under the constant 12-worker loadgroup form, so its
@@ -146,7 +157,14 @@ def parse_durations(text):
     return totals
 
 
-def parse_summary(text, label=""):
+def _sole_failed_is_mirror_guard(text):
+    """True iff the listing's FAILED set is exactly the mirror guard."""
+    failed = {_raw_nodeid(m.group(1))
+              for m in _FAILED_LINE.finditer(text)}
+    return failed == {MIRROR_GUARD_NODEID}
+
+
+def parse_summary(text, label="", tolerate_mirror_guard=False):
     """Return ``(passed, deselected)`` from the run's final summary line.
 
     Anchored to the last non-empty line on purpose: the durations listing
@@ -154,15 +172,21 @@ def parse_summary(text, label=""):
     inside a test *name* on a durations line and misparse the counts.  A
     red run (``failed``/``error`` tokens on the summary line) is rejected:
     equal passed counts across three fast samples would otherwise let a
-    deterministically failing suite slip through as authority input.
+    deterministically failing suite slip through as authority input —
+    except the designed marker-change window (``tolerate_mirror_guard``):
+    a full listing whose sole failure is the mirror-equality guard is the
+    transition state the regen closes, and rejecting it would dead-lock
+    the flip → re-measure → regen cycle (the guard is red on every
+    full-tier run until exactly that regen lands).
     """
     tail = text.rstrip().splitlines()[-1] if text.strip() else ""
     failed = _FAILED.search(tail)
     if failed:
-        raise SystemExit(
-            f"{label}: summary reports {failed.group(1)} failed/errored "
-            f"test(s) — a red run is unusable as measurement authority. "
-            f"Fix the suite and re-measure.")
+        if not (tolerate_mirror_guard and _sole_failed_is_mirror_guard(text)):
+            raise SystemExit(
+                f"{label}: summary reports {failed.group(1)} failed/errored "
+                f"test(s) — a red run is unusable as measurement authority. "
+                f"Fix the suite and re-measure.")
     passed = _PASSED.search(tail)
     deselected = _DESELECTED.search(tail)
     if passed is None:
@@ -198,10 +222,15 @@ def validate_list_identity(label, text):
     aggregate worker-side deselected counts into the summary — reports
     nothing, so absence is accepted and mis-slotted listings are caught
     structurally instead.  Identity is judged by content, not filename.
+    The full slot additionally tolerates the designed marker-change window
+    red state: a listing whose sole failure is the mirror-equality guard
+    (see ``MIRROR_GUARD_NODEID``) — the transition state the regen this
+    listing feeds exists to close.
     """
-    passed, deselected = parse_summary(text, label)
-    skipped = _SKIPPED.search(text.rstrip().splitlines()[-1] if text.strip() else "")
     is_full = label.startswith("full")
+    passed, deselected = parse_summary(
+        text, label, tolerate_mirror_guard=is_full)
+    skipped = _SKIPPED.search(text.rstrip().splitlines()[-1] if text.strip() else "")
     if is_full:
         if deselected:
             raise SystemExit(

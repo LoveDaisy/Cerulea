@@ -597,6 +597,40 @@ def test_weights_tool_red_and_skipped_runs_rejected():
         "fast1 (arg 2)", suffix + "======== 361 passed in 38.00s ==========") == (361, 0)
 
 
+def test_weights_tool_mirror_guard_window_red_accepted():
+    # the designed marker-change window: between a marker flip and the regen
+    # it feeds, the table's slow mirror lags the live markers, so the
+    # mirror-equality guard fails on every full-tier run.  A full listing
+    # whose sole failure is exactly that guard is legal authority input
+    # (the regen this listing feeds closes the window); anything else
+    # still rejects.
+    suffix = "1.00s call     tests/test_a.py::t1@bin1\n"
+    guard = ("tests/test_validation_harness.py::"
+             "test_tier_slow_mirror_matches_live_markers")
+    window_full = (
+        suffix
+        + f"FAILED {guard}@bin9\n"
+        + "======== 563 passed, 1 failed in 400.00s ==========\n")
+    assert WEIGHTS_TOOL.validate_list_identity(
+        "full (arg 1)", window_full) == (563, 0)
+    # a second, unrelated failure rejects again
+    two_failed = (
+        suffix
+        + f"FAILED {guard}@bin9\n"
+        + "FAILED tests/test_a.py::test_broken@bin2\n"
+        + "======== 562 passed, 2 failed in 400.00s ==========\n")
+    with pytest.raises(SystemExit, match="red run"):
+        WEIGHTS_TOOL.validate_list_identity("full (arg 1)", two_failed)
+    # a red summary with no FAILED lines at all (truncated output) rejects
+    bare_red = suffix + "======== 562 passed, 1 failed in 400.00s ==========\n"
+    with pytest.raises(SystemExit, match="red run"):
+        WEIGHTS_TOOL.validate_list_identity("full (arg 1)", bare_red)
+    # the fast slot never tolerates red: the mirror guard is slow-marked
+    # and cannot fail there, so no fast listing has a designed red state
+    with pytest.raises(SystemExit, match="red run"):
+        WEIGHTS_TOOL.validate_list_identity("fast1 (arg 2)", window_full)
+
+
 def test_weights_tool_population_consistency_structural_only():
     ok_full = {"tests/test_a.py::t1": 3.0, "tests/test_b.py::t2": 2.0,
                "tests/test_mc.py::m1": 20.0}
