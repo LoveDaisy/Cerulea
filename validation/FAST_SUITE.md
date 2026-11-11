@@ -315,3 +315,119 @@ tests).  Formal pairs on the green tree:
 
 Performance context for the same task: cold dusty `delta_m(32)` 39.4 -> 3.1 s
 (`scratchpad/task-cold-optics/bench_{baseline,after}.log`).
+
+## Two-tier suite (2026-11-11, task `suite-tier`)
+
+The suite is two-tier from this tree on: the default `uv run pytest -q` is
+the **fast dev-loop tier** (358 tests), the acceptance gate is the **full
+tier** (`SKYCOLOR_FULL_SUITE=1 uv run pytest -q -n 12 --dist=loadgroup`,
+559 tests, zero skips expected).  Tiers are declared in code (`slow` markers
+with `kind:`/`cost:` reasons, filter + yield rules single-sourced in
+`tests/scheduling.py`, applied in `tests/conftest.py`); the placement rules
+live in docs/DEVELOPMENT.md "Test tiers".  This section records the
+measured evidence and the provenance of every number the task rewrote.
+
+**Count chain** (mechanically exported; `SKYCOLOR_FULL_SUITE=1 uv run pytest --collect-only -q`):
+issue baseline 542 + 17 tests added by this task = **559** =
+**358 fast + 201 slow** (identity guarded by
+`test_tier_accounting_full_equals_fast_union_slow`, no count literals).
+The 17: 8 in Step 1 (7 mini tier-filter behavior tests + 1 policy-helper
+unit test), 7 weights-tool unit tests, 2 tree guards (accounting + mirror).
+The mirror equality (`test_tier_slow_mirror_matches_live_markers`) is live
+since the first regen below.
+
+**Slow list provenance:** mechanical draft = the cold-optics 12-worker
+durations listing (`scratchpad/task-cold-optics/durations_parallel5.log`,
+>2 s = 144 readings, supersedes the issue's weights-table-derived "about
+130"; the table cannot see 14 heavy tests inside light module groups),
+expanded to 201 collected items by (a) kind-dimension module marking
+(`test_mc.py` 6, `test_golden_equivalence.py` 7), (b) parametrized
+functions marked at function level, (c) 20 upgrade-adjudication marks
+(below).  Kind census (decorator-level): `kind:grid` 73, `kind:render` 24,
+`kind:mc` 10, `kind:golden` 5, `cost:` 45.  The kind additions review found
+**zero** kind-exclusive tests among the unlisted fast candidates: the only
+MC-named candidate (`test_mc_solar_beam_respects_the_opaque_bottom`) is a
+vacuum ray/intersection contract check.
+
+**Form measurement** (3 interleaved samples per form, `--durations=0`,
+window load 2.2-6.8, logs `scratchpad/task-suite-tier/step5/`):
+**12-worker xdist wins, median 50.51 s (50.49-51.03) vs serial 97.00 s
+(95.66-99.73)** — the pre-registered rule (median wall, tie → serial)
+decides without mid-tier samples; `pyproject.toml` addopts stay
+`-n 12 --dist=loadgroup`.  The issue's serial-favouring estimate (fast-tier
+compute ~11 s) measured as ~87 s serial CPU for the marked-down population;
+the >2 s cutoff retains 144 genuinely costly tests' worth of mid-weight
+items the >10 s estimate excluded.
+
+**Monitoring-surface adjudication (risk 1):** the xdist run summary does
+**not** aggregate worker-side deselected counts (serial listings show "N
+deselected"; xdist summaries omit the count entirely — verified on all
+samples).  Per the pre-registered fallback, full-tier runs are judged by
+the formal要件 "deselected = 0 (absent) and full-population passed", the
+collect-only probes carry the tier counts, and no fast-tier run claims
+completeness from its summary line.
+
+**Upgrade adjudication and the startup transient.** The winning-form
+samples' K=3 per-test medians flagged 20 unmarked tests at 6.2-14.6 s.
+A deselect probe proved these readings are a **positional xdist startup
+transient**, not intrinsic cost: deselecting the 20 moved the 12-17 s
+readings wholesale onto the new bin-head tests — including a test whose
+intrinsic cost is 0.02 s reading 16.90 s.  Every xdist run pays this
+transient once per scheduling bin (~12-17 s absorbed by each bin's first
+tests); it is already inside the 50.5 s wall and excluded from
+`fast_predicted_wall_s` by construction.  The 20 were nevertheless marked
+`slow` (`cost:` reasons, commit `ab6812b`) per the pre-registered rule —
+the safe, reversible direction — **with the documented consequence**:
+the transient follows bin position, so future regens will flag the then-current
+bin heads (a ratchet), and the slow→fast reclassification measurement
+(small nodeid selection) is confounded by the same transient.  A
+transient-aware gate or startup mitigation needs its own task; owners of
+future regens should read this paragraph before acting on gate output.
+
+**Weights regen (authoritative, 2026-11-11):** full listing
+`SKYCOLOR_FULL_SUITE=1 uv run pytest -q -n 12 --dist=loadgroup
+--durations=0 --durations-min=0` (465 s window, load rising to 18.5 —
+recorded; scheduling weights target the 12-worker form, contention
+inflation is their accepted semantics) + the three fast samples →
+`tests/data/scheduling_weights.json`: 12 module groups + 271 individual
+nodes, 5109.2 s total, `slow` mirror 201, **`fast_predicted_wall_s` 26.4**
+(sum of unmarked fast-tier medians; informational only, no assertion
+consumes it; residuals: excludes worker startup/imbalance, contains
+contention-inflated per-test readings, sub-listing-cutoff tests contribute
+zero).  `--durations-min=0` is mandatory for the full listing: the first
+regen attempt with the bare `--durations=0` failed the reuse gate on 8
+tests whose intrinsic cost sits at the 5 ms listing cutoff (listed in
+fast-tier samples, hidden in the full listing) — the full listing must be
+exhaustive for the reuse gate to be exact (suite-recert learning applied).
+
+**Regen gates:** audit gate green after the adjudication marks (zero
+unmarked >2 s); reuse gate green; slow mirror equality green (live since
+this regen); accounting identity green.
+
+**Caller inventory (default-entry semantics):** `validation/` and `tools/`
+contain no pytest invocation (`ruler_audit_recheck.py` mentions pytest only
+in a docstring); no CI configuration exists in the repo; the only in-repo
+pytest subprocess caller is the harness mini-runner itself (explicit args,
+explicit env); `validation.run_all` dispatches the six checks via
+`ProcessPoolExecutor` without pytest.  The tier split therefore has no
+silent victim among programmatic callers.
+
+**Formal pair protocol (unchanged semantics, explicit full tier):** the
+acceptance pair is taken on the full-tier entry —
+`SKYCOLOR_FULL_SUITE=1 uv run pytest -q -n 12 --dist=loadgroup`, full
+population passed ×2, zero skips, real xdist default parameters — recorded
+here when next taken; this task did not take a certification pair, and the
+quiet-window certification remains the separate backlog item.  The 360 s
+guard line and escalation clause continue to apply to full-tier pairs.
+
+**Issue-prose rewrites carried by this section** (all sourced): "exactly
+542 items" → identity + N_new chain (this task's own tests falsify the
+literal); "about 130 items" → 144 draft readings; "≈412 magnitude" → 358
+fast; "12-worker parallel measured ≤2 s" → target-form (xdist) caliber per
+the parallel-evidence learning; "budget assertion computed from the weights
+table" → authority-list medians (the ≤90 s aggregate assertion was dropped
+by user adjudication).  User adjudications of 2026-11-11 embodied here:
+drop the automated downgrade mechanism (reclassification is manual), drop
+the 90 s aggregate budget assertion (per-test ≤2 s enforced by the regen
+audit gate, aggregate stays informational), pin the explicit-nodeid yield
+semantics.
