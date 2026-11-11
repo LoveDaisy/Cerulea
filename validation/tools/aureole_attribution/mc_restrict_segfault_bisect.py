@@ -5,7 +5,7 @@ on the restricted 14-wl atmosphere and the 88-view meridian cut.  This script
 re-runs that request at a tiny photon budget across view subsets and
 atmosphere variants, twice each, to isolate the trigger.
 
-Run: PYTHONPATH=<repo root> uv run python scratchpad/task-aureole-delta-fit/probe_segfault_bisect.py
+Run: PYTHONPATH=. uv run python validation/tools/aureole_attribution/mc_restrict_segfault_bisect.py
 """
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from pathlib import Path
 
 import numpy as np
 
-REPO = Path(__file__).resolve().parents[2]
+REPO = Path(__file__).absolute().parents[3]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 

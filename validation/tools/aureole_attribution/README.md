@@ -5,8 +5,11 @@ horizon/zenith excess (model 8.815 vs CIE 110-1994 3.652, dev +141.406%,
 `validation/results.json`).  Promoted from the task scratchpad per the plan's
 evidence-persistence rule (review new-r1-Minor5): every number quoted in the
 check3 note and the stop-loss record reproduces from this directory; the
-committed JSON/NPZ/CSV are the 2026-11-11 run on the git d0b956b tree
-(+ revision da49465 lineage).
+committed JSON/NPZ/CSV are the 2026-11-11 run; the physical chain is
+unchanged since git d0b956b (skycolor has zero diff throughout), and the
+committed artifacts were produced by the HEAD-version probe script (the
+schema includes the review-r1 `moment_tail_*` diagnostics and the spectral
+`*_rad` arrays -- older probe revisions do not emit them).
 
 ## Question and answer
 
@@ -21,12 +24,13 @@ plan's G1 gate:
 |---|---|---|---|
 | B0 | production default (32-moment delta-M SOS) | 8.81524 | — |
 | P1 | `n_mu=64, n_moments=128` | 8.81188 | +0.065% — see the terminus finding: **no moment content above l=30, so this is the n_mu 32→64 quadrature effect** |
-| P2 | `delta_m=False` (raw moments) | 8.81524 (bitwise B0) | ~0 — delta-M is the identity here because f = β₃₂ = 0 |
+| P2 | `delta_m=False` (raw moments) | 8.81524 (B0 to 1 ulp; share −3.4e-16, the BLAS reduction-order floor) | ~0 — delta-M is exactly the identity here because f = β₃₂ = 0 (moment-level anchor) |
 | P3 | `spherical-mc` (exact phase + spherical transport, low preset, seed 0) | 8.7760 ± 0.0418 (1σ) | +0.76% ± 0.81% (below 3σ, not counted) |
 | T2 | aureole-band (γ∈[1°,10°]) truncated-series residual, layer 0 @550nm | — | 0.00012, **degenerate in N** (identical at N=32 and N=128) |
 
 **Moment-series terminus (measured, review r1 Major 2):** the Mie scattering
-amplitude is a finite polynomial (degree ≤ 2·nmax), so the raw Legendre
+scattering amplitude S(μ) is a finite sum of polynomials of degree ≤ nmax,
+so |S|² is a polynomial of degree ≤ 2·nmax and the raw Legendre
 moment series of this mixture terminates EXACTLY at l=30 (nmax ≤ 15 for the
 rural mode set); β_l = 0 for l ≥ 31.  The "32-moment representation limit"
 hypothesis is therefore vacuous for this aerosol — the truncated series IS

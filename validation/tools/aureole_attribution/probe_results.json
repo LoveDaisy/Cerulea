@@ -27,9 +27,9 @@
   },
   "configs": {
     "b0": {
-      "wall_s_clean": 32.61639641714282,
-      "wall_s_instrumented": 25.51247270894237,
-      "mem_peak_mb": 1058.266217,
+      "wall_s_clean": 32.88327154214494,
+      "wall_s_instrumented": 25.5988548330497,
+      "mem_peak_mb": 1058.266334,
       "ratio": 8.81523527413475,
       "dev_vs_cie": 141.40606682437675,
       "lz": 1989.508343897231,
@@ -40,9 +40,9 @@
       "anchor_ok": true
     },
     "b0c": {
-      "wall_s_clean": 1.1770865409635007,
-      "wall_s_instrumented": 1.537541959201917,
-      "mem_peak_mb": 223.611473,
+      "wall_s_clean": 1.2036628329660743,
+      "wall_s_instrumented": 1.5137686671223491,
+      "mem_peak_mb": 223.611665,
       "ratio": 8.81523527413475,
       "dev_vs_cie": 141.40606682437675,
       "n_mu_eff": 32,
@@ -55,9 +55,9 @@
       "cross_check_ok": true
     },
     "p1": {
-      "wall_s_clean": 3.1533153750933707,
-      "wall_s_instrumented": 3.1401809160597622,
-      "mem_peak_mb": 387.096321,
+      "wall_s_clean": 3.1394177922047675,
+      "wall_s_instrumented": 3.3338895831257105,
+      "mem_peak_mb": 387.095767,
       "ratio": 8.811875420257813,
       "dev_vs_cie": 141.3140569024277,
       "n_mu_eff": 64,
@@ -68,9 +68,9 @@
       "converged": true
     },
     "p2": {
-      "wall_s_clean": 1.2494378748815507,
-      "wall_s_instrumented": 1.625714125111699,
-      "mem_peak_mb": 223.61118,
+      "wall_s_clean": 1.1881044579204172,
+      "wall_s_instrumented": 1.5641987919807434,
+      "mem_peak_mb": 223.611571,
       "ratio": 8.815235274134752,
       "dev_vs_cie": 141.4060668243768,
       "n_mu_eff": 32,
@@ -81,9 +81,9 @@
       "converged": true
     },
     "p3": {
-      "wall_s_clean": 251.67753845802508,
-      "wall_s_instrumented": 427.46246462501585,
-      "mem_peak_mb": 1073.415134,
+      "wall_s_clean": 257.4210589590948,
+      "wall_s_instrumented": 432.3841111250222,
+      "mem_peak_mb": 1073.41628,
       "ratio": 8.775991161879439,
       "sigma_ratio": 0.04178553857146513,
       "wl_subset": [
@@ -168,7 +168,7 @@
     "notes": [],
     "R": 0.0006506787439562868,
     "branch": 4,
-    "verdict": "P3 not counted (<= 3 sigma); R < 1/4 -> stop-loss: axis B dominant"
+    "verdict": "P3 not counted (<= 3 sigma); R < 1/4 -> stop-loss: neither measured axis explains the gap (see attribution)"
   },
   "t2": {
     "32": {

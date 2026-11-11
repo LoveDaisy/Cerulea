@@ -21,7 +21,8 @@ task's scope; it is reported in the task records for an owner-level
 spin-off.
 
 Moment-series terminus (measured, see ``moment_tail`` diagnostics): the
-Mie scattering amplitude is a finite polynomial (degree <= 2*nmax), so the
+Mie amplitude S(mu) is a finite sum of polynomials of degree <= nmax, so
+|S|^2 is a polynomial of degree <= 2*nmax and the
 Legendre moment series of this mixture terminates EXACTLY at l=30
 (nmax <= 15 for the rural mode set); beta_l = 0 for l >= 31.  The delta-M
 renormalisation is therefore the identity here (f = beta_32 = 0), the P1
@@ -297,11 +298,12 @@ def moment_tail(atmo, n_moments: int, layer: int = 0) -> dict:
     nonzero = int(np.count_nonzero(beta))
     tail_slice = beta[MOMENT_TAIL_FROM - 1:]
     tail = float(np.max(np.abs(tail_slice))) if tail_slice.size else 0.0
-    terminus = int(nonzero - 1)
+    live = np.flatnonzero(beta)
+    terminus = int(live[-1]) if live.size else -1
     return {"n_moments": n_moments, "nonzero": nonzero,
             "terminus_l": terminus,
             f"max_abs_beta_l{MOMENT_TAIL_FROM - 1}_plus": tail,
-            "beta_last_nonzero": float(beta[terminus])}
+            "beta_last_nonzero": float(beta[terminus]) if live.size else 0.0}
 
 
 def aod_invariants(atmo) -> dict:
@@ -794,7 +796,8 @@ def evaluate_g1(results, args, control, lum, rad_cut, mc_runner):
         g["verdict"] = ("P3 not counted (<= 3 sigma); "
                         + ("gray zone -> Step 2 with weak evidence"
                            if g["branch"] == 3 else
-                           "R < 1/4 -> stop-loss: axis B dominant"))
+                           "R < 1/4 -> stop-loss: neither measured axis "
+                           "explains the gap (see attribution)"))
         return g
 
     # P3 adjudicates: branch-2 entry test at the 1/3 gate
@@ -830,8 +833,8 @@ def evaluate_g1(results, args, control, lum, rad_cut, mc_runner):
                         "C2/C4 preferred, C3 only if T2 > 0.20")
         return g
     g["branch"] = 4
-    g["verdict"] = ("R < 1/4 -> stop-loss: axis B dominant (or the gap is not "
-                    "representation-repairable); evidence attached")
+    g["verdict"] = ("R < 1/4 -> stop-loss: neither measured axis explains "
+                    "the gap (see attribution); evidence attached")
     return g
 
 
@@ -844,7 +847,9 @@ def t2_gate_value(results, g):
     """
     tail = (results["invariants"].get("moment_tail_p1")
             or results["invariants"].get("moment_tail_b0"))
-    degenerate = tail is not None and tail["nonzero"] <= MOMENT_TAIL_FROM - 1
+    # direct predicate on the measured tail magnitude, not a count proxy
+    # (an interior zero would break the count assumption; review r2 Sug3)
+    degenerate = tail is not None and tail[f"max_abs_beta_l{MOMENT_TAIL_FROM - 1}_plus"] == 0.0
     t2 = results["t2"][128]["t2"]
     value = {"t2": t2, "tail_degenerate": bool(degenerate)}
     if degenerate:
