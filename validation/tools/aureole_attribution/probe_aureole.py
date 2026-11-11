@@ -460,7 +460,10 @@ def spawn_worker(name: str, args, attempts: int = 2, mc_quality=None):
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--configs", default="b0,b0c,p1,p2,p3",
-                    help="comma list among b0,b0c,p1,p2,p3,t1,ctl")
+                    help="comma list among b0,b0c,p1,p2,p3,t1,ctl (ctl and "
+                         "t1 are produced by the G1 trigger paths; ctl is "
+                         "not a standalone entry -- it exists only as the "
+                         "0.05-band control run)")
     ap.add_argument("--mc-quality", default="low",
                     help="MC QUALITY preset for P3/CTL (D4: existing presets)")
     ap.add_argument("--seed", type=int, default=0)

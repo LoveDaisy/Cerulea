@@ -78,10 +78,12 @@ side-by-side runs or restore with `git checkout`.  A failed B0 anchor writes
 
 ## Cost (relative wall-clock criterion, plan Step 1)
 
-See `probe_costs.csv`.  B0 full grid 34.8s; cut-only SOS runs 1.2-3.2s
-(128-moment P1 3.2s, i.e. ~2.6x B0 cut -- one-hand cost evidence for any
-future higher-moment candidate, subject to the terminus finding above);
-P3 low-budget MC 261s per pass.
+See `probe_costs.csv` (the committed 2026-11-11 run; numbers below are
+mechanically exported from it).  B0 full grid 32.9s; cut-only
+SOS runs 1.20-3.14s
+(128-moment P1 3.14s, i.e. ~2.6x B0 cut -- one-hand cost
+evidence for any future higher-moment candidate, subject to the terminus
+finding above); P3 low-budget MC 257s per pass.
 
 ## Known containment (not a physics choice)
 
