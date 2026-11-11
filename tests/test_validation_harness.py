@@ -499,11 +499,9 @@ def test_tier_filter_bare_path_keeps_fast_filter(tmp_path):
 # ---------------------------------------------------------------------------
 # weights-regeneration tool: tier extension (task-suite-tier Step 3)
 # ---------------------------------------------------------------------------
-def test_weights_tool_upgrade_gate_median_and_budget_boundary():
-    m = WEIGHTS_TOOL.fast_medians
-    slow = {"tests/test_a.py::test_marked"}
+def test_weights_tool_fast_medians_median_of_available_readings():
     # median over available readings; single-reading samples use that value
-    medians = m([
+    medians = WEIGHTS_TOOL.fast_medians([
         {"tests/test_a.py::test_ok": 1.0, "tests/test_a.py::test_marked": 5.0,
          "tests/test_a.py::test_over": 2.1},
         {"tests/test_a.py::test_ok": 1.5, "tests/test_a.py::test_marked": 5.0,
@@ -513,31 +511,10 @@ def test_weights_tool_upgrade_gate_median_and_budget_boundary():
     ])
     assert medians["tests/test_a.py::test_ok"] == pytest.approx(1.2)
     assert medians["tests/test_a.py::test_marked"] == pytest.approx(5.0)
-    # exactly at the budget passes: the constraint is "median <= 2 s"
-    at_budget = m([{"t::x": 2.0}, {"t::x": 2.0}, {"t::x": 2.0}])
-    assert at_budget["t::x"] == pytest.approx(2.0)
-    assert not WEIGHTS_TOOL.upgrade_gate_offenders(
-        {"t::x": 2.0}, slow)
-    # above the budget and unmarked -> offender; marked -> exempt
-    offenders = WEIGHTS_TOOL.upgrade_gate_offenders(medians, slow)
-    assert set(offenders) == {"tests/test_a.py::test_over"}
-    assert not WEIGHTS_TOOL.upgrade_gate_offenders(
-        {"tests/test_a.py::test_marked": 5.0}, slow)
-
-
-def test_weights_tool_caliber_isolation_full_readings_never_tier():
-    # A test whose FULL-suite reading is contention-inflated but whose
-    # fast-tier median is within budget must not fail the gate: only the
-    # fast (target-form) evidence decides tiers.
-    medians = {"tests/test_a.py::test_fast_for_real": 1.5}
-    assert not WEIGHTS_TOOL.upgrade_gate_offenders(medians, set())
-    # ...and the gate has no input path for full-listing readings at all.
-    # The bytecode canary below is intentionally brittle on the PARAMETER
-    # slice only (co_varnames also holds locals, which would false-fire on
-    # an unrelated variable named like "full"): any future parameter on the
-    # gate must fail here and be reviewed.
-    code = WEIGHTS_TOOL.upgrade_gate_offenders.__code__
-    assert "full" not in code.co_varnames[:code.co_argcount]
+    # boundary convention: a value exactly at a threshold is that value
+    at_boundary = WEIGHTS_TOOL.fast_medians(
+        [{"t::x": 2.0}, {"t::x": 2.0}, {"t::x": 2.0}])
+    assert at_boundary["t::x"] == pytest.approx(2.0)
 
 
 def test_weights_tool_predicted_wall_sums_unmarked_medians():

@@ -6,11 +6,14 @@ regenerates the whole table in one pass.
 * one FULL-suite listing (``SKYCOLOR_FULL_SUITE=1`` with the constant
   12-worker form) feeds the scheduling weights (``modules``/``nodes``) —
   the packing must describe the full population it schedules;
-* three FAST-tier listings (the default entry point, winning form) are the
-  upgrade authority: per-test K=3 medians drive the audit gate — any unmarked
-  test whose fast-tier median exceeds ``FAST_BUDGET_S`` fails the run — and
-  the informational ``fast_predicted_wall_s`` (sum of unmarked medians;
-  recorded in validation/FAST_SUITE.md, consumed by no assertion);
+* three FAST-tier listings (the default entry point, target form) give
+  per-test K=3 medians feeding the informational ``fast_predicted_wall_s``
+  (sum of unmarked medians; recorded in validation/FAST_SUITE.md, consumed
+  by no assertion).  Marker placement is a human-owned declaration — the
+  2026-11-11 user adjudication (option 2) removed the automated fast→slow
+  gate; cost verification is carried entirely by the standing
+  weights-regen maintenance rule: any population or marker change
+  re-measures the required listings and regenerates the table.
 * the ``slow`` mirror is derived from a fresh ``pytest -m slow`` collection
   subprocess, so the table's mirror can never lag the live markers at regen
   time (the harness equality test then forbids lagging afterwards).
@@ -45,6 +48,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import os
 import pathlib
 import re
 import statistics
@@ -67,12 +71,6 @@ _SKIPPED = re.compile(r"\b(\d+) skipped\b")
 #: absence means a serial (or otherwise mis-formed) listing was passed.
 _SUFFIXED_DURATION_LINE = re.compile(
     r"^\s*[0-9.]+s\s+(?:call|setup|teardown)\s+\S+@bin\d+\s*$", re.MULTILINE)
-
-#: Fast-tier per-test budget [s] (K=3 median, target-form measurement).
-#: The gate fails the regen when an unmarked test exceeds it; the lawful
-#: outcomes are marking ``slow`` or opening an optimization task — never a
-#: silent pass-through.
-FAST_BUDGET_S = 2.0
 
 #: Durations listings hide phases below ~5 ms, so presence near the cutoff
 #: drifts between samples.  Readings at or below this value count as the
@@ -307,17 +305,6 @@ def fast_medians(fast_totals):
             for n in ids}
 
 
-def upgrade_gate_offenders(medians, slow, budget_s=FAST_BUDGET_S):
-    """Unmarked tests whose fast-tier median exceeds the budget.
-
-    Full-suite readings never enter here by construction: only fast-tier
-    medians are passed in, so contention-inflated full-listing costs cannot
-    fail a genuinely fast test (caliber isolation).
-    """
-    return {n: m for n, m in sorted(medians.items())
-            if m > budget_s and n not in slow}
-
-
 def reuse_gate(full_totals, medians, band_s=BOUNDARY_BAND_S):
     """Fail when the full listing misses tests with real fast-tier readings.
 
@@ -389,13 +376,12 @@ def collect_population_nodeids():
 def prune_to_population(totals_list, live):
     """Drop readings of tests that no longer exist in the live tree.
 
-    The standing authority samples legitimately contain readings of tests
-    since deleted (any removal of a once-measured fast test).  Left in,
-    those stale readings dead-lock the gates: the reuse gate would demand a
-    fresh full listing that can never contain a deleted test, and the audit
-    gate would raise fake offenders.  Pruning to the live collection makes
-    every gate judge exactly the population that exists, which is what the
-    removal path of the marker-change cost model requires.
+    The standing samples legitimately contain readings of tests since
+    deleted (any removal of a once-measured test).  Left in, those stale
+    readings dead-lock the reuse gate: it would demand a fresh full listing
+    that can never contain a deleted test.  Pruning to the live collection
+    makes the gate judge exactly the population that exists, which is what
+    the removal path of the marker-change cost model requires.
     """
     return [{n: s for n, s in t.items() if n in live} for t in totals_list]
 
@@ -468,22 +454,6 @@ def main():
     check_population_consistency(
         labels, passed, totals, slow=slow)
     reuse_gate(totals[0], medians)
-    offenders = upgrade_gate_offenders(medians, slow)
-    if offenders:
-        lines = "\n".join(
-            f"  {n}  median {m:.2f} s" for n, m in offenders.items())
-        raise SystemExit(
-            f"fast-tier audit gate: {len(offenders)} unmarked test(s) above "
-            f"the {FAST_BUDGET_S} s budget:\n{lines}\n"
-            "Lawful outcomes: mark them slow (kind:/cost: reason), or open an "
-            "optimization task and mark them slow meanwhile.  There is no "
-            "'leave unmarked' outcome — except the adjudicated transient "
-            "boundary: if the set looks like xdist bin-head spikes (~12 "
-            "positional 7-17 s medians incl. intrinsically sub-0.1 s tests), "
-            "read validation/FAST_SUITE.md 'The ratchet fired live' BEFORE "
-            "marking anything; the authoritative table is kept, the set is "
-            "recorded for the registered transient task, and no marker "
-            "flips land until that task releases the freeze.")
     payload = build_payload(totals[0], medians, slow)
     WEIGHTS_PATH.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
     total = sum(payload["modules"].values()) + sum(payload["nodes"].values())
