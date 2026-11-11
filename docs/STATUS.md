@@ -111,8 +111,13 @@ These backends have not replaced production defaults.
   ephemeris in published rural spectra; full observation matching is pending.
 - Rare-path MC uncertainty remains large in deep twilight. A single error bar or
   a better fit does not identify missing scattering or calibration error.
-- Horizon luminance and the 32-moment aureole remain unresolved; delta-fit,
-  polarisation, structured clouds and ice-crystal halos are absent.
+- Horizon luminance remains unresolved, but no longer for lack of an aureole
+  hypothesis: the pre-registered attribution probe (task-aureole-delta-fit,
+  2026-11-11) excluded moment representation and transport geometry (G1
+  stop-loss, R = 0.00065) and shifted attribution to first-order horizon
+  brightening vs the empirical CIE 110 gradation plus a horizon-weighted
+  diffuse enhancement (`validation/tools/aureole_attribution/`).  Delta-fit,
+  polarisation, structured clouds and ice-crystal halos remain absent.
 - M11 removed repeated Mie work through shared optics and a 256-state cache;
   task-cold-optics then batch-vectorised the cold build itself (bitwise
   coefficient kernels, ulp-level declared-tolerance moment/table kernels).
