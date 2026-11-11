@@ -304,3 +304,35 @@ def test_historical_snapshots_are_byte_identical():
         a = hashlib.sha256((root / original).read_bytes()).hexdigest()
         b = hashlib.sha256((hist / snapshot).read_bytes()).hexdigest()
         assert a == b, snapshot
+
+
+def test_ground_consumption_matches_registry(data, monkeypatch):
+    """The registry's ground decision reaches render_result: the cloud pair
+    renders through the production ground path consuming each run's own
+    solve-bound materials; pipeline-view renders ground=False (plan §3) --
+    captured consumption, not declarations."""
+    calls = []
+    orig = render.render_result
+
+    def spy(pres, **kwargs):
+        calls.append((pres, dict(kwargs)))
+        return orig(pres, **kwargs)
+
+    monkeypatch.setattr(render, "render_result", spy)
+    rf.render_figures(data, ["cloud", "pipeline-view"], NPZ)
+    grounds = [(pres, kw) for pres, kw in calls if kw.get("ground") is True]
+    noground = [(pres, kw) for pres, kw in calls
+                if kw.get("ground") is False]
+    assert len(grounds) == 2 and len(noground) == 1
+    matched = set()
+    for pres, _kw in grounds:
+        for key in ("l6_clear_30", "l6_cloud_30"):
+            if (np.array_equal(pres.ground_albedo,
+                               data[f"{key}/ground_albedo"])
+                    and np.array_equal(pres.ground_direct_irradiance,
+                                       data[f"{key}/ground_direct_irradiance"])):
+                matched.add(key)
+    assert matched == {"l6_clear_30", "l6_cloud_30"}
+    pres, _kw = noground[0]
+    np.testing.assert_array_equal(pres.radiance.reshape(-1, pres.wl.size),
+                                  data["l6_clear_30/total"])

@@ -185,8 +185,8 @@ FIGURES: dict[str, FigureDef] = {
          ViewPanelDef("l6_cloud_30", "total", "rect", True,
                       "L6 · + stratus deck — " + _RECT)),
         ("docs/physics/LAYER_STORY.md §L6", "docs/physics/MAINLINE.zh.md 图7"),
-        "contract-matched pair, both with the solve-bound deck-lit floor, "
-        "locked cloud exposure 0.03; no fisheye (no ground in a 180 deg dome)"),
+        "contract-matched pair, each with its own solve-bound floor lighting, "
+        "locked cloud exposure 0.03; no fisheye (no ground in a 180° dome)"),
     "pipeline-spectrum": FigureDef(
         "pipeline-spectrum", "layer_story_pipeline_spectrum_v2.png", "spectrum",
         SpectrumPanelDef(
@@ -642,9 +642,19 @@ def _sun_of(data, key: str) -> tuple[float, float]:
 
 
 def rect_panel(ax, data, vdef: ViewPanelDef, overrides=None) -> dict:
-    """The archived perspective view through the untouched production path."""
+    """The archived perspective view through the untouched production path.
+
+    ``vdef.ground`` is the authoritative ground decision for the panel and is
+    passed to render_result explicitly -- the archive display record alone
+    would silently re-impose the solving run's own choice (the cloud-group
+    record carries ground=True), contradicting the registry/manifest/caption
+    declarations.  A ground panel additionally requires the solve-bound
+    materials; a no-ground panel renders the no-ground display convention
+    below the horizon.
+    """
     key = vdef.key
-    display = {**_display_of(data, key), **(overrides or {})}
+    display = {**_display_of(data, key), "ground": vdef.ground,
+               **(overrides or {})}
     pres = ls.bind(data, key, vdef.part)
     if vdef.ground and not (pres.ground_supported
                             and pres.ground_albedo is not None
