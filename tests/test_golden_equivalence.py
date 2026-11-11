@@ -33,6 +33,9 @@ WL7 = np.array([400.0, 450.0, 500.0, 550.0, 600.0, 650.0, 700.0])
 TINY = dict(n_zen=6, n_az=8, n_anchor=3, n_photons=6.0e5)
 
 
+
+# Full-tier exclusive by species dimension (see docs/DEVELOPMENT.md):
+pytestmark = pytest.mark.slow(reason="kind:golden - committed-fixture full verification is full-tier exclusive")
 def _load(name: str) -> dict:
     path = DATA / f"golden_{name}.npz"
     if not path.exists():

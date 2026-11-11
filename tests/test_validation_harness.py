@@ -528,6 +528,7 @@ def test_at_altitude_returns_independent_truncation():
     assert float(atmo.r_bounds[0]) == ground
 
 
+@pytest.mark.slow(reason="cost: 12-worker parallel 17.0 s (cold-optics listing); fast-tier budget 2 s")
 def test_direct_case_never_calls_the_diffuse_solver(monkeypatch):
     import validation.check2_illuminance as c2
 
@@ -540,6 +541,7 @@ def test_direct_case_never_calls_the_diffuse_solver(monkeypatch):
     assert set(d) == {"dni", "e_dni", "e_horiz", "atmo"}
 
 
+@pytest.mark.slow(reason="cost: 12-worker parallel 17.1 s (cold-optics listing); fast-tier budget 2 s")
 def test_model_case_calls_the_diffuse_solver_exactly_once(monkeypatch):
     import validation.check2_illuminance as c2
 

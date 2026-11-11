@@ -86,6 +86,7 @@ def _subprocess(argv):
                           check=False, timeout=300)
 
 
+@pytest.mark.slow(reason="kind:render - full-image / display integration is full-tier exclusive")
 def test_subprocess_chart_pair_identical_stdout():
     t = _subprocess(["chart", "--time", "2026-11-05T00:00:00Z",
                      "--latitude", repr(BEIJING[0]),
@@ -96,6 +97,7 @@ def test_subprocess_chart_pair_identical_stdout():
     assert "45deg sun-side" in t.stdout      # table content sanity, not just equality
 
 
+@pytest.mark.slow(reason="kind:render - full-image / display integration is full-tier exclusive")
 def test_subprocess_render_pair_identical_png(tmp_path):
     common = ["--size", "32x16", "--no-sun", "--exposure", "1e-3"] + GRID
     p_time = tmp_path / "time.png"
@@ -124,6 +126,7 @@ MC_BUDGET = ["--quality", "low", "--seed", "0", "--mc-photons", "2e5",
 
 @pytest.mark.parametrize("approx", ["spherical-single", "plane-sos",
                                     "hybrid-sos", "spherical-mc"])
+@pytest.mark.slow(reason="kind:render - full-image / display integration is full-tier exclusive")
 def test_cli_routes_all_four_approximations(approx):
     argv = ["chart", "--sun-elevation", "10", "--sun-azimuth", "137"] + GRID + \
         ["--approximation", approx]
@@ -151,6 +154,7 @@ def test_cli_rejects_cloud_with_mc():
     assert "composes with" in err
 
 
+@pytest.mark.slow(reason="kind:render - full-image / display integration is full-tier exclusive")
 def test_cli_cloud_option_runs_and_declares_itself():
     code, out, err = _run(["chart", "--sun-elevation", "10"] + GRID +
                           ["--cloud", "stratus"])
@@ -158,6 +162,7 @@ def test_cli_cloud_option_runs_and_declares_itself():
     assert "approximation: hybrid-sos (method 'cloud')" in err
 
 
+@pytest.mark.slow(reason="kind:render - full-image / display integration is full-tier exclusive")
 def test_cli_render_cloud_writes_png_with_summary(tmp_path):
     p = tmp_path / "cloud.png"
     code, out, err = _run(["render", "--sun-elevation", "10"] + GRID +

@@ -159,6 +159,7 @@ def _forbid_solve_and_source(monkeypatch):
     monkeypatch.setattr(solar_source, "SolarSource", boom("SolarSource"))
 
 
+@pytest.mark.slow(reason="kind:render - full-image / display integration is full-tier exclusive")
 def test_prepare_once_then_display_without_solve_or_source(atmo7, monkeypatch):
     """A4: after ``solve_dome`` preparation, chart tables and all three
     cameras render repeatedly from the bound arrays alone."""
@@ -177,6 +178,7 @@ def test_prepare_once_then_display_without_solve_or_source(atmo7, monkeypatch):
                                     ground=True).shape == (16, 24, 3)
 
 
+@pytest.mark.slow(reason="kind:render - full-image / display integration is full-tier exclusive")
 def test_solve_dome_sends_absolute_azimuths_to_one_solve(atmo7, monkeypatch):
     """The relative grid plus the same solar azimuth goes to exactly one
     solve call."""
@@ -205,6 +207,7 @@ def test_solve_dome_sends_absolute_azimuths_to_one_solve(atmo7, monkeypatch):
     assert pres.radiance.shape == (N_ZEN, N_AZ, WL7.size)
 
 
+@pytest.mark.slow(reason="kind:render - full-image / display integration is full-tier exclusive")
 def test_joint_rotation_leaves_the_sky_invariant(atmo7):
     """Rotating the sun and the grid together rotates the physics, not the
     numbers.  Tolerance source: the joint rotation changes only the order of
@@ -217,6 +220,7 @@ def test_joint_rotation_leaves_the_sky_invariant(atmo7):
     np.testing.assert_allclose(p1.radiance, p0.radiance, rtol=1e-10, atol=0)
 
 
+@pytest.mark.slow(reason="kind:render - full-image / display integration is full-tier exclusive")
 def test_panorama_brightness_follows_absolute_sun_azimuth(atmo7):
     """Camera rotation with a non-zero sun azimuth: the brightest horizon
     column sits at the sun's absolute azimuth, not at the grid origin."""
@@ -231,6 +235,7 @@ def test_panorama_brightness_follows_absolute_sun_azimuth(atmo7):
     assert abs(col - expected) <= 1.5
 
 
+@pytest.mark.slow(reason="kind:render - full-image / display integration is full-tier exclusive")
 def test_presentation_from_result_is_pure_binding(atmo7, monkeypatch):
     """An explicit result + grid binds without any solve or source query."""
     from skycolor import render
@@ -303,6 +308,7 @@ def test_external_field_presentation_and_ground_rules(atmo7):
     assert render.render_result(pres, size=(8, 4), ground=False).shape == (4, 8, 3)
 
 
+@pytest.mark.slow(reason="kind:render - full-image / display integration is full-tier exclusive")
 def test_sky_dome_thin_forward_is_bit_identical(atmo7):
     """The dict path rides the same solve: bit-identical to the historical
     ndarray wrapper's composition."""
@@ -343,6 +349,7 @@ def test_sky_radiance_grid_passes_new_options_through(atmo7):
     assert np.array_equal(single_only, ref)
 
 
+@pytest.mark.slow(reason="kind:render - full-image / display integration is full-tier exclusive")
 def test_render_scene_is_prepare_then_render_result(atmo7):
     """render_scene keeps its ndarray contract and adds no second display
     implementation: identical pixels to solve_dome + render_result."""
@@ -409,6 +416,7 @@ def _reference_deck_ground(atmo, layer, sun_zenith_deg):
     return (weights[:, None] * per_beam).sum(axis=0) * f_inf
 
 
+@pytest.mark.slow(reason="kind:render - full-image / display integration is full-tier exclusive")
 def test_cloud_ground_helper_matches_pre_move_reference(atmo7, stratus, cirrus):
     """The helper moved, nothing else: bit-identical to the verbatim
     pre-move beam sum for decks, thin decks and no deck."""
@@ -436,6 +444,7 @@ def test_zero_tau_deck_ground_equals_plain_beam_sum(atmo7):
     np.testing.assert_allclose(moved, plain, rtol=1e-12, atol=0)
 
 
+@pytest.mark.slow(reason="kind:render - full-image / display integration is full-tier exclusive")
 def test_thick_deck_and_shadow_darken_the_ground_beam(atmo7, stratus):
     """A thick deck attenuates the ground beam; a below-horizon sun (all
     ground beams unlit) and a deck under a raised opaque ground leave it
@@ -471,6 +480,7 @@ def test_solve_dome_binds_deck_lighting_and_cloud_marker_off(atmo7, stratus):
     assert np.array_equal(auto, off)          # no unattenuated disk on a deck
 
 
+@pytest.mark.slow(reason="kind:render - full-image / display integration is full-tier exclusive")
 def test_binding_snapshots_immune_to_facade_mutation():
     """After preparation, mutating the facade cannot change the bound
     display (and a fresh preparation does see the change).  Local medium:
@@ -489,6 +499,7 @@ def test_binding_snapshots_immune_to_facade_mutation():
     assert np.all(fresh.ground_albedo == 0.9)
 
 
+@pytest.mark.slow(reason="kind:render - full-image / display integration is full-tier exclusive")
 def test_albedo_bound_on_carrier_drives_display(atmo7):
     """The bound albedo (not the facade's current value) lights the display
     ground."""
@@ -524,6 +535,7 @@ def test_albedo_bound_on_carrier_drives_display(atmo7):
     assert np.array_equal(again, dark)
 
 
+@pytest.mark.slow(reason="kind:render - full-image / display integration is full-tier exclusive")
 def test_raised_observer_rejects_ground_display(atmo7):
     """Off-the-bottom observers keep their sky (solver permitting) but have
     no ground display: refused, not evaluated at another height."""
@@ -540,6 +552,7 @@ def test_raised_observer_rejects_ground_display(atmo7):
     assert img.shape == (4, 8, 3)
 
 
+@pytest.mark.slow(reason="kind:render - full-image / display integration is full-tier exclusive")
 def test_sun_marker_consumes_apparent_source_geometry():
     """The decorative marker binds the adopted source's apparent geometry at
     preparation; without atmospheric refraction apparent == true.  Local
@@ -558,6 +571,7 @@ def test_sun_marker_consumes_apparent_source_geometry():
     assert pres_nr.sun_apparent_elevation_deg == 20.0
 
 
+@pytest.mark.slow(reason="kind:render - full-image / display integration is full-tier exclusive")
 def test_sun_marker_visibility_and_explicit_rules(atmo7, stratus, monkeypatch):
     """Auto marker: only a solver-prepared, sunlit clear sky draws it.  An
     explicit True needs bound geometry; False always disables; the marker
@@ -586,6 +600,7 @@ def test_sun_marker_visibility_and_explicit_rules(atmo7, stratus, monkeypatch):
 TINY_MC = dict(n_zen=3, n_az=4, n_anchor=3, n_photons=2.0e5)
 
 
+@pytest.mark.slow(reason="kind:render - full-image / display integration is full-tier exclusive")
 def test_summary_reports_hybrid_provenance(atmo7):
     """A converged deterministic run states what ran and its numerics."""
     from skycolor import render
@@ -600,6 +615,7 @@ def test_summary_reports_hybrid_provenance(atmo7):
     assert "input direction pre-refraction" in text
 
 
+@pytest.mark.slow(reason="kind:render - full-image / display integration is full-tier exclusive")
 def test_summary_reports_mc_budget_and_composite_stderr(atmo7):
     """A real low-budget MC run: actual photon/grid counts, the composite
     stderr statement and the budget-is-not-tail-coverage caveat."""
@@ -778,6 +794,7 @@ def test_convenience_warns_on_mc_even_with_zero_stderr(monkeypatch):
         render._warn_result_limits(res)
 
 
+@pytest.mark.slow(reason="kind:render - full-image / display integration is full-tier exclusive")
 def test_render_scene_default_sun_disk_is_auto():
     """The convenience entry shares render_result's single marker policy:
     unseen suns and external fields never force a ValueError, thick clouds
@@ -998,6 +1015,7 @@ def test_summary_external_presentation_is_summarised_as_external():
     assert "137.000" in text                       # caller-declared direction shown as such
 
 
+@pytest.mark.slow(reason="kind:render - full-image / display integration is full-tier exclusive")
 def test_presentation_rejects_non_monotonic_grid(atmo7):
     """sample_dome clips and bisects on the grid axes: descending,
     duplicated or single-node axes are rejected at the binding boundary
