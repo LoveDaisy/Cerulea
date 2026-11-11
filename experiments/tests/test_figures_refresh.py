@@ -242,6 +242,18 @@ def test_regeneration_is_pixel_identical(data, tmp_path):
     np.testing.assert_array_equal(px1, _png(second))
 
 
+def test_all_figures_render_without_solve(data):
+    """The full batch (--figure all equivalent) generates every registered
+    figure with every solver entry stubbed to raise, and the archive bytes
+    are untouched before/after."""
+    sha_before = rf.sha256_file(NPZ)
+    out = rf.render_figures(data, sorted(rf.FIGURES), NPZ)
+    assert len(out) == len(rf.FIGURES) == 8
+    for path in out:
+        assert _png(path).shape[0] > 300
+    assert rf.sha256_file(NPZ) == sha_before
+
+
 def test_manifest_records_command_and_directions(data):
     rf.render_figures(data, ["aerosol"], NPZ)
     manifest = json.loads((rf.OUT / "refresh_manifest.json").read_text())
