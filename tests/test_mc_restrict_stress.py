@@ -9,7 +9,8 @@ through the deterministic single-scattering pass of EVERY solve -- one
 process repeating ``solve(approximation='spherical-mc')`` on a
 ``_restrict``-subset atmosphere crashed after 4-8 reps, heap-layout
 dependent and intermittent (deterministic under libgmalloc).  See
-``skycolor/solar_source.py`` (``_cT``) for the mechanism and
+``skycolor/optics.py`` (``contiguous_transpose``, the single authoritative
+mitigation) for the mechanism and
 ``scratchpad/task-mc-restrict-segv/findings.md`` for the probe evidence.
 
 The anchor keeps the stress SHAPE -- one process, one ``_restrict``-subset
@@ -19,9 +20,10 @@ atmosphere construction (``validation.common.atmosphere`` + ``_restrict``)
 minimal case) and a 3e4-photon budget instead of the original 14-view /
 3e5-photon scene.  The overreading matmuls live in the deterministic pass
 and do not depend on the photon budget, so the call-pattern coverage (30
-reps, ~4x the historical crash window of 4-8) is preserved at roughly a
-tenth of the original wall clock (30 warm reps measured 44 s; the first
-solve additionally carries the one-time solar table build, ~25 s).
+reps, ~4x the historical crash window of 4-8) is preserved at a fraction
+of the original wall clock: the whole anchor measured 47.7 s in the suite
+(task progress, 2026-11-11; ~25 s of that is the one-time solar table
+build, warm reps ~1.5 s each).
 """
 from __future__ import annotations
 
