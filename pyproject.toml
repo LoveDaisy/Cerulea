@@ -37,9 +37,9 @@ testpaths = ["tests"]
 # tier: tests marked ``slow`` are deselected at collection (tests/conftest.py,
 # switchable via SKYCOLOR_FULL_SUITE=1); the full acceptance tier is the
 # explicit `SKYCOLOR_FULL_SUITE=1 uv run pytest -q -n 12 --dist=loadgroup`.
-# The scheduling form below is carried over from the pre-tier suite and is
-# re-measured for the fast population (serial vs 12-worker xdist).
-# `-n 0` runs serially and is for equivalence diagnostics only.
+# The 12-worker xdist form below was measured against serial for the fast
+# population and won (median 50.5 s vs 97.0 s over three samples each,
+# 2026-11-11); serial `-n 0` remains the equivalence-diagnostic form.
 addopts = "-n 12 --dist=loadgroup"
 markers = [
     "slow: full-tier-only test — MC statistical convergence, large-grid / full-dome integration, golden-fixture verification, or measured cost above the 2 s fast-tier budget (kind:/cost: reason required, see docs/DEVELOPMENT.md 'Test tiers'); deselected from the default fast tier, runs under SKYCOLOR_FULL_SUITE=1 or an explicit -m/-k/nodeid selection",

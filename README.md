@@ -43,7 +43,8 @@ assumes `uv run`, which uses that locked environment.
 
 ```bash
 uv sync          # creates .venv from uv.lock, exactly reproducible
-uv run pytest -q
+uv run pytest -q                          # fast dev-loop tier (~50 s)
+SKYCOLOR_FULL_SUITE=1 uv run pytest -q -n 12 --dist=loadgroup   # full suite
 ```
 
 To refresh the lock file on purpose: `uv lock --upgrade`, then re-run the

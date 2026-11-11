@@ -31,7 +31,7 @@ uv run python -c 'import skycolor; print(skycolor.__file__)'
 |---|---|
 | Documentation and document-path text | Check local links/heading anchors, stale paths and `git diff --check`; numerical reruns are unnecessary |
 | Code and interfaces | Run relevant tests; expand coverage for changed behavior and follow the task's review requirements |
-| Physics or numerical methods | Full `uv run pytest -q` plus affected `validation/check*.py`; independently explain any physical-result change |
+| Physics or numerical methods | Full-tier `pytest` run (below) plus affected `validation/check*.py`; independently explain any physical-result change |
 | Dependencies | Use RUNNING's lock-file workflow and rerun regression/physical checks |
 
 The full physical suite runs from the repository root:
@@ -45,28 +45,108 @@ baseline and distinguish existing physical failures from regressions. Passing
 software tests and passing physical checks are different claims. Updating golden
 files or physical results requires independent attribution, not just better fit.
 
+### Test tiers
+
+The suite is two-tier (task `suite-tier`, 2026-11-11 user adjudication): the
+default entry is the **fast tier** (dev loop), the **full tier** is the
+acceptance gate.  Tiers are declared in code with the `slow` marker — never
+derived from a measured threshold at run time — and reordering tiers never
+touches budgets, seeds, tolerances or assertions (zero detection-power
+reduction).
+
+```bash
+uv run pytest -q                                    # fast tier (default entry)
+SKYCOLOR_FULL_SUITE=1 uv run pytest -q -n 12 --dist=loadgroup   # full tier
+SKYCOLOR_FULL_SUITE=1 uv run pytest -n 0 -q tests/test_validation_harness.py  # serial full diagnostics
+```
+
+**Two-dimension placement rule** — a test belongs in the fast tier only when
+BOTH hold:
+
+1. **Species** (`kind:`): its guard object is logic / contract / boundary /
+   small-scale numeric anchor.  MC statistical convergence, large-grid /
+   full-dome integration, and golden-fixture full verification are full-tier
+   exclusive regardless of cost.
+2. **Cost** (`cost:`): its fast-tier K=3 median under the target form
+   (12-worker xdist) is ≤2 s.  The `tools/make_scheduling_weights.py`
+   regen audit gate enforces this mechanically: an unmarked fast-tier test
+   above the budget fails the regen.  Lawful outcomes are marking `slow` or
+   opening an optimization task — there is no "leave unmarked" outcome.
+
+**New tests are tiered by their author at write time** (species dimension from
+the rule above; cost dimension from an honest estimate, marker reason prefixed
+`cost:` with the estimate basis).  The cost dimension is mechanically
+re-checked by the next weights regen.
+
+**Optimization-task semantics:** a test over the budget whose species would
+allow the fast tier is marked `slow` *and* an optimization task is opened
+(the gate stays green; the full tier carries the test meanwhile).  After the
+optimization lands, re-measure its median via the authority list; ≤2 s, the
+marker is removed by hand through the reclassification rule below.
+
+**Reclassification (slow → fast) is a manual operation**, reviewed in
+code-review: evidence is a target-form K=3 median ≤2 s measured via the
+yield path (`SKYCOLOR_FULL_SUITE=1 uv run pytest -m slow <nodeids>
+--durations=0`), then delete the marker, then re-measure the listings
+required by the marker change and regen.  Readings from other calibers
+(durations tables, full-suite listings) are not reclassification evidence.
+Known caveat: the xdist startup transient concentrates on each scheduling
+bin's first tests (see validation/FAST_SUITE.md "suite-tier"), so a small
+candidate selection can read inflated; attribute before concluding.
+
+**Marker reasons are machine-readable** — `kind:mc` / `kind:golden` /
+`kind:grid` / `kind:render` for species-exclusive tests, `cost: <median> s
+(<source>)` for cost-only placements; greppable by species for audits.
+
+**Filter yield semantics:** the default fast-tier filter stands down for an
+explicit selection — `-m`, `-k`, or a positional argument containing `::`
+(nodeid) — so `pytest -m slow` and single-test debug runs work as typed.
+Bare paths/directories are not test selections: running a whole file keeps
+the fast filter (its slow members leave via the deselected count, visible in
+serial and collect-only output; the xdist run summary does not aggregate
+worker-side deselected counts).  `SKYCOLOR_FULL_SUITE=1` overrides to the
+full population.  Priority: explicit `-m`/`-k`/`::` nodeid > env switch >
+default fast tier.
+
+**Marker-change cost:** the table's `slow` mirror must equal the live
+markers (harness equality test).  After adding/removing markers, the only
+path back to a green full suite is re-measuring the listings the change
+requires + regen: a population change (new/removed tests) requires a fresh
+full-suite listing (~400 s) plus three fast listings; a pure marker flip
+with unchanged population may reuse the existing full listing (the reuse
+gate mechanically checks the coverage), re-measuring only the three fast
+listings + regen.
+
 ### Test-suite execution profile
 
-The default `uv run pytest -q` runs on 12 xdist workers scheduled by
-measured-cost bins, and `validation.run_all` runs the six checks on one
-8-worker pool. Measured numbers, the scheduling design, the frozen
-regression budgets and the current acceptance evidence live in
+The default `uv run pytest -q` runs the fast tier on 12 xdist workers
+scheduled by measured-cost bins, and `validation.run_all` runs the six
+checks on one 8-worker pool (run_all does not go through pytest and is
+unaffected by the tier split).  Measured numbers, the tier design, the
+frozen regression budgets and the current acceptance evidence live in
 [validation/FAST_SUITE.md](../validation/FAST_SUITE.md) — read it before
-changing test structure, photon budgets or validation dispatch. Diagnostics:
+changing test structure, photon budgets or validation dispatch.  Diagnostics:
 
 ```bash
 uv run pytest -n 0 -q ...      # serial equivalence run (no scheduling)
 uv run pytest -q --durations=0 # per-test wall times under the real schedule
-# refresh tests/data/scheduling_weights.json after material cost shifts:
-uv run python tools/make_scheduling_weights.py <durations-log>
+# refresh tests/data/scheduling_weights.json after material cost shifts
+# (one FULL listing + three fast-tier listings, all exhaustive):
+SKYCOLOR_FULL_SUITE=1 uv run pytest -q -n 12 --dist=loadgroup --durations=0 --durations-min=0 > /tmp/full.txt
+uv run pytest -q --durations=0 > /tmp/fast1.txt   # + fast2.txt, fast3.txt
+uv run python tools/make_scheduling_weights.py /tmp/full.txt /tmp/fast1.txt /tmp/fast2.txt /tmp/fast3.txt
 ```
 
-**Maintenance rule:** any task that adds or removes tests from the default
-collection must, before closing, regenerate `tests/data/scheduling_weights.json`
-from a fresh parallel `--durations=0` listing (commands above), re-take the
-sequential formal wall-clock pair for the default suite, and record the table
-and pair evidence in [validation/FAST_SUITE.md](../validation/FAST_SUITE.md) —
-the 360 s guard line and its escalation clause live there.
+**Maintenance rule (two-tier version, superseding the single-suite rule from
+the pre-tier suite):** any task that adds or removes tests from the suite
+must, before closing, regenerate `tests/data/scheduling_weights.json` per
+the flow above (a population change requires re-measuring the full-suite
+listing) and record the table, tier counts and `fast_predicted_wall_s` in
+[validation/FAST_SUITE.md](../validation/FAST_SUITE.md).  The formal
+wall-clock pair for acceptance is taken on the **full tier** entry
+(`SKYCOLOR_FULL_SUITE=1 …`, full population ×2, zero skips); quiet-window
+certification remains a separate backlog item.  The 360 s guard line and
+its escalation clause live in FAST_SUITE.md.
 
 ## Commit and merge locally
 
