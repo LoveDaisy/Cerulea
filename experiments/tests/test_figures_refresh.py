@@ -75,7 +75,7 @@ def no_solve(monkeypatch):
 # ---------------------------------------------------------------------------
 # audit
 # ---------------------------------------------------------------------------
-def test_audit_endpoints_and_capability(data):
+def test_audit_endpoints_and_capability(data, v3):
     report = rf.audit(data, NPZ)
     dome_runs = [k for k, cap in report["runs"].items() if cap["dome_views"]]
     assert dome_runs == ["l1_rayleigh_30", "l2_aerosol_30", "l4_bridge_30",
@@ -90,8 +90,29 @@ def test_audit_endpoints_and_capability(data):
             assert cap["zenith_span"] == [0.0, 90.0]
             assert cap["azimuth_span"] == [0.0, 180.0]
             assert cap["rows_match"]
-    assert all(f["feasible"] for f in report["figures"].values())
-    for fig in report["figures"].values():
+    # the original archive lacks the L3 dome: overview/ozone report it by
+    # name instead of crashing, everything else stays feasible
+    assert not report["figures"]["overview"]["feasible"]
+    assert report["figures"]["overview"]["missing_runs"] == ["l3_o3_dome_3"]
+    assert not report["figures"]["ozone"]["feasible"]
+    assert report["figures"]["ozone"]["missing_runs"] == ["l3_o3_dome_3"]
+    for fig_id in ("rayleigh", "aerosol", "multiple", "twilight", "cloud",
+                   "pipeline-spectrum", "pipeline-view"):
+        assert report["figures"][fig_id]["feasible"], fig_id
+    assert not report["mixed_source"]
+    md = rf.render_audit_markdown(report)
+    assert "missing: l3_o3_dome_3" in md
+    assert "all runs map to" in md
+    # the augmented archive adds one full dome run and everything is feasible
+    report_v3 = rf.audit(v3, V3_NPZ)
+    dome_runs_v3 = [k for k, cap in report_v3["runs"].items()
+                    if cap["dome_views"]]
+    assert dome_runs_v3 == dome_runs + ["l3_o3_dome_3"]
+    cap = report_v3["runs"]["l3_o3_dome_3"]
+    assert cap["zenith_nodes"] == 25 and cap["azimuth_nodes"] == 37
+    assert all(f["feasible"] for f in report_v3["figures"].values())
+    assert report_v3["mixed_source"]
+    for fig in report_v3["figures"].values():
         for curve in fig["curves"]:
             assert curve["exact_node"], curve
 
@@ -251,16 +272,42 @@ def test_regeneration_is_pixel_identical(data, tmp_path):
     np.testing.assert_array_equal(px1, _png(second))
 
 
-def test_all_figures_render_without_solve(data):
-    """The full batch (--figure all equivalent) generates every registered
-    figure with every solver entry stubbed to raise, and the archive bytes
+def test_all_figures_render_without_solve(v3):
+    """The full batch (--figure all equivalent) generates all nine registered
+    figures with every solver entry stubbed to raise, and both archives' bytes
     are untouched before/after."""
-    sha_before = rf.sha256_file(NPZ)
-    out = rf.render_figures(data, sorted(rf.FIGURES), NPZ)
-    assert len(out) == len(rf.FIGURES) == 8
+    sha_before = rf.sha256_file(V3_NPZ)
+    sha_old = rf.sha256_file(NPZ)
+    out = rf.render_figures(v3, sorted(rf.FIGURES), V3_NPZ)
+    assert len(out) == len(rf.FIGURES) == 9
     for path in out:
         assert _png(path).shape[0] > 300
-    assert rf.sha256_file(NPZ) == sha_before
+    assert rf.sha256_file(V3_NPZ) == sha_before
+    assert rf.sha256_file(NPZ) == sha_old
+
+
+def test_overview_is_strictly_eight_renders(v3, monkeypatch):
+    """Acceptance ④/负向验收: the overview drawing object is 2x4, every axis
+    holds an image and no axis holds a legend (curves) -- and the L3 panel
+    binds the pre-registered augmentation run, not a pseudo-dome."""
+    fig = rf.build_figure(v3, "overview")
+    assert len(fig.axes) == 8
+    for ax in fig.axes:
+        assert len(ax.images) == 1
+        assert ax.get_legend() is None
+    captured = []
+    orig = render.render_result
+
+    def spy(pres, **kwargs):
+        captured.append(pres)
+        return orig(pres, **kwargs)
+
+    monkeypatch.setattr(render, "render_result", spy)
+    rf.build_figure(v3, "overview").canvas.draw()
+    l3 = [p for p in captured
+          if np.array_equal(np.asarray(p.radiance).reshape(-1, p.wl.size),
+                            v3["l3_o3_dome_3/total"])]
+    assert len(l3) == 1
 
 
 def test_manifest_records_command_and_directions(data):
@@ -271,9 +318,30 @@ def test_manifest_records_command_and_directions(data):
     assert "--figure aerosol" in entry["command"]
     assert entry["input_sha256"] == rf.sha256_file(NPZ)
     assert entry["solve_version"] == str(data["version"])
+    assert entry["missing_runs"] == []
     for curve in entry["curves"]:
         z, a = curve["requested"]
         assert curve["row"] == ls.row_index(data, curve["key"], z, a)
+    # per-run solve provenance: the archive's global version unless the run
+    # carries its own
+    for key, version in entry["run_solve_versions"].items():
+        expected = (str(data[f"{key}/solve_version"])
+                    if f"{key}/solve_version" in data else str(data["version"]))
+        assert version == expected
+
+
+def test_manifest_distinguishes_mixed_sources(v3):
+    """The ozone manifest entry names the two provenances separately: the
+    archived zenith-row curves keep the original batch version, the sky views
+    carry the augmentation run's own solve version."""
+    rf.render_figures(v3, ["ozone"], V3_NPZ)
+    manifest = json.loads((rf.OUT / "refresh_manifest.json").read_text())
+    entry = next(e for e in manifest if e["fig_id"] == "ozone")
+    versions = entry["run_solve_versions"]
+    assert set(versions.values()) >= {str(v3["version"]),
+                                      str(v3["l3_o3_dome_3/solve_version"])}
+    assert versions["l3_o3_3"] == str(v3["version"])
+    assert versions["l3_o3_dome_3"] == str(v3["l3_o3_dome_3/solve_version"])
 
 
 def test_plain_run_writes_only_theme_outputs(data):
@@ -284,35 +352,41 @@ def test_plain_run_writes_only_theme_outputs(data):
     assert out[0].resolve().parent == theme_out
 
 
-def test_publish_names_are_the_registered_v2_set():
-    """Publishing writes only the registry's own *_v2.png names, root originals
-    (overview/spectra) are never republished or overwritten by it."""
-    expected = {"layer_story_rayleigh_v2.png", "layer_story_aerosol_v2.png",
-                "layer_story_ozone_v2.png", "layer_story_multiple_v2.png",
-                "layer_story_twilight_v2.png", "layer_story_cloud_v2.png",
-                "layer_story_pipeline_spectrum_v2.png",
-                "layer_story_pipeline_view_v2.png"}
+def test_publish_names_are_the_registered_v3_set():
+    """Publishing writes only the registry's own *_v3.png names (nine figures
+    including the overview); the retired v1/v2 root names are never republished
+    or overwritten by it."""
+    expected = {"layer_story_overview_v3.png",
+                "layer_story_rayleigh_v3.png", "layer_story_aerosol_v3.png",
+                "layer_story_ozone_v3.png", "layer_story_multiple_v3.png",
+                "layer_story_twilight_v3.png", "layer_story_cloud_v3.png",
+                "layer_story_pipeline_spectrum_v3.png",
+                "layer_story_pipeline_view_v3.png"}
     assert {f.publish_name for f in rf.FIGURES.values()} == expected
     for name in expected:
-        assert name.startswith("layer_story_") and name.endswith("_v2.png")
-        assert not Path(name).name in ("layer_story_overview.png",
-                                       "layer_story_spectra.png")
+        assert name.startswith("layer_story_") and name.endswith("_v3.png")
+    retired = {"layer_story_overview.png", "layer_story_spectra.png",
+               "layer_story_rayleigh_v2.png", "layer_story_aerosol_v2.png",
+               "layer_story_ozone_v2.png", "layer_story_multiple_v2.png",
+               "layer_story_twilight_v2.png", "layer_story_cloud_v2.png",
+               "layer_story_pipeline_spectrum_v2.png",
+               "layer_story_pipeline_view_v2.png"}
+    assert not retired & {f.publish_name for f in rf.FIGURES.values()}
 
 
-def test_historical_snapshots_are_byte_identical():
-    """The tracked v1 snapshots equal the root originals byte for byte."""
-    import hashlib
+def test_historical_snapshots_match_recorded_hashes():
+    """historical/README.md is the hash registry of the retired figure bytes
+    (v1 montages and the v2 per-position set): every recorded snapshot file
+    must exist and match its recorded sha256 prefix."""
+    import re
 
-    root = REPO / "figures"
-    hist = REPO / "experiments/layerstory/historical"
-    pairs = [("layer_story_overview.png",
-              "historical_layer_story_overview_v1.png"),
-             ("layer_story_spectra.png",
-              "historical_layer_story_spectra_v1.png")]
-    for original, snapshot in pairs:
-        a = hashlib.sha256((root / original).read_bytes()).hexdigest()
-        b = hashlib.sha256((hist / snapshot).read_bytes()).hexdigest()
-        assert a == b, snapshot
+    text = (REPO / "experiments/layerstory/historical/README.md").read_text()
+    rows = re.findall(r"\| `([^`]+\.png)` \| `([0-9a-f]{16})` \|", text)
+    assert len(rows) >= 10, "the historical README must record all snapshots"
+    for name, short in rows:
+        path = REPO / "experiments/layerstory/historical" / name
+        assert path.exists(), name
+        assert rf.sha256_file(path).startswith(short), name
 
 
 def test_ground_consumption_matches_registry(data, monkeypatch):

@@ -10,11 +10,14 @@
 的定义单源在近似图，本文只使用不复制。
 
 每层的插图与数据由当前生产代码经统一入口（`rt.solver.solve` /
-`render.solve_dome`）真实算出，全部来自
-[layerstory 主题](../../experiments/layerstory/README.md) 的 11 次生产 solve
-（10 确定性 + 1 MC 单 seed；提交的 NPZ 可无求解重画）；完整场景参数、网格、
-定标记录与调用日志以主题 README 和其 `data/layers.md` 为单源，本文不复制
-第二份配置表。
+`render.solve_dome`）真实算出。数字档案是
+[layerstory 主题](../../experiments/layerstory/README.md) 的
+`layer_story_v3.npz`：原阶梯 11 次生产 solve（10 确定性 + 1 MC 单 seed，
+其原始提交档 `layer_story.npz` 逐位保留）外加 2026-11-12 一次预注册的
+L3 dome 增补 solve（`l3_o3_dome_3`，逐 run 记录 solve 版本，混合来源在
+审计与 manifest 中显式区分）；提交的 NPZ 可无求解重画。完整场景参数、
+网格、定标记录与调用日志以主题 README 和其 `data/layers_v3.md` 为单源，
+本文不复制第二份配置表。
 
 ## 读图约定
 
@@ -30,18 +33,25 @@
   标记），组内无逐图自动提亮；日景与暮光 `ground=False`，云组 `ground=True`
   （阴天地板是叙事的一部分）。渲染图地平以下的像素是生产显示行为（穹顶
   采样在地平处的截断外推），不表示地面物理。
-- **逐位置专属图（v2）**：每层插图由提交存档无求解重画（`refresh_figures`
+- **逐位置专属图（v3）**：每层插图由提交存档无求解重画（`refresh_figures`
   入口，见[主题 README](../../experiments/layerstory/README.md)），取代
   "只看总览/谱网格某一块"的间接指认。渲染图上的地平线、方位刻度与太阳
   方向标注全部由同一相机/方向网格计算得出；太阳只标**折射前输入方向**
-  （视野内空心十字、地平下边界指示），不画物理日面；等距鱼眼（180°、
-  天顶居中、r∝θ）与透视矩形是同一场的两种显示重采样，不增加物理信息。
-  总览图保留为"整条梯子"的共享入口。
+  （视野内空心十字、地平下边界指示），不画物理日面。等距鱼眼（180°、
+  天顶居中、r∝θ）为方形轴盒；透视矩形用存档相机参数经 pinhole 映射导出的
+  **相机相对角 α/β 刻度**（相对光轴，非世界方位/仰角；地平与太阳标注仍为
+  绝对方向）。图题脚注按 run 生成：网格/间距来自档案，截断零解释只对实际
+  含零的 run 给出。**实测结论（owner 探针，2026-11-12）**：`l5_single_-4`
+  的地平截断零仅在反日侧 rel-az 147.3–180°（5/23 格），位于 yaw 0° 透视帧
+  ±50° 日侧方位窗之外——透视视图是"看不到"该方位区，不是"压缩掉"了
+  结构；日侧窗内两相机均有采样且方位分辨率相当（透视 0.156°/px 对鱼眼缘
+  0.179°/px）。总览图为 2×4 八张渲染、无曲线面板；L3 穹顶面板来自预注册
+  增补 solve。
 
-总览图（八面板：上排 L1 / L2 / L4 反日侧 / L6 云四张渲染，下排 L3 天顶谱与
-L5 三态——single / MC / 平面世界）：
+总览图（图 1 · 2×4 八张渲染、无曲线面板：上排 L1 / L2 / L3 dome / L4
+反日侧，下排 L5 三态与 L6 云；各层光谱曲线由图 2–5 的专属谱图承载）：
 
-![layer story overview](../../figures/layer_story_overview.png)
+![layer story overview](../../figures/layer_story_overview_v3.png)
 
 ---
 
@@ -56,12 +66,12 @@ L5 三态——single / MC / 平面世界）：
 穿过的大气柱变厚，蓝光在途中已被散射殆尽（光学厚度饱和），地平因此泛白。
 一天中最蓝的方向是天顶、最白的是地平，这一个斜率差就是原因。
 
-![L1 · rayleigh](../../figures/layer_story_rayleigh_v2.png)
+![L1 · rayleigh](../../figures/layer_story_rayleigh_v3.png)
 
-**L1 图（`rayleigh`，与主线图 2 同义共享）**：左，天顶与近地平（86.25°
-向日侧）log-log 谱——斜率差即"天顶蓝、地平白"的定量形状；右上，存档
-透视相机；右下，同场 180° 等距鱼眼（天顶居中）。锁定曝光 0.03；太阳
-标注为折射前输入方向（az 0°，el 30°）。
+**L1 图（`rayleigh`，与主线图 2 同义共享）**：左上，天顶与近地平（86.25°
+向日侧）log-log 谱——斜率差即“天顶蓝、地平白”的定量形状；左下，存档
+透视相机（相机相对角 α/β 刻度）；右列，同场 180° 等距鱼眼（天顶居中）。
+锁定曝光 0.03；太阳标注为折射前输入方向（az 0°，el 30°）。
 
 **可解释**：蓝天、地平白化、为什么落日方向的天空偏黄红（光路变长）。
 
@@ -75,11 +85,12 @@ L5 三态——single / MC / 平面世界）：
 亮度 **×3.92**——太阳周围出现明亮的光晕（日周光晕）；近地平 **×2.59**，
 绿红端抬升强于蓝端（下图 `aerosol`），天空整体发白。
 
-![L2 · aerosol](../../figures/layer_story_aerosol_v2.png)
+![L2 · aerosol](../../figures/layer_story_aerosol_v3.png)
 
-**L2 图（`aerosol`，与主线图 3 同义共享）**：近地平（86.25° 向日侧）同场
-谱对照——谱不挑颜色、总量抬升而绿红端抬得更多，即"发白"的形状；几何
-定位由 `rayleigh` 的穹顶对承载，本图不重复鱼眼。
+**L2 图（`aerosol`，与主线图 3 同义共享）**：左上，近地平（86.25° 向日侧）同场
+谱对照——谱不挑颜色、总量抬升而绿红端抬得更多，即“发白”的形状；左下与
+右列为 L2 态（`l2_aerosol_30`）的透视/鱼眼视图——天空只呈现叠加气溶胶
+后的状态，两态对比由谱承载，不暗示一天空两态。
 
 **如实声明的表示极限**：气溶胶相函数的前向峰比任何有限矩表示更陡，生产用
 delta-M 折矩把前向峰摊开——光晕的**角宽和近太阳亮度是矩截断下的近似**，
@@ -104,11 +115,12 @@ delta-M 折矩把前向峰摊开——光晕的**角宽和近太阳亮度是矩�
 低太阳天空因此从白转向蓝。NO₂ 在同一观察量下的贡献不超过 **~3%**（谱最大
 相对变化，探针核查），如实记录为次要项，不放大。
 
-![L3 · ozone](../../figures/layer_story_ozone_v2.png)
+![L3 · ozone](../../figures/layer_story_ozone_v3.png)
 
-**L3 图（`ozone`，与主线图 4 同义共享）**：太阳 3° 天顶谱对照——绿红区
-被"挖槽"而蓝端几乎不动。存档只有天顶谱行，本层不做全天视图（不伪造
-无数据支持的色度场）。
+**L3 图（`ozone`，与主线图 4 同义共享）**：左上，太阳 3° 天顶谱对照（原
+阶梯桥接态 vs +O₃/NO₂ 天顶行）——绿红区被“挖槽”而蓝端几乎不动；左下与
+右列的天空视图来自 2026-11-12 预注册增补 solve `l3_o3_dome_3`（与谱曲线
+分属两次 solve，逐 run 版本在案；介质与场景同一）。
 
 **可解释**：Chappuis 带是"清洁大气低太阳偏蓝"的主要化学成因。完整的
 **蓝色时刻**（太阳地平下、天空深蓝）需要暮光几何——那是 L5 的能力，
@@ -128,10 +140,11 @@ delta-M 折矩把前向峰摊开——光晕的**角宽和近太阳亮度是矩�
 多次散射占该方向亮度的 50%，沿波长单调衰减至 750 nm 的 24%，合成色度因此
 向蓝移动（45° 反日 xy 0.251/0.264 → 0.236/0.241）。
 
-![L4 · multiple](../../figures/layer_story_multiple_v2.png)
+![L4 · multiple](../../figures/layer_story_multiple_v3.png)
 
-**L4 图（`multiple`，与主线图 5 同义共享）**：45° 反日侧（相对太阳方位
-180°，不是散射角 90°）同场谱对照——高阶项整体抬升且蓝端相对最显著。
+**L4 图（`multiple`，与主线图 5 同义共享）**：左上，45° 反日侧（相对太阳
+方位 180°，不是散射角 90°）同场谱对照——高阶项整体抬升且蓝端相对最显著；
+左下与右列为 `l4_multiple_30`（yaw 180°，视图朝向与谱一致）的透视/鱼眼。
 
 **可解释**：背对太阳时天空依然明亮、影子内部的漫射照明。
 "multiple" 是生产分量定义（总量减一次项，含各求解器处理的地面返回），
@@ -160,7 +173,7 @@ delta-M 折矩把前向峰摊开——光晕的**角宽和近太阳亮度是矩�
   `twilight`：球面 single 的亮带贴着地平，平面世界把亮光挂在天顶附近。
   **单点量级对不等于几何对**，这是本层最重要的教训。
 
-![L5 · twilight](../../figures/layer_story_twilight_v2.png)
+![L5 · twilight](../../figures/layer_story_twilight_v3.png)
 
 **L5 图（`twilight`，与主线图 6 同义共享）**：−4° 三态各配透视与 180°
 等距鱼眼（组内锁定曝光 10.0；MC 为单 seed / 粗网格定性记录，不是收敛
@@ -186,7 +199,7 @@ overlay（生产契约：overlay 只与 `hybrid-sos` 组合，观察者必须在
 成了白色的光。地面从晴天的日照对比变成昏暗均匀的漫射照明（下图 `cloud`
 两面板的地面：clear 的日照地板 → 云下昏暗漫射地板）。
 
-![L6 · cloud](../../figures/layer_story_cloud_v2.png)
+![L6 · cloud](../../figures/layer_story_cloud_v3.png)
 
 **L6 图（`cloud`，与主线图 7 同义共享）**：契约匹配 clear / 云两面板，
 同相机同锁定曝光 0.03，地面照明均为各自 solve 绑定材料；等距鱼眼不画
@@ -236,19 +249,22 @@ overlay（生产契约：overlay 只与 `hybrid-sos` 组合，观察者必须在
 ```bash
 # 全阶梯：11 次生产 solve（10 确定性 + 1 MC 单 seed），写主题 out/ 与 figures/
 uv run python -m experiments.layerstory.layer_story
-# 从提交的数据无求解重画正式图（含发布到根 figures/）
-uv run python -m experiments.layerstory.layer_story \
-  --from-npz experiments/layerstory/data/layer_story.npz --publish-figures
-# 存档覆盖审计（只读 NPZ，写主题 out/audit_coverage.{md,json}）
+# 预注册增补（2026-11-12 已执行一次）：一次 L3 dome solve，写
+# layer_story_v3.npz 与 v3 调用表；拒绝覆盖既有 run record，不重跑兜底
+uv run python -m experiments.layerstory.layer_story --augment-l3-dome
+# 存档覆盖审计（只读 NPZ，写主题 out/audit_coverage.{md,json}；报告逐 run
+# solve 版本与混合来源）
 uv run python -m experiments.layerstory.refresh_figures \
-  --from-npz experiments/layerstory/data/layer_story.npz --audit-only
-# 逐位置专属图（v2，零 solve）：谱 / 透视 / 等距鱼眼重投影 + 计算标注；
-# 普通运行只写主题 out/，--publish-figures 才写根 figures/ 的 *_v2.png
+  --from-npz experiments/layerstory/data/layer_story_v3.npz --audit-only
+# 九张正式图（图 1–9，零 solve）：普通运行只写主题 out/，
+# --publish-figures 才写根 figures/ 的 *_v3.png
 uv run python -m experiments.layerstory.refresh_figures \
-  --from-npz experiments/layerstory/data/layer_story.npz --figure all --publish-figures
+  --from-npz experiments/layerstory/data/layer_story_v3.npz --figure all --publish-figures
 ```
 
 每层的介质/场景/近似/网格参数单源在
 [layerstory 主题 README](../../experiments/layerstory/README.md)；提交的
-`data/layer_story.npz` 用普通 `np.load(..., allow_pickle=False)` 即可回读。
-本文引用的全部数字来自该 NPZ 对应的调用记录（`data/layers.md`，含采用版本）。
+`data/layer_story.npz`（原阶梯）与 `data/layer_story_v3.npz`（含增补 run
+及逐 run solve 版本）用普通 `np.load(..., allow_pickle=False)` 即可回读。
+本文引用的全部数字来自该 NPZ 对应的调用记录（`data/layers_v3.md`，含采用
+版本与逐 run solve 版本）。

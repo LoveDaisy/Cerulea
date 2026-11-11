@@ -113,8 +113,32 @@ class FigureDef:
 _FISH = "fisheye (equidistant, zenith-centred, 180°)"
 
 FIGURES: dict[str, FigureDef] = {
+    "overview": FigureDef(
+        "overview", "layer_story_overview_v3.png", "overview_grid",
+        None,
+        (ViewPanelDef("l1_rayleigh_30", "total", "rect", False,
+                      "L1 · Rayleigh only"),
+         ViewPanelDef("l2_aerosol_30", "total", "rect", False,
+                      "L2 · + Mie aerosol"),
+         ViewPanelDef("l3_o3_dome_3", "total", "rect", False,
+                      "L3 · + O$_3$/NO$_2$"),
+         ViewPanelDef("l4_multiple_30", "total", "rect", False,
+                      "L4 · + multiple (anti-solar)"),
+         ViewPanelDef("l5_single_-4", "total", "rect", False,
+                      "L5 · spherical single"),
+         ViewPanelDef("l5_mc_-4", "total", "rect", False,
+                      "L5 · + MC higher orders"),
+         ViewPanelDef("l5_plane_-4", "total", "rect", False,
+                      "L5 · plane-parallel world"),
+         ViewPanelDef("l6_cloud_30", "total", "rect", True,
+                      "L6 · + stratus deck")),
+        ("docs/physics/LAYER_STORY.md 总览", "docs/physics/MAINLINE.zh.md 图1"),
+        "the whole ladder: eight renders, no curve panels (curves live in the "
+        "per-layer figures); same locked exposure per group; the L3 dome is "
+        "the pre-registered 2026-11-12 augmentation run l3_o3_dome_3 with its "
+        "own solve version"),
     "rayleigh": FigureDef(
-        "rayleigh", "layer_story_rayleigh_v2.png", "spectrum_pair",
+        "rayleigh", "layer_story_rayleigh_v3.png", "spectrum_pair",
         SpectrumPanelDef(
             (Curve("l1_rayleigh_30", "total", 0.0, 0.0, "zenith", "-"),
              Curve("l1_rayleigh_30", "total", 86.25, 0.0,
@@ -128,38 +152,53 @@ FIGURES: dict[str, FigureDef] = {
         ("docs/physics/LAYER_STORY.md §L1", "docs/physics/MAINLINE.zh.md 图2"),
         "the spectrum explains the colour; the dome pair locates zenith/horizon"),
     "aerosol": FigureDef(
-        "aerosol", "layer_story_aerosol_v2.png", "spectrum",
+        "aerosol", "layer_story_aerosol_v3.png", "spectrum_pair",
         SpectrumPanelDef(
             (Curve("l1_rayleigh_30", "total", 86.25, 0.0, "L1 clean", "-"),
              Curve("l2_aerosol_30", "total", 86.25, 0.0, "L2 + aerosol", "-")),
             loglog=False,
             title="L2 · aerosol whitening (near horizon, sun-side)"),
-        (),
+        (ViewPanelDef("l2_aerosol_30", "total", "rect", False,
+                      "L2 · + Mie aerosol"),
+         ViewPanelDef("l2_aerosol_30", "total", "fisheye", False,
+                      f"L2 · + Mie aerosol — {_FISH}")),
         ("docs/physics/LAYER_STORY.md §L2", "docs/physics/MAINLINE.zh.md 图3"),
-        "same-scene spectral contrast; geometry is established by `rayleigh`"),
+        "the curves contrast L1 vs L2 at the same horizon node; the sky views "
+        "show the L2 state only (l2_aerosol_30), not a two-state side-by-side"),
     "ozone": FigureDef(
-        "ozone", "layer_story_ozone_v2.png", "spectrum",
+        "ozone", "layer_story_ozone_v3.png", "spectrum_pair",
         SpectrumPanelDef(
             (Curve("l3_bridge_3", "total", 0.0, 0.0, "no O$_3$", "-"),
              Curve("l3_o3_3", "total", 0.0, 0.0, "+ O$_3$/NO$_2$", "-")),
             loglog=False,
             title="L3 · Chappuis band (zenith, sun 3°)"),
-        (),
+        (ViewPanelDef("l3_o3_dome_3", "total", "rect", False,
+                      "L3 · + O$_3$/NO$_2$"),
+         ViewPanelDef("l3_o3_dome_3", "total", "fisheye", False,
+                      f"L3 · + O$_3$/NO$_2$ — {_FISH}")),
         ("docs/physics/LAYER_STORY.md §L3", "docs/physics/MAINLINE.zh.md 图4"),
-        "zenith rows only -- the archive has no L3 dome, so no sky view here"),
+        "curves are the archived zenith rows (l3_bridge_3 vs l3_o3_3, the "
+        "original ladder solves); the sky views are the pre-registered "
+        "2026-11-12 L3 dome run l3_o3_dome_3 -- separate provenance, same "
+        "medium and scene"),
     "multiple": FigureDef(
-        "multiple", "layer_story_multiple_v2.png", "spectrum",
+        "multiple", "layer_story_multiple_v3.png", "spectrum_pair",
         SpectrumPanelDef(
             (Curve("l4_bridge_30", "total", 45.0, 180.0, "single only", "-"),
              Curve("l4_multiple_30", "total", 45.0, 180.0, "+ multiple", "-")),
             loglog=False,
             title="L4 · multiple fills the anti-solar sky (45° anti-solar, "
                   "rel. azimuth 180°)"),
-        (),
+        (ViewPanelDef("l4_multiple_30", "total", "rect", False,
+                      "L4 · + multiple (anti-solar)"),
+         ViewPanelDef("l4_multiple_30", "total", "fisheye", False,
+                      f"L4 · + multiple (anti-solar) — {_FISH}")),
         ("docs/physics/LAYER_STORY.md §L4", "docs/physics/MAINLINE.zh.md 图5"),
-        "anti-solar means relative azimuth 180°, not a 90° scattering angle"),
+        "the archived run faces the anti-solar side (yaw 180°), like its "
+        "curves; anti-solar means relative azimuth 180°, not a 90° scattering "
+        "angle"),
     "twilight": FigureDef(
-        "twilight", "layer_story_twilight_v2.png", "triple_pair",
+        "twilight", "layer_story_twilight_v3.png", "triple_pair",
         None,
         (ViewPanelDef("l5_single_-4", "total", "rect", False,
                       "L5 · spherical single"),
@@ -177,7 +216,7 @@ FIGURES: dict[str, FigureDef] = {
         "three -4 deg states, locked twilight exposure 10.0; MC panel is "
         "single-seed / coarse-grid qualitative (no new convergence evidence)"),
     "cloud": FigureDef(
-        "cloud", "layer_story_cloud_v2.png", "rect_pair",
+        "cloud", "layer_story_cloud_v3.png", "rect_pair",
         None,
         (ViewPanelDef("l6_clear_30", "total", "rect", True,
                       "L6 · clear (same contract)"),
@@ -187,7 +226,8 @@ FIGURES: dict[str, FigureDef] = {
         "contract-matched pair, each with its own solve-bound floor lighting, "
         "locked cloud exposure 0.03; no fisheye (no ground in a 180° dome)"),
     "pipeline-spectrum": FigureDef(
-        "pipeline-spectrum", "layer_story_pipeline_spectrum_v2.png", "spectrum",
+        "pipeline-spectrum", "layer_story_pipeline_spectrum_v3.png",
+        "spectrum",
         SpectrumPanelDef(
             (Curve("l6_clear_30", "total", 0.0, 0.0, "zenith", "-"),
              Curve("l6_clear_30", "total", 81.0, 0.0,
@@ -199,7 +239,7 @@ FIGURES: dict[str, FigureDef] = {
         ("docs/physics/MAINLINE.zh.md 图8",),
         "only the two directions of the SAME run that figure 9 images"),
     "pipeline-view": FigureDef(
-        "pipeline-view", "layer_story_pipeline_view_v2.png", "single_rect",
+        "pipeline-view", "layer_story_pipeline_view_v3.png", "single_rect",
         None,
         (ViewPanelDef("l6_clear_30", "total", "rect", False,
                       "hybrid-sos @ sun 30°, no ground"),),
@@ -276,10 +316,24 @@ def curve_actual_node(data, curve: Curve) -> tuple[float, float, int]:
 
 
 def figure_feasibility(data, fig: FigureDef) -> dict:
-    """Per-figure feasibility against the archive's real capabilities."""
-    caps = {k: run_capability(data, k) for k in
-            {c.key for c in (fig.spectrum.curves if fig.spectrum else ())}
-            | {v.key for v in fig.views}}
+    """Per-figure feasibility against the archive's real capabilities.
+
+    A figure needing a run this archive does not hold (e.g. the v3 figures on
+    the original 11-run archive, which lack l3_o3_dome_3) is reported
+    infeasible with the missing run names -- never a KeyError, never an
+    implicit solve.
+    """
+    runs_present = {str(r) for r in data["runs"]}
+    needed = sorted({c.key for c in (fig.spectrum.curves if fig.spectrum else ())}
+                    | {v.key for v in fig.views})
+    missing = [k for k in needed if k not in runs_present]
+    base = dict(fig_id=fig.fig_id, publish_name=fig.publish_name,
+                consumers=list(fig.consumers), note=fig.note,
+                missing_runs=missing)
+    if missing:
+        return dict(**base, curves=[], views=[], spectrum_feasible=None,
+                    feasible=False)
+    caps = {k: run_capability(data, k) for k in needed}
     curves = []
     for c in (fig.spectrum.curves if fig.spectrum else ()):
         z, a, row = curve_actual_node(data, c)
@@ -299,8 +353,7 @@ def figure_feasibility(data, fig: FigureDef) -> dict:
     spectrum_feasible = None if fig.spectrum is None else all(
         f"{c.key}/{c.part}" in data for c in fig.spectrum.curves)
     return dict(
-        fig_id=fig.fig_id, publish_name=fig.publish_name,
-        consumers=list(fig.consumers), note=fig.note,
+        **base,
         curves=curves, views=views,
         spectrum_feasible=spectrum_feasible,
         feasible=bool(spectrum_feasible is not False
@@ -308,11 +361,20 @@ def figure_feasibility(data, fig: FigureDef) -> dict:
     )
 
 
+def _solve_version(data, key: str) -> str:
+    """The run's own solve version; archives without per-run fields map every
+    run explicitly to the global version (never an invented identity)."""
+    if f"{key}/solve_version" in data:
+        return str(data[f"{key}/solve_version"])
+    return str(data["version"])
+
+
 def audit(data, npz_path: Path) -> dict:
     """The Step-0 coverage audit: what the archive really holds."""
     runs = [str(r) for r in data["runs"]]
     caps = {k: run_capability(data, k) for k in runs}
     figures = {k: figure_feasibility(data, f) for k, f in FIGURES.items()}
+    versions = {k: _solve_version(data, k) for k in runs}
     return dict(
         input_file=str(npz_path),
         input_sha256=sha256_file(npz_path),
@@ -322,6 +384,8 @@ def audit(data, npz_path: Path) -> dict:
         wl_nodes=int(np.asarray(data["wl"]).size),
         n_runs=len(runs),
         runs=caps,
+        run_solve_versions=versions,
+        mixed_source=len(set(versions.values())) > 1,
         figures=figures,
         closure_check="layer_story.check(data) passed (per-solve additivity "
                       "+ XYZ/xy/Lv identities, bridge identities)",
@@ -361,8 +425,8 @@ def render_audit_markdown(report: dict) -> str:
         "## Per-run coverage",
         "",
         "| run | grid (zen x az) | span | total shape | capabilities | "
-        "components | display record |",
-        "|---|---|---|---|---|---|---|",
+        "components | display record | solve version |",
+        "|---|---|---|---|---|---|---|---|",
     ]
     for key, cap in report["runs"].items():
         lines.append(
@@ -371,13 +435,21 @@ def render_audit_markdown(report: dict) -> str:
             f"az {cap['azimuth_span'][0]}..{cap['azimuth_span'][1]} | "
             f"{cap['total_shape']} | {_capability_line(cap)} | "
             f"{', '.join(cap['components']) or '-'} | "
-            f"{'yes' if cap['has_display_record'] else 'no'} |")
-    lines += [
-        "",
-        "L3 runs are zenith-row solves: they support spectrum curves only, "
-        "never a dome view.  CSV/Lv tables stay sampled-direction summaries; "
-        "the dome authority is the NPZ arrays.",
-        "",
+            f"{'yes' if cap['has_display_record'] else 'no'} | "
+            f"`{report['run_solve_versions'][key][:7]}` |")
+    lines += ["", f"Solve provenance: "
+              + ("mixed-source archive -- " if report["mixed_source"] else "")
+              + "runs sharing the archive's global version belong to the "
+              "original single-version batch; a run with its own solve "
+              "version is a separately registered augmentation. "
+              + (f"Distinct versions: {sorted({v[:7] for v in report['run_solve_versions'].values()})}"
+                 if report["mixed_source"] else
+                 f"all runs map to `{report['solve_version'][:7]}` "
+                 "(the archive's global version)."),
+              "",
+              "Zenith-row solves (spectrum curves only, never a dome view): "
+              + (", ".join(f"`{k}`" for k, cap in report["runs"].items()
+                           if not cap["dome_views"]) or "none") + ".",
         "## Figure feasibility (registry vs archive)",
         "",
         "| figure | feasible | curves (requested -> node) | views | consumers |",
@@ -393,7 +465,10 @@ def render_audit_markdown(report: dict) -> str:
             f"{v['key']} {v['camera']} ground={v['ground']}"
             f" [{'ok' if v['feasible'] else 'REFUSED'}]"
             for v in fig["views"]) or "-"
-        lines.append(f"| `{fig['fig_id']}` | {'yes' if fig['feasible'] else 'NO'}"
+        verdict = "yes" if fig["feasible"] else (
+            f"NO (missing: {', '.join(fig['missing_runs'])})"
+            if fig["missing_runs"] else "NO")
+        lines.append(f"| `{fig['fig_id']}` | {verdict}"
                      f" | {curve_txt} | {view_txt} | "
                      f"{', '.join(fig['consumers'])} |")
     lines.append("")
@@ -557,7 +632,8 @@ def _ann_text(ax, x, y, text, offset=(5, 7)):
                 bbox=dict(fc="#ffffff", ec="none", alpha=0.65, pad=1.2))
 
 
-def _draw_sun(ax, placement, sun_az: float, sun_el: float) -> None:
+def _draw_sun(ax, placement, sun_az: float, sun_el: float,
+              marker_offset=(5, 7)) -> None:
     kind, p = placement
     if p is None:
         _ann_text(ax, 4, 14, _sun_label("outside", sun_az, sun_el),
@@ -566,7 +642,8 @@ def _draw_sun(ax, placement, sun_az: float, sun_el: float) -> None:
     if kind == "marker":
         ax.plot(*p, marker="+", markersize=13, markeredgewidth=1.8,
                 color=_ANN_INK)
-        _ann_text(ax, *p, _sun_label(kind, sun_az, sun_el))
+        _ann_text(ax, *p, _sun_label(kind, sun_az, sun_el),
+                  offset=marker_offset)
     else:  # "horizon": boundary direction indicator, never a disk
         ax.plot(*p, marker="o", markersize=7, markerfacecolor="none",
                 markeredgecolor=_ANN_INK, markeredgewidth=1.4)
@@ -630,7 +707,9 @@ def annotate_fisheye(ax, az, el, mask, sun_az: float, sun_el: float,
         # clipped at the square's edge, bbox keeps them readable on sky
         lp = (p[0] - 16 * u[0], p[1] - 16 * u[1])
         _ann_text(ax, *lp, f"{tick:.0f}°", offset=(0, 0))
-    _draw_sun(ax, sun, sun_az, sun_el)
+    # a sun close to the top rim would push an above-marker label into the
+    # panel title: fisheye marker labels sit below-right, always on the disk
+    _draw_sun(ax, sun, sun_az, sun_el, marker_offset=(6, -11))
 
 
 def _display_of(data, key: str) -> dict:
@@ -845,7 +924,14 @@ def build_figure(data, fig_id: str):
     plt = _plt()
     fig_def = FIGURES[fig_id]
     with plt.rc_context(_STYLE):
-        if fig_def.layout == "spectrum_pair":
+        if fig_def.layout == "overview_grid":
+            # acceptance ④: strictly 2x4, eight renders, no curve panels, no
+            # empty placeholder -- one archived-camera view per ladder state
+            fig = plt.figure(figsize=(16, 7.0), layout="constrained")
+            axes = fig.subplots(2, 4)
+            for ax, vdef in zip(axes.flat, fig_def.views):
+                rect_panel(ax, data, vdef)
+        elif fig_def.layout == "spectrum_pair":
             # acceptance ⑥ layout: spectrum top-left, rect bottom-left (the
             # left column), the square fisheye owning the right column
             fig = plt.figure(figsize=(10.8, 6.6), layout="constrained")
@@ -897,6 +983,11 @@ def _manifest_entry(data, fig_id: str, npz_path: Path, publish: bool,
                 consumers=list(fig_def.consumers), note=fig_def.note,
                 command=command, curves=feas["curves"], views=feas["views"],
                 input_sha256=input_sha, solve_version=str(data["version"]),
+                run_solve_versions={
+                    k: _solve_version(data, k)
+                    for k in sorted({c["key"] for c in feas["curves"]}
+                                    | {v["key"] for v in feas["views"]})},
+                missing_runs=feas["missing_runs"],
                 drawing_version=git_head())
 
 

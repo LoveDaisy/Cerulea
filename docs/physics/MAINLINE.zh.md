@@ -34,15 +34,17 @@ Medium（大气介质）+ Scene（观察场景）+ 折射前太阳方向
 - 想知道**当前行为与验证边界**（哪些过了、哪些没过）→ [STATUS](../STATUS.md)
 - 想找**图与复现命令** → [图录](../../figures/README.md)
 
-下面是本文的主图：八面板，上排四张渲染、下排一张天顶谱加三张暮光渲染。
-它们不是示意图——每一个面板都来自生产代码的一次真实求解。本章只看一点：
+下面是本文的主图：2×4 八张渲染——上排 L1 / L2 / L3 / L4，下排 L5 三态与
+L6 云——**没有曲线面板**，每层的光谱曲线由第 2–3 章的专属谱图承载。它们
+不是示意图——每一个面板都来自生产代码的一次真实求解（L3 穹顶是一次
+预注册的增补求解，出处见 [LAYER_STORY](LAYER_STORY.md)）。本章只看一点：
 这就是整条管线的最终输出。
 
-![layer story overview](../../figures/layer_story_overview.png)
+![layer story overview](../../figures/layer_story_overview_v3.png)
 
-**图 1 · 八面板全貌。** 上排：L1 纯 Rayleigh / L2 加气溶胶 / L4 加多次散射
-（反日侧）/ L6 加云层；下排：L3 天顶谱与 L5 暮光三态（球面一次 / MC 高阶 /
-平面世界）。面板组织与读图约定的单源在
+**图 1 · 八渲染全貌（2×4，无曲线面板）。** 上排：L1 纯 Rayleigh / L2 加
+气溶胶 / L3 加 O₃+NO₂（dome）/ L4 加多次散射（反日侧）；下排：L5 暮光
+三态（球面一次 / MC 高阶 / 平面世界）与 L6 云。面板组织与读图约定的单源在
 [LAYER_STORY 读图约定](LAYER_STORY.md)。本章看点：整条管线的最终输出。
 
 ## 2. 蓝天：最简模型
@@ -63,13 +65,15 @@ Medium（大气介质）+ Scene（观察场景）+ 折射前太阳方向
 下图是本层的专属图：对数坐标下，天顶与近地平两条谱线一陡一缓，就是上面
 两句话的定量形状（具体数字不在这里复制，见 L1）。
 
-![layer story rayleigh](../../figures/layer_story_rayleigh_v2.png)
+![layer story rayleigh](../../figures/layer_story_rayleigh_v3.png)
 
-**图 2 · L1 专属图（`rayleigh`）：左，天顶与近地平（86.25° 向日侧）谱
-（log-log）；右上，透视渲染；右下，同场 180° 等距鱼眼（天顶居中）。**
-本章看点：两条谱线的斜率差就是"天顶蓝、地平白化"的定量形状；鱼眼把
+**图 2 · L1 专属图（`rayleigh`）：左上，天顶与近地平（86.25° 向日侧）谱
+（log-log）；左下，透视渲染；右列，同场 180° 等距鱼眼（天顶居中）。**
+本章看点：两条谱线的斜率差就是“天顶蓝、地平白化”的定量形状；鱼眼把
 天顶/地平放进整个上半穹顶定位。图中地平线、方位刻度与太阳方向标注由
-同一相机网格计算得出，太阳只标折射前输入方向、不画日面。
+同一相机网格计算得出，太阳只标折射前输入方向、不画日面；渲染面板的
+坐标轴是存档相机参数经 pinhole 映射导出的**相机相对角 α/β**（相对光轴，
+非世界方位/仰角），地平与太阳标注仍是绝对方向。
 
 ## 3. 逐层要素：气溶胶 → 臭氧 → 多次散射
 
@@ -92,11 +96,13 @@ Medium（大气介质）+ Scene（观察场景）+ 折射前太阳方向
 delta-M 把峰"摊开"——所以光晕的角宽和近太阳亮度是近似值，机制见
 [气溶胶方法](AEROSOL.md)。
 
-![layer story aerosol](../../figures/layer_story_aerosol_v2.png)
+![layer story aerosol](../../figures/layer_story_aerosol_v3.png)
 
-**图 3 · L2 专属图（`aerosol`）：近地平（86.25° 向日侧）同场谱对照。**
+**图 3 · L2 专属图（`aerosol`）：左上，近地平（86.25° 向日侧）同场谱
+对照；左下与右列为 L2 态（`l2_aerosol_30`）的透视/鱼眼视图。**
 本章看点：加气溶胶后（橙）相对清洁大气（蓝）整体抬升，且绿红端抬得比蓝端
-更多——谱不挑颜色加上总量抬升，就是"发白"的形状。
+更多——谱不挑颜色加上总量抬升，就是“发白”的形状；天空视图呈现的是
+叠加气溶胶后的状态，两态对比由谱承载。
 
 ### 3.2 臭氧：低太阳偏蓝的化学成因
 
@@ -111,11 +117,13 @@ delta-M 把峰"摊开"——所以光晕的角宽和近太阳亮度是近似值�
 注意这一层只是"入口"：完整的**蓝色时刻**（太阳已落到地平之下、天空深蓝）
 还需要暮光几何——那是第 4 章的能力，本层不提前引入。
 
-![layer story ozone](../../figures/layer_story_ozone_v2.png)
+![layer story ozone](../../figures/layer_story_ozone_v3.png)
 
-**图 4 · L3 专属图（`ozone`）：太阳 3° 天顶谱对照（无 O₃ 桥接态 vs
-+O₃/NO₂）。** 本章看点：加 O₃/NO₂ 后（橙）相对无臭氧（蓝）在绿红区被
-压低——谱形被"挖槽"，这就是低太阳偏蓝的主要化学成因。
+**图 4 · L3 专属图（`ozone`）：左上，太阳 3° 天顶谱对照（无 O₃ 桥接态 vs
++O₃/NO₂，原阶梯两次 solve）；左下与右列的天空视图来自一次预注册增补
+solve（`l3_o3_dome_3`，逐 run 出处见 [LAYER_STORY](LAYER_STORY.md)）。**
+本章看点：加 O₃/NO₂ 后（橙）相对无臭氧（蓝）在绿红区被
+压低——谱形被“挖槽”，这就是低太阳偏蓝的主要化学成因。
 
 ### 3.3 多次散射：离太阳 90° 的天空不黑
 
@@ -132,11 +140,12 @@ delta-M 把峰"摊开"——所以光晕的角宽和近太阳亮度是近似值�
 求解器处理的地面返回），不是"恰好两次散射"的精确识别——语义单源在
 [近似图](APPROXIMATIONS.md)。
 
-![layer story multiple](../../figures/layer_story_multiple_v2.png)
+![layer story multiple](../../figures/layer_story_multiple_v3.png)
 
-**图 5 · L4 专属图（`multiple`）：45° 反日侧（相对太阳方位 180°）同场谱
-对照。** 本章看点：+multiple（橙）相对一次散射（蓝）整体抬升、蓝端相对
-抬得更多——"离太阳 90° 的天空不黑"就是这些高阶项填出来的。
+**图 5 · L4 专属图（`multiple`）：左上，45° 反日侧（相对太阳方位 180°）
+同场谱对照；左下与右列为反日朝向（yaw 180°）的透视/鱼眼视图。** 本章
+看点：+multiple（橙）相对一次散射（蓝）整体抬升、蓝端相对
+抬得更多——“离太阳 90° 的天空不黑”就是这些高阶项填出来的。
 
 ## 4. 几何与暮光：太阳落到地平下之后
 
@@ -156,7 +165,7 @@ delta-M 把峰"摊开"——所以光晕的角宽和近太阳亮度是近似值�
 不重复其修复历史）；更深的暮光需要专门的球面引擎与计算预算（见
 [暮光专题](../twilight/README.md)）。
 
-![layer story twilight](../../figures/layer_story_twilight_v2.png)
+![layer story twilight](../../figures/layer_story_twilight_v3.png)
 
 **图 6 · L5 专属图（`twilight`）：−4° 暮光三态（球面一次 / +MC / 平面
 世界），每态透视与 180° 等距鱼眼同场配对、组内锁定曝光。** 本章看点：
@@ -177,7 +186,7 @@ MC 面板是单 seed / 粗网格的定性记录，不是收敛证据；太阳在
 一个契约注脚：生产代码里云以 overlay 进入，只与默认的 hybrid-sos 组合，
 且观察者必须在云底之下（机制见[云方法](CLOUD.md)）。
 
-![layer story cloud](../../figures/layer_story_cloud_v2.png)
+![layer story cloud](../../figures/layer_story_cloud_v3.png)
 
 **图 7 · L6 专属图（`cloud`）：契约匹配的 clear / 云两面板，同相机、同
 锁定曝光，地面照明均为各自 solve 绑定材料。** 本章看点：白色天空之下
@@ -203,14 +212,14 @@ MC 面板是单 seed / 粗网格的定性记录，不是收敛证据；太阳在
 
 两张图对照着看：
 
-![layer story pipeline spectrum](../../figures/layer_story_pipeline_spectrum_v2.png)
+![layer story pipeline spectrum](../../figures/layer_story_pipeline_spectrum_v3.png)
 
 **图 8 · 颜色管线之前：进入图 9 同一场的两个方向谱**（hybrid-sos、太阳
 30° 晴天场景；天顶与近地平向日侧 81°——这两条谱就是成像的直接输入，
 与图 9 同一 run 单源）。出处与参数：[layerstory 主题](../../experiments/layerstory/README.md)
 与[图录](../../figures/README.md)。
 
-![layer story pipeline view](../../figures/layer_story_pipeline_view_v2.png)
+![layer story pipeline view](../../figures/layer_story_pipeline_view_v3.png)
 
 **图 9 · 颜色管线之后：图 8 同一 run 的 total 谱经 CIE 色度与 tone
 mapping 后的透视成像。** 本章看点：谱→图对照——图 8 的光谱经过管线后
