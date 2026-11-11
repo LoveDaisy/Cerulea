@@ -240,11 +240,26 @@ def run():
         table=table,
         attribution=attribution,
         note=(
-            "The sun-side horizon is about 2x the CIE value at h=45deg. "
-            "Turning the aerosol off (pristine) makes it larger, not smaller, "
-            "so the dominant cause is the missing multiple scattering, not the "
-            "aerosol profile; the forward-scattering aerosol aureole adds a "
-            "secondary excess at low elevations."
+            "The h=45deg sun-side horizon/zenith excess (+141%) is not "
+            "explained by the phase-function representation or the diffuse "
+            "transport geometry: the pre-registered attribution probe "
+            "(validation/tools/aureole_attribution/, 2026-11-11; all numbers "
+            "single-sourced from the JSON files in that directory) measures "
+            "the delta-M renormalisation at exactly the identity (f = "
+            "beta_32 = 0 at the moment level; the P2 ratio reproduces B0 to "
+            "1 ulp, share -3.4e-16, the BLAS reduction-order floor) and "
+            "finds the Mie moment series terminating exactly at l=30 for "
+            "this mixture (|S|^2 is a polynomial of degree <= 2*nmax with "
+            "nmax<=15 for the rural modes), "
+            "so raising moments to 128 lifts no content and the +0.07% delta "
+            "is the n_mu 32->64 quadrature effect; the spherical-MC transport "
+            "gives +0.8% +/- 0.8% of the gap (below its 3-sigma).  "
+            "Decomposition: single scattering alone gives ratio 7.54 vs CIE "
+            "3.65, and the diffuse enhancement is horizon-weighted (x1.45 "
+            "horizon vs x1.24 zenith), opposite to the CIE narrative of "
+            "multiple scattering brightening the zenith.  The residual sits "
+            "in the first-order horizon brightening vs the empirical "
+            "gradation curve; owner re-adjudication pending."
         ),
     )
     return C.CheckResult(
