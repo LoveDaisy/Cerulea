@@ -1,30 +1,58 @@
-"""Rebuild ``tests/data/scheduling_weights.json`` from a measured durations log.
+"""Rebuild ``tests/data/scheduling_weights.json`` from measured durations logs.
 
-The weights table holds measured wall seconds per scheduling group: light
-modules as one entry, hot modules (measured total >=
-``NODE_SPLIT_THRESHOLD_S``) and ``test_twilight.py`` as per-nodeid entries.
-``tests/conftest.py`` uses it to balance xdist workers.  Refresh it when the
-suite's cost profile has materially shifted (new heavy tests, moved
-budgets) — ideally from a run under the parallel configuration itself, since
-per-test cost inflates under 12-way contention:
+Two-tier suite (task-suite-tier): the tool consumes four listings and
+regenerates the whole table in one pass.
 
-    uv run pytest -q --durations=0 > /tmp/durations.txt
-    uv run python tools/make_scheduling_weights.py /tmp/durations.txt
+* one FULL-suite listing (``SKYCOLOR_FULL_SUITE=1`` with the constant
+  12-worker form) feeds the scheduling weights (``modules``/``nodes``) —
+  the packing must describe the full population it schedules;
+* three FAST-tier listings (the default entry point, target form) give
+  per-test K=3 medians feeding the informational ``fast_predicted_wall_s``
+  (sum of unmarked medians; recorded in validation/FAST_SUITE.md, consumed
+  by no assertion).  Marker placement is a human-owned declaration — the
+  2026-11-11 user adjudication (option 2) removed the automated fast→slow
+  gate; cost verification is carried entirely by the standing
+  weights-regen maintenance rule: any population or marker change
+  re-measures the required listings and regenerates the table.
+* the ``slow`` mirror is derived from a fresh ``pytest -m slow`` collection
+  subprocess, so the table's mirror can never lag the live markers at regen
+  time (the harness equality test then forbids lagging afterwards).
+
+    SKYCOLOR_FULL_SUITE=1 uv run pytest -q -n 12 --dist=loadgroup --durations=0 --durations-min=0 > /tmp/full.txt
+    uv run pytest -q --durations=0 > /tmp/fast1.txt   # + fast2.txt, fast3.txt
+    uv run python tools/make_scheduling_weights.py /tmp/full.txt /tmp/fast1.txt /tmp/fast2.txt /tmp/fast3.txt
+
+``--durations-min=0`` on the full listing is mandatory: the bare ``=0``
+output hides <5 ms phases, which both starves the reuse gate (tests with
+real fast readings missing from the full listing) and starves the table
+(the 5.0 s default silently covering cheap tests).
 
 Parsing follows pytest's ``--durations`` listing: one line per
 setup/call/teardown phase, whose seconds are summed per nodeid.  Under
 ``--dist=loadgroup`` the reported nodeid carries xdist's ``@binN``
 scheduling suffix; it is stripped here so the regenerated table is keyed
-exactly like the next run's collection (see ``_raw_nodeid``).  Phases
-below 5 ms are hidden by pytest (use ``-vv`` to include them); their total
-weight is negligible.
+exactly like the next run's collection (see ``_raw_nodeid``).  Phases below
+5 ms are hidden by pytest (use ``-vv`` to include them); their total weight
+is negligible.
+
+Tolerance semantics: a test missing from some fast listings contributes no
+reading to those samples (the <5 ms listing cutoff makes presence drift at
+the boundary); only structural mismatches — whole modules absent from a
+listing, disagreeing passed counts — are rejected.  The full-listing reuse
+gate is the sharp counterpart: a test with a real fast-tier reading that is
+missing from the full listing means the population changed and the full
+suite must be re-measured (otherwise the test would silently fall back to
+the 5.0 s default weight).
 """
 from __future__ import annotations
 
 import datetime
 import json
+import os
 import pathlib
 import re
+import statistics
+import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -33,6 +61,34 @@ WEIGHTS_PATH = ROOT / "tests" / "data" / "scheduling_weights.json"
 _LINE = re.compile(r"^\s*([0-9.]+)s\s+(?:call|setup|teardown)\s+(\S+)")
 _HEADER = re.compile(r"=+ slowest(?: (\d+))? durations =+")
 _SCHED_SUFFIX = re.compile(r"@bin\d+$")
+_PASSED = re.compile(r"(\d+) passed")
+_DESELECTED = re.compile(r"(\d+) deselected")
+_FAILED = re.compile(r"\b(\d+) (?:failed|error(?:s)?)\b")
+_SKIPPED = re.compile(r"\b(\d+) skipped\b")
+_FAILED_LINE = re.compile(r"^FAILED (\S+)", re.MULTILINE)
+
+#: The designed marker-change window: between a marker flip and the regen it
+#: feeds, the table's slow mirror lags the live markers, so the harness
+#: mirror-equality guard fails on every full-tier run — that red is the
+#: transition state the regen exists to close, not suite unhealthiness.  A
+#: full listing whose sole failure is exactly this guard is accepted as
+#: authority input (the guard re-arms on the table this run feeds); any
+#: other failure still rejects the listing.
+MIRROR_GUARD_NODEID = (
+    "tests/test_validation_harness.py::test_tier_slow_mirror_matches_live_markers")
+#: xdist loadgroup evidence on a durations line: a real listed nodeid closes
+#: with the scheduling suffix.  Required in the full slot — the full-suite
+#: listing is measured under the constant 12-worker loadgroup form, so its
+#: absence means a serial (or otherwise mis-formed) listing was passed.
+_SUFFIXED_DURATION_LINE = re.compile(
+    r"^\s*[0-9.]+s\s+(?:call|setup|teardown)\s+\S+@bin\d+\s*$", re.MULTILINE)
+
+#: Durations listings hide phases below ~5 ms, so presence near the cutoff
+#: drifts between samples.  Readings at or below this value count as the
+#: boundary band: tolerated when missing from the full listing (the 5.0 s
+#: default weight is the accepted fallback), while anything heavier missing
+#: from the full listing means the population changed.
+BOUNDARY_BAND_S = 0.01
 
 
 def _raw_nodeid(nodeid):
@@ -48,6 +104,7 @@ def _raw_nodeid(nodeid):
     unsuffixed (serial) reports pass through untouched.
     """
     return _SCHED_SUFFIX.sub("", nodeid, count=1)
+
 
 #: Modules whose measured total exceeds this many seconds are scheduled as
 #: individual nodeids (``nodes`` in the weights table); anything lighter
@@ -65,8 +122,12 @@ TABLE_COMMENT = (
     "100 s) and tests/test_twilight.py are split into per-nodeid groups "
     "(listed in `nodes`). Collected tests absent from this table attach to "
     "their module group; a module without any measured entry gets the 5.0 s "
-    "default weight. Regenerate with tools/make_scheduling_weights.py from a "
-    "FULL parallel --durations=0 listing."
+    "default weight. `slow` mirrors the live pytest markers at regeneration "
+    "time (harness equality test forbids lagging); `fast_predicted_wall_s` "
+    "sums unmarked fast-tier K=3 medians (informational). Regenerate with "
+    "tools/make_scheduling_weights.py from one FULL listing (SKYCOLOR_"
+    "FULL_SUITE=1, 12 workers, --durations=0 --durations-min=0) plus three "
+    "fast-tier listings."
 )
 
 
@@ -96,6 +157,264 @@ def parse_durations(text):
     return totals
 
 
+def _sole_failed_is_mirror_guard(text):
+    """True iff the listing's FAILED set is exactly the mirror guard."""
+    failed = {_raw_nodeid(m.group(1))
+              for m in _FAILED_LINE.finditer(text)}
+    return failed == {MIRROR_GUARD_NODEID}
+
+
+def parse_summary(text, label="", tolerate_mirror_guard=False):
+    """Return ``(passed, deselected)`` from the run's final summary line.
+
+    Anchored to the last non-empty line on purpose: the durations listing
+    precedes the summary, so a whole-text search could match "N passed"
+    inside a test *name* on a durations line and misparse the counts.  A
+    red run (``failed``/``error`` tokens on the summary line) is rejected:
+    equal passed counts across three fast samples would otherwise let a
+    deterministically failing suite slip through as authority input —
+    except the designed marker-change window (``tolerate_mirror_guard``):
+    a full listing whose sole failure is the mirror-equality guard is the
+    transition state the regen closes, and rejecting it would dead-lock
+    the flip → re-measure → regen cycle (the guard is red on every
+    full-tier run until exactly that regen lands).
+    """
+    tail = text.rstrip().splitlines()[-1] if text.strip() else ""
+    failed = _FAILED.search(tail)
+    if failed:
+        if not (tolerate_mirror_guard and _sole_failed_is_mirror_guard(text)):
+            raise SystemExit(
+                f"{label}: summary reports {failed.group(1)} failed/errored "
+                f"test(s) — a red run is unusable as measurement authority. "
+                f"Fix the suite and re-measure.")
+    passed = _PASSED.search(tail)
+    deselected = _DESELECTED.search(tail)
+    if passed is None:
+        raise SystemExit(
+            f"{label}: no 'N passed' summary line found at the end of the "
+            f"listing")
+    return int(passed.group(1)), (int(deselected.group(1)) if deselected else 0)
+
+
+def _summary_mentions_deselected(text):
+    """Whether the final summary line itself reports a deselected count.
+
+    Same anchoring as ``parse_summary``: a whole-text substring scan would
+    false-positive on a durations line whose test *name* contains
+    "deselected" (a real fast listing with such a test would be rejected
+    as mis-slotted).
+    """
+    tail = text.rstrip().splitlines()[-1] if text.strip() else ""
+    return "deselected" in tail
+
+
+def validate_list_identity(label, text):
+    """Reject listings whose content contradicts their slot in the CLI.
+
+    Every slot demands xdist loadgroup evidence (``@binN`` scheduling
+    suffixes on durations lines): the full listing is measured under the
+    constant 12-worker form, and the fast listings are the target-form
+    authority — a serial listing in any slot would silently mix calibers
+    into the medians or produce uncontended weights.  A full-suite listing
+    never deselects and accepts no skips (the full tier is the zero-skip
+    acceptance population); a fast-tier listing either reports the
+    deselected count (serial form) or — under xdist, which does not
+    aggregate worker-side deselected counts into the summary — reports
+    nothing, so absence is accepted and mis-slotted listings are caught
+    structurally instead.  Identity is judged by content, not filename.
+    The full slot additionally tolerates the designed marker-change window
+    red state: a listing whose sole failure is the mirror-equality guard
+    (see ``MIRROR_GUARD_NODEID``) — the transition state the regen this
+    listing feeds exists to close.
+    """
+    is_full = label.startswith("full")
+    passed, deselected = parse_summary(
+        text, label, tolerate_mirror_guard=is_full)
+    skipped = _SKIPPED.search(text.rstrip().splitlines()[-1] if text.strip() else "")
+    if is_full:
+        if deselected:
+            raise SystemExit(
+                f"{label}: shows {deselected} deselected — not a full-suite "
+                f"listing.  Re-measure with SKYCOLOR_FULL_SUITE=1 and no -m/-k.")
+        if skipped:
+            raise SystemExit(
+                f"{label}: reports {skipped.group(1)} skipped — the full "
+                f"tier is the zero-skip acceptance population.  Resolve the "
+                f"skip (e.g. a pending mirror regen) and re-measure.")
+        if not _SUFFIXED_DURATION_LINE.search(text):
+            raise SystemExit(
+                f"{label}: no xdist loadgroup scheduling suffixes on any "
+                f"durations line — not a 12-worker loadgroup listing.  "
+                f"Re-measure with SKYCOLOR_FULL_SUITE=1 uv run pytest -q "
+                f"-n 12 --dist=loadgroup --durations=0 --durations-min=0.")
+    else:
+        if deselected == 0 and _summary_mentions_deselected(text):
+            raise SystemExit(
+                f"{label}: reports a zero deselected count — not a fast-tier "
+                f"listing.  Re-measure with the default entry point (no "
+                f"-m/-k/nodeid arguments).")
+        if not _SUFFIXED_DURATION_LINE.search(text):
+            raise SystemExit(
+                f"{label}: no xdist loadgroup scheduling suffixes on any "
+                f"durations line — the fast-tier authority is the "
+                f"12-worker target form.  Re-measure with the default "
+                f"entry point (add --durations=0).")
+    return passed, deselected
+
+
+def check_population_consistency(labels, passed_counts, totals_list, slow=()):
+    """Structural consistency across the four listings.
+
+    Module-level comparison is substance-gated: a module is compared only
+    when its best reading across the fast samples exceeds the listing-
+    cutoff band, so modules whose entire content flickers around the ~5 ms
+    report cutoff (presence drifting between samples under contention) are
+    exempt from the structural check, while a genuinely missing module
+    (operator error, truncated run — a heavy module has multi-second
+    readings) still fails loudly.  The full listing must cover the whole
+    slow tier: a fast listing passed in the full slot — or four fast
+    listings, whose xdist summaries are shape-identical — fails here
+    instead of silently regenerating a table without the slow weights.
+    The passed counts of the fast listings must be equal with the full
+    count above them.  Single missing tests are *not* structural: the
+    <5 ms cutoff makes per-test presence drift at the boundary (see
+    ``reuse_gate``).
+    """
+    full_label, full_totals = labels[0], totals_list[0]
+    fast_labels, fast_totals = labels[1:], totals_list[1:]
+    missing_slow = sorted(set(slow) - set(full_totals))
+    if slow and missing_slow:
+        raise SystemExit(
+            f"{full_label}: does not cover the slow tier ({len(missing_slow)} "
+            f"missing, e.g. {missing_slow[:3]}).  A full-suite listing must run "
+            f"the complete population — re-measure with SKYCOLOR_FULL_SUITE=1 "
+            f"-n 12 --dist=loadgroup --durations=0 --durations-min=0.")
+    # Best-evidence substance per module across the fast samples.
+    ref: dict[str, float] = {}
+    for totals in fast_totals:
+        for nodeid, seconds in totals.items():
+            module = nodeid.split("::")[0]
+            ref[module] = max(ref.get(module, 0.0), seconds)
+    comparable = {m for m, s in ref.items() if s > BOUNDARY_BAND_S}
+    present = [{n.split("::")[0] for n in t} for t in fast_totals]
+    for label, mods in zip(fast_labels, present):
+        missing = {m for m in comparable if m in present[0]} - mods
+        extra = {m for m in comparable if m in mods} - set(present[0])
+        if missing or extra:
+            raise SystemExit(
+                f"{label}: module population diverges from {fast_labels[0]} "
+                f"(missing {sorted(missing)}, extra {sorted(extra)}).  The "
+                f"comparison anchors on {fast_labels[0]} — either side may "
+                f"be the defective listing; check both.  The fast listings "
+                f"must cover the same population.")
+    uncovered = comparable - {n.split("::")[0] for n in full_totals}
+    if uncovered:
+        raise SystemExit(
+            f"{full_label}: modules absent from the full listing: "
+            f"{sorted(uncovered)}.  Re-measure the full suite.")
+    if len(set(passed_counts[1:])) != 1:
+        raise SystemExit(
+            f"fast listings disagree on passed counts {passed_counts[1:]} — "
+            f"a partial or failing run is unusable for medians.")
+    if passed_counts[0] < max(passed_counts[1:]):
+        raise SystemExit(
+            f"{full_label}: passed count {passed_counts[0]} is below the fast "
+            f"listings' {max(passed_counts[1:])} — the full listing must run "
+            f"a superset of the fast population.")
+
+
+def fast_medians(fast_totals):
+    """``[3 listings' totals]`` -> {nodeid: median of available readings}.
+
+    A test missing from a listing contributes no sample for it (boundary
+    drift); with a single reading available that reading is the median.
+    """
+    ids = set().union(*fast_totals)
+    return {n: statistics.median([t[n] for t in fast_totals if n in t])
+            for n in ids}
+
+
+def reuse_gate(full_totals, medians, band_s=BOUNDARY_BAND_S):
+    """Fail when the full listing misses tests with real fast-tier readings.
+
+    A test measured in the fast tier but absent from the full listing would
+    silently fall back to the 5.0 s default scheduling weight; that is only
+    acceptable inside the <5 ms boundary band (or for tests never observed
+    at all, which have no better weight available either way).
+    """
+    missing = sorted(
+        n for n, m in medians.items() if m > band_s and n not in full_totals)
+    if missing:
+        raise SystemExit(
+            "full listing does not cover tests with fast-tier readings: "
+            f"{missing}.  The population changed since the full measurement — "
+            "re-run the full-suite listing (SKYCOLOR_FULL_SUITE=1, "
+            "-n 12 --dist=loadgroup, --durations=0 --durations-min=0) and "
+            "pass the fresh file.")
+
+
+def predicted_wall_s(medians, slow):
+    """Sum of unmarked fast-tier medians (informational, no assertion).
+
+    Unmarked tests are constructed to all have fast-tier readings; tests
+    without any reading are sub-listing-cutoff and contribute zero by
+    convention.  Slow-marked tests never enter, marked or not.
+    """
+    return sum(m for n, m in medians.items() if n not in slow)
+
+
+def collect_slow_nodeids():
+    """Live slow-tier population via a fresh ``pytest -m slow`` collection.
+
+    ``-m slow`` makes the default filter yield (explicit selection), so the
+    subprocess reports exactly the slow-marked tests of the whole tree,
+    regardless of the ambient ``SKYCOLOR_FULL_SUITE`` value.  The mirror is
+    regenerated here — never inherited from the previous table — so it
+    cannot lag the markers the moment the table is written.
+    """
+    proc = subprocess.run(
+        [sys.executable, "-m", "pytest", "--co", "-q", "-m", "slow",
+         "-n", "0", "-p", "no:cacheprovider"],
+        cwd=ROOT, capture_output=True, text=True, timeout=600)
+    if proc.returncode != 0:
+        raise SystemExit(
+            "slow-tier collection subprocess failed:\n"
+            + (proc.stdout + proc.stderr)[-2000:])
+    return sorted(
+        line.strip() for line in proc.stdout.splitlines()
+        if "::" in line and not line.startswith("="))
+
+
+def collect_population_nodeids():
+    """Live full-population nodeids via a fresh env-switched collection."""
+    env = dict(os.environ, SKYCOLOR_FULL_SUITE="1")
+    proc = subprocess.run(
+        [sys.executable, "-m", "pytest", "--co", "-q", "-n", "0",
+         "-p", "no:cacheprovider"],
+        cwd=ROOT, env=env, capture_output=True, text=True, timeout=600)
+    if proc.returncode != 0:
+        raise SystemExit(
+            "population collection subprocess failed:\n"
+            + (proc.stdout + proc.stderr)[-2000:])
+    return {
+        line.strip() for line in proc.stdout.splitlines()
+        if "::" in line and not line.startswith("=")
+    }
+
+
+def prune_to_population(totals_list, live):
+    """Drop readings of tests that no longer exist in the live tree.
+
+    The standing samples legitimately contain readings of tests since
+    deleted (any removal of a once-measured test).  Left in, those stale
+    readings dead-lock the reuse gate: it would demand a fresh full listing
+    that can never contain a deleted test.  Pruning to the live collection
+    makes the gate judge exactly the population that exists, which is what
+    the removal path of the marker-change cost model requires.
+    """
+    return [{n: s for n, s in t.items() if n in live} for t in totals_list]
+
+
 def build(totals):
     """Split the totals into module weights and individually scheduled nodes.
 
@@ -117,26 +436,60 @@ def build(totals):
     return modules, nodes
 
 
-def main():
-    if len(sys.argv) != 2:
-        raise SystemExit(__doc__)
-    totals = parse_durations(pathlib.Path(sys.argv[1]).read_text())
-    if not totals:
-        raise SystemExit("no durations lines found in the input")
-    modules, nodes = build(totals)
-    payload = {
+def build_payload(full_totals, medians, slow):
+    """Pure synthesis of the new table from validated inputs."""
+    modules, nodes = build(full_totals)
+    return {
         "comment": TABLE_COMMENT,
         "measured": (
-            f"{datetime.date.today().isoformat()} from {pathlib.Path(sys.argv[1]).name}: "
-            f"per-test wall seconds under the parallel configuration"
+            f"{datetime.date.today().isoformat()}: scheduling weights from the "
+            f"full-suite listing; slow mirror from a fresh -m slow collection; "
+            f"fast medians from three fast-tier listings"
         ),
         "modules": modules,
         "nodes": nodes,
+        "slow": sorted(slow),
+        "fast_predicted_wall_s": round(predicted_wall_s(medians, slow), 2),
     }
+
+
+def main():
+    args = sys.argv[1:]
+    if len(args) != 4:
+        raise SystemExit(
+            "usage: make_scheduling_weights.py FULL_LOG FAST1 FAST2 FAST3\n"
+            "FULL_LOG: SKYCOLOR_FULL_SUITE=1 ... -n 12 --dist=loadgroup "
+            "--durations=0 --durations-min=0\n"
+            "FAST{1,2,3}: default fast-tier entry, --durations=0, three samples")
+    paths = [pathlib.Path(a) for a in args]
+    labels = ["full (arg 1)", "fast1 (arg 2)", "fast2 (arg 3)", "fast3 (arg 4)"]
+    # existence before read: a missing file must produce the labeled
+    # SystemExit, not an unlabeled FileNotFoundError traceback
+    for label, path in zip(labels, paths):
+        if not path.exists():
+            raise SystemExit(f"{label}: file not found: {path}")
+    texts = [p.read_text() for p in paths]
+    passed = []
+    for label, text in zip(labels, texts):
+        p, _d = validate_list_identity(label, text)
+        passed.append(p)
+    totals = [parse_durations(text) for text in texts]
+    if not all(totals):
+        raise SystemExit("no durations lines found in an input")
+    live = collect_population_nodeids()
+    totals = prune_to_population(totals, live)
+    medians = fast_medians(totals[1:])
+    slow = set(collect_slow_nodeids())
+    check_population_consistency(
+        labels, passed, totals, slow=slow)
+    reuse_gate(totals[0], medians)
+    payload = build_payload(totals[0], medians, slow)
     WEIGHTS_PATH.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
-    total = sum(modules.values()) + sum(nodes.values())
-    print(f"wrote {WEIGHTS_PATH}: {len(modules)} module groups, "
-          f"{len(nodes)} individual nodes, {total:.1f} s total")
+    total = sum(payload["modules"].values()) + sum(payload["nodes"].values())
+    print(f"wrote {WEIGHTS_PATH}: {len(payload['modules'])} module groups, "
+          f"{len(payload['nodes'])} individual nodes, {total:.1f} s total, "
+          f"slow mirror {len(payload['slow'])} tests, "
+          f"fast_predicted_wall_s {payload['fast_predicted_wall_s']}")
 
 
 if __name__ == "__main__":

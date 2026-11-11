@@ -53,6 +53,7 @@ def stratus():
 # ---------------------------------------------------------------------------
 # 1. bit-equality with the legacy entries
 # ---------------------------------------------------------------------------
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_clear_matches_legacy_entry(atmo81):
     ref = sky_radiance_total(atmo81, 80.0, 60.0, 120.0)
     res = solve(atmo81, 80.0, 60.0, 120.0)
@@ -61,6 +62,7 @@ def test_clear_matches_legacy_entry(atmo81):
     assert np.array_equal(res.wl, atmo81.wl)
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_twilight_matches_legacy_entry(atmo7):
     ref, ref_err = twilight_radiance(atmo7, 96.0, np.array([20.0, 70.0]),
                                      np.array([0.0, 180.0]),
@@ -71,6 +73,7 @@ def test_twilight_matches_legacy_entry(atmo7):
     assert np.array_equal(res.stderr, ref_err)
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_cloud_matches_legacy_entry(atmo7, stratus):
     ref = sky_radiance_with_cloud(atmo7, stratus, 75.0, 45.0, 135.0)
     res = solve(atmo7, 75.0, 45.0, 135.0, method="cloud", cloud_layer=stratus)
@@ -81,6 +84,7 @@ def test_cloud_matches_legacy_entry(atmo7, stratus):
 # ---------------------------------------------------------------------------
 # 2. diagnostics are traceable
 # ---------------------------------------------------------------------------
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_clear_diagnostics_orders_and_convergence(atmo81):
     res = solve(atmo81, 65.0, 45.0, 135.0)
     assert isinstance(res.diagnostics["orders"], int)
@@ -97,6 +101,7 @@ def test_clear_diagnostics_orders_and_convergence(atmo81):
     assert res.options["sun_zenith_deg"] == 65.0
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_twilight_diagnostics_trace_grid(atmo7):
     res = solve(atmo7, 96.0, 30.0, 90.0, method="twilight",
                 quality="low", grid=TINY, seed=0)
@@ -124,6 +129,7 @@ def test_unknown_method_and_missing_deck_raise(atmo7):
 # ---------------------------------------------------------------------------
 # 3. capability warnings
 # ---------------------------------------------------------------------------
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_twilight_warns_on_horizontal_field(atmo7):
     from skycolor.aerosol import HinterlandAerosol, shared
     from skycolor.atmosphere import ExponentialProfile, RadialSplitField
@@ -137,6 +143,7 @@ def test_twilight_warns_on_horizontal_field(atmo7):
               grid=TINY, seed=0)
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_default_paths_do_not_warn(atmo7, stratus):
     """Clear, cloud and uniform-field twilight run silently."""
     with warnings.catch_warnings():
@@ -150,6 +157,7 @@ def test_default_paths_do_not_warn(atmo7, stratus):
 # ---------------------------------------------------------------------------
 # 4. the display field seam
 # ---------------------------------------------------------------------------
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_render_field_matches_direct_backend_call(atmo7, stratus):
     """A cloudy dome built through render's ``radiance_field`` seam is
     bit-identical to calling the cloud backend directly."""
@@ -165,6 +173,7 @@ def test_render_field_matches_direct_backend_call(atmo7, stratus):
     assert np.array_equal(dome["radiance"].reshape(-1, WL7.size), direct)
 
 
+@pytest.mark.slow(reason="cost: slow-tier batch K=3 median 19.59 s (2026-11-11 transitional protocol, task-suite-tier step10); fast-tier budget 2 s")
 def test_ground_radiance_direct_transmittance_override(atmo7):
     """The override replaces the clear-sky beam: E_dir scales with T."""
     dome = render.sky_dome(atmo7, 60.0, n_zenith=4, n_azimuth=5)
@@ -179,6 +188,7 @@ def test_ground_radiance_direct_transmittance_override(atmo7):
     assert np.any(dark0 < base)
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_solve_rejects_empty_request_and_records_cloud_options(atmo7, stratus):
     """single=False + multiple=False computes nothing -> ValueError; the
     cloud composition always includes the clear single term, so

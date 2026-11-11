@@ -175,6 +175,7 @@ def test_moment_energy_and_asymmetry_small_particle():
 # ===========================================================================
 # 3. adaptive phase table
 # ===========================================================================
+@pytest.mark.slow(reason="cost: 12-worker parallel 5.1 s (cold-optics listing); fast-tier budget 2 s")
 @pytest.mark.parametrize("name", LIBRARY_NAMES)
 @pytest.mark.parametrize("wl", [450.0, 650.0])
 def test_phase_normalisation(library, name, wl):
@@ -186,6 +187,7 @@ def test_phase_normalisation(library, name, wl):
     assert integral / (4.0 * np.pi) == pytest.approx(1.0, abs=1e-3)
 
 
+@pytest.mark.slow(reason="cost: 12-worker parallel 3.3 s (cold-optics listing); fast-tier budget 2 s")
 @pytest.mark.parametrize("name", LIBRARY_NAMES)
 def test_phase_is_positive_and_finite(library, name):
     a = library[name]

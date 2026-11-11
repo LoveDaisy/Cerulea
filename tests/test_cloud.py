@@ -87,6 +87,7 @@ def test_moments_are_normalised_and_match_g():
     assert np.all(np.diff(m[10:40]) < 0.02)      # monotonically decaying tail
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_spectral_optical_depth_is_grey(stratus, cirrus):
     """Cloud extinction is nearly grey across the visible (why clouds are white)."""
     for layer in (stratus, cirrus):
@@ -233,6 +234,7 @@ def test_overcast_shape():
     assert flux == pytest.approx(1.0, rel=1e-6)
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_thick_cloud_has_overcast_luminance_distribution(atmo, stratus):
     """Optically thick deck, high sun: peak at the zenith, horizon/zenith 1/3."""
     view = np.array([0.0, 30.0, 60.0, 89.9])
@@ -246,6 +248,7 @@ def test_thick_cloud_has_overcast_luminance_distribution(atmo, stratus):
     assert lum[0] > 1e3 * 0.0
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_cloud_is_brighter_than_clear_sky_in_daylight(atmo, stratus):
     view = np.array([0.0])
     clear = sky_radiance_total(atmo, 45.0, view, 0.0, multiple=True)
@@ -257,6 +260,7 @@ def test_cloud_is_brighter_than_clear_sky_in_daylight(atmo, stratus):
 # ---------------------------------------------------------------------------
 # 5. clear-sky limit and integration
 # ---------------------------------------------------------------------------
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_zero_tau_reduces_exactly_to_clear_sky(atmo, stratus):
     view = np.array([0.0, 45.0, 80.0])
     clear = sky_radiance_total(atmo, 50.0, view, 0.0, multiple=True)
@@ -266,6 +270,7 @@ def test_zero_tau_reduces_exactly_to_clear_sky(atmo, stratus):
     assert np.array_equal(total, clear)            # exact, not approximate
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_cloud_attenuates_the_clear_sky(atmo, stratus):
     view = np.array([0.0, 60.0])
     clear = sky_radiance_total(atmo, 50.0, view, 0.0, multiple=True)
@@ -290,6 +295,7 @@ def test_output_shape_matches_solver(atmo, altostratus):
 # ---------------------------------------------------------------------------
 # 6. the sun below the horizon: red underlighting
 # ---------------------------------------------------------------------------
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_fully_dark_deck_beam_flux_is_zero_spectrum(atmo, stratus):
     """A deck fully inside Earth's shadow returns a zero (n_wl,) spectrum.
 
@@ -306,6 +312,7 @@ def test_fully_dark_deck_beam_flux_is_zero_spectrum(atmo, stratus):
     assert single.beam_flux.shape == (len(atmo.wl),)
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_deck_shadow_diagnostic_matches_source(atmo, stratus):
     """`shadow_km` is the unified source's occultation root, bit-for-bit.
 
@@ -327,6 +334,7 @@ def test_deck_shadow_diagnostic_matches_source(atmo, stratus):
     assert illum_r.shadow_km == src_r.shadow_height(-1.0)
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_high_clouds_stay_lit_longer(atmo, altostratus, cirrus):
     assert rtcloud.illuminate_cloud(atmo, altostratus, 92.0).geometry == "base"
     assert rtcloud.illuminate_cloud(atmo, cirrus, 93.0).geometry == "base"
@@ -340,6 +348,7 @@ def test_high_clouds_stay_lit_longer(atmo, altostratus, cirrus):
                                     97.0).geometry == "none"
 
 
+@pytest.mark.slow(reason="cost: slow-tier batch K=3 median 15.35 s (2026-11-11 transitional protocol, task-suite-tier step10); fast-tier budget 2 s")
 def test_underlit_base_turns_red(atmo, altostratus):
     """The cloud base goes white -> orange -> red as the sun sets."""
     from skycolor import color
@@ -361,6 +370,7 @@ def test_underlit_base_turns_red(atmo, altostratus):
     assert np.all(rtcloud.cloud_radiance(illum, [0.0]) == 0.0)
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_underlit_deck_is_not_seen_through_its_shadow(atmo):
     """A thick low deck cannot glow from below: the shadowed part blocks it.
 
@@ -432,6 +442,7 @@ def test_cloud_layer_is_frozen_and_replace_drops_optics():
     np.testing.assert_allclose(thin.tau / fat.tau, 5.0 / 20.0, rtol=1e-12)
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_deck_lit_segment_matches_column_shadow():
     """Ascending beams enter the deck at the COLUMN's shadow height.
 

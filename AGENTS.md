@@ -17,15 +17,23 @@ uv sync        # 从 uv.lock 重建 .venv；不要 pip install 进环境
 ### 测试
 
 ```bash
-uv run pytest -q                      # 当前默认全量 526 项，12-worker xdist / LPT；
-                                      # 当前树 recert 实测 376.5–446.9s 超 360s 回归线
-                                      # （证据包已上抛），与历史对子分开记录于
-                                      # validation/FAST_SUITE.md，不沿用旧时长认证
-uv run pytest -n 0 -q ...             # 串行等价诊断，不作为性能验收口径
-uv run python -m validation.run_all   # 六项物理校验，单池 8 worker，recert 实测
-                                      # 285.14/353.50 s（validation/FAST_SUITE.md）；
-                                      # 既有物理 FAIL 预期 exit=1
+uv run pytest -q                      # 默认 = 快层 dev loop（387 项，~38-63s 窗载依赖，
+                                      # 12-worker xdist / LPT；slow 标记项被
+                                      # 过滤，显式 -m/-k/::nodeid 退让）
+SKYCOLOR_FULL_SUITE=1 uv run pytest -q -n 12 --dist=loadgroup
+                                      # 全层验收入口（580 项全人口，零 skip）
+SKYCOLOR_FULL_SUITE=1 uv run pytest -n 0 -q tests/test_validation_harness.py
+                                      # 结构测试串行诊断（env=1 全量含 slow 成员）
+uv run python -m validation.run_all   # 六项物理校验，单池 8 worker，实测约 4 min；
+                                      # 既有物理 FAIL 预期 exit=1（不经 pytest，
+                                      # 与分层无关）
 ```
+
+双层契约与定层规则见 `docs/DEVELOPMENT.md`「Test tiers」；计数链、形态实测、
+启动暂态与 formal pair 协议（显式全层）见 `validation/FAST_SUITE.md`
+suite-tier 节。新增测试由作者写时定层（种类判据 + 成本估算，`kind:`/`cost:`
+reason）；marker 为人工声明（升线自动闸已按 2026-11-11 用户裁定删除），
+成本经权重再生成流程落表（`fast_predicted_wall_s` 记录性指标，无自动闸）。
 
 ### 运行
 

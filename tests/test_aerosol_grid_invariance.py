@@ -14,6 +14,7 @@ LIBRARY_NAMES = [
 ]
 
 
+@pytest.mark.slow(reason="cost: 12-worker parallel 2.5 s (cold-optics listing); fast-tier budget 2 s")
 @pytest.mark.parametrize("name", LIBRARY_NAMES)
 def test_mie_grid_partition_preserves_the_material_spectrum(name):
     aerosol = get_aerosol(name)

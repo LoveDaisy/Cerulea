@@ -40,7 +40,9 @@ parameters. These examples explain behavior, not absolute accuracy.
 
 The latest committed [six-check results](../validation/results.json) are
 **3 PASS / 3 FAIL** (unified solar source; see [physics/SOLAR_SOURCE.md](physics/SOLAR_SOURCE.md)). Passing regression tests do not close these physical gaps.
-Use `uv run pytest -q` for the current test count; the M18 full run is preserved
+Use `SKYCOLOR_FULL_SUITE=1 uv run pytest --collect-only -q` for the current
+full-population test count (plain `uv run pytest -q` collects the fast tier
+only); the M18 full run is preserved
 in [CURVED_TRANSPORT_AUDIT.md](twilight/CURVED_TRANSPORT_AUDIT.md).
 
 | Check | Recorded result |

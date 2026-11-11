@@ -33,10 +33,17 @@ dev = [
 # duplicate module basenames collide and abort collection with exit code 2
 # (65 collection errors on 2026-11-08; see validation/FAST_SUITE.md).
 testpaths = ["tests"]
-# Default entry point: measured-cost parallel scheduling (12 workers,
-# module-level groups; see tests/conftest.py and validation/FAST_SUITE.md).
-# `-n 0` runs serially and is for equivalence diagnostics only.
+# Two-tier suite (task-suite-tier).  Default entry point = fast dev-loop
+# tier: tests marked ``slow`` are deselected at collection (tests/conftest.py,
+# switchable via SKYCOLOR_FULL_SUITE=1); the full acceptance tier is the
+# explicit `SKYCOLOR_FULL_SUITE=1 uv run pytest -q -n 12 --dist=loadgroup`.
+# The 12-worker xdist form below was measured against serial for the fast
+# population and won (median 50.5 s vs 97.0 s over three samples each,
+# 2026-11-11); serial `-n 0` remains the equivalence-diagnostic form.
 addopts = "-n 12 --dist=loadgroup"
+markers = [
+    "slow: full-tier-only test — MC statistical convergence, large-grid / full-dome integration, golden-fixture verification, or measured cost above the 2 s fast-tier budget (kind:/cost: reason required, see docs/DEVELOPMENT.md 'Test tiers'); deselected from the default fast tier, runs under SKYCOLOR_FULL_SUITE=1 or an explicit -m/-k/nodeid selection",
+]
 
 [tool.setuptools.packages.find]
 include = ["skycolor*"]

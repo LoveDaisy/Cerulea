@@ -32,6 +32,7 @@ def test_refraction_matches_saemundsson(atmo, elev):
     assert abs(model - ref) / ref < 0.10, (elev, model, ref)
 
 
+@pytest.mark.slow(reason="cost: 12-worker parallel 11.7 s (cold-optics listing); fast-tier budget 2 s")
 def test_apparent_elevation_monotonic_and_signed(atmo):
     t = RefractionTables(atmo)
     true = np.array([0.0, 0.5, 1.0, 5.0, 20.0, 45.0, 90.0])
@@ -42,6 +43,7 @@ def test_apparent_elevation_monotonic_and_signed(atmo):
     assert app[-1] == pytest.approx(90.0, abs=1e-6)
 
 
+@pytest.mark.slow(reason="cost: 12-worker parallel 5.3 s (cold-optics listing); fast-tier budget 2 s")
 def test_shadow_threshold(atmo):
     t = RefractionTables(atmo)
     thr = t.shadow_zenith_true(np.array([0.0, 10.0, 30.0, 60.0]))
@@ -53,6 +55,7 @@ def test_shadow_threshold(atmo):
     assert np.all(np.diff(thr) > 0)
 
 
+@pytest.mark.slow(reason="cost: 12-worker parallel 5.8 s (cold-optics listing); fast-tier budget 2 s")
 def test_horizon_dip():
     t = RefractionTables(Atmosphere(WL_COARSE, aerosols=[]))
     assert t.horizon_dip(np.array([0.0]))[0] == pytest.approx(0.0)
@@ -98,6 +101,7 @@ def test_refracted_path_below_horizon_includes_both_branches():
     assert np.allclose(L, expected, rtol=1e-12)
 
 
+@pytest.mark.slow(reason="cost: 12-worker parallel 8.9 s (cold-optics listing); fast-tier budget 2 s")
 def test_refracted_path_matches_ray_trace():
     """Independent RK4 column integral along the refracted ray."""
     from skycolor import presets
@@ -176,6 +180,7 @@ def test_delta_m_identity_for_small_particles():
     assert np.allclose(beta, raw, atol=1e-6)
 
 
+@pytest.mark.slow(reason="cost: 12-worker parallel 4.7 s (cold-optics listing); fast-tier budget 2 s")
 def test_delta_m_scales_coarse_aerosol():
     from skycolor.atmosphere import AerosolLayer, Atmosphere, ExponentialProfile
     from skycolor.aerosol import DesertDustAerosol
@@ -213,6 +218,7 @@ def test_restrict_preserves_custom_air_profile():
     assert not np.array_equal(sub.n_air(np.array([40.0])), plain.n_air(np.array([40.0])))
 
 
+@pytest.mark.slow(reason="cost: 12-worker parallel 15.8 s (cold-optics listing); fast-tier budget 2 s")
 def test_refraction_cache_identity():
     """Cache identity is the medium's density definition, not a proxy.
 

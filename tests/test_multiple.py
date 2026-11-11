@@ -52,6 +52,7 @@ def _conservative_atmosphere(wl, albedo: float) -> Atmosphere:
 # ---------------------------------------------------------------------------
 # 1. empty atmosphere
 # ---------------------------------------------------------------------------
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_empty_atmosphere_is_exactly_zero():
     """No Rayleigh and no aerosol -> no scattering -> exactly zero."""
     atmo = Atmosphere(np.array([450.0, 550.0, 650.0]), ozone_du=300.0,
@@ -67,6 +68,7 @@ def test_empty_atmosphere_is_exactly_zero():
 # ---------------------------------------------------------------------------
 # 2. energy conservation
 # ---------------------------------------------------------------------------
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 @pytest.mark.parametrize("albedo", [0.0, 1.0])
 def test_energy_conservation(albedo):
     """Reflected + transmitted = incident for a conservative atmosphere.
@@ -90,6 +92,7 @@ def test_energy_conservation(albedo):
         np.testing.assert_allclose(net_down / incident, 0.0, atol=1e-6)
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_energy_conservation_thin_rayleigh_only():
     """A Rayleigh-only conservative atmosphere also closes its budget."""
     wl = np.array([450.0, 550.0, 650.0])
@@ -103,6 +106,7 @@ def test_energy_conservation_thin_rayleigh_only():
 # ---------------------------------------------------------------------------
 # 3. magnitude and horizon trend
 # ---------------------------------------------------------------------------
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_zenith_magnitude_clear_sky():
     """MS/SS at the zenith, 550 nm, sun zenith 60 deg: 0.08 .. 0.35.
 
@@ -118,6 +122,7 @@ def test_zenith_magnitude_clear_sky():
     assert 0.08 <= ratio <= 0.35, f"MS/SS={ratio:.3f}"
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_ms_ss_increases_towards_horizon():
     """MS/SS grows towards the horizon away from the sun.
 
@@ -135,6 +140,7 @@ def test_ms_ss_increases_towards_horizon():
     assert ratio[-1] > 0.6
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_horizon_headline_value():
     """Clear sky, 550 nm, sza 45, vza 88, sun side: MS/SS ~ 0.40."""
     atmo = presets.clear(WL550)
@@ -147,6 +153,7 @@ def test_horizon_headline_value():
 # ---------------------------------------------------------------------------
 # 4. smoothness and non-negativity
 # ---------------------------------------------------------------------------
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_smooth_and_nonnegative():
     atmo = presets.clear(np.arange(400.0, 701.0, 20.0))
     i550 = int(np.argmin(np.abs(atmo.wl - 550.0)))
@@ -171,6 +178,7 @@ def test_smooth_and_nonnegative():
 # ---------------------------------------------------------------------------
 # 5. twilight
 # ---------------------------------------------------------------------------
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_twilight_is_positive_and_bounded():
     atmo = presets.clear(WL550)
     ms = multiple.multiple_scattering(atmo, 96.0, [0.0], 0.0)[0, 0]
@@ -183,6 +191,7 @@ def test_twilight_is_positive_and_bounded():
 # ---------------------------------------------------------------------------
 # extra regression checks
 # ---------------------------------------------------------------------------
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_first_order_matches_single_scattering():
     """The first-order quadrature reproduces `rt.single` (plane-parallel view)."""
     atmo = presets.clear(WL550)
@@ -192,6 +201,7 @@ def test_first_order_matches_single_scattering():
     np.testing.assert_allclose(res.radiance_single[:, 0], ref, rtol=0.03)
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_optically_thick_horizon_converges():
     """Hazy atmosphere, vza 88 deg (tau along the line of sight ~ 4)."""
     atmo = presets.hazy(np.array([550.0]))
@@ -203,6 +213,7 @@ def test_optically_thick_horizon_converges():
     assert abs(ms48[0, 0] / res.radiance[0, 0] - 1.0) < 0.03
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_scalar_zenith_with_azimuth_array():
     """A scalar zenith angle can be paired with an array of azimuths."""
     atmo = presets.clear(WL550)
@@ -214,6 +225,7 @@ def test_scalar_zenith_with_azimuth_array():
     assert abs(ms[0, 0] - ms[2, 0]) > 0.0
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_direct_beam_projection_supports_many_modes():
     """The per-beam Fourier azimuth table must size itself by n_modes.
 

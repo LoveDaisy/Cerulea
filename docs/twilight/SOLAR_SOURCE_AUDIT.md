@@ -166,7 +166,7 @@ uv run python -m tools.probe_solar_refraction --refinement-pilot --out out/sourc
 uv run python -m tools.audit_single_solar_source --out out/source-single.jsonl \
     --n-gauss 24 --n-quad 16 --disk-nodes 17
 uv run python -m tools.summarize_solar_source
-uv run pytest -q
+SKYCOLOR_FULL_SUITE=1 uv run pytest -q -n 12 --dist=loadgroup
 ```
 
 JSONL逐次追加，复跑应使用新文件。独立新增11项测试约0.34秒通过，涵盖常n、解析遮挡、

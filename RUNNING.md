@@ -6,7 +6,8 @@ transitive ones**, and `.python-version` pins the interpreter.
 
 ```bash
 uv sync                      # install from the lock file
-uv run pytest -q             # current regression suite
+uv run pytest -q             # fast dev-loop tier (slow-marked tests deselected)
+SKYCOLOR_FULL_SUITE=1 uv run pytest -q -n 12 --dist=loadgroup   # full suite
 uv run python -m validation.run_all
 ```
 
@@ -39,7 +40,7 @@ MC is a budgeted algorithm choice, not automatic accuracy certification.
 
 ```bash
 uv lock --upgrade            # bump everything to the newest allowed version
-uv run pytest -q
+SKYCOLOR_FULL_SUITE=1 uv run pytest -q -n 12 --dist=loadgroup
 uv run python -m validation.run_all   # the physics numbers must not move
 git add uv.lock pyproject.toml
 ```

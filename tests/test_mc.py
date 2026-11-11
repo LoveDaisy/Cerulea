@@ -11,10 +11,17 @@ from __future__ import annotations
 
 
 import numpy as np
+import pytest
 
 from skycolor import presets, spectra
 from skycolor.atmosphere import AerosolLayer, Atmosphere
 from skycolor.rt import mc, single
+
+
+# Full-tier exclusive by species dimension: every test here drives the
+# Monte-Carlo reference to statistical convergence (see docs/DEVELOPMENT.md).
+pytestmark = pytest.mark.slow(
+    reason="kind:mc - Monte-Carlo statistical convergence is full-tier exclusive")
 
 
 # ---------------------------------------------------------------------------

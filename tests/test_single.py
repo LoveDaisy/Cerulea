@@ -11,6 +11,7 @@ def atmo():
     return Atmosphere.standard(WL_COARSE)
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_radiance_positive_and_blue(atmo):
     rad = sky_radiance(atmo, 30.0, np.array([0.0, 45.0, 80.0]),
                        np.array([180.0, 90.0, 0.0]))
@@ -43,6 +44,7 @@ def test_direct_transmittance(atmo):
     assert Tlow[i550] < T[i550]
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_thin_atmosphere_scales_linearly():
     #: probe medium for the unperturbed US76 air density (n_air needs only
     #: the pressure/temperature profiles, not the spectral grid)

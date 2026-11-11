@@ -28,6 +28,7 @@ def atmo():
 # ---------------------------------------------------------------------------
 # API contract
 # ---------------------------------------------------------------------------
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_shapes_and_units(atmo):
     zen = np.array([0.0, 30.0, 70.0])
     az = np.array([0.0, 90.0, 180.0])
@@ -39,6 +40,7 @@ def test_shapes_and_units(atmo):
     assert np.all(err >= 0.0)
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_broadcasts_scalar_zenith(atmo):
     a, ea = TW.twilight_radiance(atmo, 96.0, 20.0, np.array([0.0, 90.0]),
                                  grid=TINY, seed=3)
@@ -48,6 +50,7 @@ def test_broadcasts_scalar_zenith(atmo):
     assert np.array_equal(a, b) and np.array_equal(ea, eb)
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_single_only_matches_deterministic(atmo):
     """``multiple=False`` must be *exactly* :func:`rt.single.sky_radiance`."""
     zen = np.array([0.0, 45.0, 85.0])
@@ -66,6 +69,7 @@ def test_both_disabled_returns_zero(atmo):
     assert np.all(err == 0.0)
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_negative_radiance_impossible_and_multiple_positive(atmo):
     ms, err, info = TW.multiple_scattered(atmo, 99.0, [0.0, 85.0], [0.0, 0.0],
                                           quality="low", grid=TINY, seed=5)
@@ -78,6 +82,7 @@ def test_negative_radiance_impossible_and_multiple_positive(atmo):
 # ---------------------------------------------------------------------------
 # symmetry and interpolation
 # ---------------------------------------------------------------------------
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_mirror_symmetry_about_the_solar_meridian(atmo):
     """The model is azimuthally uniform, so +dphi and -dphi must agree.
 
@@ -126,6 +131,7 @@ def test_spectral_interpolation_is_a_convex_combination():
         assert np.isclose(wmat[i, k], 1.0)
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_anchor_wavelengths_are_used_verbatim(atmo):
     """With one anchor the value at that wavelength is the raw estimate."""
     ms1, _, info = TW.multiple_scattered(
@@ -137,6 +143,7 @@ def test_anchor_wavelengths_are_used_verbatim(atmo):
 # ---------------------------------------------------------------------------
 # physics
 # ---------------------------------------------------------------------------
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_multiple_scattering_grows_towards_twilight(atmo):
     """MS/SS is much larger in deep twilight than in daylight."""
     def ratio(h):
@@ -155,6 +162,7 @@ def test_multiple_scattering_grows_towards_twilight(atmo):
     assert ratio(-9.0) > 1.0
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_daytime_total_matches_deterministic_model(atmo):
     """Where the deterministic model is good, the engine must agree with it.
 
@@ -171,6 +179,7 @@ def test_daytime_total_matches_deterministic_model(atmo):
     assert np.all(np.abs(ratio - 1.0) < 0.15)
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_ground_albedo_increases_the_sky():
     """A brighter ground must brighten the multiple-scattering field.
 
@@ -191,6 +200,7 @@ def test_ground_albedo_increases_the_sky():
 # ---------------------------------------------------------------------------
 # statistics
 # ---------------------------------------------------------------------------
+@pytest.mark.slow(reason="kind:mc - Monte-Carlo statistical convergence is full-tier exclusive")
 def test_error_scales_as_one_over_sqrt_n():
     """Four times the photons must halve the statistical error.
 
@@ -213,6 +223,7 @@ def test_error_scales_as_one_over_sqrt_n():
     assert 1.3 < ratio < 3.5
 
 
+@pytest.mark.slow(reason="kind:mc - Monte-Carlo statistical convergence is full-tier exclusive")
 def test_identical_seed_is_reproducible(atmo):
     a = TW.multiple_scattered(atmo, 99.0, [10.0, 60.0], [0.0, 120.0],
                               grid=TINY, seed=123)
@@ -222,6 +233,7 @@ def test_identical_seed_is_reproducible(atmo):
     assert np.array_equal(a[1], b[1])
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_error_is_reported_not_optimistic(atmo):
     """The quoted error must not be absurdly small compared with the truth."""
     ms, err, _ = TW.multiple_scattered(atmo, 96.0, [0.0], [0.0],

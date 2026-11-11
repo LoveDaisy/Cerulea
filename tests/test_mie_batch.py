@@ -93,6 +93,7 @@ def test_batch_coefficients_anchor_bitwise(anchor):
     assert np.array_equal(bat.qsca, anchor["coef_qsca"])
 
 
+@pytest.mark.slow(reason="kind:golden - committed-fixture full verification is full-tier exclusive")
 def test_state_surface_arrays_vs_anchor(anchor):
     """Plan 3b/3d test points: rc/asym bitwise, production single within TOL.
 
@@ -213,6 +214,7 @@ def test_batch_moments_match_scalar_within_declaration(anchor):
         assert np.allclose(U_bat[0], U_ref, **TOL_MOMENTS)
 
 
+@pytest.mark.slow(reason="kind:golden - committed-fixture full verification is full-tier exclusive")
 def test_batch_phase_table_preset_anchor_declared_tolerance(anchor):
     """Phase tables and the production radiance vs pinned (scalar) arrays."""
     for name, factory in (("clear", presets.clear), ("dusty", presets.dusty)):
@@ -230,6 +232,7 @@ def test_batch_phase_table_preset_anchor_declared_tolerance(anchor):
             anchor[f"{name}_p_norm"], **TOL_TABLE)
 
 
+@pytest.mark.slow(reason="kind:golden - committed-fixture full verification is full-tier exclusive")
 def test_batch_moments_preset_anchor_declared_tolerance(anchor):
     """Production surface: moments through the aerosol path vs pinned arrays."""
     for name, factory in (("clear", presets.clear), ("dusty", presets.dusty)):
@@ -244,6 +247,7 @@ def test_batch_moments_preset_anchor_declared_tolerance(anchor):
                            rtol=1e-11, atol=0.0)
 
 
+@pytest.mark.slow(reason="kind:golden - committed-fixture full verification is full-tier exclusive")
 def test_batch_coefficients_full_preset_population_bitwise():
     """Every (node, wavelength) pair of both presets, the production set."""
     for factory in (HinterlandAerosol, DustAerosol):

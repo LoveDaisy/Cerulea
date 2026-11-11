@@ -157,7 +157,7 @@ Tables I/II 的天顶列给出：−6° 高站 0.022、低站 0.060 cd ft⁻²�
 uv sync --frozen
 uv run python -c 'import skycolor; print(skycolor.__file__)'
 
-uv run pytest -q
+SKYCOLOR_FULL_SUITE=1 uv run pytest -q -n 12 --dist=loadgroup
 uv run python -m validation.run_all
 
 # 当前确定性与不经插值的直接 MC；结果逐次追加，因此使用新输出文件

@@ -194,6 +194,7 @@ def test_restrict_shares_geometry_and_altitude_does_not():
     assert g_lift.field.r_ground == lifted.r_bounds[0]
 
 
+@pytest.mark.slow(reason="cost: 12-worker parallel 16.1 s (cold-optics listing); fast-tier budget 2 s")
 def test_source_rejects_swapped_medium():
     atmo = Atmosphere(W3, ozone_du=300.0)
     source = SolarSource(atmo, 30.0)
@@ -227,6 +228,7 @@ def small_source():
     return atmo, geom, table
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_table_holdout_against_direct_field(small_source):
     atmo, geom, table = small_source
     field = geom.field
@@ -279,6 +281,7 @@ def test_table_holdout_against_direct_field(small_source):
     assert worst_tg <= 0.02
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_table_wavelength_slices_identical(small_source):
     atmo, geom, table = small_source
     z = np.array([1.0, 20.0, 60.0])
@@ -293,6 +296,7 @@ def test_table_wavelength_slices_identical(small_source):
         assert np.allclose(t_all[:, iw], t_b, rtol=0, atol=0)
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_transmittance_is_pure_attenuation(small_source):
     # T stays in [0, 1] and gain is reported separately: their product is
     # never clipped or renamed (plan section 3.1 item 3)
@@ -511,6 +515,7 @@ def test_scatter_frame_equivariant_and_batch_invariant():
     assert np.array_equal(vm[0], v1) and np.array_equal(vm[1], v2)
 
 
+@pytest.mark.slow(reason="cost: slow-tier batch K=3 median 11.03 s (2026-11-11 transitional protocol, task-suite-tier step10); fast-tier budget 2 s")
 def test_flat_query_cache_gather_matches_rows(small_source):
     """The flat query cache is a bitwise copy of the per-row arrays.
 
@@ -563,6 +568,7 @@ def test_segment_indices_match_searchsorted(small_source):
         np.testing.assert_array_equal(j, expected)
 
 
+@pytest.mark.slow(reason="cost: slow-tier batch K=3 median 20.21 s (2026-11-11 transitional protocol, task-suite-tier step10); fast-tier budget 2 s")
 def test_query_batch_matches_per_point_bitwise(small_source):
     """Batch queries across row boundaries equal per-point queries bitwise.
 
@@ -600,6 +606,7 @@ def test_query_batch_matches_per_point_bitwise(small_source):
     assert np.array_equal(lit_b, lit_p)
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_table_build_independent_of_query_order():
     """Build anchors make the shared table registration-order free.
 
@@ -812,6 +819,7 @@ def test_ground_flux_disk_center_on_horizon_matches_analytic():
     assert abs(got - expected) <= 5e-3 * expected, (got, expected)
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_ground_local_accounting_is_observer_invariant():
     """SOS bottom-boundary seam: local plane flux never sees the observer.
 
@@ -920,6 +928,7 @@ def test_scatter_aerosol_mixture_matches_analytic_cap_weights():
     np.testing.assert_allclose(full[0], expected_full, rtol=1e-9, atol=0.0)
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_scatter_applies_aerosol_phase_per_channel_and_fractions_linearly():
     """The aerosol term of the scatter mixture is present, per-channel, linear.
 
@@ -981,6 +990,7 @@ def _vacuum_atmo(wl=W3):
                       ozone_du=0.0, no2_column=0.0, refraction=False)
 
 
+@pytest.mark.slow(reason="cost: 12-worker parallel 8.9 s (cold-optics listing); fast-tier budget 2 s")
 def test_shared_table_config_is_not_mutable():
     """ensure_table takes no configuration; probes cannot retune production.
 
@@ -1004,6 +1014,7 @@ def test_shared_table_config_is_not_mutable():
     assert np.array_equal(t_a, t_b)     # probe order cannot leak into production
 
 
+@pytest.mark.slow(reason="cost: 12-worker parallel 2.8 s (cold-optics listing); fast-tier budget 2 s")
 def test_chunk_respects_element_budget():
     """The point chunk honours the element budget; chunk size never moves a value.
 
@@ -1066,6 +1077,7 @@ def _flux_reference(atmo, tab, x, normal, sun_hat, alpha_deg=SUN_RADIUS_DEG,
     return integral / (np.pi * np.sin(a) ** 2)
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_flux_receiver_plane_boundary():
     """Flux resolves the receiver-plane projection boundary exactly.
 
@@ -1113,6 +1125,7 @@ def test_flux_receiver_plane_boundary():
     assert float(o2[0]) == pytest.approx(float(o1[0]), rel=1e-3)
 
 
+@pytest.mark.slow(reason="cost: 12-worker parallel 3.5 s (cold-optics listing); fast-tier budget 2 s")
 def test_position_domain_contract_across_kernels():
     """Out-of-domain Cartesian queries fail loudly on every position kernel.
 

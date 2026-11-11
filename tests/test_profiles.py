@@ -50,6 +50,7 @@ def test_column_normalisation_matches_du(custom):
     assert col / DU == pytest.approx(250.0, rel=1e-6)
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_profile_reaches_single_and_sos(custom, default):
     """single and SOS see the injected shape, not the climatological one."""
     z_mid = custom.z_mid
@@ -64,6 +65,7 @@ def test_profile_reaches_single_and_sos(custom, default):
         sky_radiance_total(default, 60.0, 30.0, 120.0))
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_twilight_single_uses_same_profile(custom):
     """The twilight engine's deterministic term (its wavelength subsets go
     through ``_restrict``) is bit-identical to the single-scattering solver
@@ -77,6 +79,7 @@ def test_twilight_single_uses_same_profile(custom):
     assert np.all(err == 0.0)
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_twilight_ms_sees_injected_profile(custom, default):
     """The Monte Carlo multiple-scattering term reflects the injected ozone
     (historically this needed a runtime patch of the engine)."""

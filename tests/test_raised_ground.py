@@ -179,6 +179,7 @@ def test_sos_solar_source_has_the_same_shadow(refraction):
     np.testing.assert_array_equal(t_all[:, 0], (~blocked).astype(float))
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_cloud_point_and_deck_share_the_raised_ground_shadow():
     """A cloud wholly inside the high plateau's shadow gets no direct beam."""
     atmo = _vacuum(ground_km=2.4)
@@ -209,6 +210,7 @@ def test_cloud_point_and_deck_share_the_raised_ground_shadow():
     assert low.geometry == "base"
 
 
+@pytest.mark.slow(reason="cost: 12-worker parallel 8.0 s (cold-optics listing); fast-tier budget 2 s")
 def test_balloon_occultation_uses_ground_refractivity():
     """A raised observer does not replace n_ground in the Bouguer boundary."""
     from skycolor import refraction as refr

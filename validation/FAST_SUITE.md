@@ -315,3 +315,249 @@ tests).  Formal pairs on the green tree:
 
 Performance context for the same task: cold dusty `delta_m(32)` 39.4 -> 3.1 s
 (`scratchpad/task-cold-optics/bench_{baseline,after}.log`).
+
+## Two-tier suite (2026-11-11, task `suite-tier`)
+
+The suite is two-tier from this tree on: the default `uv run pytest -q` is
+the **fast dev-loop tier** (373 tests at close; 358 at first
+finalization), the acceptance gate is the **full
+tier** (`SKYCOLOR_FULL_SUITE=1 uv run pytest -q -n 12 --dist=loadgroup`,
+565 tests, zero skips expected).  Tiers are declared in code (`slow` markers
+with `kind:`/`cost:` reasons, filter + yield rules single-sourced in
+`tests/scheduling.py`, applied in `tests/conftest.py`); the placement rules
+live in docs/DEVELOPMENT.md "Test tiers".  This section records the
+measured evidence and the provenance of every number the task rewrote.
+
+**Count chain** (mechanically exported; `SKYCOLOR_FULL_SUITE=1 uv run pytest --collect-only -q`):
+issue baseline 542 + 23 tests added by this task − 1 removed (the
+audit-gate unit test, deleted together with its gate by the option-2
+adjudication) + 1 added (the marker-change-window pinning test, gen 4) =
+**565** = **373 fast + 192 slow** (identity guarded by
+`test_tier_accounting_full_equals_fast_union_slow`, no count literals;
+the 23 additions were set-diff verified against a baseline-tree collection
+at the r4 export, 23 added / 0 removed).
+
+**Merge integration** (2026-11-11, owner): task-mc-restrict-segv landed on
+main before this branch (+15 tests, one of them the ~45 s stress anchor).
+Per the tier cost principle the anchor is `slow`-marked at module level
+(the manual-marker protocol's first live use), and the authority literals
+were re-derived on the merged tree: **580 = 387 fast + 193 slow**
+(identity re-verified by `test_tier_accounting_full_equals_fast_union_slow`).
+The task-close numbers above are historical records of this task's own
+tree and are not rewritten.
+The 23: 8 in Step 1 (7 mini tier-filter behavior tests + 1 policy-helper
+unit test), 12 weights-tool unit tests, 2 tree guards (accounting + mirror),
+1 review-round addition (mini scenario (g), xdist worker-side `-m` yield).
+The mirror equality (`test_tier_slow_mirror_matches_live_markers`) is live
+since the first regen below; it fired once for real when scenario (g) moved
+the slow population 201 → 202, and the mandated marker-change cycle
+restored it; the gen-4 correction below then moved the slow population
+202 → 192 and the final regen re-derived the mirror from a fresh
+collection.  Note that the owner-side rebase onto main will fold in
+further test files (mc-restrict-segv), requiring one more export at merge
+time.
+
+**Slow list provenance:** mechanical draft = the cold-optics 12-worker
+durations listing (`scratchpad/task-cold-optics/durations_parallel5.log`,
+>2 s = 144 readings, supersedes the issue's weights-table-derived "about
+130"; the table cannot see 14 heavy tests inside light module groups),
+expanded to 201 collected items by (a) kind-dimension module marking
+(`test_mc.py` 6, `test_golden_equivalence.py` 7), (b) parametrized
+functions marked at function level, (c) 20 upgrade-adjudication marks
+(below; 10 of them corrected back to the fast tier by the batch protocol
+after the option-2 adjudication).  Kind census (decorator-level): `kind:grid` 73, `kind:render` 24,
+`kind:mc` 10, `kind:golden` 5, `cost:` 45.  The kind additions review found
+**zero** kind-exclusive tests among the unlisted fast candidates: the only
+MC-named candidate (`test_mc_solar_beam_respects_the_opaque_bottom`) is a
+vacuum ray/intersection contract check.
+
+**Form measurement** (3 interleaved samples per form, `--durations=0`,
+window load 2.2-6.8, logs `scratchpad/task-suite-tier/step5/`):
+**12-worker xdist wins, median 50.51 s (50.49-51.03) vs serial 97.00 s
+(95.66-99.73)** — the pre-registered rule (median wall, tie → serial)
+decides without mid-tier samples; `pyproject.toml` addopts stay
+`-n 12 --dist=loadgroup`.  The issue's serial-favouring estimate (fast-tier
+compute ~11 s) measured as ~87 s serial CPU for the marked-down population;
+the >2 s cutoff retains 144 genuinely costly tests' worth of mid-weight
+items the >10 s estimate excluded.
+
+**Monitoring-surface adjudication (risk 1):** the xdist run summary does
+**not** aggregate worker-side deselected counts (serial listings show "N
+deselected"; xdist summaries omit the count entirely — verified on all
+samples).  Per the pre-registered fallback, full-tier runs are judged by
+the formal要件 "deselected = 0 (absent) and full-population passed", the
+collect-only probes carry the tier counts, and no fast-tier run claims
+completeness from its summary line.
+
+**Upgrade adjudication and the startup transient.** The winning-form
+samples' K=3 per-test medians flagged 20 unmarked tests at 6.2-14.6 s.
+A deselect probe proved these readings are a **positional xdist startup
+transient**, not intrinsic cost: deselecting the 20 moved the 12-17 s
+readings wholesale onto the new bin-head tests — including a test whose
+intrinsic cost is 0.02 s reading 16.90 s.  Every xdist run pays this
+transient once per scheduling bin (~12-17 s absorbed by each bin's first
+tests); it is already inside the 50.5 s wall and excluded from
+`fast_predicted_wall_s` by construction (true while the transient-carrying
+bin heads stayed slow-marked; after the gen-4 correction the standing fast
+listings' then-current bin heads contribute their transient again — see
+the gen-4 regen paragraph).  The 20 were nevertheless marked
+`slow` (`cost:` reasons, commit `ab6812b`) per the pre-registered rule —
+the safe, reversible direction — with the documented consequence that the
+transient follows bin position: a post-review re-measurement flagged the
+new bin heads (below), and the ratchet had no mechanical exit.  The
+follow-up was adjudicated by the user (2026-11-11 "option 2"): the
+automated fast→slow gate is removed from `tools/make_scheduling_weights.py`
+(markers are human-owned declarations; cost verification is carried by the
+weights-regen rule), the transition freeze is lifted, and the 20 marks
+were re-measured via the pinned transitional batch protocol and corrected
+by hand (outcome below).  The once-registered transient-aware-gate backlog
+entry is superseded — the batch protocol is the standing measurement
+de-pollution method.
+
+**Correction of the 20 marks (2026-11-11, option-2 adjudication).**  The 20
+candidates were re-measured via the pinned transitional batch protocol:
+three `-m slow` full-tier samples over the 202-test slow tier
+(`scratchpad/task-suite-tier/step10/slow_batch_{1,2,3}.log`, 202 passed ×3,
+~357 s wall each; window load 1.8 rising to 22-23 across samples — recorded;
+the split is bimodal with no candidate near the 2 s boundary, so the load
+anomaly cannot flip any decision).  K=3 medians: **10 candidates read
+0.05-0.97 s** — the original 6-14 s fast-listing readings were pure
+bin-head transients (e.g. `test_azimuth_symmetry` 14.36 s → 0.06 s) — and
+their markers were deleted, restoring them to the fast tier; **10
+candidates read 11.03-20.53 s, stable across samples** — genuinely heavy
+(grid/render/SOS-class dome integration) — and keep their `slow` markers
+with reasons refreshed to cite the batch medians.  No candidate was
+unresolved, so no serial attribution run was needed.  Identity after the
+correction: 564 = 372 fast + 192 slow (565 = 373 + 192 once the gen-4
+window-red pinning test below is counted); marker-line census at the corrected
+head: `cost:` 36, `kind:grid` 73, `kind:render` 24, `kind:mc` 9,
+`kind:golden` 5 (module-level `pytestmark` on `test_mc.py` /
+`test_golden_equivalence.py` expands to the collected counts).
+
+**Weights regen (authoritative, 2026-11-11):** full listing
+`SKYCOLOR_FULL_SUITE=1 uv run pytest -q -n 12 --dist=loadgroup
+--durations=0 --durations-min=0` (465 s window, load rising to 18.5 —
+recorded; scheduling weights target the 12-worker form, contention
+inflation is their accepted semantics) + the three fast samples →
+`tests/data/scheduling_weights.json`: 12 module groups + 271 individual
+nodes (5109.2 s on that listing), `slow` mirror 201, **`fast_predicted_wall_s`
+26.4**
+(sum of unmarked fast-tier medians; informational only, no assertion
+consumes it; residuals: excludes worker startup/imbalance, contains
+contention-inflated per-test readings, sub-listing-cutoff tests contribute
+zero).  `--durations-min=0` is mandatory for the full listing: the first
+regen attempt with the bare `--durations=0` failed the reuse gate on 8
+tests whose intrinsic cost sits at the 5 ms listing cutoff (listed in
+fast-tier samples, hidden in the full listing) — the full listing must be
+exhaustive for the reuse gate to be exact (suite-recert learning applied).
+
+**Regen input-health checks (historical).**  Audit gate green after the
+adjudication marks (zero unmarked >2 s); reuse gate green; slow mirror
+equality green (live since this regen); accounting identity green.  A
+second authoritative regen
+(2026-11-11 12:15, full listing re-measured for the mirror delta after
+review-round additions) refreshed the table: 12 module groups + 271 nodes,
+4651.5 s total, **mirror 202**, `fast_predicted_wall_s` 26.4 — audit and
+reuse gates green on its inputs (the standing fast-tier authority samples;
+the fast population had not changed, only the slow tier grew by one).
+**The three fast-tier tool-unit tests added in the same review round fall in
+the accepted inter-regen blind spot (plan 待补全项 ①): unmeasured by the
+authority samples, invisible to the gate and the predicted sum.  The
+marker-policy audit gate referenced above was removed by the option-2
+adjudication (commit `87ca9c3`): marker placement is human-owned, and the
+identity / structural-consistency / reuse / mirror-equality checks remain
+as input-health validation, never marker policy.
+
+**Regen after the correction (gen 4, 2026-11-11).**  One flip-window full
+listing + three fresh fast-tier listings →
+`tests/data/scheduling_weights.json`: 12 module groups + 271 individual
+nodes, 4149.3 s total, **slow mirror 192** (re-derived from a fresh
+collection — current), **`fast_predicted_wall_s` 249.7**.  Input-health
+checks green (identity / structural consistency / reuse / mirror equality).
+The full listing was measured in the marker-change window: its sole failure
+is the mirror-equality guard (table mirror 202 vs live 192 before this
+regen) — the designed transition state, accepted by the full slot's named
+exception (commit `fc8f002`); any other failure still rejects.  The
+predicted sum now structurally includes the listing's own bin-head
+transient readings (~12-17 s each on the then-current scheduling heads):
+the previous 26.4 excluded them only because the transient-carrying heads
+were slow-marked by construction — with the correction those heads are
+honest fast-tier members again.  The metric stays informational (no
+assertion consumes it); the same tree's actual fast wall measured
+39.1-39.9 s (final verification below).  Window load 10-19 (full listing)
+/ 19-21 (fast samples) — recorded.
+
+**The ratchet fired live (2026-11-11 12:16-12:18).**  A post-review
+re-measurement of the fast tier (three samples over the 361-test population,
+`scratchpad/task-suite-tier/step8/fast2_*.log`) hit the audit gate on
+exactly 12 tests at medians 7.16-12.71 s — the NEW scheduling-bin heads
+predicted by the deselect probe, including a 0.02 s-intrinsic test reading
+12.71 s.  Marking them slow would start the removal spiral (~12 tests per
+regen cycle, no convergence); the table was kept and the set recorded as
+transient evidence.  This live firing is the recorded proof that the gate
+family measured bin position, not cost — the evidence base for the
+option-2 adjudication that removed the gate.  In the no-gate world the
+same readings reappear as inflated weights on the then-current bin heads
+inside fresh fast listings: expected artifacts of the transient, absorbed
+by the packing, never a marker instruction.
+
+**Caller inventory (default-entry semantics):** `validation/` and `tools/`
+contain no pytest invocation (`ruler_audit_recheck.py` mentions pytest only
+in a docstring); no CI configuration exists in the repo; the only in-repo
+pytest subprocess caller is the harness mini-runner itself (explicit args,
+explicit env); `validation.run_all` dispatches the six checks via
+`ProcessPoolExecutor` without pytest.  The tier split therefore has no
+silent victim among programmatic callers.
+
+**Formal pair protocol (unchanged semantics, explicit full tier):** the
+acceptance pair is taken on the full-tier entry —
+`SKYCOLOR_FULL_SUITE=1 uv run pytest -q -n 12 --dist=loadgroup`, full
+population passed ×2, zero skips, real xdist default parameters — recorded
+here when next taken; this task did not take a certification pair, and the
+quiet-window certification remains the separate backlog item.  The 360 s
+guard line and escalation clause continue to apply to full-tier pairs.
+
+**Issue-prose rewrites carried by this section** (all sourced): "exactly
+542 items" → identity + N_new chain (this task's own tests falsify the
+literal); "about 130 items" → 144 draft readings; "≈412 magnitude" → 358
+fast; "12-worker parallel measured ≤2 s" → target-form (xdist) caliber per
+the parallel-evidence learning; "budget assertion computed from the weights
+table" → authority-list medians (the ≤90 s aggregate assertion was dropped
+by user adjudication).  User adjudications of 2026-11-11 embodied here:
+drop the automated downgrade mechanism (reclassification is manual), drop
+the 90 s aggregate budget assertion (per-test ≤2 s enforced by the regen
+audit gate, aggregate stays informational), pin the explicit-nodeid yield
+semantics.  The follow-up **"option 2" adjudication** (2026-11-11, after
+the implement code-review budget fused at four rounds) is embodied in this
+section's current state: the automated fast→slow audit gate is removed
+(markers are human-owned declarations; cost verification = the
+weights-regen rule), the transition freeze is lifted, the 20 upgrade marks
+are corrected via the transitional batch protocol, and the
+transient-aware-gate backlog entry is superseded.
+
+**Final verification (this task, 2026-11-11):** fast tier 358 passed ×2
+(outer wall 62.50 / 56.70 s, window load 8-24), harness serial diagnostics
+41 passed (30.67 s); post-review-round verification on the refreshed table:
+fast tier 361 passed ×3 (pre-r3/r4-gate-tree) (outer wall 38.74 / 38.52 / 37.94 s — the
+tier-updated packing distributes startup cost better than the pre-tier
+table), full tier **563 passed, zero skips**, exit 0 (393.70 s); r3/r4
+gate-hardening commits added tests after those runs, so the
+**delivered-HEAD verification** re-ran the chain: harness serial 47
+passed, fast tier 363 passed (38.48 s wall), full tier **565 passed,
+zero skips**, exit 0 (390.74 s, window load 2.6→10).  Attributions, per run: the 62.50 / 56.70 s pair sat
+above the 50.5 s form-measurement median under a loaded window (1-min load
+8→24) — recorded attribution per the measurement-window protocol,
+informational only (no aggregate assertion exists by adjudication); the
+38.74 / 38.52 / 37.94 s triple ran on the refreshed (tier-updated) packing;
+the 393.70 s full-tier run compares against the 465 s authoritative
+full-suite measurement, whose extra time over 393 s is the exhaustive
+`--durations-min=0` listing overhead plus its own climbing window load.
+
+**Final verification (gen 4 correction, 2026-11-11, HEAD `fc8f002`):**
+harness serial diagnostics 47 passed (24.06 s); fast tier 373 passed ×2
+(50.22 / 51.50 s wall, window load ~12 — the AGENTS.md wall band spans
+this task's loaded and quiet windows); full tier **565 passed, zero
+skips, exit 0** (358.66 s, window load 16-20).  `git diff main...HEAD --
+skycolor/` empty; the `validation/` diff contains only this file;
+`validation/results.json` untouched; run_all not re-run (the caller
+inventory above shows it does not go through pytest).

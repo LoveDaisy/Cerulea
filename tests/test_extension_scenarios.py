@@ -69,6 +69,7 @@ class _BlackCarbonLike(aerosol.Aerosol):
         return m
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_absorbing_constituent_reaches_all_backends():
     """The absorbing layer changes the direct beam, the single-scattered sky,
     the SOS field and the Monte Carlo -- without touching any solver file."""
@@ -106,6 +107,7 @@ def test_absorbing_constituent_reaches_all_backends():
 # ---------------------------------------------------------------------------
 # (iii) balloon vs plateau: two distinct observer semantics
 # ---------------------------------------------------------------------------
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_balloon_and_plateau_are_distinct_constructions():
     """Balloon: observer raised, model domain still starts at sea level.
     Plateau: the model itself is truncated at the site (ground = site).
@@ -143,6 +145,7 @@ def test_balloon_and_plateau_are_distinct_constructions():
 # ---------------------------------------------------------------------------
 # (iv) shared preset parameter changes flow through replace, identities apart
 # ---------------------------------------------------------------------------
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_shared_preset_redefinition_is_isolated():
     from skycolor.aerosol import LogNormalMode
 
@@ -171,6 +174,7 @@ def test_shared_preset_redefinition_is_isolated():
 # ---------------------------------------------------------------------------
 # (v) one display path for clear and cloudy skies
 # ---------------------------------------------------------------------------
+@pytest.mark.slow(reason="kind:render - full-image / display integration is full-tier exclusive")
 def test_one_display_path_for_clear_and_cloud():
     layer = cloud.get_preset("stratus")
     atmo = presets.clear(WL)

@@ -143,6 +143,13 @@ _MINI_WEIGHTS = {
 # test_mini_b.py is deliberately absent from the table: unknown modules and
 # parametrized nodeids must still be scheduled (DEFAULT_WEIGHT_S path).
 
+# Slow-marker reason used by the tier-filter mini fixtures.  ``role:`` is
+# deliberately NOT one of the suite vocabulary prefixes (kind:/cost: are
+# reserved for real-suite tier declarations, docs/DEVELOPMENT.md); these
+# synthetic markers exist to exercise filter behavior, not to classify a
+# real test.
+_MINI_SLOW_REASON = "role:fixture - synthetic slow marker for tier-filter behavior tests"
+
 _RECORDER = '''\
 def _record(request):
     marker = request.node.get_closest_marker("xdist_group")
@@ -156,22 +163,32 @@ def _record(request):
 '''
 
 
-def _mini_project(root: pathlib.Path) -> pathlib.Path:
-    """Materialise the synthetic project wired to the real hook code."""
+def _mini_project(root: pathlib.Path, *, slow: bool = False) -> pathlib.Path:
+    """Materialise the synthetic project wired to the real hook code.
+
+    ``slow=True`` additionally adds slow-marked members for the tier-filter
+    behavior tests: one slow test inside the otherwise-fast ``test_mini_a.py``
+    (the bare-path boundary of the yield rule needs a mixed file) and the
+    all-slow module ``test_mini_slow.py``.  The default keeps the original
+    all-fast population the scheduling tests above assert on.
+    """
     root.mkdir(parents=True, exist_ok=True)
     (root / "conftest.py").write_text((TESTS_DIR / "conftest.py").read_text())
     (root / "scheduling.py").write_text((TESTS_DIR / "scheduling.py").read_text())
     weights = root / "mini_weights.json"
     weights.write_text(json.dumps(_MINI_WEIGHTS))
-    (root / "test_mini_a.py").write_text(
-        _RECORDER
-        + "\n\n"
-        + "\n\n".join(
-            f"def test_{name}(request):\n    _record(request)"
-            for name in ("alpha", "beta", "gamma")
-        )
-        + "\n"
+    header = "import pytest\n\n\n" if slow else ""
+    alpha_tests = "\n\n".join(
+        f"def test_{name}(request):\n    _record(request)"
+        for name in ("alpha", "beta", "gamma")
     )
+    if slow:
+        alpha_tests += (
+            "\n\n\n"
+            + f'@pytest.mark.slow(reason="{_MINI_SLOW_REASON}")\n'
+            + "def test_slow_member(request):\n    _record(request)"
+        )
+    (root / "test_mini_a.py").write_text(header + _RECORDER + "\n\n" + alpha_tests + "\n")
     (root / "test_mini_b.py").write_text(
         "import pytest\n\n\n"
         + _RECORDER
@@ -188,11 +205,32 @@ def _mini_project(root: pathlib.Path) -> pathlib.Path:
         )
         + "\n"
     )
+    if slow:
+        (root / "test_mini_slow.py").write_text(
+            "import pytest\n\n\n"
+            + _RECORDER
+            + "\n\n"
+            + "\n\n".join(
+                f'@pytest.mark.slow(reason="{_MINI_SLOW_REASON}")\n'
+                f"def test_slow_{name}(request):\n    _record(request)"
+                for name in ("one", "two")
+            )
+            + "\n"
+        )
     return weights
 
 
-def _run_mini(root: pathlib.Path, weights: pathlib.Path, *args: str):
-    env = dict(os.environ, **{scheduling.WEIGHTS_ENV: str(weights)})
+def _run_mini(root: pathlib.Path, weights: pathlib.Path, *args: str, full_suite=None):
+    """Run pytest in the mini project with an explicitly constructed tier env.
+
+    ``SKYCOLOR_FULL_SUITE`` is always set or deleted here, never inherited:
+    the host session may carry it (e.g. under the full-suite entry point) and
+    inheriting it would silently flip the scenario under test.
+    """
+    env = {k: v for k, v in os.environ.items() if k != scheduling.FULL_SUITE_ENV}
+    env[scheduling.WEIGHTS_ENV] = str(weights)
+    if full_suite is not None:
+        env[scheduling.FULL_SUITE_ENV] = full_suite
     return subprocess.run(
         [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", *args],
         cwd=root, env=env, capture_output=True, text=True, timeout=180,
@@ -308,6 +346,490 @@ def test_weights_refresh_round_trips_loadgroup_report_ids(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# two-tier suite: slow filter policy (task-suite-tier Step 1)
+# ---------------------------------------------------------------------------
+def test_tier_policy_helpers_priority(monkeypatch):
+    # Priority: explicit -m / -k / :: nodeid > full-suite env > default fast.
+    import types
+
+    def cfg(markexpr="", keyword="", args=()):
+        return types.SimpleNamespace(
+            option=types.SimpleNamespace(markexpr=markexpr, keyword=keyword),
+            args=list(args),
+        )
+
+    assert scheduling.full_suite_selected() is (os.environ.get(
+        scheduling.FULL_SUITE_ENV, "") not in ("", "0"))
+    # The scenarios below need the env out of the way; the fixture restores
+    # it afterwards.  The subprocess-level scenarios construct their own env.
+    monkeypatch.delenv(scheduling.FULL_SUITE_ENV, raising=False)
+    assert scheduling.fast_tier_active(cfg())
+    for yielded in (
+        cfg(markexpr="slow"),
+        cfg(keyword="slow"),
+        cfg(args=["tests/x.py::test_t"]),
+    ):
+        assert scheduling.slow_filter_yields(yielded)
+        assert not scheduling.fast_tier_active(yielded)
+    # bare paths / directories are not explicit test selections
+    assert not scheduling.slow_filter_yields(cfg(args=["tests/x.py", "tests/"]))
+    assert scheduling.fast_tier_active(cfg(args=["tests/x.py"]))
+    monkeypatch.setenv(scheduling.FULL_SUITE_ENV, "1")
+    assert scheduling.full_suite_selected()
+    assert not scheduling.fast_tier_active(cfg())
+    for value in ("", "0"):
+        monkeypatch.setenv(scheduling.FULL_SUITE_ENV, value)
+        assert not scheduling.full_suite_selected()
+        assert scheduling.fast_tier_active(cfg())
+
+
+_FAST_MINI_IDS = {
+    "test_mini_a.py::test_alpha",
+    "test_mini_a.py::test_beta",
+    "test_mini_a.py::test_gamma",
+    "test_mini_b.py::test_case[x]",
+    "test_mini_b.py::test_case[y]",
+    "test_mini_hot.py::test_heavy_one",
+    "test_mini_hot.py::test_heavy_two",
+}
+_SLOW_MINI_IDS = {
+    "test_mini_a.py::test_slow_member",
+    "test_mini_slow.py::test_slow_one",
+    "test_mini_slow.py::test_slow_two",
+}
+
+
+# (a) env unset, plain invocation: slow members deselected, fast members run.
+@pytest.mark.slow(reason="cost: mini-project pytest subprocess scenario (~2-4 s each); estimated, pre-tier marking")
+def test_tier_filter_default_fast_tier_deselects_slow(tmp_path):
+    weights = _mini_project(tmp_path, slow=True)
+    proc = _run_mini(tmp_path, weights)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    records = _read_results(tmp_path)
+    assert set(records) == _FAST_MINI_IDS
+    assert "3 deselected" in proc.stdout
+
+
+# (b) env=1: every collected test runs, none deselected.
+@pytest.mark.slow(reason="cost: mini-project pytest subprocess scenario (~2-4 s each); estimated, pre-tier marking")
+def test_tier_filter_full_suite_env_runs_everything(tmp_path):
+    weights = _mini_project(tmp_path, slow=True)
+    proc = _run_mini(tmp_path, weights, full_suite="1")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    records = _read_results(tmp_path)
+    assert set(records) == _FAST_MINI_IDS | _SLOW_MINI_IDS
+    assert "deselected" not in proc.stdout
+
+
+# (c) env unset + -m slow: the filter yields; only slow-marked tests run.
+@pytest.mark.slow(reason="cost: mini-project pytest subprocess scenario (~2-4 s each); estimated, pre-tier marking")
+def test_tier_filter_markexpr_slow_yields(tmp_path):
+    weights = _mini_project(tmp_path, slow=True)
+    proc = _run_mini(tmp_path, weights, "-m", "slow")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    records = _read_results(tmp_path)
+    assert set(records) == _SLOW_MINI_IDS
+
+
+# (d) env unset + xdist: workers inherit the env, deselect on their side, and
+# pack the surviving (fast) population into coherent bins.
+@pytest.mark.slow(reason="cost: mini-project xdist subprocess scenario (~4-6 s); estimated, pre-tier marking")
+def test_tier_filter_xdist_workers_deselect_and_pack_survivors(tmp_path):
+    weights = _mini_project(tmp_path, slow=True)
+    proc = _run_mini(tmp_path, weights, "-n", "2", "--dist=loadgroup")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    records = _read_results(tmp_path)
+    assert set(records) == _FAST_MINI_IDS, "slow members must never execute"
+    expected = scheduling.assign_bins(sorted(records), 2, weights_path=weights)
+    for nodeid, (_worker, group) in records.items():
+        assert group == f"bin{expected[nodeid]}", nodeid
+    assert len({w for w, _g in records.values()}) >= 2, "both workers used"
+
+
+# (e) env unset + -k matching slow members: same yield family as -m.
+@pytest.mark.slow(reason="cost: mini-project pytest subprocess scenario (~2-4 s each); estimated, pre-tier marking")
+def test_tier_filter_keyword_expression_yields(tmp_path):
+    weights = _mini_project(tmp_path, slow=True)
+    proc = _run_mini(tmp_path, weights, "-k", "slow")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    records = _read_results(tmp_path)
+    assert set(records) == _SLOW_MINI_IDS
+
+
+# (g) xdist + -m slow: the yield engages on the worker side (the
+# reclassification measurement path runs exactly this shape under the
+# default addopts), so only slow-marked tests execute and each is
+# scheduled normally.
+@pytest.mark.slow(reason="cost: mini-project xdist subprocess scenario (~4-6 s); estimated, pre-tier marking")
+def test_tier_filter_xdist_markexpr_yields_on_workers(tmp_path):
+    weights = _mini_project(tmp_path, slow=True)
+    proc = _run_mini(tmp_path, weights, "-n", "2", "--dist=loadgroup", "-m", "slow")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    records = _read_results(tmp_path)
+    assert set(records) == _SLOW_MINI_IDS
+    assert len({w for w, _g in records.values()}) >= 2, "both workers used"
+
+
+# (f) nodeid yield boundary, both sides: an explicit :: nodeid runs even when
+# slow; a bare path keeps the fast filter (its slow member is deselected and
+# the fact is visible on the summary line).
+@pytest.mark.slow(reason="cost: mini-project pytest subprocess scenario (~2-4 s each); estimated, pre-tier marking")
+def test_tier_filter_explicit_nodeid_yields(tmp_path):
+    weights = _mini_project(tmp_path, slow=True)
+    proc = _run_mini(tmp_path, weights, "test_mini_slow.py::test_slow_one")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    records = _read_results(tmp_path)
+    assert set(records) == {"test_mini_slow.py::test_slow_one"}
+
+
+@pytest.mark.slow(reason="cost: mini-project pytest subprocess scenario (~2-4 s each); estimated, pre-tier marking")
+def test_tier_filter_bare_path_keeps_fast_filter(tmp_path):
+    weights = _mini_project(tmp_path, slow=True)
+    proc = _run_mini(tmp_path, weights, "test_mini_a.py")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    records = _read_results(tmp_path)
+    assert set(records) == {
+        "test_mini_a.py::test_alpha",
+        "test_mini_a.py::test_beta",
+        "test_mini_a.py::test_gamma",
+    }
+    assert "1 deselected" in proc.stdout
+
+
+# ---------------------------------------------------------------------------
+# weights-regeneration tool: tier extension (task-suite-tier Step 3)
+# ---------------------------------------------------------------------------
+def test_weights_tool_fast_medians_median_of_available_readings():
+    # median over available readings; single-reading samples use that value
+    medians = WEIGHTS_TOOL.fast_medians([
+        {"tests/test_a.py::test_ok": 1.0, "tests/test_a.py::test_marked": 5.0,
+         "tests/test_a.py::test_over": 2.1},
+        {"tests/test_a.py::test_ok": 1.5, "tests/test_a.py::test_marked": 5.0,
+         "tests/test_a.py::test_over": 3.0},
+        {"tests/test_a.py::test_ok": 1.2, "tests/test_a.py::test_marked": 5.0,
+         "tests/test_a.py::test_over": 2.5},
+    ])
+    assert medians["tests/test_a.py::test_ok"] == pytest.approx(1.2)
+    assert medians["tests/test_a.py::test_marked"] == pytest.approx(5.0)
+    # boundary convention: a value exactly at a threshold is that value
+    at_boundary = WEIGHTS_TOOL.fast_medians(
+        [{"t::x": 2.0}, {"t::x": 2.0}, {"t::x": 2.0}])
+    assert at_boundary["t::x"] == pytest.approx(2.0)
+
+
+def test_weights_tool_predicted_wall_sums_unmarked_medians():
+    medians = {
+        "tests/test_a.py::test_one": 1.0,
+        "tests/test_a.py::test_two": 0.5,
+        "tests/test_a.py::test_marked": 60.0,
+    }
+    # a test without any reading in any listing never enters the dict at all,
+    # so it contributes zero by construction (sub-cutoff convention)
+    predicted = WEIGHTS_TOOL.predicted_wall_s(
+        medians, {"tests/test_a.py::test_marked"})
+    assert predicted == pytest.approx(1.5)  # marked entries contribute 0
+
+
+def test_weights_tool_list_identity_by_content():
+    full_text = (
+        "3.00s call     tests/test_a.py::t1@bin5\n"
+        "======== 558 passed in 400.00s ==========\n"
+    )
+    # serial fast listing: carries the deselected summary
+    fast_text = (
+        "1.00s call     tests/test_a.py::t1\n"
+        "======== 358 passed, 201 deselected in 55.00s ==========\n"
+    )
+    # xdist fast listing: xdist does not aggregate worker-side deselected
+    # counts into the summary (suite-tier step5 finding) — absence is valid
+    xdist_fast_text = (
+        "1.00s call     tests/test_a.py::t1@bin1\n"
+        "======== 358 passed, 1 warning in 50.36s ==========\n"
+    )
+    # identity is judged by the summary content, not the filename
+    assert WEIGHTS_TOOL.validate_list_identity("full (arg 1)", full_text) == (558, 0)
+    assert WEIGHTS_TOOL.validate_list_identity("fast1 (arg 2)", xdist_fast_text) == (358, 0)
+    # ...but BOTH slots demand the target-form (12-worker loadgroup)
+    # evidence: a serial fast listing mixes calibers into the medians
+    with pytest.raises(SystemExit, match="target form"):
+        WEIGHTS_TOOL.validate_list_identity("fast1 (arg 2)", fast_text)
+    # a listing that explicitly reports deselected tests is never a full
+    # listing, regardless of its suffixes
+    with pytest.raises(SystemExit, match="not a full-suite"):
+        WEIGHTS_TOOL.validate_list_identity(
+            "full (arg 1)",
+            "1.00s call     tests/test_a.py::t1@bin1\n"
+            "======== 358 passed, 201 deselected in 55.00s ==========\n")
+    # an explicit zero deselected count means the filter never engaged
+    with pytest.raises(SystemExit, match="not a fast-tier"):
+        WEIGHTS_TOOL.validate_list_identity(
+            "fast1 (arg 2)",
+            "1.00s call     tests/test_a.py::t1@bin1\n"
+            "======== 358 passed, 0 deselected in 55s ======\n")
+    # a "deselected" substring inside a test NAME on a durations line must
+    # not reject a real xdist fast listing (the scan is tail-anchored)
+    poisoned_fast = (
+        "1.00s call     tests/test_x.py::test_9_deselected_cases@bin1\n"
+        "======== 358 passed, 1 warning in 50.36s ==========\n"
+    )
+    assert WEIGHTS_TOOL.validate_list_identity("fast1 (arg 2)", poisoned_fast) == (358, 0)
+    # a full/fast swap is caught structurally (population consistency and
+    # the reuse gate), not here: an xdist fast listing and a full listing have
+    # the same summary shape, so this check alone cannot separate them
+
+
+def test_weights_tool_red_and_skipped_runs_rejected():
+    suffix = "1.00s call     tests/test_a.py::t1@bin1\n"
+    # a red run is unusable as measurement authority — even when the passed
+    # counts happen to agree across all three fast samples
+    red_fast = suffix + "======== 357 passed, 1 failed in 55.00s ==========\n"
+    with pytest.raises(SystemExit, match="red run"):
+        WEIGHTS_TOOL.parse_summary(red_fast, "fast1 (arg 2)")
+    red_full = suffix + "======== 562 passed, 1 failed in 400.00s ==========\n"
+    with pytest.raises(SystemExit, match="red run"):
+        WEIGHTS_TOOL.validate_list_identity("full (arg 1)", red_full)
+    # the full tier is the zero-skip acceptance population
+    skipped_full = suffix + "======== 562 passed, 1 skipped in 400.00s ==========\n"
+    with pytest.raises(SystemExit, match="skipped"):
+        WEIGHTS_TOOL.validate_list_identity("full (arg 1)", skipped_full)
+    # green xdist fast and full listings pass
+    assert WEIGHTS_TOOL.validate_list_identity(
+        "fast1 (arg 2)", suffix + "======== 361 passed in 38.00s ==========") == (361, 0)
+
+
+def test_weights_tool_mirror_guard_window_red_accepted():
+    # the designed marker-change window: between a marker flip and the regen
+    # it feeds, the table's slow mirror lags the live markers, so the
+    # mirror-equality guard fails on every full-tier run.  A full listing
+    # whose sole failure is exactly that guard is legal authority input
+    # (the regen this listing feeds closes the window); anything else
+    # still rejects.
+    suffix = "1.00s call     tests/test_a.py::t1@bin1\n"
+    guard = ("tests/test_validation_harness.py::"
+             "test_tier_slow_mirror_matches_live_markers")
+    window_full = (
+        suffix
+        + f"FAILED {guard}@bin9\n"
+        + "======== 563 passed, 1 failed in 400.00s ==========\n")
+    assert WEIGHTS_TOOL.validate_list_identity(
+        "full (arg 1)", window_full) == (563, 0)
+    # a second, unrelated failure rejects again
+    two_failed = (
+        suffix
+        + f"FAILED {guard}@bin9\n"
+        + "FAILED tests/test_a.py::test_broken@bin2\n"
+        + "======== 562 passed, 2 failed in 400.00s ==========\n")
+    with pytest.raises(SystemExit, match="red run"):
+        WEIGHTS_TOOL.validate_list_identity("full (arg 1)", two_failed)
+    # a red summary with no FAILED lines at all (truncated output) rejects
+    bare_red = suffix + "======== 562 passed, 1 failed in 400.00s ==========\n"
+    with pytest.raises(SystemExit, match="red run"):
+        WEIGHTS_TOOL.validate_list_identity("full (arg 1)", bare_red)
+    # the fast slot never tolerates red: the mirror guard is slow-marked
+    # and cannot fail there, so no fast listing has a designed red state
+    with pytest.raises(SystemExit, match="red run"):
+        WEIGHTS_TOOL.validate_list_identity("fast1 (arg 2)", window_full)
+
+
+def test_weights_tool_population_consistency_structural_only():
+    ok_full = {"tests/test_a.py::t1": 3.0, "tests/test_b.py::t2": 2.0,
+               "tests/test_mc.py::m1": 20.0}
+    fast1 = {"tests/test_a.py::t1": 3.0, "tests/test_b.py::t2": 2.0}
+    fast2 = {"tests/test_a.py::t1": 3.0, "tests/test_b.py::t2b": 2.0}  # item drift: fine
+    WEIGHTS_TOOL.check_population_consistency(
+        ["full", "fast1", "fast2"], [3, 2, 2], [ok_full, fast1, fast2],
+        slow={"tests/test_mc.py::m1"})
+    # whole module missing from a fast listing -> structural
+    with pytest.raises(SystemExit, match="diverges"):
+        WEIGHTS_TOOL.check_population_consistency(
+            ["full", "fast1", "fast2"], [3, 1, 2],
+            [ok_full, {"tests/test_a.py::t1": 3.0}, fast2],
+            slow={"tests/test_mc.py::m1"})
+    # heavy module missing from the full listing -> structural
+    with pytest.raises(SystemExit, match="full listing"):
+        WEIGHTS_TOOL.check_population_consistency(
+            ["full", "fast1", "fast2"], [2, 2, 2],
+            [{"tests/test_a.py::t1": 3.0}, fast1, fast2],
+            slow=set())
+    # disagreeing passed counts -> partial run
+    with pytest.raises(SystemExit, match="passed counts"):
+        WEIGHTS_TOOL.check_population_consistency(
+            ["full", "fast1", "fast2"], [3, 2, 1], [ok_full, fast1, fast2])
+    # the full slot must cover the slow tier: a fast listing passed in
+    # the full slot (xdist summaries are shape-identical) fails here,
+    # not silently
+    with pytest.raises(SystemExit, match="slow tier"):
+        WEIGHTS_TOOL.check_population_consistency(
+            ["full", "fast1", "fast2"], [2, 2, 2],
+            [fast1, fast1, fast2], slow={"tests/test_mc.py::m1"})
+
+
+def test_weights_tool_module_boundary_drift_does_not_false_fail():
+    # A module whose entire content sits inside the ~5 ms listing-cutoff
+    # band (readings at/below BOUNDARY_BAND_S, presence drifting between
+    # samples under contention) is exempt from the structural comparison —
+    # only modules with a real (>band) best-evidence reading anywhere are
+    # compared.  A straddling module (a >band reading in some sample) is
+    # compared and its absence fires: honest fail-loud, rerun resolves it.
+    fast1 = {"tests/test_a.py::t1": 3.0, "tests/test_tiny.py::x": 0.01}
+    fast2 = {"tests/test_a.py::t1": 3.0}
+    fast3 = {"tests/test_a.py::t1": 3.0, "tests/test_tiny.py::x": 0.01}
+    WEIGHTS_TOOL.check_population_consistency(
+        ["full", "fast1", "fast2", "fast3"], [3, 2, 2, 2],
+        [{"tests/test_a.py::t1": 3.0, "tests/test_tiny.py::x": 0.01},
+         fast1, fast2, fast3])
+    # ...while a genuinely missing heavy module still fires
+    fast3_heavy_missing = {"tests/test_a.py::t1": 3.0}
+    fast1_heavy = {"tests/test_a.py::t1": 3.0, "tests/test_tiny.py::x": 0.01,
+                   "tests/test_heavy.py::t2": 2.0}
+    fast2_heavy = {"tests/test_a.py::t1": 3.0,
+                   "tests/test_heavy.py::t2": 2.0}
+    with pytest.raises(SystemExit, match="diverges"):
+        WEIGHTS_TOOL.check_population_consistency(
+            ["full", "fast1_heavy", "fast2_heavy", "fast3_heavy_missing"],
+            [3, 2, 2, 1],
+            [{"tests/test_a.py::t1": 3.0, "tests/test_tiny.py::x": 0.01,
+              "tests/test_heavy.py::t2": 2.0},
+             fast1_heavy, fast2_heavy, fast3_heavy_missing])
+
+
+def test_weights_tool_parse_summary_anchored_to_last_line():
+    # a durations line whose test name embeds "N passed" must not poison
+    # the count extraction: only the final summary line is parsed
+    text = (
+        "0.02s call     tests/test_x.py::test_2_passed_states@bin0\n"
+        "======== 559 passed, 3 warnings in 400.00s ==========\n"
+    )
+    assert WEIGHTS_TOOL.parse_summary(text) == (559, 0)
+    text_ds = (
+        "1.00s call     tests/test_y.py::test_9_deselected_cases\n"
+        "======== 358 passed, 201 deselected in 55.00s ==========\n"
+    )
+    assert WEIGHTS_TOOL.parse_summary(text_ds) == (358, 201)
+    with pytest.raises(SystemExit, match="summary line"):
+        WEIGHTS_TOOL.parse_summary("0.02s call     tests/test_z.py::test_1_passed\n")
+
+
+def test_weights_tool_full_listing_requires_loadgroup_evidence():
+    # the full-suite listing is measured under the constant 12-worker
+    # loadgroup form; a serial full listing would silently produce
+    # uncontended weights, so the slot demands @binN suffix evidence
+    serial_full = (
+        "3.00s call     tests/test_a.py::t1\n"
+        "======== 559 passed in 400.00s ==========\n"
+    )
+    with pytest.raises(SystemExit, match="loadgroup"):
+        WEIGHTS_TOOL.validate_list_identity("full (arg 1)", serial_full)
+    xdist_full = (
+        "3.00s call     tests/test_a.py::t1@bin3\n"
+        "======== 559 passed in 400.00s ==========\n"
+    )
+    assert WEIGHTS_TOOL.validate_list_identity("full (arg 1)", xdist_full) == (559, 0)
+
+
+def test_weights_tool_reuse_gate_full_must_cover_fast_readings():
+    full = {"tests/test_a.py::t1": 3.0}
+    medians = {
+        "tests/test_a.py::t1": 3.0,             # covered
+        "tests/test_a.py::new_heavy": 3.0,      # real reading, not in full -> fail
+        "tests/test_a.py::boundary": 0.01,      # 5 ms band -> tolerated
+    }
+    with pytest.raises(SystemExit, match="new_heavy"):
+        WEIGHTS_TOOL.reuse_gate(full, medians)
+    del medians["tests/test_a.py::new_heavy"]
+    WEIGHTS_TOOL.reuse_gate(full, medians)  # boundary + absent items tolerated
+
+
+def test_weights_tool_prune_drops_deleted_tests_readings():
+    # a once-measured test deleted from the tree keeps a reading in the
+    # standing authority samples; pruning to the live population removes it
+    # so the reuse gate cannot demand an impossible fresh full listing
+    live = {"tests/test_a.py::t1", "tests/test_a.py::t2"}
+    totals = [{"tests/test_a.py::t1": 3.0, "tests/test_a.py::t2": 1.0,
+               "tests/test_a.py::deleted": 4.0}]
+    pruned = WEIGHTS_TOOL.prune_to_population(totals, live)
+    assert pruned[0] == {"tests/test_a.py::t1": 3.0, "tests/test_a.py::t2": 1.0}
+    # ...and a live test genuinely missing from the full listing still fires
+    medians = {"tests/test_a.py::t2": 3.0, "tests/test_a.py::deleted": 4.0}
+    with pytest.raises(SystemExit, match="t2"):
+        WEIGHTS_TOOL.reuse_gate({"tests/test_a.py::t1": 3.0},
+                                WEIGHTS_TOOL.fast_medians(
+                                    [{"tests/test_a.py::t2": 3.0}]))
+
+
+def test_weights_tool_payload_schema_is_backward_compatible(tmp_path):
+    full = {
+        "tests/test_light.py::t1": 1.0,
+        "tests/test_twilight.py::deep": 120.0,
+    }
+    payload = WEIGHTS_TOOL.build_payload(
+        full, {"tests/test_light.py::t1": 1.0}, {"tests/test_mc.py::m"})
+    assert set(payload["modules"]) == {"tests/test_light.py"}
+    assert payload["nodes"]["tests/test_twilight.py::deep"] == pytest.approx(120.0)
+    assert payload["slow"] == ["tests/test_mc.py::m"]
+    assert payload["fast_predicted_wall_s"] == pytest.approx(1.0)
+    table = tmp_path / "table.json"
+    table.write_text(json.dumps(payload))
+    modules, nodes = scheduling.load_weights(table)
+    assert modules == {"tests/test_light.py": 1.0}
+    assert nodes == {"tests/test_twilight.py::deep": 120.0}
+
+
+# ---------------------------------------------------------------------------
+# two-tier suite: full-tree guards (task-suite-tier Step 4)
+# ---------------------------------------------------------------------------
+def _collect_tree_nodeids(*args: str, full_suite=None):
+    """Real-tree collection via subprocess (``-n 0`` to keep the cost down).
+
+    ``SKYCOLOR_FULL_SUITE`` is always constructed explicitly, never
+    inherited, so the host session's tier cannot leak into the scenario.
+    """
+    env = {k: v for k, v in os.environ.items() if k != scheduling.FULL_SUITE_ENV}
+    if full_suite is not None:
+        env[scheduling.FULL_SUITE_ENV] = full_suite
+    proc = subprocess.run(
+        [sys.executable, "-m", "pytest", "--co", "-q", "-n", "0",
+         "-p", "no:cacheprovider", *args],
+        cwd=TESTS_DIR.parent, env=env, capture_output=True, text=True,
+        timeout=600)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    return {
+        line.strip() for line in proc.stdout.splitlines()
+        if "::" in line and not line.startswith("=")
+    }
+
+
+# Structural accounting over the real tree: full = fast ⊎ slow, mutually
+# exclusive and complete.  Deliberately no count literals and no reads of
+# task bookkeeping (both would turn this guard into a regression on every
+# new test); "the numbers match the recorded values" is a human check
+# against the task record and FAST_SUITE.md.
+@pytest.mark.slow(reason="cost: three real-tree pytest collections per run (~5 s); estimated, pre-tier marking")
+def test_tier_accounting_full_equals_fast_union_slow():
+    fast = _collect_tree_nodeids()
+    full = _collect_tree_nodeids(full_suite="1")
+    slow = _collect_tree_nodeids("-m", "slow", full_suite="1")
+    assert full == fast | slow
+    assert not (fast & slow), "a test cannot be both tiers"
+    assert fast, "sanity: the fast tier is nonempty"
+    assert slow, "sanity: the slow tier is nonempty"
+
+
+# The table's slow mirror must equal the live markers whenever it exists —
+# a lagging mirror means markers changed without the mandated re-measure +
+# regen cycle.  Until the first regeneration produces the field, the
+# equality is vacuous and skipped (the accounting guard above already
+# covers the tier structure).
+@pytest.mark.slow(reason="cost: one real-tree pytest collection per run (~2 s); estimated, pre-tier marking")
+def test_tier_slow_mirror_matches_live_markers():
+    data = json.loads(scheduling.WEIGHTS_PATH.read_text())
+    if "slow" not in data:
+        pytest.skip("weights table has no slow mirror yet (first regen pending)")
+    live = _collect_tree_nodeids("-m", "slow", full_suite="1")
+    assert set(data["slow"]) == live
+
+
+# ---------------------------------------------------------------------------
 # validation atmosphere reuse (Step 3)
 # ---------------------------------------------------------------------------
 @pytest.fixture(autouse=True)
@@ -355,6 +877,7 @@ def test_at_altitude_returns_independent_truncation():
     assert float(atmo.r_bounds[0]) == ground
 
 
+@pytest.mark.slow(reason="cost: 12-worker parallel 17.0 s (cold-optics listing); fast-tier budget 2 s")
 def test_direct_case_never_calls_the_diffuse_solver(monkeypatch):
     import validation.check2_illuminance as c2
 
@@ -367,6 +890,7 @@ def test_direct_case_never_calls_the_diffuse_solver(monkeypatch):
     assert set(d) == {"dni", "e_dni", "e_horiz", "atmo"}
 
 
+@pytest.mark.slow(reason="cost: 12-worker parallel 17.1 s (cold-optics listing); fast-tier budget 2 s")
 def test_model_case_calls_the_diffuse_solver_exactly_once(monkeypatch):
     import validation.check2_illuminance as c2
 

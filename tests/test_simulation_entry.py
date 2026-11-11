@@ -56,6 +56,7 @@ def stratus():
 # ---------------------------------------------------------------------------
 # 1. the four approximations are reachable and closed
 # ---------------------------------------------------------------------------
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_spherical_single_reachable_and_closed(atmo7):
     res = solve(atmo7, 60.0, VZA, 90.0, approximation="spherical-single")
     ref = single.sky_radiance(atmo7, 60.0, VZA, 90.0)
@@ -74,6 +75,7 @@ def test_spherical_single_rejects_explicit_multiple(atmo7):
               multiple=True)
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_plane_sos_matches_direct_kernel_call(atmo7):
     res = solve(atmo7, 60.0, VZA, 90.0, approximation="plane-sos")
     sos = multiple.solve(atmo7, 60.0, VZA, 90.0, single_view=True)
@@ -87,6 +89,7 @@ def test_plane_sos_matches_direct_kernel_call(atmo7):
     assert res.method == "clear"
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_plane_sos_order_selection(atmo7):
     sos = multiple.solve(atmo7, 60.0, VZA, 90.0, single_view=True)
     res_ss = solve(atmo7, 60.0, VZA, 90.0, approximation="plane-sos",
@@ -99,6 +102,7 @@ def test_plane_sos_order_selection(atmo7):
     assert res_ms.components["single"] is None
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_plane_sos_single_only_still_one_sos_run(atmo7, monkeypatch):
     """single-only plane-sos takes the explicit existing-kernel cost: the
     full SOS runs once with single_view and the first order is extracted."""
@@ -120,6 +124,7 @@ def test_plane_sos_single_only_still_one_sos_run(atmo7, monkeypatch):
     assert calls == {"sos": 1, "single": 0}
 
 
+@pytest.mark.slow(reason="cost: slow-tier batch K=3 median 17.51 s (2026-11-11 transitional protocol, task-suite-tier step10); fast-tier budget 2 s")
 def test_sos_config_reaches_kernel(atmo7):
     res = solve(atmo7, 60.0, VZA, 90.0, approximation="plane-sos",
                 sos_config=SOSConfig(n_mu=8, max_orders=3, tol=0.5))
@@ -128,6 +133,7 @@ def test_sos_config_reaches_kernel(atmo7):
     assert np.array_equal(res.radiance, sos.radiance_single + sos.radiance)
 
 
+@pytest.mark.slow(reason="kind:mc - Monte-Carlo statistical convergence is full-tier exclusive")
 def test_spherical_mc_reachable(atmo7):
     res = solve(atmo7, 96.0, ZEN_TW, AZ_TW, approximation="spherical-mc",
                 mc_config=MCConfig(quality="low", seed=0, grid=TINY))
@@ -140,6 +146,7 @@ def test_spherical_mc_reachable(atmo7):
     assert res.effective["mc"]["seed"] == 0
 
 
+@pytest.mark.slow(reason="kind:mc - Monte-Carlo statistical convergence is full-tier exclusive")
 def test_mc_seed_reaches_the_stream(atmo7):
     kw = dict(approximation="spherical-mc",
               mc_config=MCConfig(quality="low", grid=TINY))
@@ -152,6 +159,7 @@ def test_mc_seed_reaches_the_stream(atmo7):
 # ---------------------------------------------------------------------------
 # 2. hybrid-sos: one single call + one SOS call, legacy parity
 # ---------------------------------------------------------------------------
+@pytest.mark.slow(reason="cost: slow-tier batch K=3 median 20.53 s (2026-11-11 transitional protocol, task-suite-tier step10); fast-tier budget 2 s")
 def test_hybrid_matches_legacy_wrapper_bitwise(atmo7):
     res = solve(atmo7, 60.0, VZA, 90.0)
     ref = sky_radiance_total(atmo7, 60.0, VZA, 90.0)
@@ -191,6 +199,7 @@ def test_hybrid_calls_each_kernel_exactly_once(atmo7, monkeypatch):
 # ---------------------------------------------------------------------------
 # 3. request validation happens before any kernel runs
 # ---------------------------------------------------------------------------
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_method_aliases_and_conflicts(atmo7):
     res = solve(atmo7, 60.0, VZA, 90.0, method="clear",
                 approximation="hybrid-sos")
@@ -241,6 +250,7 @@ def test_invalid_requests_fail_before_kernels(atmo7, monkeypatch):
 # ---------------------------------------------------------------------------
 # 4. support-domain boundaries
 # ---------------------------------------------------------------------------
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_plane_terms_require_bottom_observer(atmo7):
     balloon = presets.clear(WL7)
     balloon.elevation_km = 2.0
@@ -257,6 +267,7 @@ def test_plane_terms_require_bottom_observer(atmo7):
     assert res.components["multiple"] is not None
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_horizontal_field_support_boundaries(atmo7):
     from skycolor.aerosol import HinterlandAerosol, shared
     from skycolor.atmosphere import AerosolLayer, ExponentialProfile, \
@@ -281,6 +292,7 @@ def test_horizontal_field_support_boundaries(atmo7):
 # ---------------------------------------------------------------------------
 # 5. effective settings are kernel truth, request values stay in options
 # ---------------------------------------------------------------------------
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_effective_settings_match_kernel_clamps(atmo7):
     res = solve(atmo7, 60.0, VZA, 90.0,
                 sos_config=SOSConfig(n_mu=33, n_moments=64, tol=1e-2))
@@ -293,6 +305,7 @@ def test_effective_settings_match_kernel_clamps(atmo7):
     assert res.options["approximation"] == "hybrid-sos"
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_default_options_bookkeeping_superset(atmo7):
     res = solve(atmo7, 80.0, 60.0, 120.0)
     assert {"sun_zenith_deg", "sun_azimuth_deg", "single", "multiple",
@@ -302,6 +315,7 @@ def test_default_options_bookkeeping_superset(atmo7):
 # ---------------------------------------------------------------------------
 # 6. MC consolidation: the solver assembles single + multiple_scattered
 # ---------------------------------------------------------------------------
+@pytest.mark.slow(reason="kind:mc - Monte-Carlo statistical convergence is full-tier exclusive")
 def test_mc_route_matches_direct_composition(atmo7):
     res = solve(atmo7, 96.0, ZEN_TW, AZ_TW, approximation="spherical-mc",
                 mc_config=MCConfig(quality="low", seed=0, grid=TINY))
@@ -314,6 +328,7 @@ def test_mc_route_matches_direct_composition(atmo7):
     assert np.array_equal(res.stderr, err)
 
 
+@pytest.mark.slow(reason="kind:mc - Monte-Carlo statistical convergence is full-tier exclusive")
 def test_mc_route_calls_kernels_exactly_once(atmo7, monkeypatch):
     import skycolor.rt.solver as solver
 
@@ -349,6 +364,7 @@ def test_mc_single_only_keeps_legacy_zero_error(atmo7):
     assert res.components["multiple"] is None
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_twilight_wrapper_scalar_array_broadcast(atmo7):
     """scalar zenith + array azimuth keeps the historical wrapper contract
     and is bitwise identical to the explicit array request."""
@@ -508,6 +524,7 @@ def test_overlay_honors_sos_config(atmo7, stratus):
 # ---------------------------------------------------------------------------
 # 8. H3 invariants: media/caching/restriction/render seam through the entry
 # ---------------------------------------------------------------------------
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_same_medium_reentry_is_stable(atmo7):
     """Repeated solve() calls on one medium are bitwise identical (no
     per-call drift from shared caches), for a deterministic and an MC
@@ -523,6 +540,7 @@ def test_same_medium_reentry_is_stable(atmo7):
     assert np.array_equal(m1.stderr, m2.stderr)
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_independent_construction_same_result():
     """Two independently built (equal) media give bitwise equal results."""
     a1 = presets.clear(WL7, aod=0.05)
@@ -548,6 +566,7 @@ def test_restrict_column_consistency(atmo7):
     assert np.array_equal(sub_ss, full_ss[:, idx])
 
 
+@pytest.mark.slow(reason="cost: slow-tier batch K=3 median 20.50 s (2026-11-11 transitional protocol, task-suite-tier step10); fast-tier budget 2 s")
 def test_render_default_path_reaches_the_entry(atmo7):
     """render.sky_radiance_grid (no radiance_field) is bit-identical to the
     authoritative entry -- the display layer rides the thin wrapper."""
@@ -613,6 +632,7 @@ def test_settings_for_kernels_that_will_not_run_are_rejected(atmo7, stratus):
               include_clear=False, sos_config=SOSConfig(n_mu=8))
 
 
+@pytest.mark.slow(reason="kind:mc - Monte-Carlo statistical convergence is full-tier exclusive")
 def test_mc_records_actual_single_settings(atmo7):
     """spherical-mc with a non-default single config: the request values
     land in options AND the effective record."""
@@ -623,6 +643,7 @@ def test_mc_records_actual_single_settings(atmo7):
     assert res.effective["single"] == {"n_gauss": 2, "chunk": 64}
 
 
+@pytest.mark.slow(reason="kind:mc - Monte-Carlo statistical convergence is full-tier exclusive")
 def test_mc_effective_reports_what_ran_not_what_was_asked():
     """Anchor dedup and per-direction photon rounding are engine facts:
     a single-wavelength model collapses n_anchor=5 to one anchor, and a
@@ -652,6 +673,7 @@ def test_sos_records_optics_and_transport_moment_counts(atmo7):
     assert sos_eff["n_mu"] == 4
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_refraction_state_recorded_not_assumed(atmo7):
     """The per-component record carries the actual solar-side refraction
     switch; a result must not claim a refraction treatment that did not
@@ -700,6 +722,7 @@ def test_horizontal_field_unused_by_the_plan_is_rejected(atmo7, monkeypatch):
               clear_radiance=np.zeros((ZEN_C.size, WL7.size)))
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_view_domain_is_the_public_sky_domain(atmo7, monkeypatch):
     """[0, 90] deg exactly: the horizon keeps the kernel clipping, anything
     below it fails before any kernel runs."""
@@ -747,6 +770,7 @@ def test_mc_single_only_records_its_settings(atmo7, monkeypatch):
     assert np.all(res.stderr == 0.0)
 
 
+@pytest.mark.slow(reason="kind:mc - Monte-Carlo statistical convergence is full-tier exclusive")
 def test_mc_effective_grid_sizes_are_what_ran():
     """_coarse_grid clamps the angular sizes (min 2 each): effective
     reports the grid the engine built, consistent with coarse_zenith."""
@@ -763,6 +787,7 @@ def test_mc_effective_grid_sizes_are_what_ran():
     assert res.diagnostics["n_zen"] == 1 and res.diagnostics["n_az"] == 1
 
 
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_cloud_overlay_warns_for_field_even_without_higher_orders(atmo7):
     """The cloud two-stream is another field-blind component: an overlay
     over a single-only clear base still emits the one partial-support
@@ -786,6 +811,7 @@ def test_cloud_overlay_warns_for_field_even_without_higher_orders(atmo7):
 # ---------------------------------------------------------------------------
 # 11. review round 3: cloud observer at the model bottom, albedo record
 # ---------------------------------------------------------------------------
+@pytest.mark.slow(reason="kind:grid - large-grid / full-solve integration is full-tier exclusive")
 def test_cloud_requests_require_the_model_bottom_observer(atmo7, stratus):
     """Plan 3.4: the deck composition is a view from the model bottom,
     below the cloud base -- on every cloud path, whatever clear kernels
