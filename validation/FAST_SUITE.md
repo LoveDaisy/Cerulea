@@ -474,7 +474,11 @@ semantics.
 41 passed (30.67 s); post-review-round verification on the refreshed table:
 fast tier 361 passed ×3 (pre-r3/r4-gate-tree) (outer wall 38.74 / 38.52 / 37.94 s — the
 tier-updated packing distributes startup cost better than the pre-tier
-table), full tier **563 passed, zero skips**, exit 0 (393.70 s).  Attributions, per run: the 62.50 / 56.70 s pair sat
+table), full tier **563 passed, zero skips**, exit 0 (393.70 s); r3/r4
+gate-hardening commits added tests after those runs, so the
+**delivered-HEAD verification** re-ran the chain: harness serial 47
+passed, fast tier 363 passed (38.48 s wall), full tier **565 passed,
+zero skips**, exit 0 (390.74 s, window load 2.6→10).  Attributions, per run: the 62.50 / 56.70 s pair sat
 above the 50.5 s form-measurement median under a loaded window (1-min load
 8→24) — recorded attribution per the measurement-window protocol,
 informational only (no aggregate assertion exists by adjudication); the
