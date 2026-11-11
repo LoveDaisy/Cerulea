@@ -179,8 +179,9 @@ AGENTS.md test-section counts and wall band in the same sync (the AGENTS
 numbers are entry-point literals and rot silently otherwise).  The formal
 wall-clock pair for acceptance is taken on the **full tier** entry
 (`SKYCOLOR_FULL_SUITE=1 …`, full population ×2, zero skips); quiet-window
-certification remains a separate backlog item.  The 360 s guard line and
-its escalation clause live in FAST_SUITE.md.
+certification remains a separate backlog item.  The wall guard attaches to the **fast dev-loop tier** (owner ruling
+2026-11-11): the fast tier's wall is the regression-line subject; the
+full-tier wall is recorded in FAST_SUITE.md without a line.
 
 ## Commit and merge locally
 

@@ -53,7 +53,9 @@ pytest-internal 257.26 / 256.01) —
 strictly under the 300 s line twice in a row, so the windowed acceptance the
 owner granted (see the adjudication note at the bottom of this file) is no
 longer needed for the current pair; the adjudication's regression clause
-(any suite stably exceeding 6 min is escalated) remains the standing guard.
+(any suite stably exceeding 6 min is escalated) remained the standing guard
+until the 2026-11-11 owner disposition moved the line to the fast dev-loop
+tier (see the quiet-window certification section at the bottom of this file).
 
 ## Later tree: architecture consolidation (2026-11-08)
 
@@ -233,6 +235,9 @@ as kernel-side wait — an attribution made on the **ungrouped** path and
 not carried over as a settled claim about the current schedule.  The
 standing clauses: windowed acceptance may be revoked by the user, and any
 suite stably exceeding 6 min counts as a regression and is escalated.
+  [Superseded 2026-11-11 (owner): the 6-min line now attaches to the fast
+  dev-loop tier; the full tier is recorded without a wall line — see the
+  quiet-window certification section at the bottom of this file.]
 The post-fix pair (257.41 / 256.22 s outer wall) passes strictly, so the
 windowed
 interpretation is not exercised by the current acceptance evidence.
@@ -589,5 +594,11 @@ the population grew 542 -> 580 (+38 tests, mc-restrict-segv and suite-tier)
 at unchanged per-test cost (~0.69 s/test); per-test degradation is ruled
 out.  The disposition of the line (re-scale for the acceptance-gate tier /
 attach the wall line to the fast dev-loop tier / keep 360 s as aspiration)
-is escalated to the owner; the fast dev-loop tier measures 37.5 s on the
-same quiet machine, an order of magnitude inside any historical line.
+is resolved by the owner (2026-11-11): **the line moves to the fast
+dev-loop tier** — the full tier is the pre-merge acceptance gate and its
+wall (~400 s on this machine at 580 tests) is recorded without a line;
+the fast tier's 6-min guard has an order-of-magnitude margin (37.5 s
+measured on the same quiet machine, an order of magnitude inside any
+historical line).  Future full-tier wall growth is tracked through
+per-test cost (~0.69 s/test) and the DEVELOPMENT.md weight-regeneration
+rule rather than a wall line.
