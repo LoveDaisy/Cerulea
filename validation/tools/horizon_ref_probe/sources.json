@@ -1,0 +1,186 @@
+{
+  "task": "task-horizon-ref-probe",
+  "generated_local": "2026-11-11T20:06+08:00",
+  "purpose": "Source-screening record for the sun-side horizon/zenith independent-measurement probe (plan Step 1). Answers plan gate G0: does at least one public original measurement satisfy the pre-registered admission contract?",
+  "admission_contract": {
+    "main_adjudication_requires": [
+      "original paper (not second-hand, not model-generated data)",
+      "daytime clear sky: solar elevation > 0 deg, clear stated in the original",
+      "sun-side direction: |relative azimuth to sun| <= 5 deg",
+      "view elevation within [0 deg, 5 deg] (near-horizon points used at their actual direction/FOV, never extrapolated to 0 deg)",
+      "zenith measured in the same scan",
+      "same-field turbidity/AOD (Linke T, AOD, or Angstrom with stated convention)",
+      "photopic-comparable quantity: V(lambda)-weighted luminance or full-visible-band spectral radiance convertible to photopic Y (narrow-band ratios are auxiliary only)",
+      "reference-side independence from the CIE 110-1994 fitting corpus, with recorded basis (new acquisition later than the curve's finalisation and not reusing historical scans; publication date alone is insufficient)"
+    ],
+    "g0": "at least 1 qualified independent scan; |ln(M/C)| >= ln(1.5) stable over the allowed uncertainty set; observed-error half-width u <= ln(1.2) and |ln(M/C)| >= 3u; unknown error does not default to pass",
+    "abcu": "A/B/C/U branches and multi-scan aggregation as pre-registered in the task plan section 3.3 (frozen before any model run); with 0 qualified sources the verdict is U (inadjudicable) and no attribution computation is performed",
+    "provenance": "constants transcribed from the reviewed task plan (scratchpad/task-horizon-ref-probe/plan.md sections 3.1/3.3, plan status: confirmed); no numeric threshold was changed at implementation time"
+  },
+  "verdict": {
+    "qualified_main_sources": 0,
+    "gate": "G0",
+    "outcome": "U stop-loss",
+    "action": "screening table and domain-gap statement persisted here and escalated; no matched model runs, no A/B/C verdict, no attribution claim"
+  },
+  "reference_side_independence": {
+    "note": "CIE 110-1994 standard clear sky is the Kittler-type parameterisation (gradation coefficient 0.32; indicatrix 0.91 + 10 exp(-3 gamma) + 0.45 cos^2 gamma). Its fitting corpus is the 1950s-1980s European daylighting luminance-scan lineage, which conventionally does not include near-horizon points. Any pre-1994 European daylighting scan is therefore treated as independence-unknown; an acquisition later than 1994 that is newly collected and does not reuse historical scans (e.g. Granada 1998) has a defensible independence basis. The CIE 110-1994 original itself is paywalled (recorded in RULER_AUDIT.md 3d), so the complete fitting-corpus list cannot be verified; this residual does not affect the 0-qualified-sources conclusion.",
+    "checked_for_each_candidate": true
+  },
+  "costs": {
+    "candidates_screened": 12,
+    "budget_candidates": 12,
+    "retrieval_wall_clock_min": 45,
+    "retrieval_budget_min": 90,
+    "digitisation_min": 0,
+    "digitisation_budget_min": 90,
+    "retrieval_actions": "13 web searches, 6 full-text acquisitions (PDF/HTML), 2 figure-plate visual verifications",
+    "stop_reason": "budget exhausted with 0 qualified sources; stop-loss per plan"
+  },
+  "candidates": [
+    {
+      "id": "granada2001",
+      "citation": "Hernandez-Andres, J., Romero, J., Lee, R. L. Jr., 'Colorimetric and spectroradiometric characteristics of narrow-field-of-view clear skylight in Granada, Spain', J. Opt. Soc. Am. A 18(2), 412-420 (2001)",
+      "doi": "10.1364/JOSAA.18.000412",
+      "url": "http://www.ugr.es/~colorimg/pdfs/josaa_2001_412.pdf",
+      "access": "author-hosted full text",
+      "screen_level": "full_text_plus_figures",
+      "geometry": "LI-1800 spectroradiometer + telescope, 3 deg FOV (0.00215 sr), 380-780 nm at 5 nm; four meridians at relative azimuth f_rel = 0 deg (solar meridian), 45, 90, 315; routine grid view elevations h = 15..165 deg in 15 deg steps INCLUDING the zenith in every scan; additional near-horizon points h = 5 deg and h = 10 deg on the solar meridian on two days, visually confirmed in Fig. 5(a) (h0 ~ 19 deg, 1998-08-06) and Fig. 7(a) (h0 ~ 1.6 deg, 1998-08-05)",
+      "turbidity": "none measured per scan; only qualitative attribution of day-to-day chromaticity shifts to aerosol optical depth changes",
+      "photopic": "spectra cover the full visible band, photopic Y integrable in principle, but the paper publishes chromaticity-curve figures only (no radiance/luminance numeric tables, spectra not included)",
+      "independence": "supported: 1998 new acquisition at a new site, later than CIE 110-1994 finalisation, daylighting-model lineage not involved",
+      "verdict": "auxiliary_only",
+      "reason": "fails the same-field turbidity/AOD gate (qualitative mention only, cannot constrain the model input without re-fitting, which the contract forbids) and publishes no numeric luminance values, so no H/Z ratio can be extracted from the original either",
+      "local_file": "sources_raw/hernandez2001.pdf (scratchpad, gitignored)",
+      "sha256": "f97b21ea0c1fb5a6464b8bff4713b3cd8c5260fad27fdc69f67b384828a0319c",
+      "acquired_at": "2026-11-11T19:56+08:00"
+    },
+    {
+      "id": "lee1994_horizon",
+      "citation": "Lee, R. L. Jr., 'Horizon brightness revisited: measurements and a model of clear-sky radiances', Appl. Opt. 33(21), 4620-4628 (1994)",
+      "doi": "10.1364/AO.33.004620",
+      "access": "paywalled (Optica); no open copy found (Semantic Scholar status CLOSED)",
+      "screen_level": "title_only",
+      "verdict": "excluded_unread",
+      "reason": "original unreadable within budget; per contract an unread original is a second-level clue and never enters main adjudication; geometry/turbidity/zenith coverage unverified"
+    },
+    {
+      "id": "tousey_hulburt_1947",
+      "citation": "Tousey, R., Hulburt, E. O., 'Brightness and Polarization of the Daylight Sky at Various Altitudes above Sea Level', J. Opt. Soc. Am. 37(2), 78-92 (1947)",
+      "doi": "10.1364/JOSA.37.000078",
+      "access": "paywalled; abstract page with table content readable",
+      "screen_level": "abstract_plus_tables",
+      "geometry": "aircraft flights at 10,000 ft etc.; Table III = measured zenith brightness per flight (with inferred turbidity beta 0.0164-0.0201); Table I directional values (sun-side Z=0 deg, view zenith angles to 80 deg) are THEORETICAL clear-air tables",
+      "verdict": "excluded",
+      "reason": "the directional near-horizon numbers are model-generated (the contract excludes model-generated data); the measured part is zenith-only; lowest directional elevation 10 deg is also outside [0,5] deg",
+      "local_file": null,
+      "acquired_at": "2026-11-11T19:47+08:00"
+    },
+    {
+      "id": "packer_lock_1951",
+      "citation": "Packer, D. M., Lock, C., 'The Brightness and Polarization of the Daylight Sky at Altitudes of 18,000 to 38,000 Feet above Sea Level', J. Opt. Soc. Am. 41(7), 473-478 (1951)",
+      "doi": "10.1364/JOSA.41.000473",
+      "access": "paywalled",
+      "screen_level": "title_only",
+      "verdict": "excluded_unread",
+      "reason": "altitude-series companion of tousey_hulburt_1947; expected zenith-brightness-only measured content; not read within budget"
+    },
+    {
+      "id": "koomen_1952",
+      "citation": "Koomen, M. J., Lock, C., Packer, D. M., Scolnik, R., Tousey, R., Hulburt, E. O., 'Measurements of the Brightness of the Twilight Sky', J. Opt. Soc. Am. 42(5), 353-356 (1952)",
+      "doi": "10.1364/JOSA.42.000353",
+      "access": "already ingested in this repository (validation/SECOND_DATASET.md, check6)",
+      "screen_level": "known_from_repo",
+      "verdict": "excluded",
+      "reason": "twilight zenith-brightness series (solar depression 0 to -15 deg); no daytime directional scans"
+    },
+    {
+      "id": "wuttke_2006",
+      "citation": "Wuttke, S., Seckmeyer, G., 'Spectral radiance and sky luminance in Antarctica: a case study', Theor. Appl. Climatol. 85, 131-149 (2006)",
+      "doi": "10.1007/s00704-005-0188-2",
+      "url": "https://epic.awi.de/13389/1/Wut2005c.pdf",
+      "access": "open (AWI repository)",
+      "screen_level": "full_text",
+      "geometry": "Neumayer, Antarctica (snow, albedo ~0.96) and Boulder (grass); zenithal scans in the principal plane at the ANTI-solar azimuth (SAA +180 deg), view zenith angles 0-84 deg in 10 deg steps; measured photopic luminance H/Z at view zenith 84 deg (elevation 6 deg): snow 8.2 (SZA 86 deg) and 7.6 (SZA 48 deg); grass 4.9 (SZA 86 deg) and 1.4 (SZA 48 deg)",
+      "turbidity": "none ('the true aerosol content for Neumayer during the time of investigation is not available'); model runs in the paper used default libRadtran aerosol",
+      "verdict": "excluded",
+      "reason": "anti-solar azimuth (fails sun-side gate), lowest elevation 6 deg (outside [0,5] deg), no AOD, and a snow-albedo scene far from the model's 0.1",
+      "local_file": "sources_raw/wuttke2006.pdf (scratchpad, gitignored)",
+      "sha256": "0e3b5a923b5026089e55b05e92c102dc418d1d4ed7ded403088d0c4def6e1cc2",
+      "acquired_at": "2026-11-11T20:05+08:00"
+    },
+    {
+      "id": "cordero_2023",
+      "citation": "Cordero, R. R. et al., 'Ground-based measurements of the weather-driven sky radiance distribution in the Southern Hemisphere', 2023 (PMC10266621)",
+      "access": "open (PMC); fetched via curl",
+      "screen_level": "partial_text",
+      "geometry": "MUDIS multidirectional spectroradiometer; fixed-azimuth zenith-angle scans ('West-Zenith-East' plane); consecutive-day aerosol-loading comparison implies AOD available",
+      "verdict": "excluded_insufficient_evidence",
+      "reason": "zenith-angle grid and sun-side near-horizon coverage unverified within budget; MUDIS grid is believed to top out well above the horizon (typical max zenith ~80 deg), and no sun-side near-horizon + same-scan-zenith scan was confirmed",
+      "local_file": "sources_raw/cordero2023.html (scratchpad, gitignored)",
+      "acquired_at": "2026-11-11T19:53+08:00"
+    },
+    {
+      "id": "tohsing_2013",
+      "citation": "Tohsing, K., Schrempf, M., Riechelmann, S., Schilke, H., Seckmeyer, G., 'Measuring high-resolution sky luminance distributions with a CCD camera', Appl. Opt. 52(8), 1564-1573 (2013)",
+      "doi": "10.1364/AO.52.001564",
+      "access": "paywalled; abstract readable",
+      "screen_level": "abstract",
+      "verdict": "excluded",
+      "reason": "fisheye HSI luminance imaging validated for SZA < 80 deg; near-horizon region not validated, no turbidity reported"
+    },
+    {
+      "id": "nbsir_85_3251",
+      "citation": "Treado, S., Remmert, W., Bean, J., 'Sky Luminance and Direct Beam Illuminance', NBSIR 85-3251, NBS Gaithersburg (1986)",
+      "url": "https://www.govinfo.gov/content/pkg/GOVPUB-C13-01e3aaa6d1a1ba57d558b3c10f8ba3e0/pdf/GOVPUB-C13-01e3aaa6d1a1ba57d558b3c10f8ba3e0.pdf",
+      "access": "open (govinfo)",
+      "screen_level": "full_text",
+      "geometry": "five sky portions only: zenith plus 42 deg elevation N/E/S/W, 15 deg FOV, hourly averages 1982-84; compared with standard clear/partly cloudy/overcast point-luminance factors",
+      "verdict": "excluded",
+      "reason": "no near-horizon directions and no scanning; 42 deg elevation is outside [0,5] deg",
+      "local_file": "sources_raw/nist_sky_luminance.pdf (scratchpad, gitignored)",
+      "sha256": "ba543c7dfdfe5cbfae277f3ac32f66e425c53ef949dca809756c8b3c93c17bea",
+      "acquired_at": "2026-11-11T19:50+08:00"
+    },
+    {
+      "id": "knestrick_curcio_1967",
+      "citation": "Knestrick, G. L., Curcio, J. A., 'Measurements of Spectral Radiance of the Horizon Sky', Appl. Opt. 6(12), 2105-2109 (1967); also NRL Report 6615",
+      "doi": "10.1364/AO.6.002105",
+      "access": "paywalled; no open copy found",
+      "screen_level": "title_only",
+      "verdict": "excluded_unread",
+      "reason": "title indicates horizon-focused spectral radiance (no zenith in the same scan expected); unread originals never enter main adjudication"
+    },
+    {
+      "id": "domec_escape_2024",
+      "citation": "Haudemand, F. et al., 'Daytime Sky Brightness at Dome C, Antarctica', Solar Physics 299 (2024), ESCAPE project",
+      "doi": "10.1007/s11207-024-02387-8",
+      "access": "open preprint (Research Square)",
+      "screen_level": "full_text",
+      "geometry": "coronagraphic site survey; sky brightness in units of solar-disk brightness B_sun at a fixed 10 deg off-point from the sun; one scan of angular distance from the sun (-6 to +20 deg) on 2022-12-21; no zenith-distance scan, no horizon coverage",
+      "turbidity": "no AOD (diamond-dust correlation via LIDAR inconclusive)",
+      "verdict": "excluded",
+      "reason": "sun-relative geometry only, no zenith in scan, no near-horizon points, relative B_sun units, no turbidity",
+      "local_file": "sources_raw/domec_escape_2024.pdf (scratchpad, gitignored)",
+      "sha256": "c208042b70093cf1ac6eb0955cdd47afb6b3bb2e323f38ac8966b47916471936",
+      "acquired_at": "2026-11-11T20:05+08:00"
+    },
+    {
+      "id": "uv_narrowband_class",
+      "citation": "Grant, R., Heisler, G., Gao, W., Theor. Appl. Climatol. 56, 123-135 (1997a); Blumthaler, M. et al., Geophys. Res. Lett. 23, 547-550 (1996); Winter, E. M. et al., Appl. Opt. 34, 3681-3685 (1995); Zibordi, G., Voss, K. J., Remote Sens. Environ. 27, 343-358 (1989)",
+      "access": "mixed; assessed from the citation chain read in wuttke_2006 and granada2001 full texts",
+      "screen_level": "citation_level",
+      "verdict": "excluded_class",
+      "reason": "UVB/UVA/PAR broadband or narrow visible-band instruments only; the photopic/full-visible-spectral gate cannot be met, so these cannot serve the CIE photometric comparison regardless of geometry"
+    }
+  ],
+  "domain_gap": {
+    "statement": "Within the screened budget no public original measurement combines (i) a sun-side near-horizon direction (relative azimuth <= 5 deg, view elevation within [0,5] deg), (ii) the zenith in the same scan, (iii) same-field measured turbidity/AOD, and (iv) photopic or full-visible-spectral coverage. The geometrically closest campaign (Granada 2001) fails only the turbidity gate and publishes no numeric luminance table; daylighting-lineage scans conventionally stop ~6 deg above the horizon; atmospheric-optics campaigns favour the anti-solar principal plane; coronagraphic/site surveys sample sun-relative distances without zenith.",
+    "closest_candidate": "granada2001",
+    "possible_futures": [
+      "request the 1567 Granada spectra and any concurrent aerosol data from the authors (owner decision; external contact not initiated by this task)",
+      "commission/locate a directional sky scan with concurrent AOD at a site with unobstructed horizon (owner decision)",
+      "re-run this probe if such a source becomes available; the admission contract in this file is the frozen gate"
+    ]
+  }
+}
