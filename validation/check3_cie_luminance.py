@@ -23,15 +23,16 @@ Zotti 2007, which cites the CIE standard).
 The model's luminance is the photopic integral of its spectral radiance,
 normalised by the model's own zenith luminance, so the test is scale-free.
 
-What the model is missing
--------------------------
-The production model currently has no multiple scattering (the module is a
-stub returning zero).  Multiple scattering makes the real sky more uniform:
-it brightens the zenith and the anti-solar sky relative to the single-scatter
-horizon.  We therefore expect the model to be too dark at the zenith
-*relative to the horizon* -- i.e. the horizon/zenith ratio to be too large.
-We also run pristine (Rayleigh-only) and a well-mixed aerosol profile to
-separate the aerosol contribution from the multiple-scattering contribution.
+What the model is missing (historical note, corrected 2026-11-11)
+-----------------------------------------------------------------
+The stub statement below predates the production full solver and is
+outdated: the multiple-scattering module is no longer a stub -- the default
+is already single + SOS multiple scattering, and the horizon/zenith excess
+persists under it (RULER_AUDIT.md 3c).  The decomposition probe measures the
+diffuse enhancement as horizon-weighted (x1.45 horizon vs x1.24 zenith;
+validation/tools/aureole_attribution/).  We also run pristine (Rayleigh-only)
+and a well-mixed aerosol profile to separate the aerosol contribution from
+the diffuse contribution.
 
 Tolerances (chosen before looking at the final numbers)
 -------------------------------------------------------
@@ -259,7 +260,18 @@ def run():
             "horizon vs x1.24 zenith), opposite to the CIE narrative of "
             "multiple scattering brightening the zenith.  The residual sits "
             "in the first-order horizon brightening vs the empirical "
-            "gradation curve; owner re-adjudication pending."
+            "gradation curve; owner re-adjudication pending.  "
+            "Independent-measurement boundary (task-horizon-ref-probe, "
+            "2026-11-11): the sun-side near-horizon domain has no "
+            "independent measured adjudication -- the pre-registered source "
+            "screen (validation/tools/horizon_ref_probe/sources.json; 12 "
+            "candidates, 0 qualifying) found no public original measurement "
+            "combining a sun-side near-horizon direction (|Daz| <= 5deg, "
+            "elevation <= 5deg), the zenith in the same scan, same-field "
+            "turbidity/AOD, and photopic/full-visible coverage.  The "
+            "attribution therefore stays undecided between model-side "
+            "excess and CIE 110 gradation-curve domain-edge behaviour; no "
+            "verdict branch is claimed."
         ),
     )
     return C.CheckResult(
