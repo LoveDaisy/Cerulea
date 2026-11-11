@@ -1,0 +1,255 @@
+"""Explicit theme tests for the archive-only figure refresh.
+
+Run explicitly: ``uv run pytest -n 0 -q experiments/tests/test_figures_refresh.py``.
+Never in the default suite (experiments/ is outside the default testpaths).
+
+What these pins guarantee, on the real committed archive:
+
+- the redraw path NEVER re-enters the solver, the solar source or any solve
+  orchestration entry -- every such entry is stubbed to raise while figures
+  are actually generated (contract from the task plan Step 1);
+- the fisheye re-projection is genuinely equidistant (r/R = theta/90) through
+  the production direction grid, with the quadrant/seam conventions the
+  annotations rely on;
+- annotations are computed from the same camera grids the pixels came from:
+  analytic horizon/locator anchors, and out-of-FOV directions are reported,
+  never clamped to the image edge;
+- colours reach the production color pipeline with the archive's locked
+  group exposures, and the sampled spectra passed in are the archive's own.
+"""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+import sys
+
+import numpy as np
+import pytest
+
+REPO = Path(__file__).resolve().parents[2]
+if str(REPO) not in sys.path:  # theme-local tests live outside the package
+    sys.path.insert(0, str(REPO))
+
+from experiments.layerstory import layer_story as ls  # noqa: E402
+from experiments.layerstory import refresh_figures as rf  # noqa: E402
+from skycolor import color, render  # noqa: E402
+
+NPZ = REPO / "experiments/layerstory/data/layer_story.npz"
+
+_SOLVER_ENTRIES = (
+    "skycolor.rt.solver.solve",
+    "skycolor.render.solve_dome",
+    "skycolor.render.render_scene",
+    "skycolor.solar_source.SolarSource",
+)
+
+
+def _raiser(*_args, **_kwargs):
+    raise AssertionError("a solver/solar-source entry was reached during "
+                         "the archive-only redraw -- zero-solve contract broken")
+
+
+@pytest.fixture(scope="module")
+def data():
+    return rf.load(NPZ)
+
+
+@pytest.fixture(autouse=True)
+def no_solve(monkeypatch):
+    """Every solver/orchestration entry raises; the redraw must not care."""
+    for target in _SOLVER_ENTRIES:
+        monkeypatch.setattr(target, _raiser, raising=True)
+    monkeypatch.setattr(ls, "solve", _raiser, raising=True)
+    monkeypatch.setattr(ls, "compute", _raiser, raising=True)
+
+
+# ---------------------------------------------------------------------------
+# audit
+# ---------------------------------------------------------------------------
+def test_audit_endpoints_and_capability(data):
+    report = rf.audit(data, NPZ)
+    dome_runs = [k for k, cap in report["runs"].items() if cap["dome_views"]]
+    assert dome_runs == ["l1_rayleigh_30", "l2_aerosol_30", "l4_bridge_30",
+                         "l4_multiple_30", "l5_single_-4", "l5_mc_-4",
+                         "l5_plane_-4", "l6_clear_30", "l6_cloud_30"]
+    for key in ("l3_bridge_3", "l3_o3_3"):
+        cap = report["runs"][key]
+        assert cap["zenith_nodes"] == 1 and not cap["dome_views"]
+        assert cap["zenith_span"] == [0.0, 0.0]
+    for key, cap in report["runs"].items():
+        if cap["dome_views"]:
+            assert cap["zenith_span"] == [0.0, 90.0]
+            assert cap["azimuth_span"] == [0.0, 180.0]
+            assert cap["rows_match"]
+    assert all(f["feasible"] for f in report["figures"].values())
+    for fig in report["figures"].values():
+        for curve in fig["curves"]:
+            assert curve["exact_node"], curve
+
+
+def test_audit_records_versions_and_hash(data):
+    report = rf.audit(data, NPZ)
+    assert report["input_sha256"] == rf.sha256_file(NPZ)
+    assert report["solve_version"] == str(data["version"])
+    # the archive's solve version is pinned: redraws must never re-solve,
+    # and the drawing-code version is reported separately in the report
+    assert report["solve_version"].startswith("286486e")
+    assert "drawing-code version" in rf.render_audit_markdown(report)
+
+
+# ---------------------------------------------------------------------------
+# projection anchors: the grids the panels consume
+# ---------------------------------------------------------------------------
+def test_fisheye_grid_is_equidistant():
+    """r/R = theta/90 anchors: zenith 0, 45 deg at half radius, horizon rim."""
+    size = 81
+    az, el, mask = render.fisheye_grid(size, max_zenith=90.0,
+                                       projection="equidistant")
+    cx = cy = (size - 1) / 2.0
+    rim = (size - 1) / 2.0
+    assert el[int(cy), int(cx)] == pytest.approx(90.0, abs=1e-9)
+    half = int(round(rim / 2.0))
+    assert el[int(cy), int(cx) - half] == pytest.approx(45.0, abs=0.5)
+    assert el[int(round(cy - rim)), int(cx)] == pytest.approx(0.0, abs=0.5)
+    assert el[int(cy), 0] == pytest.approx(0.0, abs=0.5)  # left rim
+    assert mask[int(cy), int(cx)] and mask[int(cy), 1]  # disk inside, corners out
+    assert not mask[0, 0]
+
+
+def test_fisheye_azimuth_quadrants():
+    """The convention the tick placement relies on: 0 top, 90 right, ..."""
+    size = 81
+    az, el, _ = render.fisheye_grid(size, projection="equidistant")
+    c = int((size - 1) / 2.0)
+    rim = (size - 1) / 2.0
+    assert az[c, int(c + rim)] == pytest.approx(90.0, abs=0.5)
+    assert az[int(c + rim), c] == pytest.approx(180.0, abs=0.5)
+    assert az[c, c - int(rim)] == pytest.approx(270.0, abs=0.5)
+    assert az[c - int(rim), c] == pytest.approx(0.0, abs=0.5)
+
+
+def test_sample_dome_mirrors_across_the_principal_plane(data):
+    """Relative-azimuth seam: symmetric dome -> +1 deg and -1 deg identical."""
+    key = "l1_rayleigh_30"
+    dome = dict(zenith=data[f"{key}/zenith"],
+                azimuth_rel=data[f"{key}/azimuth_rel"],
+                radiance=data[f"{key}/total"].reshape(25, 37, 81))
+    plus = render.sample_dome(dome, np.array([45.0]), np.array([1.0]))
+    minus = render.sample_dome(dome, np.array([45.0]), np.array([-1.0]))
+    np.testing.assert_array_equal(plus, minus)
+    wrap = render.sample_dome(dome, np.array([45.0]), np.array([179.0]))
+    wrap2 = render.sample_dome(dome, np.array([45.0]), np.array([-179.0]))
+    np.testing.assert_array_equal(wrap, wrap2)
+
+
+def test_rect_grid_horizon_and_center_anchor():
+    """Analytic anchors on the archived camera: horizon row and a direction."""
+    w, h, hfov, pitch, yaw = 640, 320, 100.0, 14.0, 0.0
+    az, el = render.perspective_grid(w, h, hfov, pitch, yaw)
+    cols, rows = rf.horizon_polyline(el)
+    assert cols.size == w  # one crossing per column: a straight vanishing line
+    assert np.ptp(rows) < 2.0
+    f = (w / 2.0) / np.tan(np.radians(hfov) / 2.0)
+    expected_row = h / 2.0 + f * np.tan(np.radians(pitch)) - 0.5
+    assert float(np.median(rows)) == pytest.approx(expected_row, abs=2.0)
+    # a 30-deg-high direction toward the sun resolves to its own pixel
+    p = rf.locate(az, el, 0.0, 30.0)
+    assert p is not None
+    c, r = p
+    assert el[r, c] == pytest.approx(30.0, abs=0.5)
+    # azimuth wraps at 360: compare as a signed relative angle
+    az_rel = (az[r, c] + 180.0) % 360.0 - 180.0
+    assert az_rel == pytest.approx(0.0, abs=0.5)
+
+
+def test_sun_placement_modes():
+    """In view -> marker; below horizon -> horizon indicator; out of FOV ->
+    outside note (never clamped to the image edge)."""
+    az, el = render.perspective_grid(640, 320, 100.0, 14.0, 0.0)
+    kind, p = rf.sun_placement(az, el, 0.0, 30.0)
+    assert kind == "marker" and p is not None
+    kind, p = rf.sun_placement(az, el, 0.0, -4.0)
+    assert kind == "horizon" and p is not None
+    cols, rows = rf.horizon_polyline(el)
+    # the indicator pixel sits on the horizon line at the sun's azimuth
+    assert rows[p[0]] == pytest.approx(float(p[1]), abs=2.0)
+    # anti-solar camera: the sun azimuth is behind the view
+    az180, el180 = render.perspective_grid(640, 320, 100.0, 14.0, 180.0)
+    assert rf.sun_placement(az180, el180, 0.0, 30.0) == ("outside", None)
+    assert rf.sun_placement(az180, el180, 0.0, -4.0) == ("outside", None)
+
+
+# ---------------------------------------------------------------------------
+# zero-solve figure generation on the real archive
+# ---------------------------------------------------------------------------
+def _png(path: Path) -> np.ndarray:
+    from PIL import Image
+
+    return np.asarray(Image.open(path).convert("RGB"))
+
+
+def test_sample_figures_render_without_solve(data, monkeypatch):
+    """rayleigh + twilight generate with every solver entry stubbed to raise;
+    the archive bytes are untouched; the captured color inputs are the
+    archive's own spectra at the locked group exposures."""
+    seen = []
+    twilight_fish = {}
+
+    orig = color.render_rgb
+
+    def spy(rad, wl, **kwargs):
+        rad = np.asarray(rad, dtype=float)
+        seen.append(dict(shape=rad.shape, **kwargs))
+        # hold one fisheye chunk only (the arrays are large); the first
+        # 640px-fisheye call at the twilight exposure is l5_single chunk 0
+        if (rad.shape == (64 * 640, 81) and kwargs.get("exposure") == 10.0
+                and "chunk0" not in twilight_fish):
+            twilight_fish["chunk0"] = rad
+        return orig(rad, wl, **kwargs)
+
+    monkeypatch.setattr(color, "render_rgb", spy)
+    out = rf.render_figures(data, ["rayleigh", "twilight"], NPZ)
+    assert len(out) == 2
+    for path in out:
+        img = _png(path)
+        assert img.shape[0] > 300 and img.shape[1] > 300
+    assert twilight_fish, "twilight fisheye must render at exposure 10.0"
+    rad = twilight_fish["chunk0"]
+    fish_calls = [c for c in seen
+                  if c["shape"] == (64 * 640, 81) and c["exposure"] == 10.0]
+    assert fish_calls[0]["tonemap"] == "aces"
+    assert fish_calls[0]["adaptation"] is None
+    # the first chunk of that panel equals an independent sample_dome read of
+    # the archived total field through the same equidistant grid
+    az, el, _ = render.fisheye_grid(640, max_zenith=90.0,
+                                    projection="equidistant")
+    rel = (az - 0.0 + 180.0) % 360.0 - 180.0
+    zen = 90.0 - np.clip(el, 0.0, 90.0)
+    dome = dict(zenith=data["l5_single_-4/zenith"],
+                azimuth_rel=data["l5_single_-4/azimuth_rel"],
+                radiance=data["l5_single_-4/total"].reshape(11, 23, 81))
+    expected = render.sample_dome(dome, zen[:64].ravel(), rel[:64].ravel())
+    np.testing.assert_allclose(rad, expected, rtol=1e-12, atol=0)
+    # the day panels stay on the day group's locked exposure
+    assert any(c["exposure"] == 0.03 for c in seen)
+
+
+def test_regeneration_is_pixel_identical(data, tmp_path):
+    """Same archive, same code, same params -> identical decoded pixels."""
+    first = rf.render_figures(data, ["rayleigh"], NPZ)[0]
+    px1 = _png(first)
+    second = rf.render_figures(data, ["rayleigh"], NPZ)[0]
+    np.testing.assert_array_equal(px1, _png(second))
+
+
+def test_manifest_records_command_and_directions(data):
+    rf.render_figures(data, ["aerosol"], NPZ)
+    manifest = json.loads((rf.OUT / "refresh_manifest.json").read_text())
+    entry = manifest[0]
+    assert entry["fig_id"] == "aerosol"
+    assert "--figure aerosol" in entry["command"]
+    assert entry["input_sha256"] == rf.sha256_file(NPZ)
+    assert entry["solve_version"] == str(data["version"])
+    for curve in entry["curves"]:
+        z, a = curve["requested"]
+        assert curve["row"] == ls.row_index(data, curve["key"], z, a)

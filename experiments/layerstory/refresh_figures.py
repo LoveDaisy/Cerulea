@@ -28,6 +28,7 @@ from pathlib import Path
 import numpy as np
 
 from experiments.layerstory import layer_story as ls
+from skycolor import color, render
 
 THEME = Path(__file__).resolve().parent
 DEFAULT_NPZ = THEME / "data" / "layer_story.npz"
@@ -109,7 +110,7 @@ class FigureDef:
     note: str
 
 
-_FISH = "fisheye (equidistant, 180 deg, zenith-centred)"
+_FISH = "fisheye (equidistant, zenith-centred, 180°)"
 _RECT = "perspective (archived camera)"
 
 FIGURES: dict[str, FigureDef] = {
@@ -168,11 +169,11 @@ FIGURES: dict[str, FigureDef] = {
          ViewPanelDef("l5_plane_-4", "total", "rect", False,
                       "L5 · plane-parallel world — " + _RECT),
          ViewPanelDef("l5_single_-4", "total", "fisheye", False,
-                      "spherical single — " + _FISH),
+                      "spherical single\n" + _FISH),
          ViewPanelDef("l5_mc_-4", "total", "fisheye", False,
-                      "+ MC higher orders — " + _FISH),
+                      "+ MC higher orders\n" + _FISH),
          ViewPanelDef("l5_plane_-4", "total", "fisheye", False,
-                      "plane-parallel world — " + _FISH)),
+                      "plane-parallel world\n" + _FISH)),
         ("docs/physics/LAYER_STORY.md §L5", "docs/physics/MAINLINE.zh.md 图6"),
         "three -4 deg states, locked twilight exposure 10.0; MC panel is "
         "single-seed / coarse-grid qualitative (no new convergence evidence)"),
@@ -401,12 +402,380 @@ def render_audit_markdown(report: dict) -> str:
 
 
 def run_audit(npz_path: Path) -> dict:
-    data = load(npz_path)
-    report = audit(data, npz_path)
+    """Audit convenience entry: load, audit, write the report files."""
+    report = audit(load(npz_path), npz_path)
+    write_audit(report)
+    return report
+
+
+def write_audit(report: dict) -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "audit_coverage.md").write_text(render_audit_markdown(report))
     (OUT / "audit_coverage.json").write_text(json.dumps(report, indent=1))
-    return report
+
+
+# ---------------------------------------------------------------------------
+# drawing (Step 1+): archive-only re-projection and computed annotations
+#
+# Two projection families, both fed from the SAME bound presentation:
+# - "rect": the archived perspective camera via render.render_result (the
+#   production display path, unchanged).
+# - "fisheye": a zenith-centred equidistant 180-degree view rebuilt through
+#   production primitives only -- directions from render.fisheye_grid's
+#   equidistant branch (r/R = theta/90, horizon on the rim), sampling via
+#   render.sample_dome with render_result's own relative-azimuth convention,
+#   colouring via color.render_rgb with the group's locked exposure.  No
+#   interpolation or colour code is written here.
+#
+# Every annotation pixel (horizon, azimuth ticks, sun direction) is computed
+# from the same camera/direction grid the image was rendered from -- nothing
+# is hand-placed.  A direction outside the view is reported as such, never
+# clamped to the image edge.
+# ---------------------------------------------------------------------------
+_ANN_INK = "#111111"
+_TICK_AZIMUTHS = (0.0, 90.0, 180.0, 270.0)
+
+
+def fisheye_rgb(pres, exposure: float, size: int = 640, chunk: int = 64):
+    """Equidistant fisheye RGB of a bound presentation, plus its direction grid.
+
+    ``exposure`` is the archived display group's locked value -- the same
+    value the rect panel of the pair renders with, never an auto exposure.
+    Row-chunked so the (size, size, n_wl) spectral intermediate never fully
+    materialises; chunking is exact because an explicit exposure makes
+    color.render_rgb per-pixel pure (no global statistic crosses chunks).
+    Returns (rgb, azimuth, elevation, mask) so annotations reuse the exact
+    grid the pixels came from.
+    """
+    az, el, mask = render.fisheye_grid(size, max_zenith=90.0,
+                                       projection="equidistant")
+    dome = dict(zenith=pres.zenith, azimuth_rel=pres.azimuth_rel,
+                radiance=pres.radiance)
+    rel = (az - pres.sun_azimuth_deg + 180.0) % 360.0 - 180.0
+    zen = 90.0 - np.clip(el, 0.0, 90.0)
+    rgb = np.zeros((size, size, 3))
+    for r0 in range(0, size, chunk):
+        rows = slice(r0, min(r0 + chunk, size))
+        rad = render.sample_dome(dome, zen[rows].ravel(), rel[rows].ravel())
+        block = color.render_rgb(rad, pres.wl, exposure=exposure,
+                                 tonemap="aces", adaptation=None,
+                                 white_xy=color.D65_XY)
+        rgb[rows] = block.reshape(rows.stop - rows.start, size, 3)
+    rgb[~mask] = 0.0
+    return rgb, az, el, mask
+
+
+def _angular_distance(az, el, az_t, el_t) -> np.ndarray:
+    """Great-circle distance [deg] from every grid direction to one target."""
+    daz = np.radians((az - az_t + 180.0) % 360.0 - 180.0)
+    e1, e2 = np.radians(el), np.radians(el_t)
+    cosd = np.sin(e1) * np.sin(e2) + np.cos(e1) * np.cos(e2) * np.cos(daz)
+    return np.degrees(np.arccos(np.clip(cosd, -1.0, 1.0)))
+
+
+def locate(az, el, az_t, el_t, tol: float = 2.0):
+    """Pixel (col, row) of the grid direction nearest a target, or None.
+
+    In view means a pixel within ``tol`` degrees of the target -- an
+    out-of-FOV direction is never snapped to the image edge.
+    """
+    d = _angular_distance(az, el, az_t, el_t)
+    row, col = np.unravel_index(int(np.argmin(d)), d.shape)
+    if d[row, col] <= tol:
+        return int(col), int(row)
+    return None
+
+
+def horizon_polyline(el: np.ndarray):
+    """The el == 0 crossing of a camera direction field (one point/column).
+
+    Vectorised sign change + linear interpolation; a pinhole camera's horizon
+    is a straight vanishing line, so the sampled crossings trace it.  Columns
+    entirely above or below the horizon simply contribute nothing.
+    """
+    h, w = el.shape
+    above = el >= 0.0
+    flip = above[:-1] != above[1:]
+    rows = np.argmax(flip, axis=0)
+    has = flip[rows, np.arange(w)]
+    cols = np.arange(w)[has]
+    r = rows[has]
+    y0, y1 = el[r, cols], el[r + 1, cols]
+    t = np.where(y0 != y1, y0 / np.where(y0 != y1, y0 - y1, 1.0), 0.0)
+    return cols.astype(float), r + t
+
+
+def azimuth_tick_pixel(az, el, tick_az: float, tol: float = 0.25):
+    """Pixel of a tick azimuth, placed at its closest-to-horizon crossing."""
+    d = np.abs((az - tick_az + 180.0) % 360.0 - 180.0)
+    near = d <= tol
+    if not near.any():
+        return None
+    cost = np.where(near, np.abs(el), np.inf)
+    row, col = np.unravel_index(int(np.argmin(cost)), az.shape)
+    return int(col), int(row)
+
+
+def sun_placement(az, el, sun_az: float, sun_el: float):
+    """Where the pre-refraction sun *input direction* annotation goes.
+
+    - ("marker", pixel): direction inside the view -- hollow cross there.
+    - ("horizon", pixel): sun below the horizon -- the horizon point at the
+      sun's azimuth; the below-horizon disk itself is never drawn.
+    - ("outside", None): azimuth out of the FOV -- text note only, no edge
+      clamping.
+
+    Cloud scenes keep the same marker semantics: it is an azimuth hint for
+    the input direction, never a claim that the disk shines through the deck.
+    """
+    if sun_el < 0.0:
+        d = _angular_distance(az, el, sun_az, 0.0)
+        near = np.abs(el) <= 1.5
+        if near.any():
+            dd = np.where(near, d, np.inf)
+            row, col = np.unravel_index(int(np.argmin(dd)), d.shape)
+            if np.isfinite(dd[row, col]) and dd[row, col] <= 1.0:
+                return "horizon", (int(col), int(row))
+        return "outside", None
+    p = locate(az, el, sun_az, sun_el)
+    if p is not None:
+        return "marker", p
+    return "outside", None
+
+
+def _sun_label(kind: str, sun_az: float, sun_el: float) -> str:
+    if kind == "marker":
+        return f"sun input dir (az {sun_az:.0f}°, el {sun_el:.1f}°)"
+    if kind == "horizon":
+        return (f"sun input az {sun_az:.0f}° — {abs(sun_el):.1f}° below "
+                "horizon")
+    return f"sun input az {sun_az:.0f}°, el {sun_el:.1f}° — out of view"
+
+
+def _ann_text(ax, x, y, text, offset=(5, 7)):
+    ax.annotate(text, (x, y), xytext=offset, textcoords="offset points",
+                fontsize=8, color=_ANN_INK,
+                bbox=dict(fc="#ffffff", ec="none", alpha=0.65, pad=1.2))
+
+
+def _draw_sun(ax, placement, sun_az: float, sun_el: float) -> None:
+    kind, p = placement
+    if p is None:
+        _ann_text(ax, 4, 14, _sun_label("outside", sun_az, sun_el),
+                  offset=(2, -4))
+        return
+    if kind == "marker":
+        ax.plot(*p, marker="+", markersize=13, markeredgewidth=1.8,
+                color=_ANN_INK)
+        _ann_text(ax, *p, _sun_label(kind, sun_az, sun_el))
+    else:  # "horizon": boundary direction indicator, never a disk
+        ax.plot(*p, marker="o", markersize=7, markerfacecolor="none",
+                markeredgecolor=_ANN_INK, markeredgewidth=1.4)
+        _ann_text(ax, *p, _sun_label(kind, sun_az, sun_el), offset=(5, -12))
+
+
+def _plt():
+    """Agg-bound pyplot (same local-import convention as layer_story.draw)."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    return plt
+
+
+def annotate_rect(ax, az, el, sun_az: float, sun_el: float) -> None:
+    """Horizon line, azimuth ticks and the sun direction note on a rect view."""
+    cols, rows = horizon_polyline(el)
+    ax.plot(cols, rows, color=_ANN_INK, linewidth=1.1, alpha=0.85)
+    for tick in _TICK_AZIMUTHS:
+        p = azimuth_tick_pixel(az, el, tick)
+        if p is None:
+            continue
+        c, r = p
+        ax.plot([c, c], [r - 5, r + 5], color=_ANN_INK, linewidth=1.1)
+        _ann_text(ax, c, r, f"{tick:.0f}°", offset=(-8, 6))
+    _draw_sun(ax, sun_placement(az, el, sun_az, sun_el), sun_az, sun_el)
+
+
+def annotate_fisheye(ax, az, el, mask, sun_az: float, sun_el: float,
+                     size: int) -> None:
+    """Horizon rim, azimuth ticks and the sun direction note on a fisheye."""
+    from matplotlib.patches import Circle
+
+    cx = cy = (size - 1) / 2.0
+    # equidistant: zen = r * 90, so the horizon (zen 90) sits exactly on the
+    # r = 1 rim -- the same normalisation fisheye_grid used for the pixels
+    rim = (size - 1) / 2.0
+    ax.add_patch(Circle((cx, cy), rim, fill=False, ec=_ANN_INK,
+                        linewidth=1.2))
+    sun = sun_placement(az, el, sun_az, sun_el)
+    for tick in _TICK_AZIMUTHS:
+        # a below-horizon sun indicator at the same rim azimuth replaces the
+        # tick (its label already names that azimuth); markers live inside
+        # the dome and never collide with rim ticks
+        if (sun[0] == "horizon"
+                and abs((tick - sun_az + 180.0) % 360.0 - 180.0) <= 1.0):
+            continue
+        p = locate(az, el, tick, 0.0, tol=1.0)
+        if p is None:
+            continue
+        dx, dy = p[0] - cx, p[1] - cy
+        n = np.hypot(dx, dy)
+        u = (dx / n, dy / n)
+        ax.plot([p[0], p[0] + 6 * u[0]], [p[1], p[1] + 6 * u[1]],
+                color=_ANN_INK, linewidth=1.1)
+        # labels sit just inside the rim: always inside the image, never
+        # clipped at the square's edge, bbox keeps them readable on sky
+        lp = (p[0] - 16 * u[0], p[1] - 16 * u[1])
+        _ann_text(ax, *lp, f"{tick:.0f}°", offset=(0, 0))
+    _draw_sun(ax, sun, sun_az, sun_el)
+
+
+def _display_of(data, key: str) -> dict:
+    return ast.literal_eval(str(data[f"{key}/display"]))
+
+
+def _sun_of(data, key: str) -> tuple[float, float]:
+    opts = _run_options(data, key)
+    return float(opts["sun_azimuth_deg"]), 90.0 - float(opts["sun_zenith_deg"])
+
+
+def rect_panel(ax, data, vdef: ViewPanelDef, overrides=None) -> dict:
+    """The archived perspective view through the untouched production path."""
+    key = vdef.key
+    display = {**_display_of(data, key), **(overrides or {})}
+    pres = ls.bind(data, key, vdef.part)
+    if vdef.ground and not (pres.ground_supported
+                            and pres.ground_albedo is not None
+                            and pres.ground_direct_irradiance is not None):
+        raise ValueError(f"{key}: ground display needs the solve-bound "
+                         "materials (audit would have refused this view)")
+    rgb = render.render_result(pres, **display)
+    ax.imshow(rgb)
+    w, h = display["size"]
+    az, el = render.perspective_grid(w, h, display["hfov_deg"],
+                                     display["pitch_deg"],
+                                     display["yaw_deg"])
+    annotate_rect(ax, az, el, *_sun_of(data, key))
+    ax.set_title(vdef.title, fontsize=10)
+    return dict(camera="rect", key=key, part=vdef.part, ground=vdef.ground,
+                display=display, pixel_size=[w, h])
+
+
+def fisheye_panel(ax, data, vdef: ViewPanelDef, size: int = 640) -> dict:
+    """The equidistant re-projection of the same archived dome."""
+    display = _display_of(data, vdef.key)
+    pres = ls.bind(data, vdef.key, vdef.part)
+    rgb, az, el, mask = fisheye_rgb(pres, float(display["exposure"]), size)
+    ax.imshow(rgb)
+    annotate_fisheye(ax, az, el, mask, *_sun_of(data, vdef.key), size)
+    ax.set_title(vdef.title, fontsize=10)
+    return dict(camera="fisheye", key=vdef.key, part=vdef.part, ground=False,
+                display=dict(exposure=display["exposure"],
+                             tonemap=display["tonemap"],
+                             adaptation=display["adaptation"]),
+                pixel_size=[size, size])
+
+
+def spectrum_panel(ax, data, spec: SpectrumPanelDef) -> dict:
+    """Curves straight from archived rows via the theme's own axis helper."""
+    curves = tuple((c.key, c.part, c.label, c.style, c.zenith, c.azimuth)
+                   for c in spec.curves)
+    ls._spectrum_axis(ax, data, curves, spec.title, loglog=spec.loglog)
+    return dict(curves=[dict(key=c.key, part=c.part, zenith=c.zenith,
+                             azimuth=c.azimuth, label=c.label)
+                        for c in spec.curves],
+                loglog=spec.loglog)
+
+
+# figure-level style: the same paper tone the theme's spectra figure uses
+_STYLE = {"figure.facecolor": "#fcfcfb", "axes.facecolor": "#fcfcfb",
+          "text.color": "#0b0b0b", "axes.labelcolor": "#52514e"}
+
+
+def build_figure(data, fig_id: str):
+    """Assemble one registered figure from the archive (matplotlib, no solve)."""
+    plt = _plt()
+    fig_def = FIGURES[fig_id]
+    with plt.rc_context(_STYLE):
+        if fig_def.layout == "spectrum_pair":
+            fig = plt.figure(figsize=(10.8, 8.2), layout="constrained")
+            gs = fig.add_gridspec(2, 2, width_ratios=(1.15, 1.0),
+                                  height_ratios=(0.62, 1.0))
+            spectrum_panel(fig.add_subplot(gs[:, 0]), data, fig_def.spectrum)
+            rect_panel(fig.add_subplot(gs[0, 1]), data, fig_def.views[0])
+            fisheye_panel(fig.add_subplot(gs[1, 1]), data, fig_def.views[1])
+        elif fig_def.layout == "spectrum":
+            fig = plt.figure(figsize=(7.4, 4.8), layout="constrained")
+            spectrum_panel(fig.add_subplot(), data, fig_def.spectrum)
+        elif fig_def.layout == "triple_pair":
+            fig = plt.figure(figsize=(12.6, 7.8), layout="constrained")
+            gs = fig.add_gridspec(2, 3, height_ratios=(0.62, 1.0))
+            for j, vdef in enumerate(fig_def.views[:3]):
+                rect_panel(fig.add_subplot(gs[0, j]), data, vdef)
+            for j, vdef in enumerate(fig_def.views[3:]):
+                fisheye_panel(fig.add_subplot(gs[1, j]), data, vdef)
+        elif fig_def.layout == "rect_pair":
+            fig = plt.figure(figsize=(11.6, 3.8), layout="constrained")
+            for j, vdef in enumerate(fig_def.views):
+                rect_panel(fig.add_subplot(1, 2, j + 1), data, vdef)
+        elif fig_def.layout == "single_rect":
+            fig = plt.figure(figsize=(8.4, 4.6), layout="constrained")
+            rect_panel(fig.add_subplot(), data, fig_def.views[0])
+        else:
+            raise ValueError(f"unknown layout {fig_def.layout}")
+        fig.suptitle(fig_def.note, fontsize=10)
+    return fig
+
+
+def _manifest_entry(data, fig_id: str, npz_path: Path, publish: bool,
+                    input_sha: str) -> dict:
+    fig_def = FIGURES[fig_id]
+    feas = figure_feasibility(data, fig_def)
+    try:
+        rel = npz_path.relative_to(THEME.parents[1])
+    except ValueError:
+        rel = npz_path
+    command = (f"uv run python -m experiments.layerstory.refresh_figures "
+               f"--from-npz {rel} --figure {fig_id}")
+    if publish:
+        command += " --publish-figures"
+    return dict(fig_id=fig_id, publish_name=fig_def.publish_name,
+                consumers=list(fig_def.consumers), note=fig_def.note,
+                command=command, curves=feas["curves"], views=feas["views"],
+                input_sha256=input_sha, solve_version=str(data["version"]),
+                drawing_version=git_head())
+
+
+def render_figures(data, fig_ids, npz_path: Path,
+                   publish: bool = False) -> list[Path]:
+    """Generate the requested figures; theme out/ always, root only on publish.
+
+    A plain run never touches root figures/ or the historical snapshots --
+    publishing is explicit and writes only the registry's own v2 names.
+    """
+    plt = _plt()
+    from experiments.common import save
+
+    figures_dir = OUT / "figures"
+    figures_dir.mkdir(parents=True, exist_ok=True)
+    root = THEME.parents[1] / "figures"
+    input_sha = sha256_file(npz_path)
+    written = []
+    manifest = []
+    for fig_id in fig_ids:
+        fig = build_figure(data, fig_id)
+        theme_path = figures_dir / f"{fig_id}.png"
+        save(fig, theme_path)
+        if publish:
+            save(fig, root / FIGURES[fig_id].publish_name)
+        plt.close(fig)
+        written.append(theme_path)
+        manifest.append(_manifest_entry(data, fig_id, npz_path, publish,
+                                        input_sha))
+    (OUT / "refresh_manifest.json").write_text(json.dumps(manifest, indent=1))
+    return written
 
 
 def main(argv=None):
@@ -417,18 +786,33 @@ def main(argv=None):
                         help="archive to read (default: committed data)")
     parser.add_argument("--audit-only", action="store_true",
                         help="write the coverage report and exit")
+    parser.add_argument("--figure", action="append", metavar="ID",
+                        help="registry figure id, or 'all' (repeatable)")
+    parser.add_argument("--publish-figures", action="store_true",
+                        help="also write the named v2 files to root figures/")
     args = parser.parse_args(argv)
-    report = run_audit(args.from_npz)
-    infeasible = [k for k, f in report["figures"].items() if not f["feasible"]]
+    if args.figure is None and not args.audit_only:
+        parser.error("nothing to do: pass --audit-only and/or --figure "
+                     "<id|all>")
+    data = load(args.from_npz)
+    report = audit(data, args.from_npz)
+    write_audit(report)
     print(f"audit -> {OUT / 'audit_coverage.md'}")
     for key, cap in report["runs"].items():
         print(f"  {key}: {_capability_line(cap)}")
+    infeasible = [k for k, f in report["figures"].items() if not f["feasible"]]
     if infeasible:
         raise SystemExit(f"figures infeasible against the archive: "
                          f"{infeasible}")
-    if not args.audit_only:
-        raise SystemExit("figure generation lands with the next milestone; "
-                         "use --audit-only for now")
+    if args.figure is None:
+        return
+    ids = sorted(FIGURES) if "all" in args.figure else list(args.figure)
+    unknown = [i for i in ids if i not in FIGURES]
+    if unknown:
+        raise SystemExit(f"unknown figure ids: {unknown}")
+    for path in render_figures(data, ids, args.from_npz,
+                               publish=args.publish_figures):
+        print(f"  figure -> {path}")
 
 
 if __name__ == "__main__":
