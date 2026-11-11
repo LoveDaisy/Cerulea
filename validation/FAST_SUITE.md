@@ -329,12 +329,17 @@ live in docs/DEVELOPMENT.md "Test tiers".  This section records the
 measured evidence and the provenance of every number the task rewrote.
 
 **Count chain** (mechanically exported; `SKYCOLOR_FULL_SUITE=1 uv run pytest --collect-only -q`):
-issue baseline 542 + 21 tests added by this task = **563** =
-**361 fast + 202 slow** (identity guarded by
-`test_tier_accounting_full_equals_fast_union_slow`, no count literals).
-The 21: 8 in Step 1 (7 mini tier-filter behavior tests + 1 policy-helper
-unit test), 10 weights-tool unit tests, 2 tree guards (accounting + mirror),
+issue baseline 542 + 23 tests added by this task = **565** =
+**363 fast + 202 slow** (identity guarded by
+`test_tier_accounting_full_equals_fast_union_slow`, no count literals;
+set-diff verified against a baseline-tree collection, 23 added / 0 removed).
+The 23: 8 in Step 1 (7 mini tier-filter behavior tests + 1 policy-helper
+unit test), 12 weights-tool unit tests, 2 tree guards (accounting + mirror),
 1 review-round addition (mini scenario (g), xdist worker-side `-m` yield).
+Review-round gate hardening added its own tests after earlier exports —
+the chain below is the HEAD re-export (r4 review round); note that the
+owner-side rebase onto main will fold in further test files
+(mc-restrict-segv), requiring one more export at merge time.
 The mirror equality (`test_tier_slow_mirror_matches_live_markers`) is live
 since the first regen below; it fired once for real when scenario (g) moved
 the slow population 201 → 202, and the mandated marker-change cycle (fresh
@@ -467,7 +472,7 @@ semantics.
 **Final verification (this task, 2026-11-11):** fast tier 358 passed ×2
 (outer wall 62.50 / 56.70 s, window load 8-24), harness serial diagnostics
 41 passed (30.67 s); post-review-round verification on the refreshed table:
-fast tier 361 passed ×3 (outer wall 38.74 / 38.52 / 37.94 s — the
+fast tier 361 passed ×3 (pre-r3/r4-gate-tree) (outer wall 38.74 / 38.52 / 37.94 s — the
 tier-updated packing distributes startup cost better than the pre-tier
 table), full tier **563 passed, zero skips**, exit 0 (393.70 s).  Attributions, per run: the 62.50 / 56.70 s pair sat
 above the 50.5 s form-measurement median under a loaded window (1-min load

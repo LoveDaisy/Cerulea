@@ -644,8 +644,9 @@ def test_weights_tool_population_consistency_structural_only():
     with pytest.raises(SystemExit, match="passed counts"):
         WEIGHTS_TOOL.check_population_consistency(
             ["full", "fast1", "fast2"], [3, 2, 1], [ok_full, fast1, fast2])
-    # the full slot must cover the slow tier: four fast listings (xdist
-    # summaries are shape-identical) fail here, not silently
+    # the full slot must cover the slow tier: a fast listing passed in
+    # the full slot (xdist summaries are shape-identical) fails here,
+    # not silently
     with pytest.raises(SystemExit, match="slow tier"):
         WEIGHTS_TOOL.check_population_consistency(
             ["full", "fast1", "fast2"], [2, 2, 2],
@@ -726,6 +727,23 @@ def test_weights_tool_reuse_gate_full_must_cover_fast_readings():
         WEIGHTS_TOOL.reuse_gate(full, medians)
     del medians["tests/test_a.py::new_heavy"]
     WEIGHTS_TOOL.reuse_gate(full, medians)  # boundary + absent items tolerated
+
+
+def test_weights_tool_prune_drops_deleted_tests_readings():
+    # a once-measured test deleted from the tree keeps a reading in the
+    # standing authority samples; pruning to the live population removes it
+    # so the reuse gate cannot demand an impossible fresh full listing
+    live = {"tests/test_a.py::t1", "tests/test_a.py::t2"}
+    totals = [{"tests/test_a.py::t1": 3.0, "tests/test_a.py::t2": 1.0,
+               "tests/test_a.py::deleted": 4.0}]
+    pruned = WEIGHTS_TOOL.prune_to_population(totals, live)
+    assert pruned[0] == {"tests/test_a.py::t1": 3.0, "tests/test_a.py::t2": 1.0}
+    # ...and a live test genuinely missing from the full listing still fires
+    medians = {"tests/test_a.py::t2": 3.0, "tests/test_a.py::deleted": 4.0}
+    with pytest.raises(SystemExit, match="t2"):
+        WEIGHTS_TOOL.reuse_gate({"tests/test_a.py::t1": 3.0},
+                                WEIGHTS_TOOL.fast_medians(
+                                    [{"tests/test_a.py::t2": 3.0}]))
 
 
 def test_weights_tool_payload_schema_is_backward_compatible(tmp_path):

@@ -85,7 +85,10 @@ BOTH hold:
    candidates measuring ≤2 s are recorded as *reclassification-ready*
    and released in one batch once the transient-aware gate task lands;
    the authoritative table stays valid throughout (no marker change → no
-   mirror lag).
+   mirror lag).  Should a flip land anyway (operator error, rebase
+   conflict), the only green path during the freeze is reverting that
+   change — no regen path exists, and the mirror equality test is what
+   detects the drift.
 
 **New tests are tiered by their author at write time** (species dimension from
 the rule above; cost dimension from an honest estimate, marker reason prefixed
@@ -118,7 +121,8 @@ candidates keep their marker until the transient task lands.  During the
 transition freeze, even successful candidates do NOT have their markers
 deleted (their release would need a fresh fast regen, which the bin-head
 gate deterministically trips) — they are recorded reclassification-ready
-and released in one batch after the transient task lands.
+in validation/FAST_SUITE.md (beside the ratchet evidence) and released in
+one batch after the transient task lands.
 
 **Marker reasons are machine-readable** — `kind:mc` / `kind:golden` /
 `kind:grid` / `kind:render` for species-exclusive tests, `cost: <median> s
@@ -149,9 +153,11 @@ requires + regen.  Three scenarios: a fast-tier population change
 slow-tier-only population change (new `slow`-marked tests, fast population
 untouched) likewise requires only a fresh full-suite listing + regen; in
 both cases the standing fast-tier authority samples are reused (the
-verified minimal closure) and tests added since the authority measurement
-stay in the accepted inter-regen blind spot until the transient task's
-regen.  A pure marker FLIP with unchanged population would re-measure the
+verified minimal closure) — the regen prunes readings of tests that no
+longer exist (live-population intersection), so removing a once-measured
+test takes exactly this path too — and tests added since the authority
+measurement stay in the accepted inter-regen blind spot until the
+transient task's regen.  A pure marker FLIP with unchanged population would re-measure the
 three fast listings + regen — but during the transition freeze flips do
 not land at all (see the transient boundary above: fresh fast listings
 deterministically trip the bin-head gate), so scenario three is unusable
@@ -182,7 +188,9 @@ the pre-tier suite):** any task that adds or removes tests from the suite
 must, before closing, regenerate `tests/data/scheduling_weights.json` per
 the flow above (a population change requires re-measuring the full-suite
 listing) and record the table, tier counts and `fast_predicted_wall_s` in
-[validation/FAST_SUITE.md](../validation/FAST_SUITE.md).  The formal
+[validation/FAST_SUITE.md](../validation/FAST_SUITE.md), keeping the
+AGENTS.md test-section counts and wall band in the same sync (the AGENTS
+numbers are entry-point literals and rot silently otherwise).  The formal
 wall-clock pair for acceptance is taken on the **full tier** entry
 (`SKYCOLOR_FULL_SUITE=1 …`, full population ×2, zero skips); quiet-window
 certification remains a separate backlog item.  The 360 s guard line and

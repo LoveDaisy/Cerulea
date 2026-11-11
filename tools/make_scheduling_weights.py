@@ -369,6 +369,37 @@ def collect_slow_nodeids():
         if "::" in line and not line.startswith("="))
 
 
+def collect_population_nodeids():
+    """Live full-population nodeids via a fresh env-switched collection."""
+    env = dict(os.environ, SKYCOLOR_FULL_SUITE="1")
+    proc = subprocess.run(
+        [sys.executable, "-m", "pytest", "--co", "-q", "-n", "0",
+         "-p", "no:cacheprovider"],
+        cwd=ROOT, env=env, capture_output=True, text=True, timeout=600)
+    if proc.returncode != 0:
+        raise SystemExit(
+            "population collection subprocess failed:\n"
+            + (proc.stdout + proc.stderr)[-2000:])
+    return {
+        line.strip() for line in proc.stdout.splitlines()
+        if "::" in line and not line.startswith("=")
+    }
+
+
+def prune_to_population(totals_list, live):
+    """Drop readings of tests that no longer exist in the live tree.
+
+    The standing authority samples legitimately contain readings of tests
+    since deleted (any removal of a once-measured fast test).  Left in,
+    those stale readings dead-lock the gates: the reuse gate would demand a
+    fresh full listing that can never contain a deleted test, and the audit
+    gate would raise fake offenders.  Pruning to the live collection makes
+    every gate judge exactly the population that exists, which is what the
+    removal path of the marker-change cost model requires.
+    """
+    return [{n: s for n, s in t.items() if n in live} for t in totals_list]
+
+
 def build(totals):
     """Split the totals into module weights and individually scheduled nodes.
 
@@ -430,6 +461,8 @@ def main():
     totals = [parse_durations(text) for text in texts]
     if not all(totals):
         raise SystemExit("no durations lines found in an input")
+    live = collect_population_nodeids()
+    totals = prune_to_population(totals, live)
     medians = fast_medians(totals[1:])
     slow = set(collect_slow_nodeids())
     check_population_consistency(
