@@ -253,3 +253,42 @@ def test_manifest_records_command_and_directions(data):
     for curve in entry["curves"]:
         z, a = curve["requested"]
         assert curve["row"] == ls.row_index(data, curve["key"], z, a)
+
+
+def test_plain_run_writes_only_theme_outputs(data):
+    """A plain run never touches root figures/ or the historical snapshots."""
+    out = rf.render_figures(data, ["cloud"], NPZ)
+    assert len(out) == 1
+    theme_out = (rf.OUT / "figures").resolve()
+    assert out[0].resolve().parent == theme_out
+
+
+def test_publish_names_are_the_registered_v2_set():
+    """Publishing writes only the registry's own *_v2.png names, root originals
+    (overview/spectra) are never republished or overwritten by it."""
+    expected = {"layer_story_rayleigh_v2.png", "layer_story_aerosol_v2.png",
+                "layer_story_ozone_v2.png", "layer_story_multiple_v2.png",
+                "layer_story_twilight_v2.png", "layer_story_cloud_v2.png",
+                "layer_story_pipeline_spectrum_v2.png",
+                "layer_story_pipeline_view_v2.png"}
+    assert {f.publish_name for f in rf.FIGURES.values()} == expected
+    for name in expected:
+        assert name.startswith("layer_story_") and name.endswith("_v2.png")
+        assert not Path(name).name in ("layer_story_overview.png",
+                                       "layer_story_spectra.png")
+
+
+def test_historical_snapshots_are_byte_identical():
+    """The tracked v1 snapshots equal the root originals byte for byte."""
+    import hashlib
+
+    root = REPO / "figures"
+    hist = REPO / "experiments/layerstory/historical"
+    pairs = [("layer_story_overview.png",
+              "historical_layer_story_overview_v1.png"),
+             ("layer_story_spectra.png",
+              "historical_layer_story_spectra_v1.png")]
+    for original, snapshot in pairs:
+        a = hashlib.sha256((root / original).read_bytes()).hexdigest()
+        b = hashlib.sha256((hist / snapshot).read_bytes()).hexdigest()
+        assert a == b, snapshot

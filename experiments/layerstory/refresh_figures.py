@@ -158,7 +158,7 @@ FIGURES: dict[str, FigureDef] = {
                   "rel. azimuth 180°)"),
         (),
         ("docs/physics/LAYER_STORY.md §L4", "docs/physics/MAINLINE.zh.md 图5"),
-        "anti-solar means relative azimuth 180 deg, not a 90 deg scattering angle"),
+        "anti-solar means relative azimuth 180°, not a 90° scattering angle"),
     "twilight": FigureDef(
         "twilight", "layer_story_twilight_v2.png", "triple_pair",
         None,
@@ -748,6 +748,32 @@ def _manifest_entry(data, fig_id: str, npz_path: Path, publish: bool,
                 drawing_version=git_head())
 
 
+def _save_bytes(fig, destinations) -> None:
+    """Render ONCE, write the identical bytes everywhere.
+
+    savefig(bbox_inches="tight") runs a layout pass that can mutate a
+    constrained-layout figure's state, so a second savefig of the same fig
+    is not guaranteed to reproduce the first render byte for byte.  The
+    published copies must be pixel-identical to the theme run outputs, so
+    the figure is rendered to a buffer once and the same bytes are written
+    to every destination (same dpi/tight convention as experiments.common.save).
+    """
+    import io
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=140, bbox_inches="tight")
+    data = buf.getvalue()
+    for path in destinations:
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+        try:
+            shown = path.relative_to(THEME.parents[1])
+        except ValueError:
+            shown = path
+        print(f"  figure -> {shown}")
+
+
 def render_figures(data, fig_ids, npz_path: Path,
                    publish: bool = False) -> list[Path]:
     """Generate the requested figures; theme out/ always, root only on publish.
@@ -756,10 +782,8 @@ def render_figures(data, fig_ids, npz_path: Path,
     publishing is explicit and writes only the registry's own v2 names.
     """
     plt = _plt()
-    from experiments.common import save
 
     figures_dir = OUT / "figures"
-    figures_dir.mkdir(parents=True, exist_ok=True)
     root = THEME.parents[1] / "figures"
     input_sha = sha256_file(npz_path)
     written = []
@@ -767,9 +791,10 @@ def render_figures(data, fig_ids, npz_path: Path,
     for fig_id in fig_ids:
         fig = build_figure(data, fig_id)
         theme_path = figures_dir / f"{fig_id}.png"
-        save(fig, theme_path)
+        destinations = [theme_path]
         if publish:
-            save(fig, root / FIGURES[fig_id].publish_name)
+            destinations.append(root / FIGURES[fig_id].publish_name)
+        _save_bytes(fig, destinations)
         plt.close(fig)
         written.append(theme_path)
         manifest.append(_manifest_entry(data, fig_id, npz_path, publish,
