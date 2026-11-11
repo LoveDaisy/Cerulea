@@ -78,6 +78,14 @@ BOTH hold:
    across samples — the adjudicated outcome is the third one documented in
    validation/FAST_SUITE.md "The ratchet fired live": keep the
    authoritative table, record the flagged set as evidence, mark nothing.
+   **Transition freeze:** because any fresh fast listing deterministically
+   trips the bin-head gate while the transient exists, marker flips in
+   BOTH directions on existing tests (including successful batch-protocol
+   reclassification candidates) do not land during the transition —
+   candidates measuring ≤2 s are recorded as *reclassification-ready*
+   and released in one batch once the transient-aware gate task lands;
+   the authoritative table stays valid throughout (no marker change → no
+   mirror lag).
 
 **New tests are tiered by their author at write time** (species dimension from
 the rule above; cost dimension from an honest estimate, marker reason prefixed
@@ -106,7 +114,11 @@ the transient, so candidates read near-intrinsic; their K=3 medians are
 the evidence.  A candidate that still reads >2 s may be attributed with a
 serial reference (`uv run pytest -n 0 <nodeids> --durations=0` — an
 attribution aid, never the pass/fail evidence itself); unresolved
-candidates keep their marker until the transient task lands.
+candidates keep their marker until the transient task lands.  During the
+transition freeze, even successful candidates do NOT have their markers
+deleted (their release would need a fresh fast regen, which the bin-head
+gate deterministically trips) — they are recorded reclassification-ready
+and released in one batch after the transient task lands.
 
 **Marker reasons are machine-readable** — `kind:mc` / `kind:golden` /
 `kind:grid` / `kind:render` for species-exclusive tests, `cost: <median> s
@@ -133,14 +145,17 @@ overrides to the full population.  Priority: explicit
 markers (harness equality test).  After adding/removing markers, the only
 path back to a green full suite is re-measuring the listings the change
 requires + regen.  Three scenarios: a fast-tier population change
-(new/removed fast tests) requires a fresh full-suite listing plus three
-fresh fast listings (whose regen is subject to the transient boundary
-above); a slow-tier-only population change (new `slow`-marked tests, fast
-population untouched) requires only a fresh full-suite listing + regen,
-reusing the standing fast-tier authority samples (the verified minimal
-closure); a pure marker flip with unchanged population may reuse the
-existing full listing (the reuse gate mechanically checks the coverage),
-re-measuring only the three fast listings + regen.
+(new/removed fast tests) requires a fresh full-suite listing; a
+slow-tier-only population change (new `slow`-marked tests, fast population
+untouched) likewise requires only a fresh full-suite listing + regen; in
+both cases the standing fast-tier authority samples are reused (the
+verified minimal closure) and tests added since the authority measurement
+stay in the accepted inter-regen blind spot until the transient task's
+regen.  A pure marker FLIP with unchanged population would re-measure the
+three fast listings + regen — but during the transition freeze flips do
+not land at all (see the transient boundary above: fresh fast listings
+deterministically trip the bin-head gate), so scenario three is unusable
+until the transient task releases the freeze.
 
 ### Test-suite execution profile
 

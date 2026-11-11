@@ -387,11 +387,13 @@ the transient follows bin position, so future regens will flag the then-current
 bin heads (a ratchet), and the slow→fast reclassification measurement
 (small nodeid selection) is confounded by the same transient.  The
 transitional reclassification measurement protocol (batch over the slow
-tier via `-m slow`, serial readings as attribution aid only) and the
-serial-form regen guard are pinned in docs/DEVELOPMENT.md; the transient-
-aware gate / startup mitigation itself is a registered backlog entry
-(scratchpad/backlog.md "xdist 启动暂态：暂态感知升线闸与重分类测量去污染")
-pending its own task.
+tier via `-m slow`, serial readings as attribution aid only), the
+authoritative-table adjudication, and the **transition freeze** (no marker
+flips land until the transient-aware gate exists; successful candidates
+are recorded reclassification-ready and released in one batch) are pinned
+in docs/DEVELOPMENT.md; the transient-aware gate / startup mitigation
+itself is a registered backlog entry (scratchpad/backlog.md "xdist 启动暂态：
+暂态感知升线闸与重分类测量去污染") pending its own task.
 
 **Weights regen (authoritative, 2026-11-11):** full listing
 `SKYCOLOR_FULL_SUITE=1 uv run pytest -q -n 12 --dist=loadgroup

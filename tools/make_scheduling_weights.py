@@ -59,6 +59,8 @@ _HEADER = re.compile(r"=+ slowest(?: (\d+))? durations =+")
 _SCHED_SUFFIX = re.compile(r"@bin\d+$")
 _PASSED = re.compile(r"(\d+) passed")
 _DESELECTED = re.compile(r"(\d+) deselected")
+_FAILED = re.compile(r"\b(\d+) (?:failed|error(?:s)?)\b")
+_SKIPPED = re.compile(r"\b(\d+) skipped\b")
 #: xdist loadgroup evidence on a durations line: a real listed nodeid closes
 #: with the scheduling suffix.  Required in the full slot — the full-suite
 #: listing is measured under the constant 12-worker loadgroup form, so its
@@ -146,19 +148,29 @@ def parse_durations(text):
     return totals
 
 
-def parse_summary(text):
+def parse_summary(text, label=""):
     """Return ``(passed, deselected)`` from the run's final summary line.
 
     Anchored to the last non-empty line on purpose: the durations listing
     precedes the summary, so a whole-text search could match "N passed"
-    inside a test *name* on a durations line and misparse the counts.
+    inside a test *name* on a durations line and misparse the counts.  A
+    red run (``failed``/``error`` tokens on the summary line) is rejected:
+    equal passed counts across three fast samples would otherwise let a
+    deterministically failing suite slip through as authority input.
     """
     tail = text.rstrip().splitlines()[-1] if text.strip() else ""
+    failed = _FAILED.search(tail)
+    if failed:
+        raise SystemExit(
+            f"{label}: summary reports {failed.group(1)} failed/errored "
+            f"test(s) — a red run is unusable as measurement authority. "
+            f"Fix the suite and re-measure.")
     passed = _PASSED.search(tail)
     deselected = _DESELECTED.search(tail)
     if passed is None:
         raise SystemExit(
-            "no 'N passed' summary line found at the end of the listing")
+            f"{label}: no 'N passed' summary line found at the end of the "
+            f"listing")
     return int(passed.group(1)), (int(deselected.group(1)) if deselected else 0)
 
 
@@ -177,36 +189,49 @@ def _summary_mentions_deselected(text):
 def validate_list_identity(label, text):
     """Reject listings whose content contradicts their slot in the CLI.
 
-    A full-suite listing never deselects (``SKYCOLOR_FULL_SUITE=1``, no
-    ``-m``/``-k``) and must carry xdist loadgroup evidence (``@binN``
-    scheduling suffixes on durations lines) — the full listing is measured
-    under the constant 12-worker form, so a serial listing passed here
-    would silently produce uncontended scheduling weights.  A fast-tier
-    listing either reports the deselected count (serial form) or — under
-    xdist, which does not aggregate worker-side deselected counts into the
-    summary — reports nothing, so absence is accepted and mis-slotted
-    listings are caught structurally instead (population consistency and
-    the reuse gate fire on swaps and on all-fast inputs).  Identity is
-    judged by content, not filename.
+    Every slot demands xdist loadgroup evidence (``@binN`` scheduling
+    suffixes on durations lines): the full listing is measured under the
+    constant 12-worker form, and the fast listings are the target-form
+    authority — a serial listing in any slot would silently mix calibers
+    into the medians or produce uncontended weights.  A full-suite listing
+    never deselects and accepts no skips (the full tier is the zero-skip
+    acceptance population); a fast-tier listing either reports the
+    deselected count (serial form) or — under xdist, which does not
+    aggregate worker-side deselected counts into the summary — reports
+    nothing, so absence is accepted and mis-slotted listings are caught
+    structurally instead.  Identity is judged by content, not filename.
     """
-    passed, deselected = parse_summary(text)
+    passed, deselected = parse_summary(text, label)
+    skipped = _SKIPPED.search(text.rstrip().splitlines()[-1] if text.strip() else "")
     is_full = label.startswith("full")
     if is_full:
         if deselected:
             raise SystemExit(
                 f"{label}: shows {deselected} deselected — not a full-suite "
                 f"listing.  Re-measure with SKYCOLOR_FULL_SUITE=1 and no -m/-k.")
+        if skipped:
+            raise SystemExit(
+                f"{label}: reports {skipped.group(1)} skipped — the full "
+                f"tier is the zero-skip acceptance population.  Resolve the "
+                f"skip (e.g. a pending mirror regen) and re-measure.")
         if not _SUFFIXED_DURATION_LINE.search(text):
             raise SystemExit(
                 f"{label}: no xdist loadgroup scheduling suffixes on any "
                 f"durations line — not a 12-worker loadgroup listing.  "
                 f"Re-measure with SKYCOLOR_FULL_SUITE=1 uv run pytest -q "
                 f"-n 12 --dist=loadgroup --durations=0 --durations-min=0.")
-    elif deselected == 0 and _summary_mentions_deselected(text):
-        raise SystemExit(
-            f"{label}: reports a zero deselected count — not a fast-tier "
-            f"listing.  Re-measure with the default entry point (no "
-            f"-m/-k/nodeid arguments).")
+    else:
+        if deselected == 0 and _summary_mentions_deselected(text):
+            raise SystemExit(
+                f"{label}: reports a zero deselected count — not a fast-tier "
+                f"listing.  Re-measure with the default entry point (no "
+                f"-m/-k/nodeid arguments).")
+        if not _SUFFIXED_DURATION_LINE.search(text):
+            raise SystemExit(
+                f"{label}: no xdist loadgroup scheduling suffixes on any "
+                f"durations line — the fast-tier authority is the "
+                f"12-worker target form.  Re-measure with the default "
+                f"entry point (add --durations=0).")
     return passed, deselected
 
 
@@ -251,8 +276,10 @@ def check_population_consistency(labels, passed_counts, totals_list, slow=()):
         if missing or extra:
             raise SystemExit(
                 f"{label}: module population diverges from {fast_labels[0]} "
-                f"(missing {sorted(missing)}, extra {sorted(extra)}).  "
-                f"The fast listings must cover the same population.")
+                f"(missing {sorted(missing)}, extra {sorted(extra)}).  The "
+                f"comparison anchors on {fast_labels[0]} — either side may "
+                f"be the defective listing; check both.  The fast listings "
+                f"must cover the same population.")
     uncovered = comparable - {n.split("::")[0] for n in full_totals}
     if uncovered:
         raise SystemExit(
@@ -421,8 +448,9 @@ def main():
             "boundary: if the set looks like xdist bin-head spikes (~12 "
             "positional 7-17 s medians incl. intrinsically sub-0.1 s tests), "
             "read validation/FAST_SUITE.md 'The ratchet fired live' BEFORE "
-            "marking anything; the authoritative table is kept and the set "
-            "recorded for the registered transient task.")
+            "marking anything; the authoritative table is kept, the set is "
+            "recorded for the registered transient task, and no marker "
+            "flips land until that task releases the freeze.")
     payload = build_payload(totals[0], medians, slow)
     WEIGHTS_PATH.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
     total = sum(payload["modules"].values()) + sum(payload["nodes"].values())

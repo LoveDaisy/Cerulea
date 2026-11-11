@@ -559,20 +559,36 @@ def test_weights_tool_list_identity_by_content():
         "======== 558 passed in 400.00s ==========\n"
     )
     # serial fast listing: carries the deselected summary
-    fast_text = "======== 358 passed, 201 deselected in 55.00s =========="
+    fast_text = (
+        "1.00s call     tests/test_a.py::t1\n"
+        "======== 358 passed, 201 deselected in 55.00s ==========\n"
+    )
     # xdist fast listing: xdist does not aggregate worker-side deselected
     # counts into the summary (suite-tier step5 finding) — absence is valid
-    xdist_fast_text = "======== 358 passed, 1 warning in 50.36s =========="
+    xdist_fast_text = (
+        "1.00s call     tests/test_a.py::t1@bin1\n"
+        "======== 358 passed, 1 warning in 50.36s ==========\n"
+    )
     # identity is judged by the summary content, not the filename
     assert WEIGHTS_TOOL.validate_list_identity("full (arg 1)", full_text) == (558, 0)
-    assert WEIGHTS_TOOL.validate_list_identity("fast1 (arg 2)", fast_text) == (358, 201)
     assert WEIGHTS_TOOL.validate_list_identity("fast1 (arg 2)", xdist_fast_text) == (358, 0)
+    # ...but BOTH slots demand the target-form (12-worker loadgroup)
+    # evidence: a serial fast listing mixes calibers into the medians
+    with pytest.raises(SystemExit, match="target form"):
+        WEIGHTS_TOOL.validate_list_identity("fast1 (arg 2)", fast_text)
+    # a listing that explicitly reports deselected tests is never a full
+    # listing, regardless of its suffixes
     with pytest.raises(SystemExit, match="not a full-suite"):
-        WEIGHTS_TOOL.validate_list_identity("full (arg 1)", fast_text)
+        WEIGHTS_TOOL.validate_list_identity(
+            "full (arg 1)",
+            "1.00s call     tests/test_a.py::t1@bin1\n"
+            "======== 358 passed, 201 deselected in 55.00s ==========\n")
     # an explicit zero deselected count means the filter never engaged
     with pytest.raises(SystemExit, match="not a fast-tier"):
         WEIGHTS_TOOL.validate_list_identity(
-            "fast1 (arg 2)", "======== 358 passed, 0 deselected in 55s ======")
+            "fast1 (arg 2)",
+            "1.00s call     tests/test_a.py::t1@bin1\n"
+            "======== 358 passed, 0 deselected in 55s ======\n")
     # a "deselected" substring inside a test NAME on a durations line must
     # not reject a real xdist fast listing (the scan is tail-anchored)
     poisoned_fast = (
@@ -583,6 +599,25 @@ def test_weights_tool_list_identity_by_content():
     # a full/fast swap is caught structurally (population consistency and
     # the reuse gate), not here: an xdist fast listing and a full listing have
     # the same summary shape, so this check alone cannot separate them
+
+
+def test_weights_tool_red_and_skipped_runs_rejected():
+    suffix = "1.00s call     tests/test_a.py::t1@bin1\n"
+    # a red run is unusable as measurement authority — even when the passed
+    # counts happen to agree across all three fast samples
+    red_fast = suffix + "======== 357 passed, 1 failed in 55.00s ==========\n"
+    with pytest.raises(SystemExit, match="red run"):
+        WEIGHTS_TOOL.parse_summary(red_fast, "fast1 (arg 2)")
+    red_full = suffix + "======== 562 passed, 1 failed in 400.00s ==========\n"
+    with pytest.raises(SystemExit, match="red run"):
+        WEIGHTS_TOOL.validate_list_identity("full (arg 1)", red_full)
+    # the full tier is the zero-skip acceptance population
+    skipped_full = suffix + "======== 562 passed, 1 skipped in 400.00s ==========\n"
+    with pytest.raises(SystemExit, match="skipped"):
+        WEIGHTS_TOOL.validate_list_identity("full (arg 1)", skipped_full)
+    # green xdist fast and full listings pass
+    assert WEIGHTS_TOOL.validate_list_identity(
+        "fast1 (arg 2)", suffix + "======== 361 passed in 38.00s ==========") == (361, 0)
 
 
 def test_weights_tool_population_consistency_structural_only():
