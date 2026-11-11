@@ -87,6 +87,7 @@ import warnings
 import numpy as np
 
 from . import mc as _mc
+from ..optics import contiguous_transpose as _cT
 
 #: standing approximations of this backend
 CAPABILITIES = {
@@ -191,7 +192,7 @@ def _unit_vectors(zen_deg, az_deg, sun_zenith_deg, sun_azimuth_deg):
 
 def _angular_distance(a, b):
     """Great-circle distance between unit vectors, clipped for round-off."""
-    return np.arccos(np.clip(a @ b.T, -1.0, 1.0))
+    return np.arccos(np.clip(a @ _cT(b), -1.0, 1.0))
 
 
 def _tangent_basis(n):

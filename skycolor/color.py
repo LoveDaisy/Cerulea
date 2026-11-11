@@ -20,6 +20,7 @@ from __future__ import annotations
 import numpy as np
 
 from . import spectra
+from .optics import contiguous_transpose as _cT
 
 
 # ---------------------------------------------------------------------------
@@ -38,14 +39,14 @@ def xyz_to_linear_srgb(xyz: np.ndarray) -> np.ndarray:
     m = np.array([[3.2406, -1.5372, -0.4986],
                   [-0.9689, 1.8758, 0.0415],
                   [0.0557, -0.2040, 1.0570]])
-    return xyz @ m.T
+    return xyz @ _cT(m)
 
 
 def linear_srgb_to_xyz(rgb: np.ndarray) -> np.ndarray:
     m = np.array([[0.4124564, 0.3575761, 0.1804375],
                   [0.2126729, 0.7151522, 0.0721750],
                   [0.0193339, 0.1191920, 0.9503041]])
-    return rgb @ m.T
+    return rgb @ _cT(m)
 
 
 def luminance(xyz) -> np.ndarray:
@@ -85,14 +86,14 @@ def _rgb_to_lms(rgb):
     m = np.array([[0.38971, 0.68898, -0.07868],
                   [-0.22981, 1.18340, 0.04641],
                   [0.0, 0.0, 1.0]])
-    return rgb @ m.T
+    return rgb @ _cT(m)
 
 
 def _lms_to_rgb(lms):
     m = np.linalg.inv(np.array([[0.38971, 0.68898, -0.07868],
                                [-0.22981, 1.18340, 0.04641],
                                [0.0, 0.0, 1.0]]))
-    return lms @ m.T
+    return lms @ _cT(m)
 
 
 def bradford_adapt(xyz: np.ndarray, src_white, dst_white=_D65) -> np.ndarray:
@@ -103,7 +104,7 @@ def bradford_adapt(xyz: np.ndarray, src_white, dst_white=_D65) -> np.ndarray:
     mi = np.linalg.inv(m)
     s = m @ np.asarray(src_white, dtype=float)
     d = m @ np.asarray(dst_white, dtype=float)
-    return (xyz @ m.T * (d / np.maximum(s, 1e-12))) @ mi.T
+    return (xyz @ _cT(m) * (d / np.maximum(s, 1e-12))) @ _cT(mi)
 
 
 # ---------------------------------------------------------------------------

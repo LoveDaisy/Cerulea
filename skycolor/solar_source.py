@@ -74,7 +74,7 @@ from scipy.optimize import brentq
 
 from . import spectra
 from .constants import N_STD_AIR, R_EARTH
-from .optics import species_extinction_weights
+from .optics import contiguous_transpose as _cT, species_extinction_weights
 from .refraction import REFRACTIVITY_STD
 
 #: tabulation top of the refractive profile [m]; above it n is n_inf
@@ -1894,7 +1894,7 @@ class SolarSource:
         radius = np.linalg.norm(x, axis=1)
         radial = x / radius[:, None]
         height = self._position_heights(x)
-        true_mu = np.clip(radial @ directions.T, -1.0, 1.0)
+        true_mu = np.clip(radial @ _cT(directions), -1.0, 1.0)
         true_e = np.degrees(np.arcsin(true_mu))
         app, columns, gain, lit = self.geometry.ensure_table().query_fields(
             height[:, None], true_e)
@@ -1928,7 +1928,7 @@ class SolarSource:
         if normal.ndim == 2:                           # per-point normals (n, 3)
             n_dot_radial = np.einsum("ij,ij->i", radial, normal)[:, None]
             if directions.ndim == 2:                   # shared disk (nb, 3)
-                n_dot_beam = (directions @ normal.T).T             # (n, nb)
+                n_dot_beam = (directions @ _cT(normal)).T          # (n, nb)
             else:                                      # per point (n, nb, 3)
                 n_dot_beam = np.einsum("nbj,nj->nb", directions, normal)
         else:                                          # one shared normal (3,)
@@ -2055,7 +2055,7 @@ class SolarSource:
         # own rows in the same order
         bw = backward_chunk[active]
         dr = np.einsum("ij,ij->i", bw, radial)[:, None]
-        horizontal_dot = (bw @ directions.T
+        horizontal_dot = (bw @ _cT(directions)
                           - mu * dr) / np.sqrt(np.maximum(1 - mu ** 2, 1e-30))
         phase_mu = np.cos(app) * horizontal_dot + np.sin(app) * dr
         phase_mu = np.where(np.abs(mu) > 1 - 1e-14, np.sign(mu) * dr, phase_mu)
@@ -2251,7 +2251,7 @@ class SolarSource:
                 _, _, _, app, transmission, gain, _ = self._geometry_arrays(
                     x[pos], iw, disk=(directions, dsk[1]), local=local)
                 radial = x[pos] / np.linalg.norm(x[pos], axis=1)[:, None]
-                sin_true = np.clip(radial @ directions.T, -1, 1)
+                sin_true = np.clip(radial @ _cT(directions), -1, 1)
                 app_dot_normal = self._apparent_plane_projection(
                     normals[pos], radial, directions, sin_true, app)
                 if iw is None:
