@@ -17,7 +17,7 @@ uv sync        # 从 uv.lock 重建 .venv；不要 pip install 进环境
 ### 测试
 
 ```bash
-uv run pytest -q                      # 默认 = 快层 dev loop（363 项，~38-63s 窗载依赖，
+uv run pytest -q                      # 默认 = 快层 dev loop（373 项，~38-63s 窗载依赖，
                                       # 12-worker xdist / LPT；slow 标记项被
                                       # 过滤，显式 -m/-k/::nodeid 退让）
 SKYCOLOR_FULL_SUITE=1 uv run pytest -q -n 12 --dist=loadgroup
@@ -32,7 +32,8 @@ uv run python -m validation.run_all   # 六项物理校验，单池 8 worker，�
 双层契约与定层规则见 `docs/DEVELOPMENT.md`「Test tiers」；计数链、形态实测、
 启动暂态与 formal pair 协议（显式全层）见 `validation/FAST_SUITE.md`
 suite-tier 节。新增测试由作者写时定层（种类判据 + 成本估算，`kind:`/`cost:`
-reason）；成本维度由权重再生成审计闸机械复核（未标项中位 >2s fail）。
+reason）；marker 为人工声明（升线自动闸已按 2026-11-11 用户裁定删除），
+成本经权重再生成流程落表（`fast_predicted_wall_s` 记录性指标，无自动闸）。
 
 ### 运行
 

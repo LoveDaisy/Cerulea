@@ -68,61 +68,49 @@ BOTH hold:
    full-dome integration, and golden-fixture full verification are full-tier
    exclusive regardless of cost.
 2. **Cost** (`cost:`): its fast-tier K=3 median under the target form
-   (12-worker xdist) is ≤2 s.  The `tools/make_scheduling_weights.py`
-   regen audit gate enforces this mechanically: an unmarked fast-tier test
-   above the budget fails the regen.  Lawful outcomes are marking `slow` or
-   opening an optimization task — there is no "leave unmarked" outcome.
-   Transient boundary (until the registered backlog task lands): when the
-   gate output carries the xdist bin-head signature — ~12 positional
-   7-17 s medians including intrinsically sub-0.1 s tests, reproducing
-   across samples — the adjudicated outcome is the third one documented in
-   validation/FAST_SUITE.md "The ratchet fired live": keep the
-   authoritative table, record the flagged set as evidence, mark nothing.
-   **Transition freeze:** because any fresh fast listing deterministically
-   trips the bin-head gate while the transient exists, marker flips in
-   BOTH directions on existing tests (including successful batch-protocol
-   reclassification candidates) do not land during the transition —
-   candidates measuring ≤2 s are recorded as *reclassification-ready*
-   and released in one batch once the transient-aware gate task lands;
-   the authoritative table stays valid throughout (no marker change → no
-   mirror lag).  Should a flip land anyway (operator error, rebase
-   conflict), the only green path during the freeze is reverting that
-   change — no regen path exists, and the mirror equality test is what
-   detects the drift.
+   (12-worker xdist) is ≤2 s.  **Markers are human-owned declarations**
+   (2026-11-11 user adjudication, option 2): no automated gate judges
+   marker placement.  The cost dimension is carried by the standing
+   weights-regen rule (below): every regen measures actual costs into the
+   table and the informational `fast_predicted_wall_s`, and a marker whose
+   measured cost contradicts its tier is corrected by hand — re-measure,
+   flip, regen.  Measurement caveat: the `-n 12` xdist form concentrates a
+   ~12-17 s startup transient on each scheduling bin's first tests
+   (evidence: validation/FAST_SUITE.md "suite-tier"), so a small
+   `<nodeids>` selection reads its every member as a bin head — cost
+   evidence must come from the batch protocol in the reclassification rule
+   below, never from a small-selection run.
 
 **New tests are tiered by their author at write time** (species dimension from
 the rule above; cost dimension from an honest estimate, marker reason prefixed
-`cost:` with the estimate basis).  The cost dimension is mechanically
-re-checked by the next weights regen.
+`cost:` with the estimate basis).  The next weights regen measures the actual
+costs into the table — an estimate that proves wrong is corrected by hand
+through the marker-change rule below.
 
-**Optimization-task semantics:** a test over the budget whose species would
-allow the fast tier is marked `slow` *and* an optimization task is opened
-(the gate stays green; the full tier carries the test meanwhile).  After the
-optimization lands, re-measure its median via the authority list; ≤2 s, the
-marker is removed by hand through the reclassification rule below.
+**Optimization-task semantics:** a test whose species would allow the fast
+tier but whose measured cost exceeds the budget is marked `slow` *and* an
+optimization task is opened (the full tier carries the test meanwhile).
+After the optimization lands, re-measure its cost via the batch protocol
+below; ≤2 s and the marker is removed by hand through the marker-change
+rule.
 
 **Reclassification (slow → fast) is a manual operation**, reviewed in
-code-review: evidence is a target-form K=3 median ≤2 s, then delete the
+code-review: evidence is a batch-protocol K=3 median ≤2 s, then delete the
 marker, then re-measure the listings required by the marker change and
-regen.  Readings from other calibers (durations tables, full-suite
-listings) are not reclassification evidence.  **Transitional measurement
-protocol** (until the xdist startup-transient mitigation lands — registered
-in scratchpad/backlog.md): the default `-n 12` form concentrates a ~12-17 s
-startup transient on each scheduling bin's first tests (evidence:
-validation/FAST_SUITE.md "suite-tier"), so a small `<nodeids>` selection
-would read its every member as a bin head.  Measure candidates in a batch
-instead — `SKYCOLOR_FULL_SUITE=1 uv run pytest -q -m slow --durations=0`
-(three samples): the genuinely heavy slow tests head the bins and absorb
-the transient, so candidates read near-intrinsic; their K=3 medians are
-the evidence.  A candidate that still reads >2 s may be attributed with a
-serial reference (`uv run pytest -n 0 <nodeids> --durations=0` — an
-attribution aid, never the pass/fail evidence itself); unresolved
-candidates keep their marker until the transient task lands.  During the
-transition freeze, even successful candidates do NOT have their markers
-deleted (their release would need a fresh fast regen, which the bin-head
-gate deterministically trips) — they are recorded reclassification-ready
-in validation/FAST_SUITE.md (beside the ratchet evidence) and released in
-one batch after the transient task lands.
+regen (rule below).  Readings from other calibers (durations tables,
+full-suite listings) are not reclassification evidence.
+**Transitional measurement protocol** — the standing method for measuring a
+small candidate set without the xdist bin-head transient: measure the
+candidates in a batch over the slow tier — `SKYCOLOR_FULL_SUITE=1 uv run
+pytest -q -m slow --durations=0` (three samples): the genuinely heavy slow
+tests head the scheduling bins and absorb the transient, so candidates read
+near-intrinsic; their K=3 medians are the evidence.  A candidate that still
+reads >2 s may be attributed with a serial reference
+(`uv run pytest -n 0 <nodeids> --durations=0` — an attribution aid, never
+the pass/fail evidence itself); unresolved candidates keep their marker.
+(The transient-aware gate task once registered for this was superseded by
+the option-2 adjudication; the batch protocol is the standing de-pollution
+method.)
 
 **Marker reasons are machine-readable** — `kind:mc` / `kind:golden` /
 `kind:grid` / `kind:render` for species-exclusive tests, `cost: <median> s
@@ -146,22 +134,20 @@ overrides to the full population.  Priority: explicit
 `-m`/`-k`/`::` nodeid > env switch > default fast tier.
 
 **Marker-change cost:** the table's `slow` mirror must equal the live
-markers (harness equality test).  After adding/removing markers, the only
-path back to a green full suite is re-measuring the listings the change
-requires + regen.  Three scenarios: a fast-tier population change
-(new/removed fast tests) requires a fresh full-suite listing; a
-slow-tier-only population change (new `slow`-marked tests, fast population
-untouched) likewise requires only a fresh full-suite listing + regen; in
-both cases the standing fast-tier authority samples are reused (the
-verified minimal closure) — the regen prunes readings of tests that no
-longer exist (live-population intersection), so removing a once-measured
-test takes exactly this path too — and tests added since the authority
-measurement stay in the accepted inter-regen blind spot until the
-transient task's regen.  A pure marker FLIP with unchanged population would re-measure the
-three fast listings + regen — but during the transition freeze flips do
-not land at all (see the transient boundary above: fresh fast listings
-deterministically trip the bin-head gate), so scenario three is unusable
-until the transient task releases the freeze.
+markers (harness equality test).  After any marker or population change,
+the only path back to a green full suite is re-measuring the listings the
+change requires + regen: a population change (tests added or removed)
+re-measures the full-suite listing; a tier-membership change (markers
+flipped, population unchanged) re-measures the three fast-tier listings so
+`fast_predicted_wall_s` reflects the new membership from post-change
+readings.  The regen prunes readings of tests that no longer exist, so
+removing a once-measured test takes exactly this path too; tests added
+since the last measurement stay in the accepted inter-regen blind spot
+until the next regen.  In the flip window the full-tier run is red on the
+mirror-equality guard by design (the table lags until the regen); the
+regen's full-slot input accepts exactly that red state — sole failure =
+the mirror guard, anything else rejects (pinned in the weights-tool
+tests).
 
 ### Test-suite execution profile
 
