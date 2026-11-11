@@ -25,7 +25,12 @@ of the original wall clock: the whole anchor measured 47.7 s in the suite
 (task progress, 2026-11-11; ~25 s of that is the one-time solar table
 build, warm reps ~1.5 s each).
 """
+
 from __future__ import annotations
+
+import pytest
+
+pytestmark = pytest.mark.slow  # tier: ~45 s serial stress anchor (task-mc-restrict-segv); cost principle <=2 s puts it in the slow tier
 
 import numpy as np
 import pytest

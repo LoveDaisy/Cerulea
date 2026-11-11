@@ -336,6 +336,15 @@ adjudication) + 1 added (the marker-change-window pinning test, gen 4) =
 `test_tier_accounting_full_equals_fast_union_slow`, no count literals;
 the 23 additions were set-diff verified against a baseline-tree collection
 at the r4 export, 23 added / 0 removed).
+
+**Merge integration** (2026-11-11, owner): task-mc-restrict-segv landed on
+main before this branch (+15 tests, one of them the ~45 s stress anchor).
+Per the tier cost principle the anchor is `slow`-marked at module level
+(the manual-marker protocol's first live use), and the authority literals
+were re-derived on the merged tree: **580 = 387 fast + 193 slow**
+(identity re-verified by `test_tier_accounting_full_equals_fast_union_slow`).
+The task-close numbers above are historical records of this task's own
+tree and are not rewritten.
 The 23: 8 in Step 1 (7 mini tier-filter behavior tests + 1 policy-helper
 unit test), 12 weights-tool unit tests, 2 tree guards (accounting + mirror),
 1 review-round addition (mini scenario (g), xdist worker-side `-m` yield).
