@@ -481,6 +481,178 @@ def test_tier_filter_bare_path_keeps_fast_filter(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# weights-regeneration tool: tier extension (task-suite-tier Step 3)
+# ---------------------------------------------------------------------------
+def test_weights_tool_upgrade_gate_median_and_budget_boundary():
+    m = WEIGHTS_TOOL.fast_medians
+    slow = {"tests/test_a.py::test_marked"}
+    # median over available readings; single-reading samples use that value
+    medians = m([
+        {"tests/test_a.py::test_ok": 1.0, "tests/test_a.py::test_marked": 5.0,
+         "tests/test_a.py::test_over": 2.1},
+        {"tests/test_a.py::test_ok": 1.5, "tests/test_a.py::test_marked": 5.0,
+         "tests/test_a.py::test_over": 3.0},
+        {"tests/test_a.py::test_ok": 1.2, "tests/test_a.py::test_marked": 5.0,
+         "tests/test_a.py::test_over": 2.5},
+    ])
+    assert medians["tests/test_a.py::test_ok"] == pytest.approx(1.2)
+    assert medians["tests/test_a.py::test_marked"] == pytest.approx(5.0)
+    # exactly at the budget passes: the constraint is "median <= 2 s"
+    at_budget = m([{"t::x": 2.0}, {"t::x": 2.0}, {"t::x": 2.0}])
+    assert at_budget["t::x"] == pytest.approx(2.0)
+    assert not WEIGHTS_TOOL.upgrade_gate_offenders(
+        {"t::x": 2.0}, slow)
+    # above the budget and unmarked -> offender; marked -> exempt
+    offenders = WEIGHTS_TOOL.upgrade_gate_offenders(medians, slow)
+    assert set(offenders) == {"tests/test_a.py::test_over"}
+    assert not WEIGHTS_TOOL.upgrade_gate_offenders(
+        {"tests/test_a.py::test_marked": 5.0}, slow)
+
+
+def test_weights_tool_caliber_isolation_full_readings_never_tier():
+    # A test whose FULL-suite reading is contention-inflated but whose
+    # fast-tier median is within budget must not fail the gate: only the
+    # fast (target-form) evidence decides tiers.
+    medians = {"tests/test_a.py::test_fast_for_real": 1.5}
+    assert not WEIGHTS_TOOL.upgrade_gate_offenders(medians, set())
+    # ...and the gate has no input path for full-listing readings at all.
+    assert "full" not in WEIGHTS_TOOL.upgrade_gate_offenders.__code__.co_varnames
+
+
+def test_weights_tool_predicted_wall_sums_unmarked_medians():
+    medians = {
+        "tests/test_a.py::test_one": 1.0,
+        "tests/test_a.py::test_two": 0.5,
+        "tests/test_a.py::test_marked": 60.0,
+    }
+    # a test without any reading in any listing never enters the dict at all,
+    # so it contributes zero by construction (sub-cutoff convention)
+    predicted = WEIGHTS_TOOL.predicted_wall_s(
+        medians, {"tests/test_a.py::test_marked"})
+    assert predicted == pytest.approx(1.5)  # marked entries contribute 0
+
+
+def test_weights_tool_list_identity_by_content():
+    full_text = "======== 550 passed in 400.00s =========="
+    fast_text = "======== 371 passed, 179 deselected in 55.00s =========="
+    # identity is judged by the summary content, not the filename
+    assert WEIGHTS_TOOL.validate_list_identity("full (arg 1)", full_text) == (550, 0)
+    assert WEIGHTS_TOOL.validate_list_identity("fast1 (arg 2)", fast_text) == (371, 179)
+    with pytest.raises(SystemExit, match="not a full-suite"):
+        WEIGHTS_TOOL.validate_list_identity("full (arg 1)", fast_text)
+    with pytest.raises(SystemExit, match="not a fast-tier"):
+        WEIGHTS_TOOL.validate_list_identity("fast1 (arg 2)", full_text)
+
+
+def test_weights_tool_population_consistency_structural_only():
+    ok_full = {"tests/test_a.py::t1", "tests/test_b.py::t2",
+               "tests/test_mc.py::m1"}
+    fast1 = {"tests/test_a.py::t1", "tests/test_b.py::t2"}
+    fast2 = {"tests/test_a.py::t1", "tests/test_b.py::t2b"}  # item-level drift: fine
+    WEIGHTS_TOOL.check_population_consistency(
+        ["full", "fast1", "fast2"], [3, 2, 2], [ok_full, fast1, fast2])
+    # whole module missing from a fast listing -> structural
+    with pytest.raises(SystemExit, match="diverges"):
+        WEIGHTS_TOOL.check_population_consistency(
+            ["full", "fast1", "fast2"], [3, 1, 2],
+            [ok_full, {"tests/test_a.py::t1"}, fast2])
+    # module missing from the full listing -> structural
+    with pytest.raises(SystemExit, match="full listing"):
+        WEIGHTS_TOOL.check_population_consistency(
+            ["full", "fast1", "fast2"], [2, 2, 2],
+            [{"tests/test_a.py::t1"}, fast1, fast2])
+    # disagreeing passed counts -> partial run
+    with pytest.raises(SystemExit, match="passed counts"):
+        WEIGHTS_TOOL.check_population_consistency(
+            ["full", "fast1", "fast2"], [3, 2, 1], [ok_full, fast1, fast2])
+
+
+def test_weights_tool_reuse_gate_full_must_cover_fast_readings():
+    full = {"tests/test_a.py::t1": 3.0}
+    medians = {
+        "tests/test_a.py::t1": 3.0,             # covered
+        "tests/test_a.py::new_heavy": 3.0,      # real reading, not in full -> fail
+        "tests/test_a.py::boundary": 0.01,      # 5 ms band -> tolerated
+    }
+    with pytest.raises(SystemExit, match="new_heavy"):
+        WEIGHTS_TOOL.reuse_gate(full, medians)
+    del medians["tests/test_a.py::new_heavy"]
+    WEIGHTS_TOOL.reuse_gate(full, medians)  # boundary + absent items tolerated
+
+
+def test_weights_tool_payload_schema_is_backward_compatible(tmp_path):
+    full = {
+        "tests/test_light.py::t1": 1.0,
+        "tests/test_twilight.py::deep": 120.0,
+    }
+    payload = WEIGHTS_TOOL.build_payload(
+        full, {"tests/test_light.py::t1": 1.0}, {"tests/test_mc.py::m"})
+    assert set(payload["modules"]) == {"tests/test_light.py"}
+    assert payload["nodes"]["tests/test_twilight.py::deep"] == pytest.approx(120.0)
+    assert payload["slow"] == ["tests/test_mc.py::m"]
+    assert payload["fast_predicted_wall_s"] == pytest.approx(1.0)
+    table = tmp_path / "table.json"
+    table.write_text(json.dumps(payload))
+    modules, nodes = scheduling.load_weights(table)
+    assert modules == {"tests/test_light.py": 1.0}
+    assert nodes == {"tests/test_twilight.py::deep": 120.0}
+
+
+# ---------------------------------------------------------------------------
+# two-tier suite: full-tree guards (task-suite-tier Step 4)
+# ---------------------------------------------------------------------------
+def _collect_tree_nodeids(*args: str, full_suite=None):
+    """Real-tree collection via subprocess (``-n 0`` to keep the cost down).
+
+    ``SKYCOLOR_FULL_SUITE`` is always constructed explicitly, never
+    inherited, so the host session's tier cannot leak into the scenario.
+    """
+    env = {k: v for k, v in os.environ.items() if k != scheduling.FULL_SUITE_ENV}
+    if full_suite is not None:
+        env[scheduling.FULL_SUITE_ENV] = full_suite
+    proc = subprocess.run(
+        [sys.executable, "-m", "pytest", "--co", "-q", "-n", "0",
+         "-p", "no:cacheprovider", *args],
+        cwd=TESTS_DIR.parent, env=env, capture_output=True, text=True,
+        timeout=600)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    return {
+        line.strip() for line in proc.stdout.splitlines()
+        if "::" in line and not line.startswith("=")
+    }
+
+
+# Structural accounting over the real tree: full = fast ⊎ slow, mutually
+# exclusive and complete.  Deliberately no count literals and no reads of
+# task bookkeeping (both would turn this guard into a regression on every
+# new test); "the numbers match the recorded values" is a human check
+# against the task record and FAST_SUITE.md.
+@pytest.mark.slow(reason="cost: three real-tree pytest collections per run (~5 s); estimated, pre-tier marking")
+def test_tier_accounting_full_equals_fast_union_slow():
+    fast = _collect_tree_nodeids()
+    full = _collect_tree_nodeids(full_suite="1")
+    slow = _collect_tree_nodeids("-m", "slow", full_suite="1")
+    assert full == fast | slow
+    assert not (fast & slow), "a test cannot be both tiers"
+    assert fast, "sanity: the fast tier is nonempty"
+    assert slow, "sanity: the slow tier is nonempty"
+
+
+# The table's slow mirror must equal the live markers whenever it exists —
+# a lagging mirror means markers changed without the mandated re-measure +
+# regen cycle.  Until the first regeneration produces the field, the
+# equality is vacuous and skipped (the accounting guard above already
+# covers the tier structure).
+@pytest.mark.slow(reason="cost: one real-tree pytest collection per run (~2 s); estimated, pre-tier marking")
+def test_tier_slow_mirror_matches_live_markers():
+    data = json.loads(scheduling.WEIGHTS_PATH.read_text())
+    if "slow" not in data:
+        pytest.skip("weights table has no slow mirror yet (first regen pending)")
+    live = _collect_tree_nodeids("-m", "slow", full_suite="1")
+    assert set(data["slow"]) == live
+
+
+# ---------------------------------------------------------------------------
 # validation atmosphere reuse (Step 3)
 # ---------------------------------------------------------------------------
 @pytest.fixture(autouse=True)
