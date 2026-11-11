@@ -532,9 +532,12 @@ def test_weights_tool_caliber_isolation_full_readings_never_tier():
     medians = {"tests/test_a.py::test_fast_for_real": 1.5}
     assert not WEIGHTS_TOOL.upgrade_gate_offenders(medians, set())
     # ...and the gate has no input path for full-listing readings at all.
-    # The bytecode canary below is intentionally brittle: it is the point
-    # (any future parameter on the gate must fail here and be reviewed).
-    assert "full" not in WEIGHTS_TOOL.upgrade_gate_offenders.__code__.co_varnames
+    # The bytecode canary below is intentionally brittle on the PARAMETER
+    # slice only (co_varnames also holds locals, which would false-fire on
+    # an unrelated variable named like "full"): any future parameter on the
+    # gate must fail here and be reviewed.
+    code = WEIGHTS_TOOL.upgrade_gate_offenders.__code__
+    assert "full" not in code.co_varnames[:code.co_argcount]
 
 
 def test_weights_tool_predicted_wall_sums_unmarked_medians():
@@ -570,9 +573,16 @@ def test_weights_tool_list_identity_by_content():
     with pytest.raises(SystemExit, match="not a fast-tier"):
         WEIGHTS_TOOL.validate_list_identity(
             "fast1 (arg 2)", "======== 358 passed, 0 deselected in 55s ======")
-    # a full/fast swap is caught structurally (module divergence + reuse
-    # gate), not here: an xdist fast listing and a full listing have the
-    # same summary shape, so this check alone cannot separate them
+    # a "deselected" substring inside a test NAME on a durations line must
+    # not reject a real xdist fast listing (the scan is tail-anchored)
+    poisoned_fast = (
+        "1.00s call     tests/test_x.py::test_9_deselected_cases@bin1\n"
+        "======== 358 passed, 1 warning in 50.36s ==========\n"
+    )
+    assert WEIGHTS_TOOL.validate_list_identity("fast1 (arg 2)", poisoned_fast) == (358, 0)
+    # a full/fast swap is caught structurally (population consistency and
+    # the reuse gate), not here: an xdist fast listing and a full listing have
+    # the same summary shape, so this check alone cannot separate them
 
 
 def test_weights_tool_population_consistency_structural_only():

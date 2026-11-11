@@ -72,6 +72,12 @@ BOTH hold:
    regen audit gate enforces this mechanically: an unmarked fast-tier test
    above the budget fails the regen.  Lawful outcomes are marking `slow` or
    opening an optimization task — there is no "leave unmarked" outcome.
+   Transient boundary (until the registered backlog task lands): when the
+   gate output carries the xdist bin-head signature — ~12 positional
+   7-17 s medians including intrinsically sub-0.1 s tests, reproducing
+   across samples — the adjudicated outcome is the third one documented in
+   validation/FAST_SUITE.md "The ratchet fired live": keep the
+   authoritative table, record the flagged set as evidence, mark nothing.
 
 **New tests are tiered by their author at write time** (species dimension from
 the rule above; cost dimension from an honest estimate, marker reason prefixed
@@ -117,19 +123,24 @@ worker-side deselected counts).  Running an all-slow module by bare path
 with no deselected count on the xdist summary — that is the filter working
 as pinned, not a mechanism failure; use `-m slow`, the env switch, or
 explicit nodeids.  `--lf`/`--ff` cache selections are likewise NOT yield
-triggers today: re-running a previously failed slow test via `--lf` runs it
-only in serial form or under `SKYCOLOR_FULL_SUITE=1`.  `SKYCOLOR_FULL_SUITE=1`
+triggers today: re-running a previously failed slow test via bare `--lf`
+(serial or xdist) deselects it and exits 5; the working paths are
+`SKYCOLOR_FULL_SUITE=1` or an explicit selection (`-m`/nodeid).  `SKYCOLOR_FULL_SUITE=1`
 overrides to the full population.  Priority: explicit
 `-m`/`-k`/`::` nodeid > env switch > default fast tier.
 
 **Marker-change cost:** the table's `slow` mirror must equal the live
 markers (harness equality test).  After adding/removing markers, the only
 path back to a green full suite is re-measuring the listings the change
-requires + regen: a population change (new/removed tests) requires a fresh
-full-suite listing (~400 s) plus three fast listings; a pure marker flip
-with unchanged population may reuse the existing full listing (the reuse
-gate mechanically checks the coverage), re-measuring only the three fast
-listings + regen.
+requires + regen.  Three scenarios: a fast-tier population change
+(new/removed fast tests) requires a fresh full-suite listing plus three
+fresh fast listings (whose regen is subject to the transient boundary
+above); a slow-tier-only population change (new `slow`-marked tests, fast
+population untouched) requires only a fresh full-suite listing + regen,
+reusing the standing fast-tier authority samples (the verified minimal
+closure); a pure marker flip with unchanged population may reuse the
+existing full listing (the reuse gate mechanically checks the coverage),
+re-measuring only the three fast listings + regen.
 
 ### Test-suite execution profile
 

@@ -319,9 +319,10 @@ Performance context for the same task: cold dusty `delta_m(32)` 39.4 -> 3.1 s
 ## Two-tier suite (2026-11-11, task `suite-tier`)
 
 The suite is two-tier from this tree on: the default `uv run pytest -q` is
-the **fast dev-loop tier** (358 tests), the acceptance gate is the **full
+the **fast dev-loop tier** (361 tests at close; 358 at first
+finalization), the acceptance gate is the **full
 tier** (`SKYCOLOR_FULL_SUITE=1 uv run pytest -q -n 12 --dist=loadgroup`,
-559 tests, zero skips expected).  Tiers are declared in code (`slow` markers
+563 tests, zero skips expected).  Tiers are declared in code (`slow` markers
 with `kind:`/`cost:` reasons, filter + yield rules single-sourced in
 `tests/scheduling.py`, applied in `tests/conftest.py`); the placement rules
 live in docs/DEVELOPMENT.md "Test tiers".  This section records the
@@ -466,9 +467,11 @@ semantics.
 41 passed (30.67 s); post-review-round verification on the refreshed table:
 fast tier 361 passed ×3 (outer wall 38.74 / 38.52 / 37.94 s — the
 tier-updated packing distributes startup cost better than the pre-tier
-table), full tier **563 passed, zero skips**, exit 0 (393.70 s).  The fast walls sit above the 50.5 s form-measurement
-median with a loaded window (1-min load 8→24 during the run) — recorded
-attribution per the measurement-window protocol, informational only (no
-aggregate assertion exists by adjudication); the full-tier wall likewise
-carries the same window load on top of the 465 s uncontended-form
-measurement taken earlier the same morning.
+table), full tier **563 passed, zero skips**, exit 0 (393.70 s).  Attributions, per run: the 62.50 / 56.70 s pair sat
+above the 50.5 s form-measurement median under a loaded window (1-min load
+8→24) — recorded attribution per the measurement-window protocol,
+informational only (no aggregate assertion exists by adjudication); the
+38.74 / 38.52 / 37.94 s triple ran on the refreshed (tier-updated) packing;
+the 393.70 s full-tier run compares against the 465 s authoritative
+full-suite measurement, whose extra time over 393 s is the exhaustive
+`--durations-min=0` listing overhead plus its own climbing window load.

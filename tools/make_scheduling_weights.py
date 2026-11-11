@@ -162,6 +162,18 @@ def parse_summary(text):
     return int(passed.group(1)), (int(deselected.group(1)) if deselected else 0)
 
 
+def _summary_mentions_deselected(text):
+    """Whether the final summary line itself reports a deselected count.
+
+    Same anchoring as ``parse_summary``: a whole-text substring scan would
+    false-positive on a durations line whose test *name* contains
+    "deselected" (a real fast listing with such a test would be rejected
+    as mis-slotted).
+    """
+    tail = text.rstrip().splitlines()[-1] if text.strip() else ""
+    return "deselected" in tail
+
+
 def validate_list_identity(label, text):
     """Reject listings whose content contradicts their slot in the CLI.
 
@@ -190,7 +202,7 @@ def validate_list_identity(label, text):
                 f"durations line — not a 12-worker loadgroup listing.  "
                 f"Re-measure with SKYCOLOR_FULL_SUITE=1 uv run pytest -q "
                 f"-n 12 --dist=loadgroup --durations=0 --durations-min=0.")
-    elif deselected == 0 and "deselected" in text:
+    elif deselected == 0 and _summary_mentions_deselected(text):
         raise SystemExit(
             f"{label}: reports a zero deselected count — not a fast-tier "
             f"listing.  Re-measure with the default entry point (no "
@@ -405,7 +417,12 @@ def main():
             f"the {FAST_BUDGET_S} s budget:\n{lines}\n"
             "Lawful outcomes: mark them slow (kind:/cost: reason), or open an "
             "optimization task and mark them slow meanwhile.  There is no "
-            "'leave unmarked' outcome.")
+            "'leave unmarked' outcome — except the adjudicated transient "
+            "boundary: if the set looks like xdist bin-head spikes (~12 "
+            "positional 7-17 s medians incl. intrinsically sub-0.1 s tests), "
+            "read validation/FAST_SUITE.md 'The ratchet fired live' BEFORE "
+            "marking anything; the authoritative table is kept and the set "
+            "recorded for the registered transient task.")
     payload = build_payload(totals[0], medians, slow)
     WEIGHTS_PATH.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
     total = sum(payload["modules"].values()) + sum(payload["nodes"].values())
