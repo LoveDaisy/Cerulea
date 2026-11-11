@@ -533,15 +533,25 @@ def test_weights_tool_predicted_wall_sums_unmarked_medians():
 
 
 def test_weights_tool_list_identity_by_content():
-    full_text = "======== 550 passed in 400.00s =========="
-    fast_text = "======== 371 passed, 179 deselected in 55.00s =========="
+    full_text = "======== 558 passed in 400.00s =========="
+    # serial fast listing: carries the deselected summary
+    fast_text = "======== 358 passed, 201 deselected in 55.00s =========="
+    # xdist fast listing: xdist does not aggregate worker-side deselected
+    # counts into the summary (suite-tier step5 finding) — absence is valid
+    xdist_fast_text = "======== 358 passed, 1 warning in 50.36s =========="
     # identity is judged by the summary content, not the filename
-    assert WEIGHTS_TOOL.validate_list_identity("full (arg 1)", full_text) == (550, 0)
-    assert WEIGHTS_TOOL.validate_list_identity("fast1 (arg 2)", fast_text) == (371, 179)
+    assert WEIGHTS_TOOL.validate_list_identity("full (arg 1)", full_text) == (558, 0)
+    assert WEIGHTS_TOOL.validate_list_identity("fast1 (arg 2)", fast_text) == (358, 201)
+    assert WEIGHTS_TOOL.validate_list_identity("fast1 (arg 2)", xdist_fast_text) == (358, 0)
     with pytest.raises(SystemExit, match="not a full-suite"):
         WEIGHTS_TOOL.validate_list_identity("full (arg 1)", fast_text)
+    # an explicit zero deselected count means the filter never engaged
     with pytest.raises(SystemExit, match="not a fast-tier"):
-        WEIGHTS_TOOL.validate_list_identity("fast1 (arg 2)", full_text)
+        WEIGHTS_TOOL.validate_list_identity(
+            "fast1 (arg 2)", "======== 358 passed, 0 deselected in 55s ======")
+    # a full/fast swap is caught structurally (module divergence + reuse
+    # gate), not here: an xdist fast listing and a full listing have the
+    # same summary shape, so this check alone cannot separate them
 
 
 def test_weights_tool_population_consistency_structural_only():

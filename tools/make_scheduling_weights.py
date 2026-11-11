@@ -144,12 +144,15 @@ def parse_summary(text):
 
 
 def validate_list_identity(label, text):
-    """Reject listings that do not match their slot in the CLI.
+    """Reject listings whose summary contradicts their slot in the CLI.
 
-    A fast-tier listing must show a nonzero ``deselected`` count (the slow
-    filter engaged); the full-suite listing must show none.  Identity is
-    judged by content, not filename, so argument-order mistakes fail loudly
-    here instead of quietly poisoning the medians or the weights.
+    A full-suite listing never deselects (``SKYCOLOR_FULL_SUITE=1``, no
+    ``-m``/``-k``); a fast-tier listing either reports the deselected count
+    (serial form) or — under xdist, which does not aggregate worker-side
+    deselected counts into the summary — reports nothing, so absence is
+    accepted and mis-slotted full listings are caught structurally instead
+    (module-population divergence and the reuse gate both fire on a
+    full/fast swap).  Identity is judged by content, not filename.
     """
     passed, deselected = parse_summary(text)
     is_full = label.startswith("full")
@@ -157,9 +160,9 @@ def validate_list_identity(label, text):
         raise SystemExit(
             f"{label}: shows {deselected} deselected — not a full-suite "
             f"listing.  Re-measure with SKYCOLOR_FULL_SUITE=1 and no -m/-k.")
-    if not is_full and not deselected:
+    if not is_full and deselected == 0 and "deselected" in text:
         raise SystemExit(
-            f"{label}: shows no deselected summary — not a fast-tier "
+            f"{label}: reports a zero deselected count — not a fast-tier "
             f"listing.  Re-measure with the default entry point (no "
             f"-m/-k/nodeid arguments).")
     return passed, deselected
@@ -196,6 +199,11 @@ def check_population_consistency(labels, passed_counts, nodeid_lists):
         raise SystemExit(
             f"fast listings disagree on passed counts {passed_counts[1:]} — "
             f"a partial or failing run is unusable for medians.")
+    if passed_counts[0] < max(passed_counts[1:]):
+        raise SystemExit(
+            f"{full_label}: passed count {passed_counts[0]} is below the fast "
+            f"listings' {max(passed_counts[1:])} — the full listing must run "
+            f"a superset of the fast population.")
 
 
 def fast_medians(fast_totals):
