@@ -405,8 +405,18 @@ session handoffs are not a substitute for this record.
    are still open. [Reference audit](twilight/TWILIGHT_REFERENCE_AUDIT.md).
 4. **The limb and aureole.** CIE 110 horizon luminance differs by about a factor
    of two; a measured clear-sky spectral/luminance scan is needed to distinguish
-   model and reference error. Mie/delta-M are present, but 32-moment aureole
-   resolution and delta-fit remain open.
+   model and reference error.  The representation hypothesis is closed: the
+   pre-registered attribution probe (task-aureole-delta-fit, 2026-11-11) took
+   the G1 stop-loss branch (R = 0.00065 < 1/4) — the rural mode set's Legendre
+   series terminates exactly at l = 30, raw moments reproduce delta-M to 1 ulp,
+   and spherical-MC transport moves the sun-side ratio by +0.76% ± 0.81%
+   (below 3σ) — so neither aureole representation nor transport geometry
+   explains the sun-side excess.  Attribution shifts to first-order horizon
+   brightening against the empirical CIE 110 gradation plus a horizon-weighted
+   diffuse enhancement, opposite in direction to the CIE multiple-scattering
+   narrative; the next step is an independent clear-sky measurement comparison
+   (`validation/tools/aureole_attribution/`).  Delta-fit remains a capability
+   question, not the suspected cause of this gap.
 5. **Runtime to a reliable result.** M11 removed repeated optical work and
    task-cold-optics batch-vectorised the cold Mie build (cold dusty
    `delta_m(32)` 39.4 s -> ~3 s, coefficient kernels bitwise, moment/table
@@ -478,7 +488,11 @@ before selecting its optimisation.
 * Ice-crystal phase functions for cirrus (currently equivalent spheres, so no
   22° halo, no sundogs).
 * A proper aureole: delta-fit instead of delta-M, and an instrument
-  point-spread function for the solar disk.
+  point-spread function for the solar disk.  The attribution probe
+  (task-aureole-delta-fit) falsified the expectation that this representation
+  causes the check3 sun-side gap — the rural mode set's series is exact at 32
+  moments — so delta-fit stays a capability upgrade where delta-M is
+  load-bearing (dust, cloud droplets), not a repair for that gap.
 * Airglow, so that −18° is not zero.
 * Site-specific atmospheres (Paranal, Mauna Kea) to settle the twilight
   photometry question above.
