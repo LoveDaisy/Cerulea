@@ -1,0 +1,36 @@
+================================================================================================
+SKY-COLOUR VALIDATION SUMMARY
+================================================================================================
+check    status  what                                                 key numbers
+------------------------------------------------------------------------------------------------
+check1   PASS    Rayleigh optical depth vs Bodhaine et al. (1999)     tau_R(550) = 0.09676 vs 0.09707 (-0.31 %); worst deviation over 300-700 nm is 1.03 % at 300 nm.
+check2   PASS    Clear-sky direct and diffuse illuminance             DNI: 94.7/101.8/109.4 klx at h=30/48.19/60 vs 91.2/97.1/103.6; DHI: 9.8/11.6 klx vs CIE 9.1/11.2.
+check3   FAIL    CIE 110-1994 clear-sky luminance distribution        h=45deg: sun-side horizon/zenith 8.82 vs CIE 3.65 (+141%); anti-solar 3.37 vs 2.00; RMS 10.5% (theta<=60deg), 74.2% (horizon band).
+check4   PASS    Sky chromaticity vs measured spectra                 horizon xy: model (0.300,0.324) vs measured (0.291,0.313); RMS dxy=0.0184, du'v'=0.0105.
+check5   FAIL    Twilight zenith luminance (Patat et al. 2006)        zenith L: -6deg 0.274 vs 0.516; -9deg 0.00047 vs 0.017; -12deg 5e-07 vs 0.0015 cd/m2.
+check6   FAIL    Twilight against Koomen et al. (1952)                model/Koomen: -6deg 0.55, -9deg 1.16, -12deg 0.75; model/Patat at -6deg 0.69.
+------------------------------------------------------------------------------------------------
+
+FAILED METRICS
+
+[check3] CIE 110-1994 clear-sky luminance distribution
+  horizon sun-side / zenith, h=45deg: model=8.815 ref=3.652  dev=+141.4% tol=40.0
+  horizon anti-solar / zenith, h=45deg: model=3.373 ref=2.005  dev=+68.3% tol=25.0
+  RMS dev, 60-75deg, h=45deg: model=32.57 ref=0 % dev=+32.6 tol=25.0
+  RMS dev, 75-90deg horizon, h=45deg: model=74.18 ref=0 % dev=+74.2 tol=30.0
+  RMS dev, whole sky, h=45deg: model=35.23 ref=0 % dev=+35.2 tol=15.0
+  horizon sun-side / zenith, h=30deg: model=22.58 ref=8.35  dev=+170.4% tol=50.0
+  horizon sun-side / zenith, h=60deg: model=3.511 ref=1.597  dev=+119.9% tol=50.0
+
+[check5] Twilight zenith luminance (Patat et al. 2006)
+  zenith luminance, h=-9deg: model=4.694e-04 ref=0.01712 cd/m2 dev=-1.56 tol=0.5
+  zenith luminance, h=-12deg: model=4.879e-07 ref=0.00146 cd/m2 dev=-3.48 tol=0.5
+  zenith luminance, h=-18deg: model=0 ref=1.807e-04 cd/m2 dev=-8.26 tol=0.5
+
+[check6] Twilight against Koomen et al. (1952)
+  zenith luminance, h=-6deg: model=0.3564 ref=0.6458 cd/m2 dev=-0.258 tol=0.17609125905568124
+
+3 passed, 3 failed, 0 skipped
+real 235.56
+user 899.18
+sys 161.80

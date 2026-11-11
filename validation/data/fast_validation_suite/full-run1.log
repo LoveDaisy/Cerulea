@@ -1,0 +1,30 @@
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [ 12%]
+........................................................................ [ 24%]
+........................................................................ [ 37%]
+........................................................................ [ 49%]
+........................................................................ [ 62%]
+........................................................................ [ 74%]
+........................................................................ [ 86%]
+........................................................................ [ 99%]
+....                                                                     [100%]
+=============================== warnings summary ===============================
+tests/test_mie_batch.py::test_state_surface_arrays_vs_anchor@bin0
+  /Users/zhangjiajie/Codes/Sky Color Simulation/.venv/lib/python3.12/site-packages/scipy/interpolate/_cubic.py:329: RuntimeWarning: overflow encountered in divide
+    whmean = (w1/mk[:-1] + w2/mk[1:]) / (w1 + w2)
+
+tests/test_mie_batch.py::test_state_surface_arrays_vs_anchor@bin0
+  /Users/zhangjiajie/Codes/Sky Color Simulation/.venv/lib/python3.12/site-packages/scipy/interpolate/_cubic.py:329: RuntimeWarning: overflow encountered in add
+    whmean = (w1/mk[:-1] + w2/mk[1:]) / (w1 + w2)
+
+tests/test_result.py::test_ground_radiance_direct_transmittance_override@bin5
+  /Users/zhangjiajie/Codes/Sky Color Simulation/tests/test_result.py:183: DeprecationWarning: direct_transmittance is deprecated by the unified solar source; pass direct_irradiance instead (it carries the disk geometry)
+    dark0, E_zero = render.ground_radiance(atmo7, dome, 60.0,
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+580 passed, 3 warnings in 399.78s (0:06:39)
+real 400.05
+user 3030.63
+sys 779.25

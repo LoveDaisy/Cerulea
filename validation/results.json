@@ -346,7 +346,7 @@
           "name": "zenith luminance, h=-9deg",
           "passed": true,
           "reference": 0.0161459,
-          "tolerance": 0.32922450727912855,
+          "tolerance": 0.3292245072791287,
           "unit": "cd/m2"
         },
         {

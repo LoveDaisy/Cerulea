@@ -561,3 +561,33 @@ skips, exit 0** (358.66 s, window load 16-20).  `git diff main...HEAD --
 skycolor/` empty; the `validation/` diff contains only this file;
 `validation/results.json` untouched; run_all not re-run (the caller
 inventory above shows it does not go through pytest).
+
+## Quiet-window certification (2026-11-11, post two-tier)
+
+First certification of the full tier on the final two-tier population
+(580 = 387 fast + 193 slow), taken in a genuinely quiet window (no
+concurrent agent sessions; the two full-tier runs differ by 3.3 s).
+Sequential pair, `SKYCOLOR_FULL_SUITE=1 uv run pytest -q -n 12
+--dist=loadgroup`:
+
+| entry | result | wall |
+|---|---|---|
+| full tier run 1 | **580 passed, zero skips, exit 0** | **399.78 s** |
+| full tier run 2 | **580 passed, zero skips, exit 0** | **403.12 s** |
+| `validation.run_all` run 1 | 3 PASS / 3 FAIL / 0 SKIP, failure set {check3, check5, check6} | 237.14 s |
+| `validation.run_all` run 2 | 3 PASS / 3 FAIL / 0 SKIP, failure set {check3, check5, check6} | 235.56 s |
+
+(logs at `validation/data/fast_validation_suite/quiet-cert-*.log`; the
+run_all failure set is the post-ruler-fix baseline.  These runs also close
+the task-mc-restrict-segv acceptance-4 exception on the tree: the routed
+`contiguous_transpose` code regenerates `validation/results.json` with the
+check6 zenith −9° derived-tolerance field at its confirmed 1-ulp value
+(model fields bitwise unchanged; owner-confirmed 2026-11-11), so the
+committed guardrail file now matches what the current code produces.)  The 6-min standing line is **breached in a quiet window, with
+tight variance** — this is no longer measurement pollution.  Attribution:
+the population grew 542 -> 580 (+38 tests, mc-restrict-segv and suite-tier)
+at unchanged per-test cost (~0.69 s/test); per-test degradation is ruled
+out.  The disposition of the line (re-scale for the acceptance-gate tier /
+attach the wall line to the fast dev-loop tier / keep 360 s as aspiration)
+is escalated to the owner; the fast dev-loop tier measures 37.5 s on the
+same quiet machine, an order of magnitude inside any historical line.
