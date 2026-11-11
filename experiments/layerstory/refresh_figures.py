@@ -680,6 +680,19 @@ def fisheye_panel(ax, data, vdef: ViewPanelDef, size: int = 640) -> dict:
     rgb, az, el, mask = fisheye_rgb(pres, float(display["exposure"]), size)
     ax.imshow(rgb)
     annotate_fisheye(ax, az, el, mask, *_sun_of(data, vdef.key), size)
+    if "mc" in vdef.key:
+        # the archive's single-seed MC stores the zenith as one discrete
+        # direction estimate whose value sits ~46% below the 9-degree row it
+        # interpolates against; in the equidistant fisheye that discontinuity
+        # renders as a dark central cell.  Annotate it so a reader sees an
+        # MC-quality property, not sky physics.
+        cx = cy = (size - 1) / 2.0
+        ax.annotate("MC single-seed zenith cell",
+                    xy=(cx, cy), xytext=(cx + 108, cy - 86),
+                    arrowprops=dict(arrowstyle="-", color=_ANN_INK, lw=0.9),
+                    fontsize=7.5, color=_ANN_INK,
+                    bbox=dict(boxstyle="round,pad=0.25", fc="white",
+                              ec=_ANN_INK, lw=0.6, alpha=0.85))
     ax.set_title(vdef.title, fontsize=10)
     return dict(camera="fisheye", key=vdef.key, part=vdef.part, ground=False,
                 display=dict(exposure=display["exposure"],
@@ -735,7 +748,12 @@ def build_figure(data, fig_id: str):
             rect_panel(fig.add_subplot(), data, fig_def.views[0])
         else:
             raise ValueError(f"unknown layout {fig_def.layout}")
-        fig.suptitle(fig_def.note, fontsize=10)
+        title = fig_def.note
+        if fig_def.layout in ("spectrum_pair", "triple_pair"):
+            title += ("\nFish-eye rim: the archived dome grid is 11 x 23 "
+                      "(8.2-deg azimuth cells); horizon-row truncation zeros "
+                      "are archive content, rendered as-is.")
+        fig.suptitle(title, fontsize=9.5)
     return fig
 
 
