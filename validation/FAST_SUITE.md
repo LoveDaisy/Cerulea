@@ -431,3 +431,13 @@ drop the automated downgrade mechanism (reclassification is manual), drop
 the 90 s aggregate budget assertion (per-test ≤2 s enforced by the regen
 audit gate, aggregate stays informational), pin the explicit-nodeid yield
 semantics.
+
+**Final verification (this task, 2026-11-11 11:24-11:42, window load 8-24):**
+fast tier 358 passed ×2 (outer wall 62.50 / 56.70 s), harness serial
+diagnostics 41 passed (30.67 s), full tier **559 passed, zero skips**,
+exit 0 (576.73 s).  The fast walls sit above the 50.5 s form-measurement
+median with a loaded window (1-min load 8→24 during the run) — recorded
+attribution per the measurement-window protocol, informational only (no
+aggregate assertion exists by adjudication); the full-tier wall likewise
+carries the same window load on top of the 465 s uncontended-form
+measurement taken earlier the same morning.
