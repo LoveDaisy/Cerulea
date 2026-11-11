@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import subprocess
 import sys
 
 import numpy as np
@@ -33,8 +34,10 @@ if str(REPO) not in sys.path:  # theme-local tests live outside the package
 from experiments.layerstory import layer_story as ls  # noqa: E402
 from experiments.layerstory import refresh_figures as rf  # noqa: E402
 from skycolor import color, render  # noqa: E402
+from skycolor.rt.result import SkyResult  # noqa: E402
 
 NPZ = REPO / "experiments/layerstory/data/layer_story.npz"
+V3_NPZ = REPO / "experiments/layerstory/data/layer_story_v3.npz"
 
 _SOLVER_ENTRIES = (
     "skycolor.rt.solver.solve",
@@ -336,3 +339,129 @@ def test_ground_consumption_matches_registry(data, monkeypatch):
     pres, _kw = noground[0]
     np.testing.assert_array_equal(pres.radiance.reshape(-1, pres.wl.size),
                                   data["l6_clear_30/total"])
+
+
+# ---------------------------------------------------------------------------
+# the v3 augmentation contract (task-figures-polish): exactly ONE
+# pre-registered solve, gated by the tracked preregister; every test here
+# stubs render.solve_dome -- the real solve ran once, outside the tests
+# ---------------------------------------------------------------------------
+def _stub_solve_dome(captured: list, radiance=None):
+    """A render.solve_dome stub: capture the request, then abort -- or bind a
+    synthetic dome field (assembled from archived arrays, never computed)."""
+    def stub(atmo, sun_el, sun_az, **kwargs):
+        captured.append(dict(atmo=atmo, sun_el=sun_el, sun_az=sun_az, **kwargs))
+        if radiance is None:
+            # SystemExit passes through augment's solver-failure wrapper
+            # untouched: capture and abort before any real compute
+            raise SystemExit("captured the pre-registered request -- "
+                             "aborting before any real compute")
+        res = SkyResult(radiance=radiance, wl=ls.WL, method="clear",
+                        options=dict(sun_zenith_deg=90.0 - sun_el,
+                                     sun_azimuth_deg=sun_az,
+                                     approximation="plane-sos",
+                                     single=True, multiple=False),
+                        components={"single": radiance},
+                        approximation="plane-sos")
+        return render.presentation_from_result(
+            res, np.linspace(0.0, 90.0, 25), np.linspace(0.0, 180.0, 37),
+            sun_el, sun_az)
+    return stub
+
+
+def test_augment_request_contract(data, monkeypatch, tmp_path):
+    """The single dispatch: correct medium, scene, grid and no MC/cloud --
+    captured, then aborted before any real compute."""
+    captured = []
+    monkeypatch.setattr(render, "solve_dome", _stub_solve_dome(captured))
+    with pytest.raises(SystemExit, match="captured"):
+        ls.augment_l3_dome(destination=tmp_path)
+    assert len(captured) == 1
+    call = captured[0]
+    atmo = call["atmo"]
+    assert call["sun_el"] == 3.0 and call["sun_az"] == 0.0
+    assert atmo.ozone_du == 300.0 and atmo.no2_column == ls.NO2_COLUMN
+    assert atmo.aerosols[0].aod550 == ls.AOD_CLEAR
+    assert call["approximation"] == "plane-sos"
+    assert call["single"] is True and call["multiple"] is False
+    assert call["n_zenith"] == 25 and call["n_azimuth"] == 37
+    assert "mc_config" not in call and "cloud_layer" not in call
+
+
+def test_augment_refuses_mismatched_preregister(data, monkeypatch, tmp_path):
+    """A tampered preregister stops the dispatch before any solver call."""
+    captured = []
+    monkeypatch.setattr(render, "solve_dome", _stub_solve_dome(captured))
+    pre = json.loads(ls.PREREGISTER_PATH.read_text())
+    pre["run"]["grid"]["n_zenith"] = 46
+    tampered = tmp_path / "preregister.json"
+    tampered.write_text(json.dumps(pre))
+    with pytest.raises(SystemExit, match="preregister mismatch"):
+        ls.augment_l3_dome(destination=tmp_path, preregister=tampered)
+    assert captured == []
+
+
+def test_augment_refuses_existing_run_record(tmp_path):
+    (tmp_path / "l3_dome_run.json").write_text("{}")
+    with pytest.raises(SystemExit, match="already exists"):
+        ls.augment_l3_dome(destination=tmp_path)
+
+
+def test_augment_assembles_v3_on_stubbed_field(data, monkeypatch, tmp_path):
+    """Full assembly over a synthetic dome tiled from the archived zenith row:
+    the real zenith crosscheck passes by construction, old fields ride along
+    bit-for-bit, provenance is recorded, and the written archive re-reads
+    under the same guards as the committed one."""
+    radiance = np.tile(np.asarray(data["l3_o3_3/total"])[0], (925, 1))
+    captured = []
+    monkeypatch.setattr(render, "solve_dome", _stub_solve_dome(captured, radiance))
+    new = ls.augment_l3_dome(destination=tmp_path)
+    runs = [str(r) for r in new["runs"]]
+    assert len(runs) == 12 and runs[-1] == "l3_o3_dome_3"
+    assert runs[:-1] == [str(r) for r in data["runs"]]
+    with np.load(NPZ, allow_pickle=False) as old:
+        for k in old.files:
+            if k == "runs":  # extended by the augmentation run, prefix-checked
+                continue
+            np.testing.assert_array_equal(new[k], old[k], err_msg=k)
+    for r in runs[:-1]:
+        assert str(new[f"{r}/solve_version"]) == str(data["version"])
+    head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+    assert str(new["l3_o3_dome_3/solve_version"]) == head
+    assert str(new["l3_o3_dome_3/code_fingerprint"])
+    assert str(new["l3_o3_dome_3/display"]) == repr(ls.display_kwargs(
+        ls.l3_dome_spec()))
+    record = json.loads((tmp_path / "l3_dome_run.json").read_text())
+    assert record["run"] == "l3_o3_dome_3" and record["head"] == head
+    assert record["elapsed_s"] <= ls.L3_DOME_BUDGET_S
+    v3 = tmp_path / "layer_story_v3.npz"
+    assert v3.exists() and (tmp_path / "layers_v3.csv").exists()
+    assert (tmp_path / "layers_v3.md").exists()
+    assert record["outputs"]["layer_story_v3.npz"] == rf.sha256_file(v3)
+    reloaded = rf.load(v3)
+    assert str(reloaded["runs"][-1]) == "l3_o3_dome_3"
+    zen_rows = reloaded["l3_o3_dome_3/total"].reshape(25, 37, -1)[0]
+    np.testing.assert_allclose(
+        zen_rows, np.broadcast_to(np.asarray(data["l3_o3_3/total"])[0],
+                                  zen_rows.shape),
+        rtol=ls.L3_DOME_ZENITH_RTOL, atol=0)
+
+
+def test_augment_refuses_bad_field_and_keeps_evidence(data, monkeypatch,
+                                                       tmp_path):
+    """Both refusal paths keep evidence and never write an archive: a solver
+    failure (unbindable field) and a verification failure (negative radiance)
+    each stop after exactly one call."""
+    unbindable = np.tile(np.asarray(data["l3_o3_3/total"])[0], (900, 1))
+    negative = np.tile(np.asarray(data["l3_o3_3/total"])[0], (925, 1))
+    negative[500, 40] = -1e-3
+    for bad, pattern in ((unbindable, "solve failed"),
+                         (negative, "verification failed")):
+        captured = []
+        monkeypatch.setattr(render, "solve_dome", _stub_solve_dome(captured, bad))
+        with pytest.raises(SystemExit, match=pattern):
+            ls.augment_l3_dome(destination=tmp_path)
+        assert len(captured) == 1
+        assert (tmp_path / "l3_dome_failure.json").exists()
+        assert not (tmp_path / "layer_story_v3.npz").exists()
+        (tmp_path / "l3_dome_failure.json").unlink()  # next loop iteration

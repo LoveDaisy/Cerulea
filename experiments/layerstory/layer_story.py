@@ -15,8 +15,11 @@ from __future__ import annotations
 import argparse
 import ast
 import csv
-from pathlib import Path
+import hashlib
+import json
 import subprocess
+from datetime import datetime, timezone
+from pathlib import Path
 from time import perf_counter
 
 import numpy as np
@@ -382,9 +385,16 @@ def row_index(data, key, zenith_deg, azimuth_deg=0.0):
     return i * len(az) + j
 
 
-def write_tables(data, directory):
+def write_tables(data, directory, csv_name="layers.csv", md_name="layers.md",
+                 solve_versions=None, header_notes=()):
+    """Write the CSV direction table and the markdown call record.
+
+    ``solve_versions`` switches on per-run provenance lines for archives that
+    mix solves from different code states (the v3 augmentation); the default
+    single-version batch keeps the original header-only record byte-for-byte.
+    """
     directory.mkdir(parents=True, exist_ok=True)
-    with (directory / "layers.csv").open("w", newline="") as f:
+    with (directory / csv_name).open("w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(("run", "layer", "component", "direction", "zenith_deg",
                          "azimuth_rel_deg", "Lv_cd_m-2", "x", "y"))
@@ -418,13 +428,294 @@ def write_tables(data, directory):
                  "ranking.  MC: qualitative / budget-limited, single seed.",
              "Closure: per-solve component additivity only; cross-ingredient "
              "additivity is not attempted (nonlinear in the optical depths)."]
+    if solve_versions is not None:
+        lines += ["", "Solve versions: recorded per run below.  Runs sharing "
+                      "the production version above belong to the original "
+                      "single-version batch; a run with its own solve_version "
+                      "is a separately registered augmentation, not part of "
+                      "that batch."]
+    for note in header_notes:
+        lines += ["", note]
     for key in data["runs"]:
         lines += ["", f"## {key}  ({data[f'{key}/layer']} · {data[f'{key}/title']})", "",
-                  f"Wall time: {float(data[f'{key}/seconds']):.6f} s", "",
-                  "```text", str(data[f"{key}/summary"]), "```"]
+                  f"Wall time: {float(data[f'{key}/seconds']):.6f} s", ""]
+        if solve_versions is not None:
+            lines += [f"Solve version: `{solve_versions[str(key)]}`", ""]
+        lines += ["```text", str(data[f"{key}/summary"]), "```"]
         for name in ("options", "effective", "diagnostics", "approximations"):
             lines += ["", f"{name}: `{data[f'{key}/{name}']}`"]
-    (directory / "layers.md").write_text("\n".join(lines) + "\n")
+    (directory / md_name).write_text("\n".join(lines) + "\n")
+
+
+# ---------------------------------------------------------------------------
+# the v3 augmentation (task-figures-polish, 2026-11-12): ONE pre-registered
+# extra production solve -- the L3 state (+O3/NO2) as a full DAY_GRID dome, so
+# the overview carries a rendered L3 panel and the ozone figure gains sky
+# views.  The committed 11-run archive keeps its bytes; the augmented archive
+# is layer_story_v3.npz with per-run solve provenance.  Nothing here re-runs
+# the ladder: compute() and this entry are separate, explicit contracts.
+# ---------------------------------------------------------------------------
+L3_DOME_RUN = "l3_o3_dome_3"
+SOURCE_ARCHIVE = THEME / "data" / "layer_story.npz"
+PREREGISTER_PATH = THEME / "data" / "l3_dome_preregister.json"
+V3_ARCHIVE = THEME / "data" / "layer_story_v3.npz"
+L3_DOME_ZENITH_RTOL = 1e-10
+L3_DOME_BUDGET_S = 300.0
+
+
+def _sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for block in iter(lambda: f.read(1 << 20), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
+def _code_identity() -> tuple[str, str]:
+    """Compute-time code identity: HEAD plus a worktree-cleanliness fingerprint.
+
+    A solve-time HEAD is meaningful only for a clean tree; uncommitted changes
+    get a content fingerprint instead of silently posing as HEAD.
+    """
+    head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+    dirty = subprocess.run(["git", "status", "--porcelain"], capture_output=True,
+                           text=True, check=True).stdout.splitlines()
+    if not dirty:
+        return head, "clean-worktree"
+    return head, "dirty:" + hashlib.sha256(
+        "\n".join(sorted(dirty)).encode()).hexdigest()[:16]
+
+
+def l3_dome_spec() -> dict:
+    """The pre-registered single-run request (the dome branch of compute, once)."""
+    return dict(key=L3_DOME_RUN, layer="L3", title="+O3/NO2 (dome)",
+                medium="l3", elevation=3.0, sun_azimuth_deg=0.0,
+                approximation="plane-sos", single=True, multiple=False,
+                grid=dict(DAY_GRID), yaw=0.0, display="day")
+
+
+def _assert_l3_medium(atmo) -> str:
+    """Object readback of the L3 medium against the registered construction."""
+    a = atmo.aerosols[0]
+    np.testing.assert_allclose(atmo.ground_albedo, 0.1)
+    assert atmo.elevation_km == 0.0 and atmo.refraction is True
+    assert atmo.ozone_du == 300.0 and atmo.no2_column == NO2_COLUMN
+    assert len(atmo.aerosols) == 1 and a.aod550 == AOD_CLEAR
+    assert vars(a.profile) == vars(ExponentialProfile(HAZE_SCALE_H_KM))
+    return ("l3 medium readback: ozone_du=300, no2_column="
+            f"{NO2_COLUMN:.3e} m^-2, one Hinterland aerosol at "
+            f"AOD550={AOD_CLEAR} with H={HAZE_SCALE_H_KM} km profile, "
+            "albedo 0.1, sea-level observer, refraction on")
+
+
+def _validate_preregister(pre: dict, source: Path, source_sha: str) -> None:
+    """Every dispatch-blocking field must match the registered request."""
+    def fail(what):
+        raise SystemExit(f"preregister mismatch: {what} -- no solve may start")
+
+    run = pre["run"]
+    spec = l3_dome_spec()
+    checks = (
+        ("key", spec["key"]), ("layer", spec["layer"]), ("title", spec["title"]),
+        ("sun_elevation_deg", spec["elevation"]),
+        ("sun_azimuth_deg", spec["sun_azimuth_deg"]),
+        ("approximation", spec["approximation"]),
+        ("single", spec["single"]), ("multiple", spec["multiple"]),
+    )
+    for field, expected in checks:
+        if run[field] != expected:
+            fail(f"{field}: registered {run[field]!r} != code {expected!r}")
+    if run["grid"] != {"n_zenith": spec["grid"]["n_zenith"],
+                       "n_azimuth": spec["grid"]["n_azimuth"],
+                       "min_zenith_deg": 0.0}:
+        fail(f"grid: registered {run['grid']}")
+    if pre["source_archive"]["sha256"] != source_sha:
+        fail(f"source archive sha256 {source_sha[:16]}... does not match the "
+             f"registered {pre['source_archive']['sha256'][:16]}...")
+    if pre["source_archive"]["path"] != str(source.relative_to(THEME.parents[1])):
+        fail(f"source archive path {source} is not the registered one")
+
+
+def augment_l3_dome(source: Path = SOURCE_ARCHIVE, destination: Path | None = None,
+                    preregister: Path = PREREGISTER_PATH) -> dict:
+    """Add the single pre-registered L3 dome solve to the archive -- once.
+
+    Exactly one ``render.solve_dome`` call, gated by the tracked preregister
+    (source hash, request fields, budget, stop conditions).  The source
+    archive is only ever read; the augmented archive ``layer_story_v3.npz``
+    plus ``layers_v3.{csv,md}`` land in ``destination`` with per-run solve
+    provenance and a run record.  No verification failure, budget breach or
+    retry ever produces a second solver call: a failure writes its evidence
+    and stops.
+    """
+    destination = Path(destination) if destination is not None else V3_ARCHIVE.parent
+    record_path = destination / "l3_dome_run.json"
+    if record_path.exists():
+        raise SystemExit(f"{record_path} already exists -- the augmentation "
+                         "already ran; a deliberate reproduction must clear it "
+                         "explicitly first")
+    with np.load(source, allow_pickle=False) as archive:
+        data = {k: archive[k] for k in archive.files}
+    check(data)
+    source_sha = _sha256_file(source)
+    _validate_preregister(json.loads(Path(preregister).read_text()),
+                          source, source_sha)
+
+    media = build_media()
+    _assert_single_ingredient_step(media)
+    medium_evidence = _assert_l3_medium(media["l3"])
+    spec = l3_dome_spec()
+    key = spec["key"]
+
+    print(f"solve {key} ({spec['title']}) -- the single pre-registered "
+          "augmentation solve", flush=True)
+    start = perf_counter()
+    try:
+        pres = render.solve_dome(
+            media[spec["medium"]], spec["elevation"], spec["sun_azimuth_deg"],
+            approximation=spec["approximation"], single=spec["single"],
+            multiple=spec["multiple"], **spec["grid"])
+    except Exception as exc:  # any solver failure stops the augmentation
+        _write_failure_record(destination, preregister, source_sha,
+                              dict(elapsed_s=perf_counter() - start,
+                                   problems=[f"solve failed: {exc!r}"]))
+        raise SystemExit(f"augmentation solve failed: {exc!r} -- the failure "
+                         "record is written, no second solve") from exc
+    elapsed = perf_counter() - start
+    res = pres.result
+    wl = np.asarray(data["wl"])
+    zenith, azimuth = pres.zenith, pres.azimuth_rel
+    total = np.asarray(res.radiance)
+
+    problems = []
+    if elapsed > L3_DOME_BUDGET_S:
+        problems.append(f"budget: {elapsed:.1f} s > {L3_DOME_BUDGET_S} s cap")
+    if total.shape != (zenith.size * azimuth.size, wl.size):
+        problems.append(f"shape {total.shape} != "
+                        f"({zenith.size * azimuth.size}, {wl.size})")
+    if not (np.all(np.diff(zenith) > 0) and np.all(np.diff(azimuth) > 0)
+            and zenith[0] == 0.0 and zenith[-1] == 90.0
+            and azimuth[0] == 0.0 and azimuth[-1] == 180.0):
+        problems.append("grid endpoints not exact 0..90 / 0..180 increasing")
+    if not (np.all(np.isfinite(total)) and np.all(total >= 0.0)):
+        problems.append("radiance not finite non-negative")
+    if problems:
+        _write_failure_record(destination, preregister, source_sha,
+                              dict(elapsed_s=elapsed, problems=problems))
+        raise SystemExit("augmentation verification failed: "
+                         + "; ".join(problems) + " -- nothing written but the "
+                         "failure record, no second solve")
+    # preset repeatability against the archived zenith row, all azimuth nodes
+    zen_rows = total.reshape(zenith.size, azimuth.size, wl.size)[0]
+    old_zenith = np.asarray(data["l3_o3_3/total"])[0]
+    np.testing.assert_allclose(
+        zen_rows, np.broadcast_to(old_zenith, zen_rows.shape),
+        rtol=L3_DOME_ZENITH_RTOL, atol=0)
+
+    new = dict(data)
+    new["runs"] = np.append(np.asarray(data["runs"]), key)
+    new[f"{key}/seconds"] = elapsed
+    new[f"{key}/layer"] = spec["layer"]
+    new[f"{key}/title"] = spec["title"]
+    new[f"{key}/elevation"] = spec["elevation"]
+    new[f"{key}/medium"] = spec["medium"]
+    new[f"{key}/approximation"] = spec["approximation"]
+    new[f"{key}/method"] = res.method
+    new[f"{key}/zenith"] = zenith
+    new[f"{key}/azimuth_rel"] = azimuth
+    new[f"{key}/view_zenith"] = np.repeat(zenith, azimuth.size)
+    new[f"{key}/view_azimuth"] = np.tile(azimuth, zenith.size)
+    new[f"{key}/summary"] = render.format_result_summary(res)
+    new[f"{key}/display"] = repr(display_kwargs(spec))
+    # the solve-bound ground material rides along like compute() stores it
+    for name in ("ground_albedo", "ground_direct_irradiance"):
+        value = getattr(pres, name, None)
+        if value is not None:
+            new[f"{key}/{name}"] = value
+    new[f"{key}/ground_supported"] = np.asarray(
+        bool(getattr(pres, "ground_supported", False)))
+    for name in ("options", "effective", "diagnostics", "approximations"):
+        new[f"{key}/{name}"] = repr(_plain(getattr(res, name)))
+    for name, rad in {"total": res.radiance, **res.components}.items():
+        if not isinstance(rad, np.ndarray) or rad.ndim != 2:
+            continue
+        new[f"{key}/{name}"] = rad
+        for quantity, values in zip(("xyz", "xy", "Lv"), quantities(rad, wl)):
+            new[f"{key}/{name}_{quantity}"] = values
+    if res.stderr is not None:
+        new[f"{key}/stderr"] = res.stderr
+
+    # per-run solve provenance: the 11 ladder runs map to the original global
+    # version; the augmentation records its own compute-time identity
+    head, fingerprint = _code_identity()
+    for old_key in (str(r) for r in data["runs"]):
+        new[f"{old_key}/solve_version"] = str(data["version"])
+    new[f"{key}/solve_version"] = head
+    new[f"{key}/code_fingerprint"] = fingerprint
+    try:
+        source_rel = str(Path(source).relative_to(THEME.parents[1]))
+    except ValueError:
+        source_rel = str(source)
+    new["source_archive"] = source_rel
+    new["source_archive_sha256"] = source_sha
+    new["augment_note"] = (
+        "runs 1-11 are the original ladder solved at the production version "
+        f"below ({str(data['version'])[:7]}); {key} is the single "
+        "pre-registered 2026-11-12 augmentation solved at its own recorded "
+        "HEAD -- a mixed-source archive, not a 12-solve single version run")
+    for k in data:  # the source fields ride along bit-for-bit; "runs" is the
+        if k == "runs":  # one intentionally extended key, prefix-checked below
+            continue
+        if isinstance(data[k], np.ndarray):
+            np.testing.assert_array_equal(new[k], data[k])
+        else:
+            assert new[k] == data[k], k
+    old_runs = np.asarray(data["runs"])
+    np.testing.assert_array_equal(np.asarray(new["runs"])[:old_runs.size],
+                                  old_runs)
+    check(new)
+
+    destination.mkdir(parents=True, exist_ok=True)
+    np.savez_compressed(destination / V3_ARCHIVE.name, **new)
+    solve_versions = {str(r): str(new[f"{r}/solve_version"]) for r in new["runs"]}
+    write_tables(new, destination, csv_name="layers_v3.csv",
+                 md_name="layers_v3.md", solve_versions=solve_versions,
+                 header_notes=[f"Archive provenance: `{new['augment_note']}`",
+                               f"Source archive: `{source_rel}` "
+                               f"(sha256 `{source_sha[:16]}...`)"])
+    record = dict(
+        created=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        run=key, head=head, code_fingerprint=fingerprint,
+        elapsed_s=elapsed, budget_s=L3_DOME_BUDGET_S,
+        zenith_crosscheck_rtol=L3_DOME_ZENITH_RTOL,
+        source_archive=source_rel, source_archive_sha256=source_sha,
+        preregister=str(Path(preregister).name),
+        preregister_sha256=_sha256_file(Path(preregister)),
+        medium_evidence=medium_evidence,
+        verification=["shape/endpoints/finite-nonnegative ok",
+                      "zenith crosscheck vs l3_o3_3 ok",
+                      "old fields bit-equal, check(new) passed"],
+        outputs={name: _sha256_file(destination / name) for name in
+                 (V3_ARCHIVE.name, "layers_v3.csv", "layers_v3.md")},
+    )
+    record_path.write_text(json.dumps(record, indent=1))
+    print(f"{elapsed:.3f} s\n{new[f'{key}/summary']}\nv3 archive -> "
+          f"{destination / V3_ARCHIVE.name}", flush=True)
+    return new
+
+
+def _write_failure_record(destination: Path, preregister, source_sha: str,
+                          evidence: dict) -> None:
+    """Keep the evidence of a refused augmentation without promoting anything."""
+    destination.mkdir(parents=True, exist_ok=True)
+    head, fingerprint = _code_identity()
+    (destination / "l3_dome_failure.json").write_text(json.dumps(dict(
+        created=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        head=head, code_fingerprint=fingerprint,
+        preregister=str(Path(preregister).name),
+        source_archive_sha256=source_sha, **evidence), indent=1))
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -546,7 +837,19 @@ def main(argv=None):
                         help="explicitly write selected production figures to root figures/")
     parser.add_argument("--from-npz", type=Path,
                         help="redraw without solving (saved local arrays)")
+    parser.add_argument("--augment-l3-dome", nargs="?", const=str(SOURCE_ARCHIVE),
+                        default=None, metavar="SOURCE_NPZ",
+                        help="run the single pre-registered L3 dome solve and "
+                             "write layer_story_v3.npz + layers_v3.{csv,md} "
+                             "(default source: the committed archive); refuses "
+                             "to overwrite an existing run record")
     args = parser.parse_args(argv)
+    if args.augment_l3_dome is not None:
+        if args.quick or args.publish_figures or args.from_npz:
+            parser.error("--augment-l3-dome is exclusive of --quick, "
+                         "--publish-figures and --from-npz")
+        augment_l3_dome(Path(args.augment_l3_dome))
+        return
     if args.from_npz:
         with np.load(args.from_npz, allow_pickle=False) as archive:
             data = {k: archive[k] for k in archive.files}

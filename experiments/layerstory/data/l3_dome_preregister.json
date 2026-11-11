@@ -1,0 +1,43 @@
+{
+  "task": "task-figures-polish",
+  "created": "2026-11-12",
+  "purpose": "the single pre-registered L3 dome solve behind the v3 overview's rendered L3 panel and the ozone figure's sky views",
+  "source_archive": {
+    "path": "experiments/layerstory/data/layer_story.npz",
+    "sha256": "d4fa3daad3fb0917611d2aa381102834804d44529d3588bd91d68e8466f6f461"
+  },
+  "run": {
+    "key": "l3_o3_dome_3",
+    "layer": "L3",
+    "title": "+O3/NO2 (dome)",
+    "medium": "l3: HinterlandAerosol AOD550=0.05 (exponential H=1.5 km), ozone_du=300, no2_column=4e19 m^-2, albedo=0.1, sea-level observer, refraction=True",
+    "sun_elevation_deg": 3.0,
+    "sun_azimuth_deg": 0.0,
+    "approximation": "plane-sos",
+    "single": true,
+    "multiple": false,
+    "grid": {"n_zenith": 25, "n_azimuth": 37, "min_zenith_deg": 0.0},
+    "wavelength_grid": "theme WL (WL_COARSE, 380-780 nm / 5 nm, 81 nodes)",
+    "entry": "render.solve_dome called exactly once for this run; no other solver entry, no MC, no cloud_layer",
+    "display": "day group locked kwargs + yaw 0: perspective 640x320, hfov 100, pitch 14, exposure 0.03, aces, adaptation None, sun_disk False, ground False"
+  },
+  "budget": {
+    "wall_clock_s": 300.0,
+    "note": "planning resource cap, not a measured cost; a breach keeps diagnostics, promotes nothing, and never retries"
+  },
+  "stop_conditions": [
+    "any preregister field or source-hash mismatch -> no solve",
+    "solve failure or budget breach -> keep a failure record, no second attempt, no tolerance edits",
+    "any verification failure -> do not write the v3 archive; report and stop"
+  ],
+  "verification": {
+    "total_shape": [925, 81],
+    "grid_endpoints": "zenith 0..90 (25 nodes), relative azimuth 0..180 (37 nodes), strictly increasing, endpoints exact",
+    "values": "finite and non-negative",
+    "closure": "total == single (exact); XYZ/xy/Lv identities via layer_story.check",
+    "zenith_crosscheck": "dome zenith rows (all 37 azimuth nodes) vs archived l3_o3_3/total zenith spectrum, rtol=1e-10, atol=0 -- a preset-repeatability planning judgment, not an accuracy claim",
+    "old_fields": "every field of the source archive carries over bit-for-bit; the source file bytes stay untouched",
+    "provenance": "per-run solve_version for all 12 runs (the 11 ladder runs map to the archive's global version; the new run records compute-time HEAD plus a worktree fingerprint) and a run-record json with elapsed time and output hashes"
+  },
+  "one_call_contract": "this augmentation runs render.solve_dome exactly once; theme tests and every redraw path stay zero-solve; a future reproduction re-runs this explicit command deliberately and refuses to overwrite an existing run record"
+}
