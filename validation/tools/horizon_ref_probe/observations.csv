@@ -1,0 +1,10 @@
+source_id,obs_date,site,sun_elevation_deg,relative_azimuth_deg,view_elevation_deg,quantity,value,unit,admission,note
+granada2001,1998-08-06,Granada ES 680m,~19,0,5,chromaticity-curve point (fig 5a),figure-only,n/a,auxiliary_rejected_no_turbidity,sun-side solar-meridian near-horizon point visually confirmed; no AOD; no numeric luminance published
+granada2001,1998-08-06,Granada ES 680m,~19,0,10,chromaticity-curve point (fig 5a),figure-only,n/a,auxiliary_rejected_no_turbidity,same scan
+granada2001,1998-08-06,Granada ES 680m,~19,0,90,zenith chromaticity (in every scan),figure-only,n/a,auxiliary_rejected_no_turbidity,zenith included in all four meridian scans
+granada2001,1998-08-05,Granada ES 680m,~1.6,0,5,chromaticity-curve point (fig 7a),figure-only,n/a,auxiliary_rejected_no_turbidity,gamma=3.4 deg aureole region; no AOD
+granada2001,1998-08-05,Granada ES 680m,~1.6,0,10,chromaticity-curve point (fig 7a),figure-only,n/a,auxiliary_rejected_no_turbidity,gamma=8.4 deg; no AOD
+wuttke2006,2003-12-11,Neumayer AQ snow,~4 (SZA 86),180,6,luminance H/Z (fig 4 zenithal scan),8.2,ratio,excluded_antisolar_no_aod,anti-solar principal plane; snow albedo ~0.96; lowest view elevation 6 deg
+wuttke2006,2003-12-12,Neumayer AQ snow,~42 (SZA 48),180,6,luminance H/Z (fig 4 zenithal scan),7.6,ratio,excluded_antisolar_no_aod,anti-solar principal plane; same protocol
+wuttke2006,2003-06-22,Boulder US grass,~4 (SZA 86),180,6,luminance H/Z (fig 4 zenithal scan),4.9,ratio,excluded_antisolar_no_aod,grass surface; anti-solar; both Boulder scans on the same day
+wuttke2006,2003-06-22,Boulder US grass,~42 (SZA 48),180,6,luminance H/Z (fig 4 zenithal scan),1.4,ratio,excluded_antisolar_no_aod,grass surface; anti-solar
