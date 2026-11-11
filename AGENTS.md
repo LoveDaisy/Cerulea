@@ -100,6 +100,13 @@ uv run python -m experiments.approximations.compare
   与一次散射的域一致性是已知边界（高度响应审计时要看）。
 - `rt/twilight.py` + `rt/mc.py`：深暮光球面 Monte Carlo，split estimator（一次散射
   确定性、二次以上 MC）。引擎耗时按光子数线性。
+- `optics.py::contiguous_transpose`：macOS arm64 numpy 2.5.4 wheel 的系统 Accelerate
+  dgemm 对「第二操作数 F-contiguous 且内积维 k=3」越界读（读不改值但间歇 SIGSEGV，
+  libgmalloc 下必现）。skycolor 所有 `X @ Y.T`（k=3）站点必须经它路由：m≥64 两内核
+  逐位相同（golden 逐位不变；results.json 模型字段逐位不变，唯一例外是 check6 派生
+  tolerance 字段末位 1 ulp——非物理字段，机制见 task-mc-restrict-segv findings §4），
+  站点清单与契约由 `tests/test_blas_layout_guard.py` 机械拦截。根因证据：
+  task-mc-restrict-segv。
 - `aerosol.py` / `mie.py`：冷启动已批式向量化（task-cold-optics）：系数核与标量
   路径逐位等价（CPython 除法站点按 Smith+FMA 常量提升复现），矩/表核为 D2 声明
   容差（ulp 级，锚测试钉死）；冷 dusty `delta_m(32)` 实测 39.4→3.1 s（~13×）。
@@ -125,6 +132,10 @@ uv run python -m experiments.approximations.compare
   地面遮挡必须同源于 `r_bounds[0]`。不要把历史 1.21×/1.01× 当当前结果，或把跨文献
   0.80× 当受控海拔目标；残差不能直接归因为低层多次散射不足。
 - 不要在没有独立证据时改动 `validation/results.json` 或弦长修复的物理数字。
+- 不要在 skycolor 生产代码新增 `X @ Y.T`（k=3）matmul 而不经
+  `optics.contiguous_transpose` 路由——macOS Accelerate dgemm 对 F-contiguous B 在
+  k=3 越界读（间歇 SIGSEGV，m≥64 逐位等价）；`tests/test_blas_layout_guard.py`
+  会拦截违规站点。
 
 ### DO
 

@@ -91,3 +91,24 @@ def tau_from_columns(columns: np.ndarray, ext_weights: np.ndarray) -> np.ndarray
     for j in range(1, ext.shape[0]):
         tau = tau + columns[:, j:j + 1] * ext[j]
     return tau
+
+
+def contiguous_transpose(a: np.ndarray) -> np.ndarray:
+    """C-contiguous transposed operand for matmul.
+
+    macOS arm64 numpy wheels (2.5.4 verified) dispatch matmul to the system
+    Accelerate BLAS, whose dgemm OVERREADS past the end of an operand
+    buffer when the *second* operand is F-contiguous (a transposed view)
+    and the inner dimension is k=3 -- the Cartesian-vector case every
+    geometry matmul uses and the ``(rows, 3) @ (3, 3)`` shape of the
+    colour-matrix transforms.  The overread is read-only (no value is
+    corrupted) but SIGSEGVs whenever it crosses into an unmapped page,
+    which is heap-layout dependent: intermittent in production, immediate
+    and deterministic under libgmalloc.  Forcing the transposed operand
+    C-contiguous selects the clean kernel; for the production row counts
+    (m >= 64) the two kernels are bitwise-identical
+    (tests/test_blas_layout_guard.py pins the contract and the site
+    inventory, and ``scratchpad/task-mc-restrict-segv/findings.md``
+    carries the probe evidence).
+    """
+    return np.ascontiguousarray(np.asarray(a).T)

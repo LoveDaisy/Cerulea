@@ -87,6 +87,28 @@ finding above); P3 low-budget MC 257s per pass.
 
 ## Known containment (not a physics choice)
 
+**RESOLVED (task-mc-restrict-segv, 2026-11-11):** the segfaults below were
+traced to an upstream BLAS bug, not to the MC engine or `_restrict`:
+macOS arm64 numpy 2.5.4 wheels dispatch matmul to the system Accelerate
+BLAS, whose dgemm overreads past an operand buffer end when the *second*
+operand is F-contiguous (a transposed view) and the inner dimension is
+k=3 -- the Cartesian shape of every `X @ Y.T` matmul in the solar-source,
+colour and twilight paths.  The overread is read-only (no value changes)
+but SIGSEGVs when it crosses an unmapped page, which is heap-layout
+dependent and therefore intermittent in production and immediate under
+libgmalloc.  The full probe matrix and the guarded attribution live in the
+local task record (scratchpad, gitignored); the tracked pieces are the
+mitigation (`skycolor/optics.py::contiguous_transpose` routes every
+affected transposed operand through the clean kernel, bitwise-identical at
+BLAS row counts), its guards (`tests/test_blas_layout_guard.py`: source
+inventory + kernel contract) and the standalone upstream repro
+`validation/tools/accelerate_dgemm_overread_probe.py` -- re-run that
+probe under libgmalloc after any numpy upgrade to decide whether
+`contiguous_transpose` can be retired.  The reproduction anchor lives in
+`tests/test_mc_restrict_stress.py`; the fresh-subprocess containment is
+no longer needed and the scripts below stay as the promoted reproduction
+assets.
+
 Repeated `solve(approximation='spherical-mc')` calls on a
 `_restrict`-subset atmosphere in ONE process corrupt the heap and SIGSEGV
 after ~4-8 calls.  Reproduction assets (tracked here):
@@ -96,12 +118,9 @@ after ~4-8 calls.  Reproduction assets (tracked here):
   manifestations inside `rt/mc.py` `_flush` -> `solar_source.py`, never the
   same line).  **Intermittent**: an otherwise identical 30-rep run later the
   same day completed clean -- absence of a crash in one run is not evidence
-  of absence (the full-spectrum control stayed clean in both runs);
-* `mc_restrict_segfault_bisect.py` -- view-subset/atmosphere bisection:
-  the crash is independent of the view subset and does NOT reproduce with
-  the full-spectrum atmosphere (8 reps clean), narrowing it to the
-  `_restrict` interaction.
-
-The root cause is a production finding, out of this task's scope, reported
-to the owner for an independent spin-off (`twilight._sub_atmosphere` uses the
-same `_restrict` mechanism).
+  of absence (the full-spectrum control stayed clean in both runs -- a
+  reading the guarded probe later revised, see the RESOLVED note above);
+* `mc_restrict_segfault_bisect.py` -- view-subset/atmosphere bisection: the
+  crash is independent of the view subset; its "does NOT reproduce with the
+  full-spectrum atmosphere" reading did not survive the guarded probe
+  either.
