@@ -22,6 +22,7 @@ def test_radiance_positive_and_blue(atmo):
     assert np.all(rad[:, i450] > rad[:, i650])
 
 
+@pytest.mark.slow(reason="cost: 12-worker xdist median 14.36 s over K=3 (suite-tier step5 listing); fast-tier budget 2 s")
 def test_azimuth_symmetry(atmo):
     a = sky_radiance(atmo, 40.0, np.array([30.0, 60.0]), np.array([200.0, 340.0]),
                      sun_azimuth_deg=180.0)

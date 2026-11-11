@@ -124,6 +124,7 @@ def test_plane_sos_single_only_still_one_sos_run(atmo7, monkeypatch):
     assert calls == {"sos": 1, "single": 0}
 
 
+@pytest.mark.slow(reason="cost: 12-worker xdist median 11.82 s over K=3 (suite-tier step5 listing); fast-tier budget 2 s")
 def test_sos_config_reaches_kernel(atmo7):
     res = solve(atmo7, 60.0, VZA, 90.0, approximation="plane-sos",
                 sos_config=SOSConfig(n_mu=8, max_orders=3, tol=0.5))
@@ -158,6 +159,7 @@ def test_mc_seed_reaches_the_stream(atmo7):
 # ---------------------------------------------------------------------------
 # 2. hybrid-sos: one single call + one SOS call, legacy parity
 # ---------------------------------------------------------------------------
+@pytest.mark.slow(reason="cost: 12-worker xdist median 11.90 s over K=3 (suite-tier step5 listing); fast-tier budget 2 s")
 def test_hybrid_matches_legacy_wrapper_bitwise(atmo7):
     res = solve(atmo7, 60.0, VZA, 90.0)
     ref = sky_radiance_total(atmo7, 60.0, VZA, 90.0)
@@ -167,6 +169,7 @@ def test_hybrid_matches_legacy_wrapper_bitwise(atmo7):
                           res.components["single"] + res.components["multiple"])
 
 
+@pytest.mark.slow(reason="cost: 12-worker xdist median 12.01 s over K=3 (suite-tier step5 listing); fast-tier budget 2 s")
 def test_hybrid_calls_each_kernel_exactly_once(atmo7, monkeypatch):
     import skycolor.rt.solver as solver
 
@@ -352,6 +355,7 @@ def test_mc_route_calls_kernels_exactly_once(atmo7, monkeypatch):
     assert calls == {"single": 1, "mc": 1}
 
 
+@pytest.mark.slow(reason="cost: 12-worker xdist median 10.54 s over K=3 (suite-tier step5 listing); fast-tier budget 2 s")
 def test_mc_single_only_keeps_legacy_zero_error(atmo7):
     res = solve(atmo7, 96.0, ZEN_TW, AZ_TW, approximation="spherical-mc",
                 multiple=False)
@@ -504,6 +508,7 @@ def test_include_switches_and_ground_override(atmo7, stratus, monkeypatch):
     assert res_g.options["ground_albedo_override"] is True
 
 
+@pytest.mark.slow(reason="cost: 12-worker xdist median 14.30 s over K=3 (suite-tier step5 listing); fast-tier budget 2 s")
 def test_tau0_deck_reduces_to_clear(atmo7):
     zero = cloud.get_preset("stratus", tau550=0.0)
     res = solve(atmo7, 45.0, ZEN_C, 90.0, cloud_layer=zero)
@@ -512,6 +517,7 @@ def test_tau0_deck_reduces_to_clear(atmo7):
     assert np.array_equal(res.radiance, ref.radiance)
 
 
+@pytest.mark.slow(reason="cost: 12-worker xdist median 10.44 s over K=3 (suite-tier step5 listing); fast-tier budget 2 s")
 def test_overlay_honors_sos_config(atmo7, stratus):
     res = solve(atmo7, 45.0, ZEN_C, 90.0, cloud_layer=stratus,
                 sos_config=SOSConfig(n_mu=8, max_orders=3, tol=0.5))
@@ -564,6 +570,7 @@ def test_restrict_column_consistency(atmo7):
     assert np.array_equal(sub_ss, full_ss[:, idx])
 
 
+@pytest.mark.slow(reason="cost: 12-worker xdist median 11.71 s over K=3 (suite-tier step5 listing); fast-tier budget 2 s")
 def test_render_default_path_reaches_the_entry(atmo7):
     """render.sky_radiance_grid (no radiance_field) is bit-identical to the
     authoritative entry -- the display layer rides the thin wrapper."""
