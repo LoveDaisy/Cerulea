@@ -21,6 +21,7 @@ THEME = Path(__file__).resolve().parent          # experiments/<theme>
 FIG = THEME / "figures"      # theme-owned figure output (not the root candidates)
 OUT = THEME / "out"          # theme-owned numeric output (gitignored)
 from skycolor import color, presets, render
+from skycolor.constants import WL_DEFAULT
 
 # ---------------------------------------------------------------------------
 # CIE diagram background
@@ -33,8 +34,7 @@ def draw_cie(ax):
         XYZ = np.stack([x / y, np.ones_like(x), (1 - x - y) / y], axis=-1)
         rgb = color.xyz_to_linear_srgb(XYZ)
     inside = (rgb.min(axis=-1) > -0.02) & (x + y < 1)
-    loc = spectra.cie_xyz(np.arange(380, 781, 1.0))
-    wl = np.arange(380, 781, 1.0)
+    loc = spectra.cie_xyz(WL_DEFAULT)
     locus = loc / loc.sum(axis=1, keepdims=True)
     ax.fill(locus[:, 0], locus[:, 1], color="none")
     from matplotlib.path import Path

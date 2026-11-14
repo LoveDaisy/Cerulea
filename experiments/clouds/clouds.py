@@ -27,6 +27,8 @@ THEME = Path(__file__).resolve().parent          # experiments/<theme>
 FIG = THEME / "figures"      # theme-owned figure output (not the root candidates)
 OUT = THEME / "out"          # theme-owned numeric output (gitignored)
 from skycolor import cloud, color, presets, render
+from skycolor.color import K_M
+from skycolor.constants import WL_DEFAULT
 from skycolor.rt.cloud import (delta_eddington, illuminate_cloud,
                                sky_radiance_with_cloud)
 from skycolor.rt.solver import sky_radiance_total
@@ -279,7 +281,7 @@ def figure_albedo(atmo):
             illum = illuminate_cloud(atmo, layer, 90.0 - elev)
             L = sky_radiance_with_cloud(atmo, layer, 90.0 - elev, [0.0], 0.0,
                                         return_components=True)[1]["cloud"][0]
-            lum = 683.0 * color.spectrum_to_xyz(L, atmo.wl)[1]
+            lum = K_M * color.spectrum_to_xyz(L, atmo.wl)[1]
             target = top if illum.geometry == "top" else base
             target[0].append(elev)
             target[1].append(max(lum, 1e-3))
@@ -289,7 +291,7 @@ def figure_albedo(atmo):
     clear = []
     for elev in elevations:
         L = sky_radiance_total(atmo, 90.0 - elev, [0.0], 0.0, multiple=True)[0]
-        clear.append(683.0 * color.spectrum_to_xyz(L, atmo.wl)[1])
+        clear.append(K_M * color.spectrum_to_xyz(L, atmo.wl)[1])
     ax.semilogy(elevations, clear, "k:", lw=1, label="clear zenith")
     ax.axvline(0.0, color="0.6", ls=":", lw=1)
     ax.set_xlabel("sun elevation [deg]")
@@ -304,7 +306,7 @@ def figure_albedo(atmo):
     # noise, which is a sampling artefact and not part of the model.  Only the
     # cloud term is needed, so no multiple-scattering solve is involved.
     ax = axes[2]
-    wl1 = np.arange(380.0, 781.0, 1.0)
+    wl1 = WL_DEFAULT
     atmo1 = presets.clear(wl1)
     layer = cloud.get_preset("altostratus")
     for elev, col in [(20.0, "#444"), (0.5, "#999"), (-1.0, "tab:orange"), (-2.0, "tab:red")]:

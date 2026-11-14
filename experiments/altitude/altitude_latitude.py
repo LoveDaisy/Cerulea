@@ -25,6 +25,7 @@ from experiments.common import WL, chromaticity_of, save, strip
 THEME = Path(__file__).resolve().parent          # experiments/<theme>
 FIG = THEME / "figures"      # theme-owned figure output (not the root candidates)
 from skycolor import color, render
+from skycolor.color import K_M
 from skycolor.geometry import sun_position
 from skycolor.presets import clear
 
@@ -39,7 +40,7 @@ def altitude_panel():
         xy, Lv = chromaticity_of(dome["radiance"][0, 0])
         zens.append(xy)
         lums.append(Lv)
-        hor.append(683 * color.spectrum_to_xyz(dome["radiance"][-1, -1], WL)[..., 1])
+        hor.append(K_M * color.spectrum_to_xyz(dome["radiance"][-1, -1], WL)[..., 1])
         imgs.append(render.render_scene(atmo, 4.0, 0.0, camera="perspective",
                                         size=(300, 240), hfov_deg=110, pitch_deg=-6,
                                         reference_percentile=92, n_zenith=40,

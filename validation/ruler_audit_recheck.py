@@ -189,7 +189,7 @@ def recheck_check2(workers: int) -> None:
     wl_g, et_g, dni_g = _g173_columns()
     ybar_g = spectra.cie_xyz(wl_g)[:, 1]
     vis = (wl_g >= 380) & (wl_g <= 780)
-    g173_klx = 683.0 * np.trapezoid((dni_g * ybar_g)[vis], wl_g[vis]) / 1000.0
+    g173_klx = C.K_M * np.trapezoid((dni_g * ybar_g)[vis], wl_g[vis]) / 1000.0
     g173_w = float(np.trapezoid(dni_g, wl_g))
     print(f"2a  G173 DNI photopic illuminance 380-780 = {g173_klx:.3f} klx; "
           f"broadband 280-4000 = {g173_w:.2f} W/m2; "
@@ -198,7 +198,7 @@ def recheck_check2(workers: int) -> None:
     # G173 vs model vertical transmission, per wavelength: continuum = aerosol
     # correspondence, dips = model-missing absorption bands (water 720-740,
     # O2 A 760).  The model scene: clear preset, AOD550=0.0734, O3=343.8 DU.
-    wl_model = np.arange(380.0, 781.0, 1.0)
+    wl_model = C.WL  # library working grid (1 nm)
     atmo_g173 = _atmo_for("clear", 0.0734, 343.8, wl_model, None)
     t_model = direct_sun_transmittance(atmo_g173, 48.19)
     dni_m = np.interp(wl_model, wl_g, dni_g)

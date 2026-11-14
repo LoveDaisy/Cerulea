@@ -29,7 +29,7 @@ from typing import Sequence
 
 import numpy as np
 
-from .constants import P0, R_EARTH, Z_TOA
+from .constants import P0, Z_TOA
 from .medium import (  # noqa: F401  (re-exported for backward compatibility)
     DEFAULT_Z_BOUNDS,
     Medium,
@@ -230,12 +230,17 @@ class Atmosphere:
     # -- construction helpers ------------------------------------------------
     @classmethod
     def standard(cls, wl_nm, **kw) -> "Atmosphere":
-        """A clean mid-latitude atmosphere: 300 DU ozone, 0.05 AOD boundary layer."""
-        from .aerosol import HinterlandAerosol, shared
+        """Legacy alias of :func:`skycolor.presets.clear`.
 
-        kw.setdefault("aerosols", [AerosolLayer(shared(HinterlandAerosol), aod550=0.05,
-                                                profile=ExponentialProfile(1.5))])
-        return cls(wl_nm, ozone_du=300.0, **kw)
+        ``presets`` is the single authority for named scenes; this alias,
+        kept for the existing tests, forwards to ``clear`` (300 DU ozone,
+        0.05 AOD boundary layer).  It does not accept constructor keywords
+        outside ``clear``'s signature (``aod`` / ``ozone_du``).  Lazy
+        import: ``presets`` imports this module at load time.
+        """
+        from .presets import clear
+
+        return clear(wl_nm, **kw)
 
     def at_altitude(self, elevation_km: float) -> "Atmosphere":
         """Return a copy of this atmosphere seen from ``elevation_km``.
@@ -475,7 +480,7 @@ class Atmosphere:
     # -- column helpers ------------------------------------------------------
     @property
     def r_bounds(self) -> np.ndarray:
-        return R_EARTH + self.z_bounds * 1e3
+        return self._medium.r_bounds
 
     def __repr__(self) -> str:
         return (f"Atmosphere(nwl={len(self.wl)}, ozone={self.ozone_du} DU, "

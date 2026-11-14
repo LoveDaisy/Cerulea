@@ -38,7 +38,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from skycolor import presets, spectra  # noqa: E402
-from skycolor.constants import DU, P0, R_EARTH  # noqa: E402
+from skycolor.constants import DU, P0, R_EARTH, WL_COARSE, WL_DEFAULT as WL  # noqa: E402
+from skycolor.color import K_M  # noqa: E402
 from skycolor.rt.single import direct_sun_transmittance  # noqa: E402
 
 #: ``SKYCOLOR_MULTIPLE=1`` switches every check to the full solver
@@ -53,11 +54,11 @@ else:
 # ---------------------------------------------------------------------------
 # spectral grids
 # ---------------------------------------------------------------------------
-WL = np.arange(380.0, 781.0, 1.0)          # 1 nm, visible only
-WL_COARSE = np.arange(380.0, 781.0, 5.0)   # 5 nm, for large sky sweeps
+# ``WL`` / ``WL_COARSE`` (imported above) alias the library's working grids
+# -- a single authority (``skycolor.constants``), so a grid redefinition can
+# never drift between the checks and production.  ``WL_UV`` stays local: the
+# library has no UV grid.
 WL_UV = np.arange(300.0, 701.0, 1.0)       # Rayleigh check range
-
-K_M = 683.0  # lm/W
 
 
 def photopic(wl=WL):

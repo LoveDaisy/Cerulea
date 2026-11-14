@@ -16,6 +16,7 @@ import numpy as np
 
 from experiments.common import save
 from skycolor import color, presets, render
+from skycolor.color import K_M
 from skycolor.constants import WL_COARSE
 from skycolor.rt.result import SkyResult
 from skycolor.rt.solver import MCConfig
@@ -46,7 +47,7 @@ def _plain(value):
 def quantities(radiance, wl):
     """Un-tonemapped XYZ, xy and photopic luminance [cd m^-2]."""
     xyz = color.spectrum_to_xyz(radiance, wl)
-    return xyz, color.chromaticity(xyz), 683.0 * xyz[..., 1]
+    return xyz, color.chromaticity(xyz), K_M * xyz[..., 1]
 
 
 def compute(n_zenith=25, n_azimuth=37, wl=WL_COARSE, seeds=SEEDS):

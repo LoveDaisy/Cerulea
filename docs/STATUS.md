@@ -10,7 +10,7 @@ A reader-level mainline narrative (Chinese) lives in [physics/MAINLINE.zh.md](ph
 
 | Component | Production behavior |
 |---|---|
-| Spectral radiance, 378–780 nm | Rayleigh + Mie + O₃ + NO₂, spherical first-order geometry |
+| Spectral radiance, 380–780 nm | Rayleigh + Mie + O₃ + NO₂, spherical first-order geometry |
 | Solar source | One unified finite-disk source for every backend: apparent directions, continuous refracted columns, occultation, 16′ disk and gain (`skycolor/solar_source.py`, contract in [physics/SOLAR_SOURCE.md](physics/SOLAR_SOURCE.md)) |
 | Single scattering | Unified source at every scattering point; viewing rays remain geometric (retained approximation) |
 | Multiple scattering | Successive orders, delta-M scaled diffuse moments (raw-extinction sun), plane-parallel diffuse field; per-disk-beam Fourier source |

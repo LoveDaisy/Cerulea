@@ -604,7 +604,7 @@ def chart_table(pres: SkyPresentation, rows=DEFAULT_CHART_ROWS):
         xyz = color.spectrum_to_xyz(pres.radiance[i, j], pres.wl)
         xy = color.chromaticity(xyz)
         out.append((name, float(pres.zenith[i]), float(pres.azimuth_rel[j]),
-                    float(xy[0]), float(xy[1]), float(683.0 * xyz[1])))
+                    float(xy[0]), float(xy[1]), float(color.K_M * xyz[1])))
     return out
 
 
