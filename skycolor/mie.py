@@ -53,7 +53,6 @@ __all__ = [
     "mie_moment_numerators",
     "mie_moment_numerators_batch",
     "mie_legendre_moments",
-    "gaunt_squared",
     "phase_table_angles",
     "log_normal_nodes",
 ]

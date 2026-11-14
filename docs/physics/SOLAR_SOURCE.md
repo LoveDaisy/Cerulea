@@ -155,7 +155,6 @@ silently -- see `validation/production_solar_source.py` (suite ``closure``).
 ```bash
 uv run python -m validation.production_solar_source --suite source  --out scratchpad/task-production-solar-source/source.json
 uv run python -m validation.production_solar_source --suite closure --out scratchpad/task-production-solar-source/closure.json
-uv run python -m tools.benchmark_solar_source --out scratchpad/task-production-solar-source/perf-final.json
 ```
 
 Both suites exit non-zero on a missed threshold and write a JSON record with

@@ -35,7 +35,6 @@ from .medium import (  # noqa: F401  (re-exported for backward compatibility)
     Medium,
     THERMOSPHERE_SCALE_HEIGHT_KM,
     THERMOSPHERE_START_KM,
-    us76_number_density,
     us76_pressure,
     us76_temperature,
 )
