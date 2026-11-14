@@ -146,6 +146,12 @@ def path_lengths_sun(p_sun, cos_zenith_point, r_point, r_bounds) -> np.ndarray:
     only ``up + down`` stops at the perigee and halves the optical depth of
     every grazing twilight ray.
 
+    Consumption note: in production this fix (M-registry ``M10``,
+    ``docs/ROADMAP.md``) is exercised by the MC retired branch
+    (``rt/mc.py``) and the tests; the deterministic backends consume the
+    equivalent columns through ``solar_source``.  The fix itself is pinned --
+    do not re-derive it.
+
     Returns ``(n_shell, n_points)``.
     """
     rb = np.asarray(r_bounds, dtype=float)

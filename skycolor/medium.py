@@ -144,7 +144,15 @@ def _log_interp(table: np.ndarray, z: np.ndarray) -> np.ndarray:
 
 
 def _column_normalisation(table: np.ndarray) -> float:
-    """Column [m^-2] of a number-density table [cm^-3] over the model domain."""
+    """Column [m^-2] of a number-density table [cm^-3] over the model domain.
+
+    One of three column-integration grids, each pinned by its own historical
+    numbers: the built-in tables here (20000 points), user-supplied profile
+    shapes on ``_PROFILE_COLUMN_GRID`` below (4001, bit-comparable with the
+    historical diagnostic grid), and the display-side profile fraction in
+    ``atmosphere.VerticalProfile.column`` (4000).  Deliberate forks -- do not
+    unify; changing any grid changes the numbers it produces.
+    """
     z = np.linspace(0, Z_TOA / 1e3, 20000)
     n = _log_interp(table, z) * 1e6  # m^-3
     return float(np.trapezoid(n, z * 1e3))
@@ -381,6 +389,16 @@ class Medium:
 
         Use :meth:`delta_m_properties` to get the rescaled optical properties
         consistently with these moments.
+
+        Split note: this is one of three deliberate implementations of the
+        same Wiscombe transform -- production SOS scales moments here, cloud
+        decks through ``skycolor.cloud.delta_m``, and the aerosol module keeps
+        a non-production golden anchor (``skycolor.aerosol.delta_m``).  This
+        site and the cloud kernel clip ``f`` to ``[0, 0.999]``; the aerosol
+        anchor clips tighter (``[0, 1-1e-12]``).  The divergence is
+        unreachable for every library member (raw ``f`` <= 0.383) but matters
+        if future phase functions approach unity -- keep the three sites in
+        mind when touching any one of them.
         """
         raw = self.phase_moments(n_moments + 1)
         f = np.clip(raw[:, n_moments, :], 0.0, 0.999)
