@@ -30,9 +30,14 @@ Setup and run commands live in [the project README](../README.md) and
 | [REPORT.md](../validation/REPORT.md) | Original single-scattering baseline; the five-check table is historical |
 | [ADDENDUM.md](../validation/ADDENDUM.md) | Chronological changes and locally marked superseded interpretations |
 | [SECOND_DATASET.md](../validation/SECOND_DATASET.md) | Koomen transcription and historical model comparisons, with current audit pointers |
+| [FAST_SUITE.md](../validation/FAST_SUITE.md) | Two-tier suite ledger: tier design, measured shapes, scheduling weights and acceptance pairs |
+| [RULER_AUDIT.md](../validation/RULER_AUDIT.md) | Adjudication matrix for the physical checks: which FAILs are contract gaps vs measurement questions |
 
 Current summaries carry conclusions and links. Topic reports own methods,
 conditions, uncertainties and raw-evidence references; preserve historical
 measurements with their baseline. Update STATUS and the relevant contract/report
 when behavior changes, and ROADMAP when a milestone completes. Local `scratchpad/`
 holds workflow records rather than another project-status document.
+
+Language convention: reader-facing walkthroughs and the AI entry ([AGENTS.md](../AGENTS.md))
+are Chinese; method contracts, code and docstrings are English.

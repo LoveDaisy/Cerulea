@@ -38,7 +38,8 @@ Fixed-exposure diffuse sky, no sun marker or ground. [Parameters and version](fi
 ## Quick start
 
 The environment is managed by [uv](https://docs.astral.sh/uv/) and the exact
-dependency versions are pinned in `uv.lock` (Python 3.12).  Everything below
+dependency versions are pinned in `uv.lock` (Python 3.11+, developed on
+3.12).  Everything below
 assumes `uv run`, which uses that locked environment.
 
 ```bash
@@ -90,6 +91,12 @@ skycolor/
   mie.py          Mie coefficients, analytic Legendre moments, adaptive phase grids
   aerosol.py      eight-member aerosol library (rural … volcanic … cloud), delta-M
   geometry.py     solar position, spherical-shell ray tracing
+  medium.py       frozen physical medium (US1976, profiles, layer optics)
+  scene.py        frozen observing scene; the one solar-input resolver
+  solar_source.py unified finite-disk solar source shared by every backend
+  optics.py       shared species/column algebra; k=3 matmul routing
+  constants.py    physical constants and the working wavelength grids
+  cli.py          `python -m skycolor` (render / chart)
   rt/solver.py    one production entry, four finite approximation combinations
   rt/single.py    spherical-shell first order, straight viewing rays
   rt/multiple.py  successive-orders multiple scattering (Fourier + Gauss-Legendre)
@@ -110,11 +117,18 @@ docs/                 project overview, architecture and development guide
   twilight/           twilight engine, audit sequence and historical sensitivities
 ```
 
+The authoritative module map, with contracts and approximation limits, is
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 ## Where it stands
 
 [STATUS.md](docs/STATUS.md) records current behavior, the physical-check
 snapshot and validation limits;
 [the documentation guide](docs/README.md) maps methods and historical evidence.
+For a reader-level walkthrough of the physics, with every production figure
+and its caption (Chinese), start at
+[MAINLINE.zh.md](docs/physics/MAINLINE.zh.md); [SUMMARY.zh.md](docs/SUMMARY.zh.md)
+is the Chinese overview.
 The six-check suite currently exits non-zero for known physical deviations
 (their scope is in STATUS.md, which is the single place the counts live).
 

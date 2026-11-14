@@ -17,7 +17,7 @@ Each report preserves a different intervention and its conditions. Their numeric
 results are not interchangeable. Their scripts were retired from the active
 `tools/` tree in the research-boundary reorganisation: code, rerun commands and
 known limitations are indexed per topic in `experiments/retired/README.md`
-(fixed commit `afaae17`; task-7 tooling at `dda8673`), and the frozen evidence
+(fixed commit `afaae17`; the deep-twilight-reference tooling at `dda8673`), and the frozen evidence
 packages stay under `validation/data/`.
 
 | Document | Question and outcome |
@@ -37,6 +37,11 @@ raw-data checks: recoverable FORS metadata and same-twilight candidates, an
 independently identified station-ephemeris mismatch in published CSSP spectra,
 and original photometric time series. These are candidate validation inputs;
 instrument, background and atmospheric matching are still incomplete.
+The observation-input side of that line — the CSSP 42-record frozen package
+(raw↔published-spectra reproduction, session screening, observation-operator
+matrix) — is documented in
+[CSSP_OBSERVATION_INPUTS.md](CSSP_OBSERVATION_INPUTS.md), backed by the
+[experiments/cssp](../../experiments/cssp/README.md) theme.
 
 General scattering/refraction methods are in [physics/](../physics/README.md).
 Reference transcription is in [SECOND_DATASET.md](../../validation/SECOND_DATASET.md).

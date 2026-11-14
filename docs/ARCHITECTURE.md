@@ -2,8 +2,8 @@
 
 This document is the contract between the modules.  If you change an interface,
 update this file in the same commit.  It describes the architecture after the
-`task-architecture-refactor` split (frozen `Medium` / `Scene`, species column
-algebra in `optics`, `SkyResult`, `radiance_field` display seam).
+refactor that split frozen `Medium` / `Scene`, moved species column algebra
+into `optics`, and introduced `SkyResult` and the `radiance_field` display seam.
 
 ## Conventions
 
@@ -115,7 +115,7 @@ two backends using the same source cannot validate it: the independent
 chain lives in `validation/production_solar_source.py` (RK anchors, analytic
 limits, table holdout and the deterministic-vs-MC first-order closure).
 
-### delta-M quantities vs raw physics (E4)
+### delta-M quantities vs raw physics
 
 `phase_moments(n)` returns the *raw* Legendre moments of the layer-averaged
 phase function (`p(cos t) = Σ (2l+1) β_l P_l`, ∫p dΩ = 4π).  `delta_m_moments`
@@ -161,7 +161,7 @@ establish a missing low-altitude multiple-scattering component.
   media never share caches.  "Frozen" guarantees the *binding*, not the
   content: the numpy arrays and nested objects held by a frozen object are
   still technically mutable in place — treat everything reachable from a
-  frozen object as read-only (a51: the mutation surface is not fenced; the
+  frozen object as read-only (the mutation surface is not fenced; the
   contract is documented here rather than enforced).
 * Species-column caches per backend key on (wavelength, shell) values —
   per-instance, value-semantics keys.
@@ -291,14 +291,15 @@ instead of silently pairing the custom sky with the clear beam.
 | `cloud._Distribution` | `cloud.SizeDistribution` (alias kept) |
 | `refraction._Profile` / `_trace` in data pipeline | `refractive_profile` / `trace_ray(..., profile=...)` |
 | mutating a shared aerosol | `aerosol.replace(**kw)` (shared instances are frozen) |
-| `at_altitude` (double-scaled rescaling) | truncation at the site (Step 3c) |
+| `at_altitude` (double-scaled rescaling) | truncation at the site: the layer grid starts at the observer altitude, the ground moves to it, and no column quantity is renormalised |
 | `experiments/clouds/clouds.py` display helpers | `render.sky_dome` / `render_scene` with `radiance_field`; the deck ground-beam helper lives in `rt.cloud.ground_direct_irradiance` (experiments forward to it) |
 | CLI `--elevation` | unchanged semantics (site altitude); values follow the truncation fix |
 | CLI `--time` (chart ignored it; `refraction=True` ephemeris angle) | both subcommands consume `--time` through `scene.resolve_sun`: naive means UTC, explicit offsets convert before the ephemeris reads clock fields, and the resolved direction is pre-refraction (the source applies refraction once) |
 
 ### Semantics tightened by the presentation consolidation
 
-Display-level corrections (task-presentation-flow); solve numbers inside the
+Display-level corrections from the presentation consolidation (local task log
+`task-presentation-flow`, untracked); solve numbers inside the
 supported domains are unchanged:
 
 1. Time/numeric solar inputs now describe the same pre-refraction direction

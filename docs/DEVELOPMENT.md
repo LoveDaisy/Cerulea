@@ -16,8 +16,9 @@ git switch main
 git switch -c chore/documentation-layout
 ```
 
-Manage the work in local `scratchpad/` according to `scratchpad/common.md` and the
-applicable skills. For simultaneous independent tasks, use separate worktrees
+Manage the work in local `scratchpad/` (untracked: its `common.md` handbook
+exists only in local checkouts) and the applicable skills. For simultaneous
+independent tasks, use separate worktrees
 and their own environments, sharing scratchpad through the established workflow.
 Before running package code/tests in a worktree, confirm the actual import path:
 
@@ -47,12 +48,13 @@ files or physical results requires independent attribution, not just better fit.
 
 ### Test tiers
 
-The suite is two-tier (task `suite-tier`, 2026-11-11 user adjudication): the
-default entry is the **fast tier** (dev loop), the **full tier** is the
-acceptance gate.  Tiers are declared in code with the `slow` marker — never
-derived from a measured threshold at run time — and reordering tiers never
-touches budgets, seeds, tolerances or assertions (zero detection-power
-reduction).
+The suite is two-tier: the default entry is the **fast tier** (dev loop), the
+**full tier** is the acceptance gate.  Tiers are declared in code with the
+`slow` marker — never derived from a measured threshold at run time — and
+reordering tiers never touches budgets, seeds, tolerances or assertions (zero
+detection-power reduction).  The authoritative ledger for counts, measured
+shapes and the formal pair protocol is
+[validation/FAST_SUITE.md](../validation/FAST_SUITE.md) ("suite-tier" section).
 
 ```bash
 uv run pytest -q                                    # fast tier (default entry)
@@ -60,26 +62,28 @@ SKYCOLOR_FULL_SUITE=1 uv run pytest -q -n 12 --dist=loadgroup   # full tier
 SKYCOLOR_FULL_SUITE=1 uv run pytest -n 0 -q tests/test_validation_harness.py  # serial full diagnostics
 ```
 
+**Theme tests live outside both tiers:** `experiments/*/tests/` (layout
+contracts, figure-refresh guards) are not collected — `testpaths` pins pytest
+to `tests/` — and run through each theme's documented entry (theme README).
+They are not part of the full-tier population and not covered by the
+weights-regen flow.
+
+#### Placing and moving tests — current rules
+
 **Two-dimension placement rule** — a test belongs in the fast tier only when
 BOTH hold:
 
 1. **Species** (`kind:`): its guard object is logic / contract / boundary /
    small-scale numeric anchor.  MC statistical convergence, large-grid /
-   full-dome integration, and golden-fixture full verification are full-tier
-   exclusive regardless of cost.
+   full-dome integration, and golden-fixture (committed bitwise reference
+   outputs) full verification are full-tier exclusive regardless of cost.
 2. **Cost** (`cost:`): its fast-tier K=3 median under the target form
-   (12-worker xdist) is ≤2 s.  **Markers are human-owned declarations**
-   (2026-11-11 user adjudication, option 2): no automated gate judges
-   marker placement.  The cost dimension is carried by the standing
-   weights-regen rule (below): every regen measures actual costs into the
-   table and the informational `fast_predicted_wall_s`, and a marker whose
-   measured cost contradicts its tier is corrected by hand — re-measure,
-   flip, regen.  Measurement caveat: the `-n 12` xdist form concentrates a
-   ~12-17 s startup transient on each scheduling bin's first tests
-   (evidence: validation/FAST_SUITE.md "suite-tier"), so a small
-   `<nodeids>` selection reads its every member as a bin head — cost
-   evidence must come from the batch protocol in the reclassification rule
-   below, never from a small-selection run.
+   (12-worker xdist) is ≤2 s.  **Markers are human-owned declarations** (see
+   background below for the adjudication): no automated gate judges marker
+   placement.  The cost dimension is carried by the standing weights-regen
+   rule (below): every regen measures actual costs into the table and the
+   informational `fast_predicted_wall_s`, and a marker whose measured cost
+   contradicts its tier is corrected by hand — re-measure, flip, regen.
 
 **New tests are tiered by their author at write time** (species dimension from
 the rule above; cost dimension from an honest estimate, marker reason prefixed
@@ -93,24 +97,6 @@ optimization task is opened (the full tier carries the test meanwhile).
 After the optimization lands, re-measure its cost via the batch protocol
 below; ≤2 s and the marker is removed by hand through the marker-change
 rule.
-
-**Reclassification (slow → fast) is a manual operation**, reviewed in
-code-review: evidence is a batch-protocol K=3 median ≤2 s, then delete the
-marker, then re-measure the listings required by the marker change and
-regen (rule below).  Readings from other calibers (durations tables,
-full-suite listings) are not reclassification evidence.
-**Transitional measurement protocol** — the standing method for measuring a
-small candidate set without the xdist bin-head transient: measure the
-candidates in a batch over the slow tier — `SKYCOLOR_FULL_SUITE=1 uv run
-pytest -q -m slow --durations=0` (three samples): the genuinely heavy slow
-tests head the scheduling bins and absorb the transient, so candidates read
-near-intrinsic; their K=3 medians are the evidence.  A candidate that still
-reads >2 s may be attributed with a serial reference
-(`uv run pytest -n 0 <nodeids> --durations=0` — an attribution aid, never
-the pass/fail evidence itself); unresolved candidates keep their marker.
-(The transient-aware gate task once registered for this was superseded by
-the option-2 adjudication; the batch protocol is the standing de-pollution
-method.)
 
 **Marker reasons are machine-readable** — `kind:mc` / `kind:golden` /
 `kind:grid` / `kind:render` for species-exclusive tests, `cost: <median> s
@@ -133,6 +119,12 @@ triggers today: re-running a previously failed slow test via bare `--lf`
 overrides to the full population.  Priority: explicit
 `-m`/`-k`/`::` nodeid > env switch > default fast tier.
 
+**Reclassification (slow → fast) is a manual operation**, reviewed in
+code-review: evidence is a batch-protocol K=3 median ≤2 s, then delete the
+marker, then re-measure the listings required by the marker change and
+regen (rule below).  Readings from other calibers (durations tables,
+full-suite listings) are not reclassification evidence.
+
 **Marker-change cost:** the table's `slow` mirror must equal the live
 markers (harness equality test).  After any marker or population change,
 the only path back to a green full suite is re-measuring the listings the
@@ -148,6 +140,36 @@ mirror-equality guard by design (the table lags until the regen); the
 regen's full-slot input accepts exactly that red state — sole failure =
 the mirror guard, anything else rejects (pinned in the weights-tool
 tests).
+
+#### Background — measurement protocol and adjudication history
+
+Not needed to place a new test; kept for audits and future re-adjudications.
+
+**Measurement caveat (xdist startup transient):** the `-n 12` xdist form
+concentrates a ~12-17 s startup transient on each scheduling bin's first
+tests (evidence: validation/FAST_SUITE.md "suite-tier"), so a small
+`<nodeids>` selection reads its every member as a bin head — cost evidence
+must come from the batch protocol below, never from a small-selection run.
+
+**Transitional measurement protocol** — the standing method for measuring a
+small candidate set without the xdist bin-head transient: measure the
+candidates in a batch over the slow tier — `SKYCOLOR_FULL_SUITE=1 uv run
+pytest -q -m slow --durations=0` (three samples): the genuinely heavy slow
+tests head the scheduling bins and absorb the transient, so candidates read
+near-intrinsic; their K=3 medians are the evidence.  A candidate that still
+reads >2 s may be attributed with a serial reference
+(`uv run pytest -n 0 <nodeids> --durations=0` — an attribution aid, never
+the pass/fail evidence itself); unresolved candidates keep their marker.
+(The transient-aware gate task once registered for this was superseded by
+the marker-ownership adjudication; the batch protocol is the standing
+de-pollution method.)
+
+**Adjudication history:** the two-tier design and marker ownership were
+adjudicated 2026-11-11 (option 2: markers are human-owned declarations, the
+automated placement gate was removed); the fast-tier wall guard is the
+regression-line subject per the same day's owner ruling, while the full-tier
+wall is recorded in FAST_SUITE.md without a line (see the maintenance rule in
+"Test-suite execution profile").
 
 ### Test-suite execution profile
 
@@ -202,7 +224,10 @@ git merge --no-ff chore/documentation-layout
 
 The branch name above is an example. Use explicit `--no-ff` even when a
 fast-forward is possible, preserving the project's task boundary in history.
-The repository's configured Git hooks enforce the clean merge policy.
+Merge discipline is by convention; no hooks ship with the repository, so a
+fresh clone enforces nothing.  The owner may additionally run machine-local
+Git hooks via `core.hooksPath`, but that is local configuration, not part of
+the repo.
 
 Confirm that the merge tree matches the verified topic-branch tree and that the
 main working tree is clean. Record the verification and merge in the task's

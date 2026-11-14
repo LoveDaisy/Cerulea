@@ -15,7 +15,8 @@ The remaining station difference is not causally identified; the paper does
 not supply an absolute error budget that assigns it to calibration.
 
 The altitude interpretation was revised by the subsequent
-[audit](../docs/twilight/TWILIGHT_ALTITUDE_AUDIT.md): Step 3c fixed truncation, but
+[audit](../docs/twilight/TWILIGHT_ALTITUDE_AUDIT.md): the truncation fix changed
+the modelled domain, but
 solar visibility still let rays cross the raised opaque ground.  Correcting
 that changes the deterministic -6° high/low ratio **1.208 → 1.027**;
 full-spectrum direct MC gives dimming instead.  The cross-study ratio 0.80
