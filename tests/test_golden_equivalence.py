@@ -9,7 +9,7 @@ recorded reason in the task progress log -- never to make a failing
 comparison pass.
 
 All scenarios are pinned at ``elevation_km=0`` so the structural criterion
-stays decoupled from the altitude-semantics change (plan Step 3c), which is
+stays decoupled from the altitude-truncation semantics change, which is
 verified separately (see ``docs/twilight/TWILIGHT_ALTITUDE_AUDIT.md``).
 """
 from __future__ import annotations
@@ -126,7 +126,7 @@ def test_mc_split(clear7):
 
 
 def test_altitude_truncated_baseline(clear7):
-    """Step 3c truncation semantics, pinned as a NEW-semantics baseline:
+    """Truncation semantics (post-at_altitude-fix), pinned as a NEW-semantics baseline:
     generated after the at_altitude fix and never compared with the
     elevation=0 fixtures.  The observer radius must coincide with the first
     shell boundary (single integrates from it, SOS/MC ground is z_bounds[0])."""

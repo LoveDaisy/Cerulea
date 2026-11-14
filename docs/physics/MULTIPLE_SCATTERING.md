@@ -36,7 +36,7 @@ The solver is a **successive orders of scattering (SOS)** solver:
   With default `delta_m=True`, optical depths, albedos and Legendre moments
   use `Atmosphere.delta_m_properties(n_moments)`. With `delta_m=False`,
   `Atmosphere.phase_moments` supplies the raw layer-averaged moments.
-  See [ARCHITECTURE.md](../ARCHITECTURE.md#delta-m-quantities-vs-raw-physics-e4).
+  See [ARCHITECTURE.md](../ARCHITECTURE.md#delta-m-quantities-vs-raw-physics).
   The azimuthal expansion is exact up to the mode/moment truncation; there is
   no `m = 0` approximation.  Twelve modes (default) are enough for the phase
   functions in this package (the result changes by < 0.1 % between 8 and 20

@@ -40,8 +40,8 @@ import 无目录创建副作用。
 | `altitude/` | 海拔/纬度 | 观察者高度与纬度响应 |
 | `bluesun/` | 蓝太阳 | 大颗粒气溶胶下的太阳色 |
 | `clouds/` | 云（清/阴、鱼眼、日落序列、反照率） | 云层对天空与地面照明 |
-| `cssp/` | CSSP 观测输入工具与冻结包（hermetic） | 真实观测对比的输入端，见其 README |
-| `retired/` | 退休主题索引与历史图（代码在固定历史提交） | 复跑入口与证据定位，见其 README |
+| [cssp/](cssp/README.md) | CSSP 观测输入工具与冻结包（hermetic） | 真实观测对比的输入端，见其 README |
+| [retired/](retired/README.md) | 退休主题索引与历史图（代码在固定历史提交） | 复跑入口与证据定位，见其 README |
 
 ## 共用辅助
 

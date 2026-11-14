@@ -52,7 +52,7 @@ in [CURVED_TRANSPORT_AUDIT.md](twilight/CURVED_TRANSPORT_AUDIT.md).
 | 3 — CIE relative luminance | FAIL; upper sky RMS 10.6%, sun-side horizon +142% at sun 45° |
 | 4 — Horizon chromaticity | PASS, marginal; Δxy = 0.0184 |
 | 5 — Twilight, first order only | FAIL in deep twilight; does not test the full engine |
-| 6 — Koomen twilight | FAIL; −6° deterministic 0.55×, −9°/−12° engine 1.15×/0.75× — the round-4 contact-band disk fix raised the deep-twilight MC NEE (old 2×8 disk under-integrated partially occulted beams; deterministic SS unchanged) |
+| 6 — Koomen twilight | FAIL; −6° deterministic 0.55×, −9°/−12° engine 1.15×/0.75× — the contact-band disk correction (fourth iteration of the paired-source refinement) raised the deep-twilight MC next-event-estimation (NEE) variance: the old 2×8 disk under-integrated partially occulted beams; deterministic single scattering unchanged |
 
 Read-only audit of the reference contracts behind checks 2/3/6 (premises,
 definitions, solar-axis conventions, transcription): 2026-11-10, see
@@ -102,7 +102,8 @@ These backends have not replaced production defaults.
   (`physics/SOLAR_SOURCE.md` §Known deviations records the adjudicated
   residuals). Remaining inverse-angle table sparsity and refracted disk
   angular gain are tracked there; the entry consolidation
-  (task-simulation-entry) made `rt.solver.solve` the single composition
+  (local task log `task-simulation-entry`, untracked) made `rt.solver.solve`
+  the single composition
   of single+SOS/MC/cloud.
 - Absolute twilight validation needs matched solar-axis metadata, site atmospheres
   and instrument responses. Patat's total V-band sky includes night background.
@@ -114,14 +115,18 @@ These backends have not replaced production defaults.
 - Rare-path MC uncertainty remains large in deep twilight. A single error bar or
   a better fit does not identify missing scattering or calibration error.
 - Horizon luminance remains unresolved, but no longer for lack of an aureole
-  hypothesis: the pre-registered attribution probe (task-aureole-delta-fit,
-  2026-11-11) excluded moment representation and transport geometry (G1
-  stop-loss, R = 0.00065) and shifted attribution to first-order horizon
+  hypothesis: the pre-registered attribution probe of 2026-11-11 (local task
+  log `task-aureole-delta-fit`, untracked; evidence promoted to
+  `validation/tools/aureole_attribution/`) excluded moment representation and
+  transport geometry (its pre-registered stop-loss triggered: probe effect
+  size R = 0.00065, i.e. no attributable contribution) and shifted attribution
+  to first-order horizon
   brightening vs the empirical CIE 110 gradation plus a horizon-weighted
   diffuse enhancement (`validation/tools/aureole_attribution/`).  Delta-fit,
   polarisation, structured clouds and ice-crystal halos remain absent.
 - M11 removed repeated Mie work through shared optics and a 256-state cache;
-  task-cold-optics then batch-vectorised the cold build itself (bitwise
+  a follow-up cold-build vectorisation (local task log `task-cold-optics`,
+  untracked) then batch-vectorised the cold build itself (bitwise
   coefficient kernels, ulp-level declared-tolerance moment/table kernels).
   Cold dusty `delta_m(32)` fell from 39.4 s to about 3 s; see
   [M11 measurements](ROADMAP.md#m11--mie-working-set-caching-and-shared-preset-optics-2026-10-31)

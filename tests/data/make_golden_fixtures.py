@@ -11,7 +11,7 @@ explicit, recorded reason in the task progress log -- never to make a
 failing comparison pass.
 
 All scenarios are pinned at ``elevation_km=0`` so the structural criterion
-stays decoupled from the altitude-semantics change (plan Step 3c), which is
+stays decoupled from the altitude-truncation semantics change, which is
 verified separately (see ``docs/twilight/TWILIGHT_ALTITUDE_AUDIT.md``).
 """
 from __future__ import annotations
@@ -129,9 +129,9 @@ def main() -> None:
           total_err=res["total_err"], wl=atmo.wl)
     print(f"  mc: {time.perf_counter() - t0:.1f} s")
 
-    # Truncation semantics (plan Step 3c): a NEW-semantics baseline at
+    # Truncation semantics (post-at_altitude-fix): a NEW-semantics baseline at
     # z0=2.4 km, generated after the at_altitude fix and never compared
-    # against pre-Step-3c fixtures.  It gives the truncated default the same
+    # against pre-fix fixtures.  It gives the truncated default the same
     # bit-exact protection the elevation=0 fixtures give the old domain.
     t0 = time.perf_counter()
     atmo = presets.clear(WL7).at_altitude(2.4)

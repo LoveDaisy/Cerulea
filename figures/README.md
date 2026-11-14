@@ -1,6 +1,10 @@
 # Production figures
 
 This is the **selected current-production set**, not the old candidate pool.
+Just want to look at the figures? Read them with their captions in the
+reader-level walkthrough [docs/physics/MAINLINE.zh.md](../docs/physics/MAINLINE.zh.md)
+(Chinese); everything below the guide line is provenance — versions, commands,
+archives — for reproduction and audits.
 The first four images were actually generated and opened on 2026-11-08 through
 `render.solve_dome` → `rt.solver.solve` → saved spectra → `render.render_result`.
 Production version **`6627c00`** (same `skycolor/` tree as `7d7ce15`); the

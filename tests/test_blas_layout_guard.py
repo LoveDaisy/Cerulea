@@ -92,7 +92,8 @@ def test_no_transposed_right_operand_matmul_in_skycolor():
 def test_transpose_aliases_are_the_single_authority():
     """The module-local ``_cT`` names must BE ``optics.contiguous_transpose``.
 
-    One authoritative implementation (AGENTS.md a56 discipline): the
+    One authoritative implementation (single-authority discipline, see
+    AGENTS.md): the
     solar_source / color aliases exist only as import spellings.
     """
     assert solar_source._cT is contiguous_transpose

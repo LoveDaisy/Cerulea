@@ -10,7 +10,7 @@ confident we are?**  Everything below is measured against that.
 This tracked document records completed milestones and their evidence, including
 conclusions superseded by later work.  [STATUS.md](STATUS.md) is the current
 snapshot; topic documents carry reproducible methods, results and limitations.
-Session handoffs in `scratchpad/` are temporary navigation aids, not a second
+Session handoffs in `scratchpad/` (gitignored, local only) are temporary navigation aids, not a second
 source of project state.  Once consumed, their durable findings belong here or
 in the relevant topic document; their historical instructions are retired.
 
