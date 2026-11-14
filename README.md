@@ -146,3 +146,9 @@ not a maintenance dependency on the current solver. See [ROADMAP.md](docs/ROADMA
 
 See `skycolor/data/SOURCES.md`.  All tables are committed so the code runs
 offline; `tools/build_data.py` regenerates them from `data_raw/`.
+
+## License
+
+MIT — see [LICENSE](LICENSE).  The data tables in `skycolor/data/` keep their
+upstream terms; per-file sources and the licensing note live in
+`skycolor/data/SOURCES.md`.

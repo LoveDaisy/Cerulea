@@ -20,3 +20,7 @@ Notes
   and Gueymard (2004) spectra; its 400–700 nm integral is 530 W m⁻².
 * Rayleigh scattering is computed analytically (Bodhaine et al. 1999) rather
   than tabulated.
+* The tables in `skycolor/data/` are committed for offline reproducibility of
+  this repository under its license; the underlying data keep their upstream
+  terms (CIE 1931 CMFs via CVRL/UCL, ASTM G173-03 via pvlib, JPL cross
+  sections via NCAR TUV-x) — see the table above for per-file sources.
