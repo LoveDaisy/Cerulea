@@ -92,11 +92,6 @@ def us76_pressure(z_km: np.ndarray) -> np.ndarray:
     return out
 
 
-def us76_number_density(z_km: np.ndarray) -> np.ndarray:
-    """Dry-air number density [m^-3] from the US Standard Atmosphere."""
-    return us76_pressure(z_km) / (K_B * us76_temperature(z_km))
-
-
 # ---------------------------------------------------------------------------
 # Default vertical grid
 # ---------------------------------------------------------------------------

@@ -302,13 +302,6 @@ def get_tables(atmo) -> RefractionTables:
     return tables
 
 
-def apparent_solar_zenith(atmo, true_zenith_deg, refraction=True):
-    """Convert a true (ephemeris) solar zenith angle to the apparent one."""
-    if not refraction:
-        return true_zenith_deg
-    return get_tables(atmo).apparent_zenith(true_zenith_deg)
-
-
 # ---------------------------------------------------------------------------
 # the refractive geometry used by the radiative transfer
 # ---------------------------------------------------------------------------
@@ -322,6 +315,11 @@ def _load_table():
 
 class RefractionGeometry:
     """Turn the packaged refraction table into fast vectorised lookups.
+
+    Legacy data-pipeline/test-anchor role: production radiative transfer
+    builds its solar source from :mod:`skycolor.solar_source` instead; this
+    family survives for ``tools/build_data.py`` (the producer of
+    ``skycolor/data/refraction.csv``) and the refraction tests.
 
     The table gives, for a grid of altitudes and *apparent* elevations, the
     *true* (asymptotic) elevation of the source.  Radiative transfer needs the

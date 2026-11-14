@@ -1026,8 +1026,3 @@ def save_png(rgb: np.ndarray, path):
 
     Image.fromarray(color.to_uint8(rgb)).save(path)
     return path
-
-
-def save_hdr(radiance: np.ndarray, wl, path):
-    np.savez_compressed(path, radiance=radiance, wl=wl)
-    return path

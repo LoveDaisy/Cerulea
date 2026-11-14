@@ -11,8 +11,6 @@ is what twilight is all about.
 from __future__ import annotations
 
 import datetime as _dt
-from dataclasses import dataclass
-
 import numpy as np
 
 from .constants import R_EARTH
@@ -113,46 +111,9 @@ def sun_vector(azimuth_deg: float, elevation_deg: float) -> np.ndarray:
     return np.array([np.cos(el) * np.sin(az), np.cos(el) * np.cos(az), np.sin(el)])
 
 
-def direction_vector(azimuth_deg, elevation_deg) -> np.ndarray:
-    """Unit vector for a viewing direction, shape ``(..., 3)``."""
-    az = np.radians(np.asarray(azimuth_deg, dtype=float))
-    el = np.radians(np.asarray(elevation_deg, dtype=float))
-    return np.stack([np.cos(el) * np.sin(az), np.cos(el) * np.cos(az), np.sin(el)], axis=-1)
-
-
 # ===========================================================================
 # Spherical shell ray geometry
 # ===========================================================================
-@dataclass
-class RayGeometry:
-    """Geometry of a straight ray through a shell atmosphere.
-
-    Attributes
-    ----------
-    p : impact parameter (distance of closest approach to the Earth centre) [m]
-    d0 : distance from the perigee to the observer along the ray [m]
-    """
-
-    p: float
-    d0: float
-
-    @classmethod
-    def from_zenith_angle(cls, r_observer: float, cos_zenith: float) -> "RayGeometry":
-        c = float(np.clip(cos_zenith, -1.0, 1.0))
-        p = r_observer * np.sqrt(max(1.0 - c * c, 0.0))
-        d0 = r_observer * abs(c)
-        return cls(p, d0)
-
-    def radius(self, u):
-        """Radius at distance ``u`` from the perigee."""
-        return np.sqrt(self.p**2 + np.asarray(u, dtype=float) ** 2)
-
-    def cos_zenith(self, u):
-        """Cosine of the local zenith angle at distance ``u`` from the perigee."""
-        u = np.asarray(u, dtype=float)
-        return u / np.sqrt(self.p**2 + u**2 + 1e-9)
-
-
 def shell_lengths_upward(p: float, r_bounds: np.ndarray, u_from, u_to) -> np.ndarray:
     """Per-shell path lengths along a ray, between two distances from the perigee.
 
@@ -209,16 +170,6 @@ def is_sunlit(p_sun, cos_zenith_point, r_earth: float = R_EARTH) -> np.ndarray:
     p = np.asarray(p_sun, dtype=float)
     c = np.asarray(cos_zenith_point, dtype=float)
     return (c >= 0.0) | (p > r_earth)
-
-
-# ===========================================================================
-# Convenience: angular grids on the sky
-# ===========================================================================
-def sky_angles(n_zenith: int = 48, n_azimuth: int = 96, vmin_deg: float = 0.0):
-    """A regular grid in (viewing zenith, azimuth) for computing a sky dome."""
-    v = np.linspace(vmin_deg, 90.0, n_zenith)
-    a = np.linspace(0.0, 360.0, n_azimuth, endpoint=False)
-    return np.meshgrid(v, a, indexing="ij")
 
 
 def path_lengths_sun_array(p, cos_zenith_point, r_point, r_bounds) -> np.ndarray:

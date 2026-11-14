@@ -113,19 +113,12 @@ class Aerosol:
     def delta_m(self, wl_nm, n_moments: int = 32, tau=None, omega=None) -> "DeltaMResult":
         """Delta-M scaling of this aerosol's phase function.
 
-        Computes the moments ``beta_0 .. beta_{n_moments}``, takes
-        ``f = beta_{n_moments}`` and returns the renormalised set.  See
-        :func:`delta_m` for the transformation and the meaning of ``tau`` and
-        ``omega``.
+        Non-production golden anchor: production SOS scales moments through
+        ``Medium.delta_m_moments``.  See :func:`delta_m` for the
+        transformation and the meaning of ``tau`` and ``omega``.
         """
         mom = self.legendre_moments(wl_nm, int(n_moments) + 1)
         return delta_m(mom, n_moments, tau=tau, omega=omega)
-
-    # ``sos_inputs`` is the name used by the multiple-scattering solver: the
-    # returned object carries beta*, f, tau*, omega* and g*.
-    def sos_inputs(self, wl_nm, n_moments: int = 32, tau=None, omega=None) -> "DeltaMResult":
-        """Alias for :meth:`delta_m`; the result is what the SOS solver needs."""
-        return self.delta_m(wl_nm, n_moments, tau=tau, omega=omega)
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}({self.name})"
@@ -267,11 +260,6 @@ class PhaseTable:
 # ===========================================================================
 # Mie theory (compatibility helpers)
 # ===========================================================================
-def _log_normal_weights(r, r_g, sigma_g):
-    """Number density weights of a log-normal distribution (unnormalised)."""
-    return np.exp(-0.5 * (np.log(r / r_g) / np.log(sigma_g)) ** 2) / (r * np.log(sigma_g))
-
-
 def mie_single(x: float, m: complex, n_angles: int = 0):
     """Mie coefficients for a single sphere.
 
@@ -746,7 +734,8 @@ class MieAerosol(Aerosol):
         """``int p dOmega`` from the tabulated phase function [should be 4 pi]."""
         return self.phase_table(wl_nm).normalisation()
 
-    # -- named constructors kept for compatibility ---------------------------
+    # -- named constructors kept for compatibility (no production callers;
+    #    the named-library constructors below are the live API) ---------------
     @classmethod
     def water_soluble(cls, rh: float = 0.5):
         """Shettle & Fenn water-soluble aerosol with humidity growth."""
@@ -872,6 +861,12 @@ def delta_m(moments, n_moments: int | None = None, tau=None, omega=None) -> Delt
     forward delta function from the phase function and rescaling the optical
     depth and albedo keeps the *scattered* energy unchanged.  ``beta*_0 = 1``
     follows immediately from ``beta_0 = 1``.
+
+    Role note: this module-level implementation is **not on any production
+    path** -- production SOS scales moments through ``Medium.delta_m_moments``
+    and cloud decks through ``cloud.delta_m`` (three deliberately separate
+    implementations of the same Wiscombe transform; see each docstring).  It
+    is kept as a golden anchor for the tests.
 
     Parameters
     ----------

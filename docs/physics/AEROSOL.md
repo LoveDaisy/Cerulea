@@ -306,7 +306,6 @@ res.g_star      # (n_wl,), beta*_1
 
 # the same thing as a method
 res = aerosol.delta_m(wl, n_moments, tau=tau, omega=omega)
-res = aerosol.sos_inputs(wl, n_moments, tau=tau, omega=omega)  # alias
 ```
 
 `f` is clipped to `[0, 1-1e-12]` for numerical safety.  For every library
@@ -570,8 +569,8 @@ ssa = dust.ssa(wl)
 g = dust.asymmetry(wl)                      # analytic, in (-1, 1)
 beta = dust.legendre_moments(wl, 33)        # (33, 3), beta_0 = 1
 
-# delta-M inputs for the SOS solver
-res = dust.sos_inputs(wl, 32, tau=0.3, omega=ssa)
+# delta-M scaling (the SOS solver consumes this shape)
+res = dust.delta_m(wl, 32, tau=0.3, omega=ssa)
 res.beta, res.f, res.tau_star, res.omega_star, res.g_star
 ```
 
