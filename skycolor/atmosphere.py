@@ -234,8 +234,9 @@ class Atmosphere:
 
         ``presets`` is the single authority for named scenes; this alias,
         kept for the existing tests, forwards to ``clear`` (300 DU ozone,
-        0.05 AOD boundary layer).  Lazy import: ``presets`` imports this
-        module at load time.
+        0.05 AOD boundary layer).  It does not accept constructor keywords
+        outside ``clear``'s signature (``aod`` / ``ozone_du``).  Lazy
+        import: ``presets`` imports this module at load time.
         """
         from .presets import clear
 

@@ -28,6 +28,7 @@ FIG = THEME / "figures"      # theme-owned figure output (not the root candidate
 OUT = THEME / "out"          # theme-owned numeric output (gitignored)
 from skycolor import cloud, color, presets, render
 from skycolor.color import K_M
+from skycolor.constants import WL_DEFAULT
 from skycolor.rt.cloud import (delta_eddington, illuminate_cloud,
                                sky_radiance_with_cloud)
 from skycolor.rt.solver import sky_radiance_total
@@ -305,7 +306,7 @@ def figure_albedo(atmo):
     # noise, which is a sampling artefact and not part of the model.  Only the
     # cloud term is needed, so no multiple-scattering solve is involved.
     ax = axes[2]
-    wl1 = np.arange(380.0, 781.0, 1.0)
+    wl1 = WL_DEFAULT
     atmo1 = presets.clear(wl1)
     layer = cloud.get_preset("altostratus")
     for elev, col in [(20.0, "#444"), (0.5, "#999"), (-1.0, "tab:orange"), (-2.0, "tab:red")]:
