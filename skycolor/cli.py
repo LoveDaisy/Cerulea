@@ -13,6 +13,7 @@ path.
 from __future__ import annotations
 
 import argparse
+import inspect
 import sys
 
 import numpy as np
@@ -24,10 +25,11 @@ from .scene import resolve_sun
 def _build_atmo(args):
     wl = np.arange(args.wl_min, args.wl_max + 1e-9, args.wl_step)
     p = presets.PRESETS[args.preset]
-    try:
-        atmo = p(wl, aod=args.aod)
-    except TypeError:
-        atmo = p(wl)
+    # Presets without an aerosol load (e.g. pristine) take no ``aod``:
+    # dispatch on the signature instead of catching TypeError, so a real
+    # TypeError raised inside a preset is never swallowed into a retry.
+    kw = {"aod": args.aod} if "aod" in inspect.signature(p).parameters else {}
+    atmo = p(wl, **kw)
     if args.elevation:
         atmo = atmo.at_altitude(args.elevation)
     return atmo, wl
@@ -109,7 +111,9 @@ def main(argv=None):
 
     def common(p):
         p.add_argument("--preset", default="clear", choices=sorted(presets.PRESETS))
-        p.add_argument("--aod", type=float, default=0.1, help="aerosol optical depth at 550 nm")
+        p.add_argument("--aod", type=float, default=0.05,
+                       help="aerosol optical depth at 550 nm "
+                            "(default 0.05, matching preset clear)")
         p.add_argument("--elevation", type=float, default=0.0, help="observer altitude [km]")
         p.add_argument("--sun-elevation", type=float, default=None,
                        help="sun elevation [deg] (default 10 without --time)")

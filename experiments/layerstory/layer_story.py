@@ -27,6 +27,7 @@ import numpy as np
 from experiments.common import save
 from skycolor import cloud, color, presets, render
 from skycolor.atmosphere import AerosolLayer, Atmosphere, ExponentialProfile
+from skycolor.color import K_M
 from skycolor.aerosol import HinterlandAerosol, shared
 from skycolor.constants import WL_COARSE
 from skycolor.rt.result import SkyResult
@@ -221,7 +222,7 @@ def _plain(value):
 def quantities(radiance, wl):
     """Un-tonemapped XYZ, xy and photopic luminance [cd m^-2]."""
     xyz = color.spectrum_to_xyz(radiance, wl)
-    return xyz, color.chromaticity(xyz), 683.0 * xyz[..., 1]
+    return xyz, color.chromaticity(xyz), K_M * xyz[..., 1]
 
 
 def display_kwargs(spec):

@@ -14,6 +14,7 @@ import pathlib
 import numpy as np
 
 from skycolor import color
+from skycolor.color import K_M
 from skycolor.constants import WL_COARSE
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -61,7 +62,7 @@ def row(images, gap=4):
 
 def chromaticity_of(rad, wl=WL):
     xyz = color.spectrum_to_xyz(rad, wl)
-    return color.chromaticity(xyz), 683.0 * xyz[..., 1]
+    return color.chromaticity(xyz), K_M * xyz[..., 1]
 
 
 def panel_label(rgb, text, size=1):

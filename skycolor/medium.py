@@ -15,6 +15,13 @@ and :class:`skycolor.atmosphere.Atmosphere` is the facade pairing the two.
 Custom profiles enter as data at construction (``ozone_profile`` /
 ``no2_profile`` / ``air_profile`` callables); every processing method reads
 the medium's own profiles.
+
+Wavelength-grid convention: derived-coefficient methods take ``wl_nm=None``
+to reuse the grid cached at construction, and recompute when an explicit
+grid is passed.  The cached grid is one of the working grids of
+``skycolor.constants`` (``WL_DEFAULT`` / ``WL_COARSE``); consumers needing
+a different resolution pass it explicitly rather than re-deriving the
+constants.
 """
 from __future__ import annotations
 
@@ -28,6 +35,7 @@ from . import spectra
 from .constants import (
     DU,
     G0,
+    K_B,
     M_AIR,
     P0,
     R_EARTH,
@@ -86,7 +94,7 @@ def us76_pressure(z_km: np.ndarray) -> np.ndarray:
 
 def us76_number_density(z_km: np.ndarray) -> np.ndarray:
     """Dry-air number density [m^-3] from the US Standard Atmosphere."""
-    return us76_pressure(z_km) / (1.380649e-23 * us76_temperature(z_km))
+    return us76_pressure(z_km) / (K_B * us76_temperature(z_km))
 
 
 # ---------------------------------------------------------------------------
@@ -264,9 +272,9 @@ class Medium:
         pressure = self.pressure
         temperature = self.temperature
         z = np.asarray(z_km, dtype=float)
-        n = pressure(z) / (1.380649e-23 * temperature(z))
+        n = pressure(z) / (K_B * temperature(z))
         n0 = pressure(np.array(THERMOSPHERE_START_KM)) / (
-            1.380649e-23 * temperature(np.array(THERMOSPHERE_START_KM)))
+            K_B * temperature(np.array(THERMOSPHERE_START_KM)))
         tail = n0 * np.exp(-(z - THERMOSPHERE_START_KM) / THERMOSPHERE_SCALE_HEIGHT_KM)
         return np.where(z > THERMOSPHERE_START_KM, tail, n)
 

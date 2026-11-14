@@ -5,8 +5,9 @@ This is the **original single-scattering baseline**, recorded on
 scattering was still a stub. The five-check table and interpretation below
 retain that historical context; they are not the current harness output.
 
-The latest committed six-check [results.json](results.json) has **3 PASS /
-3 FAIL**; [STATUS.md](../docs/STATUS.md) explains the present limits.
+The latest committed six-check [results.json](results.json) carries the
+current snapshot; [STATUS.md](../docs/STATUS.md) is the single source for
+the PASS/FAIL counts and explains the present limits.
 [ADDENDUM.md](ADDENDUM.md) records subsequent changes, and
 [the documentation guide](../docs/README.md) maps the later independent audits.
 Reference sources are documented in [SOURCES.md](data/SOURCES.md).

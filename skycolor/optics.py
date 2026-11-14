@@ -17,8 +17,10 @@ stay bit-exact (equivalence criterion A of the task plan).
 The ``atmo`` argument is duck-typed: anything exposing ``n_air``/``n_o3``/
 ``n_no2``, ``aerosols`` (with ``aod550``/``profile``/``aerosol``) and the
 ``_sigma_*`` cross-section arrays works -- the frozen ``Medium`` is the
-canonical such object, and this module is the one place that reads those
-attributes.
+canonical such object, and this module is the primary reader of those
+attributes.  Two pre-existing direct readers of the ``_sigma_*`` arrays are
+sanctioned (``rt.single`` and ``rt.mc``); new backends should consume the
+column algebra here instead of adding a fourth reader.
 """
 from __future__ import annotations
 

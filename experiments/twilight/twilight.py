@@ -21,6 +21,7 @@ THEME = Path(__file__).resolve().parent          # experiments/<theme>
 FIG = THEME / "figures"      # theme-owned figure output (not the root candidates)
 OUT = THEME / "out"          # theme-owned numeric output (gitignored)
 from skycolor import color, presets, render
+from skycolor.color import K_M
 
 #: Clear-sky zenith luminance in the V band, from the empirical fit of
 #: Patat, Ugolnikov & Postylyakov (2006), A&A 455, 385 (the reference used in
@@ -48,7 +49,7 @@ def main(quick: bool = False):
         for az in hor_lum:
             j = np.argmin(abs(dome["azimuth_rel"] - az))
             k = np.argmin(abs(dome["zenith"] - 88.0))
-            hor_lum[az].append(683 * color.spectrum_to_xyz(
+            hor_lum[az].append(K_M * color.spectrum_to_xyz(
                 dome["radiance"][k, j], WL)[..., 1])
 
     fig, axes = plt.subplots(1, 2, figsize=(12.5, 4.8))

@@ -22,6 +22,11 @@ import numpy as np
 from . import spectra
 from .optics import contiguous_transpose as _cT
 
+#: Maximum luminous efficacy of monochromatic radiation at 555 nm, lm/W --
+#: 683 exactly, fixed by definition (SI, 1979).  Single authority for the
+#: photometric conversion; ``validation.common`` re-exports this value.
+K_M = 683.0
+
 
 # ---------------------------------------------------------------------------
 # colorimetry
