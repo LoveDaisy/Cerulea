@@ -17,12 +17,12 @@ uv sync        # 从 uv.lock 重建 .venv；不要 pip install 进环境
 ### 测试
 
 ```bash
-uv run pytest -q                      # 默认 = 快层 dev loop（387 项，~38-63s 窗载依赖，
+uv run pytest -q                      # 默认 = 快层 dev loop（389 项，~38-63s 窗载依赖，
                                       # 12-worker xdist / LPT（longest-processing-time
                                       # 优先调度）；slow 标记项被
                                       # 过滤，显式 -m/-k/::nodeid 退让）
 SKYCOLOR_FULL_SUITE=1 uv run pytest -q -n 12 --dist=loadgroup
-                                      # 全层验收入口（580 项全人口，零 skip）
+                                      # 全层验收入口（582 项全人口，零 skip）
 SKYCOLOR_FULL_SUITE=1 uv run pytest -n 0 -q tests/test_validation_harness.py
                                       # 结构测试串行诊断（env=1 全量含 slow 成员）
 uv run python -m validation.run_all   # 六项物理校验，单池 8 worker，实测约 4 min；

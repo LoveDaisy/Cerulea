@@ -50,7 +50,14 @@ class VerticalProfile:
         raise NotImplementedError
 
     def column(self, z0: float = 0.0, z1: float = np.inf) -> float:
-        """Fraction of the column between ``z0`` and ``z1`` (km)."""
+        """Fraction of the column between ``z0`` and ``z1`` (km).
+
+        Display/layer-splitting helper on its own 4000-point grid; the
+        absolute column normalisations live in ``Medium`` on two other,
+        separately pinned grids (``medium._column_normalisation`` and
+        ``medium._PROFILE_COLUMN_GRID``).  Three grids by design -- do not
+        unify.
+        """
         zz = np.linspace(max(z0, 0.0), min(z1, Z_TOA / 1e3), 4000)
         v = self(zz)
         return float(np.trapezoid(v, zz))

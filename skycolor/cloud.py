@@ -37,7 +37,10 @@ The routines below are a self-contained rewrite of the Mie scattering core in
 and with a per-size truncation of the Riccati-Bessel recurrences.  It is
 deliberately *not* imported from ``aerosol.py``: that module is on a separate
 evolution path, and a cloud model must not silently change when an aerosol
-model is refactored.
+model is refactored.  The size-parameter truncation criterion
+(``n_max = x + 4x^(1/3) + 2``, Bohren & Huffman 1983) is nevertheless shared
+with ``skycolor.mie``, and kernel agreement between the two implementations
+is pinned by ``tests/test_mie_kernel_crosscheck.py``.
 """
 from __future__ import annotations
 
@@ -362,6 +365,15 @@ def delta_m(tau, omega, g, f):
     Henyey-Greenstein phase function ``beta_l = g^l`` and ``f = g^2``, which is
     exactly the classical delta-Eddington scaling of Joseph, Wiscombe &
     Weinman (1976): the delta-M limit of a two-stream *is* delta-Eddington.
+
+    Split note: this is one of three deliberate implementations of the same
+    Wiscombe transform -- production SOS uses ``Medium.delta_m_moments``, the
+    aerosol module keeps a non-production golden anchor
+    (``skycolor.aerosol.delta_m``), and cloud decks use this one (the module
+    docstring above explains why the cloud core does not import the aerosol
+    machinery).  The clip ``f <= 0.999`` matches the medium site; the aerosol
+    anchor clips tighter.  Kernel agreement with ``skycolor.mie`` is pinned by
+    ``tests/test_mie_kernel_crosscheck.py``.
     """
     tau = np.asarray(tau, dtype=float)
     omega = np.asarray(omega, dtype=float)

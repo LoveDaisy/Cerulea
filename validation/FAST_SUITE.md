@@ -602,3 +602,28 @@ measured on the same quiet machine, an order of magnitude inside any
 historical line).  Future full-tier wall growth is tracked through
 per-test cost (~0.69 s/test) and the DEVELOPMENT.md weight-regeneration
 rule rather than a wall line.
+
+## Population and weights regen (2026-11-14, fork-guard)
+
+`chore-fork-guard` added `tests/test_mie_kernel_crosscheck.py` (one
+fast-tier test, serial cost 0.08 s, kernel-to-kernel contract anchor).
+Because `test_research_boundary` parametrizes over
+`sorted(TESTS_DIR.glob("test_*.py"))` at collection time, one added test
+file raises the population by **two** collected tests — verified by a
+stashed both-side collection diff.  Authority literals re-derived:
+**582 = 389 fast + 193 slow** (identity and slow mirror re-verified by the
+harness guards on the new listing).  The formal pair above remains the
+last certified acceptance evidence; no new full-tier pair was taken for a
++1-test population change — the regen below refreshes the scheduling
+table and doubles as the change's full-tier green evidence.
+
+Weights regen per the DEVELOPMENT.md maintenance rule (population change
+re-measures the full listing): full listing `582 passed` (440.20 s), fast
+listings 389 × 3 (30.9 / 30.9 / 31.6 s), `tools/make_scheduling_weights.py`
+wrote `tests/data/scheduling_weights.json`: 15 module groups, 271
+individual nodes, 4647.1 s total, `slow` mirror 193,
+**`fast_predicted_wall_s` 169.35**.  The predicted-sum drop from the
+recorded 249.7 tracks the input listings' quiet window (observed fast
+wall ~31 s today, below the 38-63 s window-loaded band), not a per-test
+cost regression.  AGENTS.md test-section literals synced to 389/582 in
+the same commit.
