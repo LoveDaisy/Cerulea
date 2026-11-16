@@ -367,10 +367,60 @@ def calibrate(task, workers, label):
             print(json.dumps(run["projection"]), flush=True)
 
 
+def resource_summary(path):
+    samples = [json.loads(line) for line in path.read_text().splitlines()]
+    good = [s for s in samples if "error" not in s]
+    if not good:
+        raise ValueError("no resource samples")
+    swaps = [float(re.search(r"used = ([\d.]+)M", s["swap"])[1]) for s in good]
+    pageouts = [int(re.search(r"Swapouts:\s+(\d+)", s["vm_stat"])[1]) for s in good]
+    # Existing swap is not itself pressure during the measurement. An increase
+    # or active swap-outs is: such a run cannot certify a usable configuration.
+    pressure = max(swaps) - min(swaps) > 1. or max(pageouts) > min(pageouts)
+    return dict(sample_count=len(good), errors=len(samples)-len(good),
+                rss_tree_peak_bytes=max(s["rss_tree_bytes"] for s in good),
+                swap_used_start_mb=swaps[0], swap_used_end_mb=swaps[-1],
+                swap_growth_mb=max(swaps)-min(swaps),
+                swapout_pages=max(pageouts)-min(pageouts),
+                load_min=min(s["load"][0] for s in good),
+                load_max=max(s["load"][0] for s in good),
+                memory_eligible=not pressure and len(good) == len(samples))
+
+
+def replay(task):
+    baseline = load(task / "baseline.json")
+    out = task / "reference-replay"
+    with budget(task, "reference-replay"):
+        out.mkdir(exist_ok=False)
+        # Only requests not present in the fixed calibration worklist need a
+        # new solve. Matching outputs from either run remain independent of the
+        # old reference and are checked against every original array below.
+        covered = {request_key(j["request"]) for j in worklist()}
+        jobs = [dict(id=f"reference-{r['id']:02d}", request=r["request"])
+                for r in baseline["references"] if request_key(r["request"]) not in covered]
+        with ProcessPoolExecutor(1, mp_context=multiprocessing.get_context("spawn")) as pool:
+            rows = pool.submit(worker, jobs, str(out)).result(timeout=1800)
+        dump(out / "replay.json", rows)
+    with budget(task, "tracemalloc-difficult"):
+        out = task / "memory-probe"
+        out.mkdir(exist_ok=False)
+        with ProcessPoolExecutor(1, mp_context=multiprocessing.get_context("spawn")) as pool:
+            rows = pool.submit(worker, [worklist()[0]], str(out), True).result(timeout=1800)
+        dump(out / "memory.json", rows)
+
+
 def verify(task):
     baseline = load(task / "baseline.json")
     runs = [load(path) for path in sorted(task.glob("*/run.json"))]
     candidates = [row for run in runs for row in run["records"]]
+    replay_path = task / "reference-replay/replay.json"
+    if replay_path.exists():
+        candidates += load(replay_path)
+    for row in candidates:
+        if sha(row["archive"]) != row["archive_sha256"]:
+            raise ValueError("changed output archive")
+        if archive_signature(row["archive"]) != row["arrays"]:
+            raise ValueError("changed output arrays")
     for run in runs:
         validate_run(run)
         for row in run["records"]:
@@ -389,8 +439,16 @@ def verify(task):
                 raise ValueError(f"reference byte difference: {ref['id']}")
             if row["effective"] != ref["effective"] or row["diagnostics"] != ref["diagnostics"]:
                 raise ValueError("reference metadata difference")
+    costs = []
+    for path in sorted(task.glob("*/run.json")):
+        run = load(path)
+        row = projection(run)
+        row["run"] = path.parent.name
+        row["resources"] = resource_summary(path.parent / "resources.jsonl")
+        row["adoptable"] = row["cost_eligible"] and row["resources"]["memory_eligible"]
+        costs.append(row)
     report = dict(status="VERIFIED" if not missing else "INCOMPLETE", missing_references=missing,
-                  projections=[projection(run) for run in runs])
+                  projections=costs, target_supported=any(r["adoptable"] for r in costs))
     dump(task / "cost-report.json", report)
     print(json.dumps(report, indent=2))
     return 2 if missing else 0
@@ -398,7 +456,7 @@ def verify(task):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("audit-baseline", "calibrate", "verify"))
+    parser.add_argument("action", choices=("audit-baseline", "calibrate", "replay", "verify"))
     parser.add_argument("--task-dir", required=True, type=Path)
     parser.add_argument("--reference-dir", type=Path)
     parser.add_argument("--workers", type=int, nargs="+", choices=(4, 6, 8), default=[4, 6, 8])
@@ -411,6 +469,8 @@ def main():
         audit(task, args.reference_dir.resolve())
     elif args.action == "calibrate":
         calibrate(task, args.workers, args.label)
+    elif args.action == "replay":
+        replay(task)
     else:
         with budget(task, "verify"):
             return verify(task)
