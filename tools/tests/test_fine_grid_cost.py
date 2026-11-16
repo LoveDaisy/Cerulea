@@ -1,4 +1,9 @@
-"""Cheap bookkeeping/byte-contract probes, without production dome solves."""
+"""Tool-local bookkeeping/byte contracts, without production dome solves.
+
+Run explicitly with ``uv run python -m pytest -n 0 tools/tests``. The default
+production suite intentionally cannot import tools (research boundary).
+kind: bookkeeping/contract; cost: five synthetic tests, 0.11 s combined.
+"""
 from copy import deepcopy
 import json
 
@@ -72,3 +77,55 @@ def test_byte_contract_and_budget_no_reset(tmp_path):
     with pytest.raises(ValueError, match="interrupted"):
         with cost.budget(tmp_path, "four"):
             pytest.fail("must reject before executing")
+
+
+def test_resource_pressure_and_completion_record(tmp_path, monkeypatch):
+    samples = [dict(swap="used = 10.00M", vm_stat="Swapouts: 100.",
+                    rss_tree_bytes=100, load=[4., 3., 2.]),
+               dict(swap="used = 9.00M", vm_stat="Swapouts: 100.",
+                    rss_tree_bytes=120, load=[5., 3., 2.])]
+    path = tmp_path / "resources.jsonl"
+    path.write_text("\n".join(json.dumps(s) for s in samples))
+    resources = cost.resource_summary(path)
+    assert resources["memory_eligible"]
+    assert resources["swap_growth_mb"] == 0
+    samples[1]["vm_stat"] = "Swapouts: 101."
+    path.write_text("\n".join(json.dumps(s) for s in samples))
+    assert not cost.resource_summary(path)["memory_eligible"]
+
+    archive = tmp_path / "state.npz"
+    np.savez(archive, single=np.array([1.]))
+    row = dict(archive=str(archive), archive_sha256=cost.sha(archive), pid=42,
+               request={"example": True}, arrays=cost.archive_signature(archive))
+    cost.dump(archive.with_suffix(".json"), row)
+    cost.dump(archive.with_suffix(".started.json"), dict(pid=42, request=row["request"]))
+    monkeypatch.setattr(cost, "check_arrays", lambda data: None)
+    cost.verify_record(row)
+    archive.with_suffix(".json").unlink()
+    with pytest.raises(FileNotFoundError):
+        cost.verify_record(row)
+    cost.dump(archive.with_suffix(".json"), row)
+    np.savez(archive, single=np.array([2.]))
+    with pytest.raises(ValueError, match="changed output archive"):
+        cost.verify_record(row)
+
+
+def test_portable_report_arithmetic_is_recomputed(tmp_path):
+    runs = [synthetic_run(p) for p in (4, 6, 8, 4, 6, 8)]
+    records = []
+    for run in runs:
+        row = cost.projection(run)
+        row.update(resources={"memory_eligible": True}, adoptable=row["cost_eligible"])
+        records.append(row)
+    ref = {k: runs[0]["records"][0][k] for k in ("request", "arrays", "effective", "diagnostics")}
+    data = dict(schema_version=1, runs=runs, references=[ref]*8, replay=[],
+                decision=dict(projections=records, target_supported=True),
+                compute_charged_s=10., audit_and_export_allowance_s=60.,
+                budget_ledger=[dict(elapsed_s=10.)])
+    path = tmp_path / "report.json"
+    cost.dump(path, data)
+    cost.recheck_report(path)
+    data["decision"]["projections"][0]["component_volumes"] = 96
+    cost.dump(path, data)
+    with pytest.raises(ValueError, match="projection arithmetic"):
+        cost.recheck_report(path)

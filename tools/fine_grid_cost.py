@@ -332,6 +332,29 @@ def projection(run):
                 cost_eligible=adopted <= 8*3600)
 
 
+def execute_bundles(bundles, out, timeout, instrumented=False):
+    start = time.perf_counter()
+    pool = ProcessPoolExecutor(len(bundles), mp_context=multiprocessing.get_context("spawn"))
+    try:
+        futures = [pool.submit(worker, bundle, str(out), instrumented) for bundle in bundles]
+        submitted_s = time.perf_counter() - start
+        rows = []
+        for future in futures:
+            left = timeout - (time.perf_counter() - start)
+            if left <= 0:
+                raise TimeoutError("cumulative compute budget expired")
+            rows.extend(future.result(timeout=left))
+        return rows, submitted_s
+    except BaseException:
+        # A Future timeout alone does not stop a process; a context manager's
+        # wait=True would otherwise silently run past the compute budget.
+        for process in pool._processes.values():
+            process.terminate()
+        raise
+    finally:
+        pool.shutdown(wait=True, cancel_futures=True)
+
+
 def calibrate(task, workers, label):
     baseline = load(task / "baseline.json")
     current = identity()
@@ -346,19 +369,7 @@ def calibrate(task, workers, label):
             bundles = [jobs[i::p] for i in range(p)]
             start = time.perf_counter()
             with Sampler(out / "resources.jsonl"):
-                pool = ProcessPoolExecutor(p, mp_context=multiprocessing.get_context("spawn"))
-                try:
-                    futures = [pool.submit(worker, bundle, str(out)) for bundle in bundles]
-                    submitted_s = time.perf_counter() - start
-                    rows = []
-                    for future in futures:
-                        rows.extend(future.result(timeout=max(1., remaining-(time.perf_counter()-start))))
-                except BaseException:
-                    for process in pool._processes.values():
-                        process.terminate()
-                    raise
-                finally:
-                    pool.shutdown(wait=True, cancel_futures=True)
+                rows, submitted_s = execute_bundles(bundles, out, remaining)
             run = dict(workers=p, identity=current, records=rows, startup_s=submitted_s,
                        pool_wall_s=time.perf_counter()-start)
             validate_run(run)
@@ -380,7 +391,7 @@ def resource_summary(path):
     return dict(sample_count=len(good), errors=len(samples)-len(good),
                 rss_tree_peak_bytes=max(s["rss_tree_bytes"] for s in good),
                 swap_used_start_mb=swaps[0], swap_used_end_mb=swaps[-1],
-                swap_growth_mb=max(swaps)-min(swaps),
+                swap_growth_mb=max(0., max(swaps)-swaps[0]),
                 swapout_pages=max(pageouts)-min(pageouts),
                 load_min=min(s["load"][0] for s in good),
                 load_max=max(s["load"][0] for s in good),
@@ -390,7 +401,7 @@ def resource_summary(path):
 def replay(task):
     baseline = load(task / "baseline.json")
     out = task / "reference-replay"
-    with budget(task, "reference-replay"):
+    with budget(task, "reference-replay") as remaining:
         out.mkdir(exist_ok=False)
         # Only requests not present in the fixed calibration worklist need a
         # new solve. Matching outputs from either run remain independent of the
@@ -398,38 +409,53 @@ def replay(task):
         covered = {request_key(j["request"]) for j in worklist()}
         jobs = [dict(id=f"reference-{r['id']:02d}", request=r["request"])
                 for r in baseline["references"] if request_key(r["request"]) not in covered]
-        with ProcessPoolExecutor(1, mp_context=multiprocessing.get_context("spawn")) as pool:
-            rows = pool.submit(worker, jobs, str(out)).result(timeout=1800)
+        rows, _ = execute_bundles([jobs], out, min(1800., remaining))
         dump(out / "replay.json", rows)
-    with budget(task, "tracemalloc-difficult"):
+    with budget(task, "tracemalloc-difficult") as remaining:
         out = task / "memory-probe"
         out.mkdir(exist_ok=False)
-        with ProcessPoolExecutor(1, mp_context=multiprocessing.get_context("spawn")) as pool:
-            rows = pool.submit(worker, [worklist()[0]], str(out), True).result(timeout=1800)
+        rows, _ = execute_bundles([[worklist()[0]]], out, min(1800., remaining), True)
         dump(out / "memory.json", rows)
+
+
+def verify_record(row):
+    archive = Path(row["archive"])
+    record_path = archive.with_suffix(".json")
+    started = load(archive.with_suffix(".started.json"))
+    if load(record_path) != row or started["request"] != row["request"]:
+        raise ValueError("incomplete or mismatched completion record")
+    if started["pid"] != row["pid"]:
+        raise ValueError("completion worker differs from start record")
+    if sha(archive) != row["archive_sha256"]:
+        raise ValueError("changed output archive")
+    with np.load(archive, allow_pickle=False) as data:
+        check_arrays(data)
+    if archive_signature(archive) != row["arrays"]:
+        raise ValueError("changed output arrays")
 
 
 def verify(task):
     baseline = load(task / "baseline.json")
+    current = identity()
+    for key in ("production_sha256", "uv_lock_sha256", "results_sha256"):
+        if current[key] != baseline["identity"][key]:
+            raise ValueError(f"final production identity differs from baseline: {key}")
     runs = [load(path) for path in sorted(task.glob("*/run.json"))]
     candidates = [row for run in runs for row in run["records"]]
     replay_path = task / "reference-replay/replay.json"
     if replay_path.exists():
         candidates += load(replay_path)
     for row in candidates:
-        if sha(row["archive"]) != row["archive_sha256"]:
-            raise ValueError("changed output archive")
-        if archive_signature(row["archive"]) != row["arrays"]:
-            raise ValueError("changed output arrays")
+        verify_record(row)
     for run in runs:
         validate_run(run)
-        for row in run["records"]:
-            if sha(row["archive"]) != row["archive_sha256"]:
-                raise ValueError("changed output archive")
-            if archive_signature(row["archive"]) != row["arrays"]:
-                raise ValueError("changed output arrays")
+        for key in ("production_sha256", "uv_lock_sha256", "results_sha256"):
+            if run["identity"][key] != baseline["identity"][key]:
+                raise ValueError("run from a different production tree")
     missing = []
     for ref in baseline["references"]:
+        if sha(ref["archive"]) != ref["archive_sha256"]:
+            raise ValueError("reference archive changed since baseline audit")
         matching = [r for r in candidates if request_key(r["request"]) == request_key(ref["request"])]
         if not matching:
             missing.append(ref["id"])
@@ -440,40 +466,158 @@ def verify(task):
             if row["effective"] != ref["effective"] or row["diagnostics"] != ref["diagnostics"]:
                 raise ValueError("reference metadata difference")
     costs = []
+    memory_path = task / "memory-probe/memory.json"
+    if memory_path.exists():
+        for row in load(memory_path):
+            verify_record(row)
+            repeat = next(r for r in candidates if r["id"] == "repeat-00")
+            if row["arrays"] != repeat["arrays"]:
+                raise ValueError("instrumented output differs from timing output")
     for path in sorted(task.glob("*/run.json")):
         run = load(path)
+        starts = {}
+        for r in run["records"]:
+            epoch = load(path.parent / f"{r['id']}.started.json")["epoch"]
+            starts[r["pid"]] = min(starts.get(r["pid"], epoch), epoch)
+        entry = next(e for e in load(task / "budget.json") if e["label"] == path.parent.name)
+        # The budget starts before the pool: this includes import/spawn latency,
+        # unlike the legacy startup_s field, which only measured submission.
+        run["startup_s"] = max(starts.values()) - entry["started_epoch"]
         row = projection(run)
+        row["startup_bound_s"] = run["startup_s"]
         row["run"] = path.parent.name
         row["resources"] = resource_summary(path.parent / "resources.jsonl")
         row["adoptable"] = row["cost_eligible"] and row["resources"]["memory_eligible"]
         costs.append(row)
-    report = dict(status="VERIFIED" if not missing else "INCOMPLETE", missing_references=missing,
-                  projections=costs, target_supported=any(r["adoptable"] for r in costs))
+    supported = not missing and any(r["adoptable"] for r in costs)
+    report = dict(status=("INCOMPLETE" if missing else
+                          "COST_GATE_PASSED" if supported else "COST_GATE_FAILED"),
+                  evidence_status="INCOMPLETE" if missing else "VERIFIED",
+                  missing_references=missing, projections=costs, target_supported=supported)
     dump(task / "cost-report.json", report)
     print(json.dumps(report, indent=2))
-    return 2 if missing else 0
+    return 2 if missing else 0 if supported else 3
+
+
+def public_report(task):
+    """Small portable arithmetic/identity ledger, not a substitute for raw NPZ."""
+    baseline = load(task / "baseline.json")
+    costs = load(task / "cost-report.json")
+    runs = []
+    for cost in costs["projections"]:
+        original = load(task / cost["run"] / "run.json")
+        original["startup_s"] = cost["startup_bound_s"]
+        for row in original["records"]:
+            row["archive"] = str(Path(row["archive"]).relative_to(task))
+        original["identity"] = {k: original["identity"][k] for k in (
+            "head", "production_sha256", "uv_lock_sha256", "results_sha256", "thread_env")}
+        runs.append(original)
+    for row in baseline["references"]:
+        row["archive"] = ("m1-first-scene/scene.npz" if row["id"] == 0 else
+                          "m1-spectral/" + Path(row["archive"]).name)
+    ident = baseline["identity"]
+    ident = {k: ident[k] for k in ("head", "production_sha256", "uv_lock_sha256",
+                                  "results_sha256", "python", "numpy", "machine",
+                                  "cpu_count", "hardware", "thread_env")}
+    ledger = load(task / "budget.json")
+    if any(e["status"] == "RUNNING" for e in ledger):
+        raise ValueError("budget not settled before export")
+    candidates = {}
+    for name in ("candidate-1-micro", "candidate-2-micro"):
+        path = task / f"{name}.json"
+        if path.exists():
+            candidates[name] = load(path)
+    for name in ("candidate-1-before", "candidate-1-after"):
+        path = task / name / "probe.json"
+        if path.exists():
+            data = load(path)
+            candidates[name] = dict(pool_wall_s=data["pool_wall_s"],
+                                    production_sha256=data["identity"]["production_sha256"],
+                                    resources=resource_summary(path.parent / "resources.jsonl"),
+                                    records=[{k: r[k] for k in ("id", "request", "complete_s",
+                                              "solve_s", "arrays")} for r in data["records"]])
+    replay_rows = load(task / "reference-replay/replay.json")
+    for row in replay_rows:
+        row["archive"] = str(Path(row["archive"]).relative_to(task))
+    return dict(schema_version=1, identity=ident, decision=costs, runs=runs,
+                verifier_sha256=sha(Path(__file__)),
+                references=baseline["references"], replay=replay_rows,
+                memory_probe={k: load(task / "memory-probe/memory.json")[0][k] for k in (
+                    "request", "solve_s", "tracemalloc_peak_bytes", "instrumented")},
+                budget_ledger=ledger,
+                compute_charged_s=sum(e["elapsed_s"] for e in ledger),
+                audit_and_export_allowance_s=60., candidates=candidates,
+                raw_location="scratchpad/task-fine-grid-solve-cost (ignored, local only)",
+                evidence_limit="Recheck verifies recorded arithmetic/signatures; full verify needs raw NPZ.")
+
+
+def recheck_report(path):
+    data = load(path)
+    if (data["schema_version"] != 1 or len(data["runs"]) != 6
+            or len(data["references"]) != 8
+            or sorted(r["workers"] for r in data["runs"]) != [4, 4, 6, 6, 8, 8]):
+        raise ValueError("incomplete published calibration")
+    for run, recorded in zip(data["runs"], data["decision"]["projections"]):
+        recomputed = projection(run)
+        if any(recorded.get(k) != v for k, v in recomputed.items()):
+            raise ValueError("published projection arithmetic differs")
+        if recorded["adoptable"] != (recomputed["cost_eligible"]
+                                      and recorded["resources"]["memory_eligible"]):
+            raise ValueError("published adoptability differs")
+    supported = any(r["adoptable"] for r in data["decision"]["projections"])
+    if data["decision"]["target_supported"] != supported:
+        raise ValueError("published target decision differs")
+    rows = [r for run in data["runs"] for r in run["records"]] + data["replay"]
+    for ref in data["references"]:
+        matches = [r for r in rows if request_key(r["request"]) == request_key(ref["request"])]
+        if not matches or any(any(r["arrays"].get(k) != v for k, v in ref["arrays"].items())
+                              or r["effective"] != ref["effective"]
+                              or r["diagnostics"] != ref["diagnostics"] for r in matches):
+            raise ValueError("published reference signature mismatch")
+    if data["compute_charged_s"] != sum(e["elapsed_s"] for e in data["budget_ledger"]):
+        raise ValueError("published budget differs")
+    if data["compute_charged_s"] + data["audit_and_export_allowance_s"] > BUDGET_S:
+        raise ValueError("budget exceeded")
+    print(json.dumps(dict(status="RECORDED_EVIDENCE_RECHECKED",
+                          target_supported=data["decision"]["target_supported"],
+                          scope="recorded arithmetic and signatures, NOT new physical verification")))
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("audit-baseline", "calibrate", "replay", "verify"))
-    parser.add_argument("--task-dir", required=True, type=Path)
+    parser.add_argument("action", choices=("audit-baseline", "calibrate", "replay", "verify",
+                                            "recheck-report"))
+    parser.add_argument("--task-dir", type=Path)
+    parser.add_argument("--report-out", type=Path)
+    parser.add_argument("--report", type=Path)
     parser.add_argument("--reference-dir", type=Path)
     parser.add_argument("--workers", type=int, nargs="+", choices=(4, 6, 8), default=[4, 6, 8])
     parser.add_argument("--label", default="parallel")
     args = parser.parse_args()
+    if args.action == "recheck-report":
+        if args.report is None:
+            parser.error("recheck-report requires --report")
+        recheck_report(args.report)
+        return 0
+    if args.task_dir is None:
+        parser.error("this action requires --task-dir")
     task = args.task_dir.resolve()
     if args.action == "audit-baseline":
         if args.reference_dir is None:
             parser.error("audit-baseline requires --reference-dir")
-        audit(task, args.reference_dir.resolve())
+        task.mkdir(parents=True, exist_ok=True)
+        with budget(task, "audit-baseline"):
+            audit(task, args.reference_dir.resolve())
     elif args.action == "calibrate":
         calibrate(task, args.workers, args.label)
     elif args.action == "replay":
         replay(task)
     else:
         with budget(task, "verify"):
-            return verify(task)
+            code = verify(task)
+        if args.report_out is not None:
+            dump(args.report_out, public_report(task))
+        return code
     return 0
 
 
