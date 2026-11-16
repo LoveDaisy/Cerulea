@@ -233,11 +233,21 @@ Full `verify` needs raw data. Exit **0** means evidence and cost admission pass;
 failed cost admission; invalid/missing files or mismatches fail nonzero. The
 present experiment returns **3**, explicitly `target_supported=false`.
 
-## Owner handoff — unresolved, not demo re-entry
+## Owner handoff — evidence delivered, not demo re-entry
 
-The implementation phase must remain **BLOCKED**, not DONE. The owner can
-commission a separately bounded performance direction with a new explicit
-acceptance boundary, or revisit the demo's cost/grid/generation contract; neither
-is authorized by this report. The demo's own ≤2-worker / 16-worker-hour limit
-is unchanged. Testing 4/6/8 workers here does not amend that authorization.
-There is no resume sidecar, demo-state update, full scan, merge, push or release.
+The owner adjudicated the implementation dispute on 2026-11-16 (local task
+`issue.md`, owner decision): close this task as **evidence delivered, target
+unsupported**, then proceed through code review and closeout. Phase DONE records
+completion of the evidence delivery, **not cost admission**:
+`evidence_status=VERIFIED`, `COST_GATE_FAILED`, and `target_supported=false`
+remain unchanged. The conditional zero-production-change success clause never
+triggered: even the eight-worker projection is 37.09h > 8h. This supersedes the
+earlier BLOCKED disposition, not the measurements or their uncertainty.
+
+Both follow-up options—a newly bounded single-source performance direction and
+a revised demo generation strategy—are handed to the demo owner and author for
+adjudication; neither is implementation work authorized here. The demo's own
+≤2-worker / 16-worker-hour limit is unchanged. Testing 4/6/8 workers here does
+not amend that authorization. Production remains byte-identical to the baseline.
+This task writes no demo resume sidecar or demo-state update, and performs no
+full scan, merge, push or release.
