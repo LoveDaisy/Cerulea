@@ -76,7 +76,8 @@ uv run python -m experiments.approximations.compare
   `render.py`、`presets.py`、`data/`。
 - **外围**：`validation/`（check1..6 + common.py）、`experiments/`（现象主题 +
   cssp/retired）、`tests/`、`docs/`、`tools/`（build_data / perf_bench /
-  make_scheduling_weights / make_mie_anchor_arrays 窄维护）、`figures/`、
+  make_scheduling_weights / make_mie_anchor_arrays / fine_grid_cost 窄维护；
+  `tools/tests/` 显式工具合同测试，不进默认生产套件）、`figures/`、
   `data_raw/`（数据源文件，`skycolor/data/SOURCES.md` 逐一定向）、
   `scratchpad/`（本地任务管理，gitignore）。
 
