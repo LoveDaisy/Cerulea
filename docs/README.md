@@ -31,6 +31,7 @@ Setup and run commands live in [the project README](../README.md) and
 | [ADDENDUM.md](../validation/ADDENDUM.md) | Chronological changes and locally marked superseded interpretations |
 | [SECOND_DATASET.md](../validation/SECOND_DATASET.md) | Koomen transcription and historical model comparisons, with current audit pointers |
 | [FAST_SUITE.md](../validation/FAST_SUITE.md) | Two-tier suite ledger: tier design, measured shapes, scheduling weights and acceptance pairs |
+| [Fine-grid solve cost](performance/FINE_GRID_SOLVE_COST.md) | 4/6/8-worker production-chain calibration, byte checks and failed ≤8h admission; no retained production optimization |
 | [RULER_AUDIT.md](../validation/RULER_AUDIT.md) | Adjudication matrix for the physical checks: which FAILs are contract gaps vs measurement questions |
 
 Current summaries carry conclusions and links. Topic reports own methods,
