@@ -376,7 +376,7 @@ def resource_summary(path):
     pageouts = [int(re.search(r"Swapouts:\s+(\d+)", s["vm_stat"])[1]) for s in good]
     # Existing swap is not itself pressure during the measurement. An increase
     # or active swap-outs is: such a run cannot certify a usable configuration.
-    pressure = max(swaps) - min(swaps) > 1. or max(pageouts) > min(pageouts)
+    pressure = max(swaps) - swaps[0] > 1. or max(pageouts) > min(pageouts)
     return dict(sample_count=len(good), errors=len(samples)-len(good),
                 rss_tree_peak_bytes=max(s["rss_tree_bytes"] for s in good),
                 swap_used_start_mb=swaps[0], swap_used_end_mb=swaps[-1],
