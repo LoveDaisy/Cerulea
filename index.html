@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light"><meta name="description" content="从太阳光谱与大气散射出发，连续探索天空的颜色。离线预计算、浏览器现场重建。">
+<title>Cerulea 天空取景器</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%23243b68' d='M0 0h32v32H0z'/%3E%3Cpath fill='%23bad5ec' d='M0 20Q16 6 32 20v12H0z'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css"><script type="module" src="app.js"></script>
+</head>
+<body>
+<header><a class="wordmark" href="./" aria-label="Cerulea 天空取景器首页">Cerulea<span>天空取景器</span></a><a href="#about">这片天空从何而来</a></header>
+<main>
+<section class="viewer" aria-label="交互天空">
+  <div class="sky-frame"><canvas id="sky" tabindex="0" aria-label="天空视图，拖动或使用方向键改变视角，加减键缩放"></canvas>
+    <div class="view-caption"><h1>光穿过大气，<br>成为天空的颜色。</h1><p id="rendered">正在准备天空，尚未呈现</p></div>
+    <div class="view-tools"><button id="faceSun" type="button">面向太阳方向</button><button id="fullscreen" type="button">全屏</button></div>
+    <span class="horizon-note">地平线以下不绘制地景</span>
+  </div>
+  <div class="status-line"><p id="status" role="status" aria-live="polite">正在读取天空数据…</p><button id="retry" type="button" hidden>重试加载</button></div>
+  <div class="controls">
+    <div class="control"><label for="height">太阳高度 <output id="heightValue">3.00°</output></label><input id="height" type="range" min="-6" max="90" step="any" value="3"><div class="endpoints"><span>暮光 −6°</span><span>天顶 90°</span></div></div>
+    <div class="control"><label for="aod">气溶胶 <output id="aodValue">0.0500</output></label><input id="aod" type="range" min="0" max="0.3" step="any" value="0.05"><div class="endpoints"><span>洁净 0</span><span>AOD550 0.3</span></div></div>
+    <div class="control ozone"><label for="ozone">臭氧柱量</label><select id="ozone"><option value="300">有臭氧 · 300 DU</option><option value="0">无臭氧 · 0 DU</option></select><p>其余大气条件保持一致</p></div>
+  </div>
+  <details class="view-settings"><summary>视角与曝光 <span>拖动天空转向，滚轮缩放</span></summary><div class="settings-grid">
+    <div class="control"><label for="yaw">相对太阳方位 <output id="yawValue">0°</output></label><input id="yaw" type="range" min="-180" max="180" step="0.1" value="0"></div>
+    <div class="control"><label for="pitch">仰角 <output id="pitchValue">12°</output></label><input id="pitch" type="range" min="-20" max="90" step="0.1" value="12"></div>
+    <div class="control"><label for="fov">水平视野 <output id="fovValue">100°</output></label><input id="fov" type="range" min="30" max="120" step="0.1" value="100"></div>
+    <div class="control"><label for="exposureMode">曝光方式</label><select id="exposureMode"><option value="auto">场景自动（不随视角变化）</option><option value="fixed">固定基准（倍率 1）</option></select></div>
+    <div class="control"><label for="ev">曝光补偿 <output id="evValue">0 EV</output></label><input id="ev" type="range" min="-4" max="4" step="0.1" value="0"></div>
+  </div><p class="hint">方位 0° 面向太阳，±180° 背向太阳。太阳高度是折射前的几何输入。自动曝光会使暮光显亮；切换固定基准可比较绝对亮度趋势。显示使用无色适应、保色度 ACES 与 sRGB。</p></details>
+</section>
+<section id="about" class="about"><div><h2>不是天空照片。<br>也不是调好的渐变。</h2><p>太阳光谱进入大气后，被空气分子和气溶胶散射，也被臭氧吸收。这个取景器展示项目物理模型算出的总天空光，再将光谱转换为屏幕颜色。</p><p>大气预先求解，角度与参数在浏览器中连续重建。页面不运行 Python 服务，不需要下载光谱原始档案，也不依赖外部 CDN。</p></div><div class="boundaries"><h3>把边界留在画面旁</h3><p>当前是海平面、晴空大陆背景气溶胶，太阳 −6° 至 90°，AOD550 为 0 至 0.3。臭氧只切换 0 / 300 DU，不代表连续臭氧模型。</p><p>一次散射使用球面几何与有限太阳源；多次散射为平面平行 SOS 近似。模型已有物理校验仍存在不通过项。紧凑编码与重建在暮光、近地平线和太阳邻域留有局部误差；本页不是精度认证。观感已由作者视觉终验确认（2026-11-18），这不替代精度认证。</p><p>有限太阳盘参与照明，但画面<strong>不绘制直射太阳盘</strong>。不包含地景、云、高站、深暮光 Monte Carlo 或其他气溶胶。黑暗下半球不是模拟出的地面。</p><p><a href="guide.html">方法、验证边界与设备检查</a></p><p id="dataInfo" class="data-info">数据身份将在清单加载后显示。</p></div></section>
+</main><footer><span>Cerulea · 光谱天空颜色模拟</span><span>浏览器 WebGL2 / 原生 deflate 解压</span></footer>
+<noscript><p>此取景器需要 JavaScript、WebGL2 和 DecompressionStream。请启用 JavaScript，或阅读项目方法说明。</p></noscript>
+</body></html>
